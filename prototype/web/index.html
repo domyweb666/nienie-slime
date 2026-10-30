@@ -1,0 +1,332 @@
+<title>捏捏史萊姆動畫版</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+/* Layout: a flat, sunny little field drawn on canvas with the slime in the middle; chunky cartoon chips float top and bottom. One deliberate light look. */
+:root{
+  --sky:#CDEBFA; --ink:#2E3A2A; --ink-soft:#5E7458; --chip:#FFFFFF; --chip-line:#2E3A2A;
+  --chip-on:#2E3A2A; --chip-on-ink:#FFFFFF; --scrim:rgba(30,45,30,.6);
+  --display:"Mochiy Pop One","Zen Maru Gothic","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+  --ui:"Zen Maru Gothic","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{background:var(--sky);color:var(--ink);font-family:var(--ui)}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.bar{position:fixed;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar>*{pointer-events:auto}
+.top{top:0;padding-top:calc(env(safe-area-inset-top,0px) + 14px)}
+.bottom{bottom:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}
+.brand{display:flex;align-items:baseline;gap:6px;pointer-events:none;-webkit-user-select:none;user-select:none}
+.brand b{font-family:var(--display);font-weight:400;font-size:26px;letter-spacing:.04em}
+.brand span{font-size:13px;font-weight:700;color:var(--ink-soft);letter-spacing:.14em}
+button{font-family:var(--ui);touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer;color:var(--ink)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.round{width:46px;height:46px;border-radius:50%;border:2.5px solid var(--chip-line);background:var(--chip);display:grid;place-items:center;flex:none;padding:0;box-shadow:0 3px 0 var(--chip-line)}
+.round:active{transform:translateY(2px);box-shadow:0 1px 0 var(--chip-line)}
+.round svg{width:22px;height:22px}
+.group{display:flex;align-items:center;gap:8px;min-width:0}
+.mats{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--chip);border:2.5px solid var(--chip-line);box-shadow:0 3px 0 var(--chip-line);min-width:0}
+.mats button{border:0;background:transparent;border-radius:999px;padding:8px 11px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.mats button i{width:12px;height:12px;border-radius:50%;display:block;border:2px solid var(--chip-line)}
+.mats button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+.mats button[aria-pressed="true"] i{border-color:#fff}
+.cam{width:60px;height:60px}.cam svg{width:28px;height:28px}
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);
+  padding:8px 16px;border-radius:999px;background:#fff;border:2.5px solid var(--chip-line);font-size:14px;font-weight:700;
+  white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis;transition:opacity .6s;pointer-events:none}
+.hint.off{opacity:0}
+.flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.go{animation:fl .45s ease-out}@keyframes fl{0%{opacity:.85}100%{opacity:0}}
+.photo{position:fixed;inset:0;background:var(--scrim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:calc(env(safe-area-inset-top,0px) + 24px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px))}
+.photo img{max-width:100%;max-height:68vh;border-radius:20px;border:6px solid #fff;box-shadow:0 18px 50px rgba(0,0,0,.35);-webkit-touch-callout:default;transform:rotate(-1.5deg)}
+.photo p{margin:0;color:#fff;font-size:14px;font-weight:700;text-align:center}
+.photo button{border:2.5px solid var(--chip-line);border-radius:999px;padding:11px 26px;font-size:15px;font-weight:700;background:#fff}
+.tune{max-height:calc(100vh - 200px);overflow:auto;position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:#fff;border:2.5px solid var(--chip-line);border-radius:22px;box-shadow:0 4px 0 var(--chip-line);
+  padding:12px 16px 14px;display:flex;flex-direction:column;gap:8px;max-width:460px;margin:0 auto}
+.tune-head{display:flex;justify-content:space-between;align-items:baseline}
+.tune-head b{font-family:var(--display);font-weight:400;font-size:17px}.tune-head span{font-size:13px;font-weight:700;color:var(--ink-soft)}
+.tune label{display:grid;grid-template-columns:1fr auto;grid-template-areas:"name val" "hint hint" "range range";column-gap:8px;font-size:14px;font-weight:700}
+.tune small{grid-area:hint;font-size:11.5px;font-weight:500;color:var(--ink-soft)}
+.tune input{grid-area:range;width:100%;accent-color:#2E3A2A;margin:2px 0 0}
+.tune output{grid-area:val;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-soft)}
+.tune-actions{display:flex;gap:8px}
+.sstyle{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700}
+.sstyle span{margin-right:auto}
+.sstyle button{border:2px solid var(--chip-line);border-radius:999px;background:#fff;padding:6px 12px;font-size:13px;font-weight:700}
+.sstyle button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+.tune-actions button{flex:1;border:2.5px solid var(--chip-line);border-radius:999px;background:#fff;padding:8px;font-size:14px;font-weight:700}
+.tune-actions button:first-child{background:var(--chip-on);color:var(--chip-on-ink)}
+.tune textarea{width:100%;box-sizing:border-box;font:12px ui-monospace,Menlo,monospace;border:1.5px solid #c9d3c4;border-radius:10px;padding:6px 8px;resize:none;color:var(--ink)}
+@media (prefers-reduced-motion: reduce){.flash.go{animation:none}.hint{transition:none}}
+@media (max-width:380px){.mats button{padding:8px 8px;font-size:13px}.mats button i{display:none}}
+</style>
+
+<canvas id="c" aria-label="史萊姆，可以揉、拉長、拉斷、推回去"></canvas>
+
+<div class="bar top">
+  <div class="brand"><b>捏捏</b><span>史萊姆</span></div>
+  <div class="group">
+  <button class="round" id="tbtn" aria-label="調手感" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.2" fill="#fff"/><circle cx="15" cy="12" r="2.2" fill="#fff"/><circle cx="8" cy="18" r="2.2" fill="#fff"/></svg>
+  </button>
+  <button class="round" id="sound" aria-label="關閉聲音" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w1" d="M15.5 9a4 4 0 0 1 0 6"/><path class="w2" d="M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5" hidden/></svg>
+  </button>
+  </div>
+</div>
+
+<div class="hint" id="hint">抓住拉・按住壓・從旁邊推</div>
+
+<div class="bar bottom">
+  <div class="group">
+    <div class="mats" role="group" aria-label="史萊姆手感">
+      <button id="m-bouncy" aria-pressed="false"><i style="background:#7FE0C2"></i>Q彈</button>
+      <button id="m-mochi" aria-pressed="true"><i style="background:#C9B6FF"></i>麻糬</button>
+      <button id="m-clay" aria-pressed="false"><i style="background:#FFD86B"></i>黏土</button>
+    </div>
+    <button class="round" id="reset" aria-label="揉回原形">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="tune" id="tune" hidden>
+  <div class="tune-head"><b>調手感</b><span id="tune-mat">麻糬</span></div>
+  <div class="sstyle" role="group" aria-label="音效風格"><span>音效</span><button data-s="wet" aria-pressed="true">濕黏</button><button data-s="soft" aria-pressed="false">柔軟</button><button data-s="quiet" aria-pressed="false">安靜</button></div>
+  <div id="tune-body" style="display:flex;flex-direction:column;gap:8px"></div>
+  <div class="tune-actions"><button id="t-copy">複製數值</button><button id="t-default">恢復預設</button></div>
+  <textarea id="t-out" readonly rows="3" aria-label="目前的手感數值"></textarea>
+</div>
+
+
+<script>
+(()=>{
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR,R,GROUND,CX,CY;
+
+/* ---- feel parameters (same names as 參數表) ---- */
+const DEF={
+  bouncy:{response:.28,damping:.42,lag:.04,maxPull:1.5,neck:.55,press:.3,creep:.25,yield:.3,recover:.6,pitch:1.12,
+    base:'#7FE0C2',shade:'#4FB99E',line:'#2B6E61',light:'#E9FFF7'},
+  mochi:{response:.42,damping:.6,lag:.08,maxPull:1.7,neck:.6,press:.38,creep:1.2,yield:.12,recover:.12,pitch:.98,
+    base:'#C9B6FF',shade:'#9E86E6',line:'#4E3C8F',light:'#FAF6FF'},
+  clay:{response:.55,damping:.85,lag:.12,maxPull:1.9,neck:.65,press:.42,creep:4,yield:.04,recover:0,pitch:.86,
+    base:'#FFD86B',shade:'#EDB23C',line:'#8A5A12',light:'#FFF8DC'}
+};
+const MATS={};for(const k in DEF)MATS[k]={...DEF[k]};
+let mat=MATS.mochi;
+
+/* ---- rig: 18 control points around the body, each a spring ---- */
+const K=18;
+const ang=new Float64Array(K),r0=new Float64Array(K);           // rest angle and radius
+const ox=new Float64Array(K),oy=new Float64Array(K);            // current offset from rest
+const vx=new Float64Array(K),vy=new Float64Array(K);
+const mx=new Float64Array(K),my=new Float64Array(K);            // remembered (molded) offset
+const tx=new Float64Array(K),ty=new Float64Array(K),tw=new Float64Array(K); // target from fingers
+let sq=0,sqv=0; // whole-body squash spring (positive = flatter)
+function restR(a){const c=Math.cos(a),s=Math.sin(a),ry=s<0?R:R*.72;
+  return (1/Math.sqrt((c/(R*1.1))**2+(s/ry)**2))*(1+.2*Math.exp(-(((a+Math.PI/2)/.32)**2)))}
+function setup(){
+  DPR=Math.min(devicePixelRatio||1,3);W=innerWidth;H=innerHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);
+  R=Math.max(70,Math.min(W*.3,H*.17,190));GROUND=Math.min(H*.64,H-140);CX=W/2;
+  for(let k=0;k<K;k++){ang[k]=-Math.PI/2+k/K*Math.PI*2;r0[k]=restR(ang[k])}
+  let maxY=-1e9;for(let k=0;k<K;k++)maxY=Math.max(maxY,Math.sin(ang[k])*r0[k]);CY=GROUND-maxY;
+  ox.fill(0);oy.fill(0);vx.fill(0);vy.fill(0);mx.fill(0);my.fill(0);sq=0;sqv=0;fingers.clear();
+}
+const restX=k=>CX+Math.cos(ang[k])*r0[k],restY=k=>CY+Math.sin(ang[k])*r0[k];
+function ptX(k){return restX(k)+ox[k]}function ptY(k){const yb=restY(k)-CY;return CY+yb*(1-sq*(yb>0?.0:1))+oy[k]+sq*R*.0}
+// squash: top comes down, sides go out (keeps area roughly)
+function shape(k){const bx=Math.cos(ang[k])*r0[k],by=Math.sin(ang[k])*r0[k];
+  const sx=1+sq*.55,sy=1-sq;let x=CX+bx*sx+ox[k],y=CY+(by<0?by*sy:by)+oy[k];
+  if(y>GROUND)y=GROUND;return[x,y]}
+
+/* ---- fingers ---- */
+const fingers=new Map();
+function pos(e){const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+function insideBody(x,y){let c=false;for(let i=0,j=K-1;i<K;j=i++){const [ax,ay]=shape(i),[bx,by]=shape(j);
+  if((ay>y)!==(by>y)&&x<(bx-ax)*(y-ay)/(by-ay)+ax)c=!c}return c}
+function nearestBone(x,y){let best=0,bd=1e9;for(let k=0;k<K;k++){const [px,py]=shape(k),d=Math.hypot(px-x,py-y);if(d<bd){bd=d;best=k}}return best}
+cv.addEventListener('pointerdown',e=>{e.preventDefault();audio();try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  const p=pos(e),ins=insideBody(p.x,p.y),near=Math.hypot(p.x-CX,p.y-(CY-R*.2))<R*2.2;
+  const k=nearestBone(p.x,p.y),[bx,by]=shape(k);
+  const f={x:p.x,y:p.y,sx:p.x,sy:p.y,lx:p.x,ly:p.y,t0:performance.now(),moved:0,still:0,press:0,k,
+    mode:ins?'grab':(near?'push':'none'),gx:bx,gy:by,fx:p.x,fy:p.y,ex:0,ey:0,creak:0};
+  fingers.set(e.pointerId,f);
+  if(f.mode==='grab'){ // first frame: the spot under the finger dips in right away
+    const dx=CX-bx,dy=CY-by,l=Math.hypot(dx,dy)||1;ox[k]+=dx/l*R*.05;oy[k]+=dy/l*R*.05;vx[k]+=dx/l*R*1.2;vy[k]+=dy/l*R*1.2;sfxSquish(.45)}
+},{passive:false});
+cv.addEventListener('pointermove',e=>{const f=fingers.get(e.pointerId);if(!f)return;const p=pos(e);f.moved+=Math.hypot(p.x-f.x,p.y-f.y);f.x=p.x;f.y=p.y});
+function up(e){const f=fingers.get(e.pointerId);if(!f)return;fingers.delete(e.pointerId);
+  if(f.mode==='grab'||f.mode==='press'){const quick=performance.now()-f.t0<220&&f.moved<12;
+    if(quick){sqv+=3.5;sfxTap()}else{const st=Math.hypot(f.ex,f.ey)/R;sfxBoing(Math.min(1,.2+st*.5+f.press*.4))
+      if(++releases%8===0){sqv-=4;for(let k=0;k<K;k++){vx[k]+=(Math.random()-.5)*R*1.5;vy[k]+=(Math.random()-.5)*R*1.5}}}}}
+let releases=0;
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('gesturestart',e=>e.preventDefault());
+
+/* ---- per-frame rules (designed deformation, not physics) ---- */
+function update(dt){
+  tw.fill(0);tx.fill(0);ty.fill(0);let sqT=0;
+  for(const f of fingers.values()){
+    const sp=Math.hypot(f.x-f.lx,f.y-f.ly)/Math.max(dt,1e-3);f.lx=f.x;f.ly=f.y;
+    // sticky lag: the slime follows the finger a little behind
+    const kl=1-Math.exp(-dt/Math.max(.005,mat.lag));f.fx+=(f.x-f.fx)*kl;f.fy+=(f.y-f.fy)*kl;
+    if(f.mode==='grab'||f.mode==='press'){
+      if(sp<R*.4)f.still+=dt;else f.still=0;
+      if(f.mode==='grab'&&f.still>.2&&f.moved<12){f.mode='press';let bk=0,bd=1e9;for(let k=0;k<K;k++){if(Math.sin(ang[k])>-.2)continue;const d=Math.abs(shape(k)[0]-f.x);if(d<bd){bd=d;bk=k}}f.k=bk;sfxSquish(.8)}
+      if(f.mode==='press'){f.press=Math.min(1,f.press+dt/.6);sqT=Math.max(sqT,f.press*mat.press);
+        const k=f.k,dx=CX-restX(k),dy=CY-restY(k),l=Math.hypot(dx,dy)||1;
+        addTarget(k,dx/l*R*.12*f.press,dy/l*R*.12*f.press,1,.35);continue}
+      // pull: drag vector, softly limited
+      let ex=f.fx-f.sx,ey=f.fy-f.sy;const el=Math.hypot(ex,ey),lim=mat.maxPull*R,s=el>0?lim*Math.tanh(el/lim)/el:0;ex*=s;ey*=s;f.ex=ex;f.ey=ey;
+      // the grabbed point and its neighbours follow, weaker further away; the base of the pull gets thinner
+      const k0=f.k;
+      for(let d=-4;d<=4;d++){const k=(k0+d+K)%K,w=Math.exp(-(d*d)/2.2);
+        let txk=mx[k]+ex*w,tyk=my[k]+ey*w;
+        if(d!==0&&el>R*.2){const nx=Math.cos(ang[k0]),ny=Math.sin(ang[k0]),side=-Math.sign(d)*w*(1-w)*mat.neck*Math.min(1,el/R)*R*.5;
+          txk+=-ny*side;tyk+=nx*side}
+        addTarget(k,txk,tyk,w,0)}
+      const st=el/R,step=Math.floor(st*5);if(step>f.creak&&st>.4)sfxCreak(Math.min(1,st/1.6));f.creak=step}
+    else if(f.mode==='push'){ // finger outside: the edge it touches is pushed in, the rest bulges a bit
+      for(let k=0;k<K;k++){const [px,py]=shape(k),d=Math.hypot(px-f.x,py-f.y),rf=R*.2;
+        if(d<rf+R*.25){const dx=CX-px,dy=CY-py,l=Math.hypot(dx,dy)||1,depth=Math.max(0,rf+R*.25-d);
+          const w=Math.min(1,depth/(R*.25));addTarget(k,ox[k]+dx/l*depth*.5,oy[k]+dy/l*depth*.5,w,0)}}}
+  }
+  // springs: each control point chases its target (touched) or its remembered shape (free)
+  const om=2*Math.PI/mat.response,kk=om*om,cc=2*mat.damping*om;
+  let pushOut=0;
+  for(let k=0;k<K;k++){
+    const w=Math.min(1,tw[k]),gx=w>0?tx[k]/Math.max(tw[k],1e-6):mx[k],gy=w>0?ty[k]/Math.max(tw[k],1e-6):my[k];
+    const Gx=mx[k]+(gx-mx[k])*w,Gy=my[k]+(gy-my[k])*w;
+    const ax=kk*(Gx-ox[k])-cc*vx[k],ay=kk*(Gy-oy[k])-cc*vy[k];
+    vx[k]+=ax*dt;vy[k]+=ay*dt;ox[k]+=vx[k]*dt;oy[k]+=vy[k]*dt;
+    // keep it a clean shape: never fold inside out, never stretch absurdly
+    const rx=Math.cos(ang[k]),ry=Math.sin(ang[k]),rad=ox[k]*rx+oy[k]*ry,tan=-ox[k]*ry+oy[k]*rx;
+    const radC=Math.max(-r0[k]*.7,Math.min(R*2,rad)),tanC=Math.max(-R*1.4,Math.min(R*1.4,tan));
+    ox[k]=radC*rx-tanC*ry;oy[k]=radC*ry+tanC*rx;
+    if(w<.05)pushOut+=0;
+    // molding memory (mode C): long, big deformations are kept; then slowly relax back
+    const dx=ox[k]-mx[k],dy=oy[k]-my[k],dl=Math.hypot(dx,dy),yl=mat.yield*R;
+    if(w>.05&&dl>yl){const kc=Math.min(1,mat.creep*dt*w);mx[k]+=dx*(1-yl/dl)*kc;my[k]+=dy*(1-yl/dl)*kc}
+    if(w<.05){const kr=Math.min(1,mat.recover*dt);mx[k]*=1-kr;my[k]*=1-kr}
+  }
+  // keep the area roughly constant: pulling one part out makes the rest a little slimmer
+  let A=0,A0=0;for(let i=0;i<K;i++){const j=(i+1)%K,[ax,ay]=shape(i),[bx,by]=shape(j);A+=ax*by-bx*ay;
+    A0+=(restX(i)*restY(j)-restX(j)*restY(i))}
+  const ratio=A0/A;if(isFinite(ratio)){const adj=Math.max(-.08,Math.min(.08,(Math.sqrt(ratio)-1)));
+    for(let k=0;k<K;k++)if(tw[k]<.3){ox[k]+=Math.cos(ang[k])*r0[k]*adj*.15;oy[k]+=Math.sin(ang[k])*r0[k]*adj*.15}}
+  const sk=kk*.8,sc=cc*.9;sqv+=(sk*(sqT-sq)-sc*sqv)*dt;sq+=sqv*dt;sq=Math.max(-.35,Math.min(.6,sq));
+}
+function addTarget(k,x,y,w,_){tx[k]+=x*w;ty[k]+=y*w;tw[k]+=w}
+
+/* ---- drawing (flat cartoon) ---- */
+function smoothPts(){const P=[];for(let k=0;k<K;k++)P.push(shape(k));return P}
+function bodyPath(P,ox0=0,oy0=0){const n=P.length;ctx.beginPath();ctx.moveTo(P[0][0]+ox0,P[0][1]+oy0);
+  for(let i=0;i<n;i++){const p0=P[(i+n-1)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];
+    ctx.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6+ox0,p1[1]+(p2[1]-p0[1])/6+oy0,p2[0]-(p3[0]-p1[0])/6+ox0,p2[1]-(p3[1]-p1[1])/6+oy0,p2[0]+ox0,p2[1]+oy0)}ctx.closePath()}
+function drawBG(){const hz=GROUND-R*.55;
+  ctx.fillStyle='#CDEBFA';ctx.fillRect(0,0,W,hz);
+  ctx.fillStyle='#E6F6FF';[[.18,.18,1],[.72,.12,.8],[.9,.3,.6]].forEach(([u,v,s])=>{const x=u*W,y=v*H,r=R*.45*s;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.arc(x+r*.9,y+r*.15,r*.75,0,7);ctx.arc(x-r*.9,y+r*.2,r*.65,0,7);ctx.fill()});
+  ctx.fillStyle='#BFE6A8';ctx.fillRect(0,hz,W,H-hz);ctx.fillStyle='#A9D98F';ctx.fillRect(0,hz,W,4);
+  ctx.strokeStyle='#97CB7C';ctx.lineWidth=3;ctx.lineCap='round';
+  [[.1,.84],[.2,.95],[.82,.86],[.9,.97],[.35,1.02],[.66,1.05]].forEach(([u,v])=>{const x=u*W,y=hz+(H-hz)*(v-.75)*1.6;
+    ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x-9,y-9);ctx.moveTo(x,y);ctx.lineTo(x,y-12);ctx.moveTo(x+6,y);ctx.lineTo(x+9,y-9);ctx.stroke()})}
+function draw(){
+  ctx.clearRect(0,0,W,H);drawBG();const P=smoothPts();
+  let x0=1e9,x1=-1e9;for(const p of P)if(p[1]>GROUND-R*.3){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0])}
+  if(x1>x0){ctx.fillStyle='rgba(60,110,50,.22)';ctx.beginPath();ctx.ellipse((x0+x1)/2,GROUND+R*.05,(x1-x0)/2+R*.12,R*.1,0,0,7);ctx.fill()}
+  const lw=Math.max(3,R*.055);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,GROUND+lw*.5);ctx.clip();
+  ctx.save();bodyPath(P);ctx.fillStyle=mat.shade;ctx.fill();ctx.clip();bodyPath(P,-R*.07,-R*.1);ctx.fillStyle=mat.base;ctx.fill();
+  // highlight rides on the upper-left part of the body
+  const a=P[Math.round(K*.82)%K],b=P[Math.round(K*.9)%K],c=P[0];const hx=(a[0]+b[0]+c[0])/3+R*.25,hy=(a[1]+b[1]+c[1])/3+R*.22;
+  ctx.fillStyle=mat.light;ctx.save();ctx.translate(hx,hy);ctx.rotate(-.5);ctx.scale(1+sq*.4,1-sq*.5);ctx.beginPath();ctx.ellipse(0,0,R*.2,R*.085,0,0,7);ctx.fill();
+  ctx.beginPath();ctx.arc(R*.27,R*.09,R*.04,0,7);ctx.fill();ctx.restore();ctx.restore();
+  ctx.lineJoin='round';ctx.strokeStyle=mat.line;ctx.lineWidth=lw;bodyPath(P);ctx.stroke();ctx.restore()}
+
+/* ---- audio: three styles to choose by ear ---- */
+let AC=null,master=null,noiseBuf=null,pinkBuf=null,muted=false,STYLE='wet',bedG=null,bedF=null,bedLvl=0;
+function audio(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;AC=new C();master=AC.createGain();master.gain.value=muted?0:.9;
+  const comp=AC.createDynamicsCompressor();master.connect(comp);comp.connect(AC.destination);
+  noiseBuf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate);pinkBuf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate);
+  const d=noiseBuf.getChannelData(0),q=pinkBuf.getChannelData(0);let b0=0,b1=0,b2=0;
+  for(let i=0;i<d.length;i++){const w=Math.random()*2-1;d[i]=w;b0=.997*b0+w*.03;b1=.985*b1+w*.06;b2=.95*b2+w*.12;q[i]=(b0+b1+b2)*.6}
+  // a continuous bed that follows how fast you're kneading
+  const s=AC.createBufferSource();s.buffer=pinkBuf;s.loop=true;bedF=AC.createBiquadFilter();bedF.type='lowpass';bedF.frequency.value=600;bedF.Q.value=.7;
+  bedG=AC.createGain();bedG.gain.value=0;s.connect(bedF);bedF.connect(bedG);bedG.connect(master);s.start()}
+  if(AC.state==='suspended')AC.resume()}
+const rnd=(a,b)=>a+Math.random()*(b-a),ok=()=>AC&&!muted;
+function env(g,t,a,p,d){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,p),t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d)}
+function nz(t,buf,type,f0,f1,q,peak,a,d){const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=buf;f.type=type;f.Q.value=q;
+  f.frequency.setValueAtTime(f0,t);if(f1)f.frequency.exponentialRampToValueAtTime(f1,t+a+d);env(g,t,a,peak,d);s.connect(f);f.connect(g);g.connect(master);s.start(t,Math.random()*1.5);s.stop(t+a+d+.05)}
+function tn(t,f0,f1,peak,a,d,type='sine'){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+a+d);
+  env(g,t,a,peak,d);o.connect(g);g.connect(master);o.start(t);o.stop(t+a+d+.05)}
+const P=()=>mat.pitch*rnd(.92,1.08);
+// wet clicks: tiny sticky crackles, the core of slime ASMR
+function clicks(t,n,spread,vol){for(let i=0;i<n;i++)nz(t+Math.random()*spread,noiseBuf,'bandpass',rnd(1800,5200),0,rnd(2,5),vol*rnd(.4,1),.001,rnd(.004,.014))}
+function sfxPress(i){if(!ok())return;const t=AC.currentTime,p=P();
+  if(STYLE==='wet'){nz(t,pinkBuf,'bandpass',900*p,280*p,2.2,.32*i+.08,.006,.16);nz(t,pinkBuf,'lowpass',500,0,.7,.2*i+.05,.004,.1);clicks(t+.01,3+Math.round(i*5),.09,.12)}
+  else if(STYLE==='soft'){nz(t,pinkBuf,'lowpass',420*p,180,.6,.35*i+.1,.02,.18);tn(t,120*p,70,.18*i+.05,.01,.16)}
+  else{nz(t,pinkBuf,'lowpass',300*p,150,.6,.12*i+.04,.03,.2)}}
+function sfxStretch(i){if(!ok())return;const t=AC.currentTime;
+  if(STYLE==='wet')clicks(t,2+Math.round(i*3),.05,.09);
+  else if(STYLE==='soft')tn(t,300*mat.pitch*(1+i*.4),340*mat.pitch*(1+i*.45),.035,.02,.08);}
+function sfxRelease(i){if(!ok())return;const t=AC.currentTime,p=P();
+  if(STYLE==='wet'){tn(t,230*p,70,.22*i+.06,.003,.07);nz(t,pinkBuf,'lowpass',1400,300,.8,.16*i+.04,.002,.07);clicks(t+.02,2+Math.round(i*3),.06,.1)}
+  else if(STYLE==='soft'){tn(t,520*p,260*p,.14*i+.05,.004,.09);tn(t+.05,780*p,420*p,.05*i+.02,.004,.07)}
+  else{tn(t,320*p,200*p,.06*i+.02,.01,.08)}}
+function sfxTap(){if(!ok())return;const t=AC.currentTime,p=P();
+  if(STYLE==='wet'){nz(t,pinkBuf,'bandpass',700*p,300,2,.18,.003,.08);clicks(t,2,.03,.1)}
+  else if(STYLE==='soft'){tn(t,600*p,320*p,.12,.003,.07)}else{tn(t,400*p,260*p,.05,.005,.06)}}
+// called every frame with how fast fingers are moving across the slime (0..1)
+function audioBed(speed,dt){if(!AC||!bedG)return;bedLvl+=(speed-bedLvl)*Math.min(1,dt*12);const t=AC.currentTime,v=muted?0:bedLvl;
+  if(STYLE==='wet'){bedG.gain.setTargetAtTime(v*.16,t,.03);bedF.frequency.setTargetAtTime(400+v*900,t,.04);if(Math.random()<v*28*dt)clicks(t,1+Math.round(v*2),.02,.08)}
+  else if(STYLE==='soft'){bedG.gain.setTargetAtTime(v*.1,t,.05);bedF.frequency.setTargetAtTime(250+v*350,t,.05)}
+  else{bedG.gain.setTargetAtTime(v*.04,t,.06);bedF.frequency.setTargetAtTime(200+v*200,t,.06)}}
+// keep old names used above
+const sfxSquish=i=>sfxPress(i),sfxCreak=i=>sfxStretch(i),sfxBoing=i=>sfxRelease(i);
+
+/* ---- loop ---- */
+let last=performance.now();
+function frame(t){const dt=Math.min(1/30,(t-last)/1000);last=t;
+  let spd=0;for(const f of fingers.values())if(f.mode!=='none'){spd+=Math.hypot(f.x-(f.bx??f.x),f.y-(f.by??f.y))/Math.max(dt,1e-3);f.bx=f.x;f.by=f.y}
+  audioBed(Math.min(1,spd/(R*6)),dt);const n=Math.max(1,Math.ceil(dt/.004));for(let i=0;i<n;i++)update(dt/n);draw();requestAnimationFrame(frame)}
+
+/* ---- UI ---- */
+const NAMES={bouncy:'Q彈',mochi:'麻糬',clay:'黏土'},keys=Object.keys(NAMES),keyOf=()=>keys.find(k=>MATS[k]===mat);
+keys.forEach(k=>document.getElementById('m-'+k).addEventListener('click',()=>{audio();mat=MATS[k];
+  keys.forEach(j=>document.getElementById('m-'+j).setAttribute('aria-pressed',String(j===k)));syncTune();sqv+=3;sfxSquish(.4)}));
+document.getElementById('reset').addEventListener('click',()=>{audio();for(let k=0;k<K;k++){mx[k]=0;my[k]=0}sqv+=3;sfxSquish(.7)});
+const F=[['response','回彈速度（秒）','越小彈得越快'],['damping','晃動（阻尼）','越小越會晃、越 Q'],['lag','黏滯','拉的時候跟手的延遲感'],
+  ['press','按壓深度','按住能壓多扁'],['maxPull','拉伸上限','最多拉多長'],['creep','定型速度','揉多快就記住新形狀'],['recover','回原形速度','放著多快變回原樣']];
+const tune=document.getElementById('tune-body');
+tune.innerHTML=F.map(([k,n,h])=>`<label>${n}<small>${h}</small><input type="range" id="t-${k}"><output id="o-${k}"></output></label>`).join('');
+const RANGE={response:[.12,.9,.01],damping:[.15,1,.01],lag:[0,.3,.01],press:[.1,.6,.01],maxPull:[.6,2.4,.05],creep:[0,6,.1],recover:[0,1.5,.02]};
+for(const [k] of F){const el=document.getElementById('t-'+k),[a,b,s]=RANGE[k];el.min=a;el.max=b;el.step=s;el.addEventListener('input',()=>{mat[k]=+el.value;syncTune()})}
+function syncTune(){document.getElementById('tune-mat').textContent=NAMES[keyOf()];
+  for(const [k] of F){document.getElementById('t-'+k).value=mat[k];document.getElementById('o-'+k).textContent=(+mat[k]).toFixed(2)}
+  const o={手感:NAMES[keyOf()]};for(const [k,n] of F)o[n]=+(+mat[k]).toFixed(2);document.getElementById('t-out').value=JSON.stringify(o)}
+const tb=document.getElementById('tbtn'),tp=document.getElementById('tune');
+tb.addEventListener('click',()=>{tp.hidden=!tp.hidden;tb.setAttribute('aria-pressed',String(!tp.hidden));syncTune()});
+document.getElementById('t-default').addEventListener('click',()=>{Object.assign(MATS[keyOf()],DEF[keyOf()]);syncTune()});
+document.getElementById('t-copy').addEventListener('click',e=>{const ta=document.getElementById('t-out'),btn=e.currentTarget;
+  const done=()=>{btn.textContent='已複製';setTimeout(()=>btn.textContent='複製數值',1400)};
+  try{navigator.clipboard.writeText(ta.value).then(done,()=>{ta.focus();ta.select()})}catch(_){ta.focus();ta.select()}});
+const sb=document.getElementById('sound');
+sb.addEventListener('click',()=>{audio();muted=!muted;if(master)master.gain.value=muted?0:.85;sb.setAttribute('aria-pressed',String(muted));sb.setAttribute('aria-label',muted?'打開聲音':'關閉聲音');
+  sb.querySelector('.x').hidden=!muted;sb.querySelector('.w1').style.display=muted?'none':'';sb.querySelector('.w2').style.display=muted?'none':''});
+document.querySelectorAll('.sstyle button').forEach(b=>b.addEventListener('click',()=>{audio();STYLE=b.dataset.s;document.querySelectorAll('.sstyle button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));sfxPress(.6);setTimeout(()=>sfxRelease(.6),280)}));
+const hintEl=document.getElementById('hint');setTimeout(()=>hintEl.classList.add('off'),7000);
+let rzT=null,lw=innerWidth,lh=innerHeight;addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(Math.abs(innerWidth-lw)>2||Math.abs(innerHeight-lh)>160){lw=innerWidth;lh=innerHeight;setup()}},150)});
+setup();syncTune();requestAnimationFrame(t=>{last=t;requestAnimationFrame(frame)});
+})();
+
+</script>

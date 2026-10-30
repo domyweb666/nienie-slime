@@ -1,0 +1,382 @@
+<title>捏捏史萊姆黏土版</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+/* Layout: a flat, sunny little field drawn on canvas with the slime in the middle; chunky cartoon chips float top and bottom. One deliberate light look. */
+:root{
+  --sky:#CDEBFA; --ink:#2E3A2A; --ink-soft:#5E7458; --chip:#FFFFFF; --chip-line:#2E3A2A;
+  --chip-on:#2E3A2A; --chip-on-ink:#FFFFFF; --scrim:rgba(30,45,30,.6);
+  --display:"Mochiy Pop One","Zen Maru Gothic","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+  --ui:"Zen Maru Gothic","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{background:var(--sky);color:var(--ink);font-family:var(--ui)}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.bar{position:fixed;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar>*{pointer-events:auto}
+.top{top:0;padding-top:calc(env(safe-area-inset-top,0px) + 14px)}
+.bottom{bottom:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}
+.brand{display:flex;align-items:baseline;gap:6px;pointer-events:none;-webkit-user-select:none;user-select:none}
+.brand b{font-family:var(--display);font-weight:400;font-size:26px;letter-spacing:.04em}
+.brand span{font-size:13px;font-weight:700;color:var(--ink-soft);letter-spacing:.14em}
+button{font-family:var(--ui);touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer;color:var(--ink)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.round{width:46px;height:46px;border-radius:50%;border:2.5px solid var(--chip-line);background:var(--chip);display:grid;place-items:center;flex:none;padding:0;box-shadow:0 3px 0 var(--chip-line)}
+.round:active{transform:translateY(2px);box-shadow:0 1px 0 var(--chip-line)}
+.round svg{width:22px;height:22px}
+.group{display:flex;align-items:center;gap:8px;min-width:0}
+.mats{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--chip);border:2.5px solid var(--chip-line);box-shadow:0 3px 0 var(--chip-line);min-width:0}
+.mats button{border:0;background:transparent;border-radius:999px;padding:8px 11px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.mats button i{width:12px;height:12px;border-radius:50%;display:block;border:2px solid var(--chip-line)}
+.mats button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+.mats button[aria-pressed="true"] i{border-color:#fff}
+.cam{width:60px;height:60px}.cam svg{width:28px;height:28px}
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);
+  padding:8px 16px;border-radius:999px;background:#fff;border:2.5px solid var(--chip-line);font-size:14px;font-weight:700;
+  white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis;transition:opacity .6s;pointer-events:none}
+.hint.off{opacity:0}
+.flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.go{animation:fl .45s ease-out}@keyframes fl{0%{opacity:.85}100%{opacity:0}}
+.photo{position:fixed;inset:0;background:var(--scrim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:calc(env(safe-area-inset-top,0px) + 24px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px))}
+.photo img{max-width:100%;max-height:68vh;border-radius:20px;border:6px solid #fff;box-shadow:0 18px 50px rgba(0,0,0,.35);-webkit-touch-callout:default;transform:rotate(-1.5deg)}
+.photo p{margin:0;color:#fff;font-size:14px;font-weight:700;text-align:center}
+.photo button{border:2.5px solid var(--chip-line);border-radius:999px;padding:11px 26px;font-size:15px;font-weight:700;background:#fff}
+.tune{position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:#fff;border:2.5px solid var(--chip-line);border-radius:22px;box-shadow:0 4px 0 var(--chip-line);
+  padding:12px 16px 14px;display:flex;flex-direction:column;gap:8px;max-width:460px;margin:0 auto}
+.tune-head{display:flex;justify-content:space-between;align-items:baseline}
+.tune-head b{font-family:var(--display);font-weight:400;font-size:17px}.tune-head span{font-size:13px;font-weight:700;color:var(--ink-soft)}
+.tune label{display:grid;grid-template-columns:1fr auto;grid-template-areas:"name val" "hint hint" "range range";column-gap:8px;font-size:14px;font-weight:700}
+.tune small{grid-area:hint;font-size:11.5px;font-weight:500;color:var(--ink-soft)}
+.tune input{grid-area:range;width:100%;accent-color:#2E3A2A;margin:2px 0 0}
+.tune output{grid-area:val;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-soft)}
+.tune-actions{display:flex;gap:8px}
+.tune-actions button{flex:1;border:2.5px solid var(--chip-line);border-radius:999px;background:#fff;padding:8px;font-size:14px;font-weight:700}
+.tune-actions button:first-child{background:var(--chip-on);color:var(--chip-on-ink)}
+.tune textarea{width:100%;box-sizing:border-box;font:12px ui-monospace,Menlo,monospace;border:1.5px solid #c9d3c4;border-radius:10px;padding:6px 8px;resize:none;color:var(--ink)}
+@media (prefers-reduced-motion: reduce){.flash.go{animation:none}.hint{transition:none}}
+@media (max-width:380px){.mats button{padding:8px 8px;font-size:13px}.mats button i{display:none}}
+</style>
+
+<canvas id="c" aria-label="史萊姆，可以揉、拉長、拉斷、推回去"></canvas>
+
+<div class="bar top">
+  <div class="brand"><b>捏捏</b><span>史萊姆</span></div>
+  <div class="group">
+  <button class="round" id="tbtn" aria-label="調手感" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.2" fill="#fff"/><circle cx="15" cy="12" r="2.2" fill="#fff"/><circle cx="8" cy="18" r="2.2" fill="#fff"/></svg>
+  </button>
+  <button class="round" id="sound" aria-label="關閉聲音" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w1" d="M15.5 9a4 4 0 0 1 0 6"/><path class="w2" d="M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5" hidden/></svg>
+  </button>
+  </div>
+</div>
+
+<div class="hint" id="hint">隨便揉・拉長拉斷・推回去黏起來</div>
+
+<div class="bar bottom">
+  <div class="group">
+    <div class="mats" role="group" aria-label="史萊姆手感">
+      <button id="m-bouncy" aria-pressed="false"><i style="background:#7FE0C2"></i>Q彈</button>
+      <button id="m-mochi" aria-pressed="true"><i style="background:#C9B6FF"></i>麻糬</button>
+      <button id="m-clay" aria-pressed="false"><i style="background:#FFD86B"></i>黏土</button>
+    </div>
+    <button class="round" id="reset" aria-label="揉回原形">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/></svg>
+    </button>
+  </div>
+  <button class="round cam" id="cam" aria-label="拍照">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.6"/></svg>
+  </button>
+</div>
+
+<div class="tune" id="tune" hidden>
+  <div class="tune-head"><b>調手感</b><span id="tune-mat">麻糬</span></div>
+  <label>硬度<small>越右越硬、晃得越快</small><input type="range" id="t-E" min="2000" max="18000" step="100"><output id="o-E"></output></label>
+  <label>黏稠<small>越右越像在糖漿裡動</small><input type="range" id="t-visc" min="2" max="100" step="1"><output id="o-visc"></output></label>
+  <label>回彈範圍<small>越左越像黏土（一捏就定型），越右越會彈回</small><input type="range" id="t-yield" min=".02" max=".8" step=".01"><output id="o-yield"></output></label>
+  <div class="tune-actions"><button id="t-copy">複製數值</button><button id="t-default">恢復預設</button></div>
+  <textarea id="t-out" readonly rows="2" aria-label="目前的手感數值"></textarea>
+</div>
+
+<div class="flash" id="flash"></div>
+<div class="photo" id="photo" hidden>
+  <img id="shot" alt="史萊姆的照片">
+  <p>長按照片，就能儲存或分享</p>
+  <button id="close">再玩一下</button>
+</div>
+
+<script>
+(()=>{
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR,cell,COLS,ROWS,GR,R; // cell = px per grid cell, GR = ground row (cells)
+
+/* materials. E = stiffness, yc/ys = how far it can be squashed/stretched before it keeps the new shape (smaller = more clay-like),
+   visc = gooey thickness */
+const DEF={
+  bouncy:{E:9000,yc:.5,ys:0,visc:14,pitch:1.12,base:'#7FE0C2',shade:'#4FB99E',line:'#2B6E61',light:'#E9FFF7'},
+  mochi:{E:5000,yc:.12,ys:0,visc:70,pitch:.98,base:'#C9B6FF',shade:'#9E86E6',line:'#4E3C8F',light:'#FAF6FF'},
+  clay:{E:6000,yc:.05,ys:0,visc:45,pitch:.86,base:'#FFD86B',shade:'#EDB23C',line:'#8A5A12',light:'#FFF8DC'}
+};
+const MATS={};for(const k in DEF)MATS[k]={...DEF[k]};
+let mat=MATS.mochi;
+
+/* ---------- particles & grid ---------- */
+const MAXP=4200;
+const px=new Float32Array(MAXP),py=new Float32Array(MAXP),vx=new Float32Array(MAXP),vy=new Float32Array(MAXP),
+  c00=new Float32Array(MAXP),c01=new Float32Array(MAXP),c10=new Float32Array(MAXP),c11=new Float32Array(MAXP),
+  f00=new Float32Array(MAXP),f01=new Float32Array(MAXP),f10=new Float32Array(MAXP),f11=new Float32Array(MAXP);
+let working=false,workT=0,NP=0,PV=.3,GW=0,GH=0,gm,gx,gy;
+const NU=.4,RHO=1,GRAV=60,SUB=8,RATE=1.2;
+function spawn(){densPrev=null;hl=null;
+  const sp=.55;PV=sp*sp;NP=0;
+  const cx=COLS/2,Rr=R,rr=a=>{const c=Math.cos(a),sn=Math.sin(a),ry=sn<0?Rr:Rr*.74;
+    return (1/Math.sqrt((c/(Rr*1.12))**2+(sn/ry)**2))*(1+.22*Math.exp(-(((a+Math.PI/2)/.3)**2)))};
+  let maxY=-1e9;for(let a=0;a<6.3;a+=.01){const r=rr(a);maxY=Math.max(maxY,Math.sin(a)*r)}
+  const cy=GR-maxY-.3;
+  for(let y=-Rr*1.4;y<=Rr;y+=sp)for(let x=-Rr*1.3;x<=Rr*1.3;x+=sp){
+    const jx=x+(Math.random()-.5)*sp*.6,jy=y+(Math.random()-.5)*sp*.6;
+    if(Math.hypot(jx,jy)<=rr(Math.atan2(jy,jx))&&NP<MAXP){const i=NP++;px[i]=cx+jx;py[i]=cy+jy;vx[i]=vy[i]=0;
+      c00[i]=c01[i]=c10[i]=c11[i]=0;f00[i]=f11[i]=1;f01[i]=f10[i]=0}}
+}
+function setup(){
+  DPR=Math.min(devicePixelRatio||1,3);W=innerWidth;H=innerHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);
+  COLS=56;cell=W/COLS;
+  const groundPx=Math.min(H*.66,H-150);GR=groundPx/cell;ROWS=Math.ceil(GR)+3;
+  R=Math.min(COLS*.3,GR*.38);
+  GW=COLS+4;GH=ROWS+4;gm=new Float32Array(GW*GH);gx=new Float32Array(GW*GH);gy=new Float32Array(GW*GH);
+  RW=COLS*2+3;RH=ROWS*2+3;dens=new Float32Array(RW*RH);
+  spawn();fingers.clear();
+}
+
+/* ---------- 2x2 SVD: F = U diag(s1,s2) V^T, U=rot(phi), V^T=rot(theta) ---------- */
+let sv_phi=0,sv_th=0,sv1=1,sv2=1;
+function svd(a,b,c,d){const E=(a+d)/2,F=(a-d)/2,G=(c+b)/2,Hh=(c-b)/2,Q=Math.sqrt(E*E+Hh*Hh),Rr=Math.sqrt(F*F+G*G);
+  sv1=Q+Rr;sv2=Q-Rr;const a1=Math.atan2(G,F),a2=Math.atan2(Hh,E);sv_th=(a2-a1)/2;sv_phi=(a2+a1)/2}
+
+/* ---------- fingers ---------- */
+const fingers=new Map();
+function pos(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)/cell,y:(e.clientY-r.top)/cell}}
+function massAt(x,y){const i=Math.round(x)+2,j=Math.round(y)+2;if(i<0||j<0||i>=GW||j>=GH)return 0;
+  let m=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const k=(j+b)*GW+i+a;if(k>=0&&k<gm.length)m+=gm[k]}return m/9}
+cv.addEventListener('pointerdown',e=>{e.preventDefault();audio();try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  const p=pos(e),now=performance.now();
+  const f={x:p.x,y:p.y,lx:p.x,ly:p.y,ox:p.x,oy:p.y,vx:0,vy:0,t0:now,moved:0,still:0,mode:massAt(p.x,p.y)>PV*.6?'grab':'push',depth:0,top:0,acc:0};
+  fingers.set(e.pointerId,f);if(f.mode==='grab')sfxSquish(.5)},{passive:false});
+cv.addEventListener('pointermove',e=>{const f=fingers.get(e.pointerId);if(!f)return;const p=pos(e);f.moved+=Math.hypot(p.x-f.x,p.y-f.y)*cell;f.x=p.x;f.y=p.y});
+function up(e){const f=fingers.get(e.pointerId);if(!f)return;fingers.delete(e.pointerId);
+  if(f.mode!=='push'&&performance.now()-f.t0<220&&f.moved<12)sfxSquish(.4);else if(f.mode!=='push')sfxBoing(.5)}
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('gesturestart',e=>e.preventDefault());
+
+/* ---------- MPM step (MLS-MPM, elasto-plastic) ---------- */
+function step(dt,frac){
+  gm.fill(0);gx.fill(0);gy.fill(0);
+  const mu=mat.E/(2*(1+NU)),la=mat.E*NU/((1+NU)*(1-2*NU)),mass=PV*RHO,lo1=1-mat.yc,hi1=1+mat.ys,eta=mat.visc;
+  for(let p=0;p<NP;p++){
+    const x=px[p],y=py[p],bx=Math.floor(x-.5),by=Math.floor(y-.5),fx=x-bx,fy=y-by;
+    const wx0=.5*(1.5-fx)**2,wx1=.75-(fx-1)**2,wx2=.5*(fx-.5)**2,wy0=.5*(1.5-fy)**2,wy1=.75-(fy-1)**2,wy2=.5*(fy-.5)**2;
+    const C00=c00[p],C01=c01[p],C10=c10[p],C11=c11[p];
+    let a=f00[p],b=f01[p],c=f10[p],d=f11[p];
+    const n00=a+dt*(C00*a+C01*c),n01=b+dt*(C00*b+C01*d),n10=c+dt*(C10*a+C11*c),n11=d+dt*(C10*b+C11*d);
+    svd(n00,n01,n10,n11);
+    // plasticity: whatever stretches past the limit becomes the new shape
+    // plasticity only while it's being worked (fast deformation); at rest it holds its shape instead of slowly melting
+    const rate=Math.sqrt(C00*C00+C01*C01+C10*C10+C11*C11);
+    // clay/slime plasticity (von Mises in log-strain): only the SHAPE part can yield, the volume never does,
+    // so it bends and keeps new shapes without crumbling apart
+    let e1=Math.log(Math.min(4,Math.max(.2,sv1))),e2=Math.log(Math.min(4,Math.max(.2,sv2)));
+    if(working&&rate>RATE){const mm=(e1+e2)/2;let d1=e1-mm,d2=e2-mm;const dn=Math.hypot(d1,d2),Yl=mat.yc;
+      if(dn>Yl){d1*=Yl/dn;d2*=Yl/dn}e1=mm+d1;e2=mm+d2}
+    const mm2=(e1+e2)/2,mc=Math.max(-.25,Math.min(.25,mm2));e1+=mc-mm2;e2+=mc-mm2;
+    const s1=Math.exp(e1),s2=Math.exp(e2);
+    const cu=Math.cos(sv_phi),su=Math.sin(sv_phi),cv_=Math.cos(sv_th),sv_=Math.sin(sv_th);
+    // F = U S Vt with U=[[cu,-su],[su,cu]], Vt=[[cv,-sv],[sv,cv]]
+    a=cu*s1*cv_-su*s2*sv_;b=-cu*s1*sv_-su*s2*cv_;c=su*s1*cv_+cu*s2*sv_;d=-su*s1*sv_+cu*s2*cv_;
+    f00[p]=a;f01[p]=b;f10[p]=c;f11[p]=d;
+    const J=s1*s2,rc=Math.cos(sv_phi+sv_th),rs=Math.sin(sv_phi+sv_th);
+    const A00=a-rc,A01=b+rs,A10=c-rs,A11=d-rc;
+    let t00=2*mu*(A00*a+A01*b)+la*J*(J-1),t01=2*mu*(A00*c+A01*d),t10=2*mu*(A10*a+A11*b),t11=2*mu*(A10*c+A11*d)+la*J*(J-1);
+    t00+=eta*2*C00;t11+=eta*2*C11;t01+=eta*(C01+C10);t10+=eta*(C01+C10);
+    const k=-dt*PV*4;
+    const a00=k*t00+mass*C00,a01=k*t01+mass*C01,a10=k*t10+mass*C10,a11=k*t11+mass*C11;
+    const mvx=mass*vx[p],mvy=mass*vy[p];
+    const WX=[wx0,wx1,wx2],WY=[wy0,wy1,wy2];
+    for(let i=0;i<3;i++){const dx=i-fx;for(let j=0;j<3;j++){const dy=j-fy,w=WX[i]*WY[j],n=(by+j+2)*GW+bx+i+2;
+      gx[n]+=w*(mvx+a00*dx+a01*dy);gy[n]+=w*(mvy+a10*dx+a11*dy);gm[n]+=w*mass}}
+  }
+  // grid update + floor + finger tools
+  const tools=[];
+  for(const f of fingers.values()){const fx=f.ox+(f.x-f.ox)*frac,fy=f.oy+(f.y-f.oy)*frac;
+    if(f.mode==='grab')tools.push({t:0,x:fx,y:fy,vx:f.vx,vy:f.vy,r:4});
+    else if(f.mode==='push')tools.push({t:1,x:fx,y:fy,vx:f.vx,vy:f.vy,r:2.6});
+    else if(f.mode==='press')tools.push({t:1,x:fx,y:f.top-3+f.depth,vx:f.vx,vy:f.press?R*.5:0,r:3})}
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){const n=j*GW+i;const m=gm[n];if(m<=0)continue;
+    const dmp=1-1.5*dt;let ux=gx[n]/m*dmp,uy=gy[n]/m*dmp+dt*GRAV;const X=i-2,Y=j-2;
+    for(const T of tools){const dx=X-T.x,dy=Y-T.y,dd=Math.hypot(dx,dy);
+      if(T.t===0){if(dd<T.r){const w=(1-dd/T.r)*.55;ux+=(T.vx-ux)*w;uy+=(T.vy-uy)*w}}
+      else if(dd<T.r){const nx=dd>1e-4?dx/dd:0,ny=dd>1e-4?dy/dd:-1,rx=ux-T.vx,ry=uy-T.vy,vn=rx*nx+ry*ny;
+        if(vn<0){ux-=vn*nx;uy-=vn*ny}ux+=nx*(T.r-dd)*3;uy+=ny*(T.r-dd)*3}}
+    if(Y>=GR-.5){ux=0;uy=Math.min(uy,0)*0} // sticky table
+    if(X<2&&ux<0)ux=0;if(X>COLS-2&&ux>0)ux=0;if(Y<2&&uy<0)uy=0;
+    gx[n]=ux;gy[n]=uy}
+  // G2P
+  for(let p=0;p<NP;p++){
+    const x=px[p],y=py[p],bx=Math.floor(x-.5),by=Math.floor(y-.5),fx=x-bx,fy=y-by;
+    const WX=[.5*(1.5-fx)**2,.75-(fx-1)**2,.5*(fx-.5)**2],WY=[.5*(1.5-fy)**2,.75-(fy-1)**2,.5*(fy-.5)**2];
+    let nvx=0,nvy=0,C00=0,C01=0,C10=0,C11=0;
+    for(let i=0;i<3;i++){const dx=i-fx;for(let j=0;j<3;j++){const dy=j-fy,w=WX[i]*WY[j],n=(by+j+2)*GW+bx+i+2,ux=gx[n],uy=gy[n];
+      nvx+=w*ux;nvy+=w*uy;const w4=4*w;C00+=w4*ux*dx;C01+=w4*ux*dy;C10+=w4*uy*dx;C11+=w4*uy*dy}}
+    vx[p]=nvx;vy[p]=nvy;c00[p]=C00;c01[p]=C01;c10[p]=C10;c11[p]=C11;
+    let X=x+dt*nvx,Y=y+dt*nvy;
+    if(X<1)X=1;if(X>COLS-1)X=COLS-1;if(Y<1)Y=1;if(Y>GR-.05)Y=GR-.05;
+    px[p]=X;py[p]=Y}
+}
+
+/* ---------- rendering: density -> outline (marching squares) -> flat cartoon ---------- */
+let RW,RH,dens,densPrev=null,hl=null;
+const SEG=[[],[[3,0]],[[0,1]],[[3,1]],[[1,2]],[[3,0],[1,2]],[[0,2]],[[3,2]],[[2,3]],[[0,2]],[[0,1],[2,3]],[[1,2]],[[1,3]],[[0,1]],[[3,0]],[]];
+function outlines(){
+  if(!densPrev||densPrev.length!==dens.length)densPrev=new Float32Array(dens.length);
+  dens.fill(0);
+  for(let p=0;p<NP;p++){const rx=px[p]*2,ry=py[p]*2,ix=Math.floor(rx),iy=Math.floor(ry);
+    for(let i=ix-2;i<=ix+3;i++){const wx=1-Math.abs(i-rx)/2.6;if(wx<=0)continue;
+      for(let j=iy-2;j<=iy+3;j++){const wy=1-Math.abs(j-ry)/2.6;if(wy<=0||i<0||j<0||i>=RW||j>=RH)continue;dens[j*RW+i]+=wx*wy}}}
+  for(let i=0;i<dens.length;i++){const v=densPrev[i]*.55+dens[i]*.45;dens[i]=v;densPrev[i]=v}
+  const iso=1.3,pt=new Map(),nb=new Map();
+  const val=(i,j)=>dens[j*RW+i];
+  const ep=(id)=>{if(pt.has(id))return;const h=id%2===0,k=id>>1,i=k%RW,j=(k/RW)|0;
+    const a=val(i,j),b=h?val(i+1,j):val(i,j+1),t=Math.max(0,Math.min(1,(iso-a)/(b-a||1e-6)));
+    pt.set(id,h?[(i+t)*cell/2,j*cell/2]:[i*cell/2,(j+t)*cell/2])};
+  const link=(a,b)=>{(nb.get(a)||nb.set(a,[]).get(a)).push(b);(nb.get(b)||nb.set(b,[]).get(b)).push(a)};
+  for(let j=0;j<RH-1;j++)for(let i=0;i<RW-1;i++){
+    const idx=(val(i,j)>=iso?1:0)|(val(i+1,j)>=iso?2:0)|(val(i+1,j+1)>=iso?4:0)|(val(i,j+1)>=iso?8:0);if(idx===0||idx===15)continue;
+    const e=[(j*RW+i)*2,((j*RW+i+1)*2)+1,((j+1)*RW+i)*2,(j*RW+i)*2+1];
+    for(const [u,v] of SEG[idx]){ep(e[u]);ep(e[v]);link(e[u],e[v])}}
+  const seen=new Set(),loops=[];
+  for(const start of nb.keys()){if(seen.has(start))continue;const L=[];let prev=-1,cur=start,guard=0;
+    while(guard++<20000){seen.add(cur);L.push(pt.get(cur));const ns=nb.get(cur);const nx=ns[0]!==prev?ns[0]:ns[1];if(nx===undefined||nx===start)break;prev=cur;cur=nx}
+    if(L.length>14)loops.push(chaikin(chaikin(relax(L))))}
+  const areaOf=L=>{let a=0;for(let i=0;i<L.length;i++){const p=L[i],q=L[(i+1)%L.length];a+=p[0]*q[1]-q[0]*p[1]}return Math.abs(a)/2};
+  const inside=(pt0,L)=>{let c=false;for(let i=0,j=L.length-1;i<L.length;j=i++){const a=L[i],b=L[j];if((a[1]>pt0[1])!==(b[1]>pt0[1])&&pt0[0]<(b[0]-a[0])*(pt0[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c};
+  loops.forEach(L=>L.area=areaOf(L));loops.sort((a,b)=>b.area-a.area);
+  const out=[];for(const L of loops){if(out.some(O=>inside(L[0],O)))continue;if(L.area<(cell*1.6)**2)continue;out.push(L)}
+  return out}
+function relax(L){let A=L;for(let k=0;k<3;k++){const n=A.length,B=new Array(n);for(let i=0;i<n;i++){const a=A[(i+n-1)%n],b=A[i],c=A[(i+1)%n];B[i]=[b[0]*.5+(a[0]+c[0])*.25,b[1]*.5+(a[1]+c[1])*.25]}A=B}return A}
+function chaikin(L){const o=[];for(let i=0;i<L.length;i++){const a=L[i],b=L[(i+1)%L.length];o.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75])}return o}
+function loopPath(loops,ox=0,oy=0){ctx.beginPath();for(const L of loops){const n=L.length;
+  ctx.moveTo((L[n-1][0]+L[0][0])/2+ox,(L[n-1][1]+L[0][1])/2+oy);
+  for(let i=0;i<n;i++){const a=L[i],b=L[(i+1)%n];ctx.quadraticCurveTo(a[0]+ox,a[1]+oy,(a[0]+b[0])/2+ox,(a[1]+b[1])/2+oy)}ctx.closePath()}}
+function drawBG(gy){
+  const hz=gy-R*cell*.55;
+  ctx.fillStyle='#CDEBFA';ctx.fillRect(0,0,W,hz);
+  ctx.fillStyle='#E6F6FF';[[.18,.18,1],[.72,.12,.8],[.9,.3,.6]].forEach(([u,v,s])=>{const x=u*W,y=v*H,r=R*cell*.45*s;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.arc(x+r*.9,y+r*.15,r*.75,0,7);ctx.arc(x-r*.9,y+r*.2,r*.65,0,7);ctx.fill()});
+  ctx.fillStyle='#BFE6A8';ctx.fillRect(0,hz,W,H-hz);ctx.fillStyle='#A9D98F';ctx.fillRect(0,hz,W,4);
+  ctx.strokeStyle='#97CB7C';ctx.lineWidth=3;ctx.lineCap='round';
+  [[.1,.84],[.2,.95],[.82,.86],[.9,.97],[.35,1.02],[.66,1.05]].forEach(([u,v])=>{const x=u*W,y=hz+(H-hz)*(v-.75)*1.6;
+    ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x-9,y-9);ctx.moveTo(x,y);ctx.lineTo(x,y-12);ctx.moveTo(x+6,y);ctx.lineTo(x+9,y-9);ctx.stroke()});
+}
+function draw(){
+  const gyp=GR*cell;ctx.clearRect(0,0,W,H);drawBG(gyp);
+  const loops=outlines();if(!loops.length)return;
+  // shadow on the table under whatever is touching it
+  let x0=1e9,x1=-1e9;for(let p=0;p<NP;p++)if(py[p]>GR-1.5){x0=Math.min(x0,px[p]);x1=Math.max(x1,px[p])}
+  if(x1>x0){ctx.fillStyle='rgba(60,110,50,.22)';ctx.beginPath();ctx.ellipse((x0+x1)/2*cell,gyp+cell*.6,(x1-x0)/2*cell+R*cell*.12,R*cell*.1,0,0,7);ctx.fill()}
+  const lw=Math.max(3,R*cell*.055);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,gyp+lw*.6);ctx.clip();
+  ctx.save();loopPath(loops);ctx.fillStyle=mat.shade;ctx.fill();ctx.clip();
+  loopPath(loops,-R*cell*.07,-R*cell*.1);ctx.fillStyle=mat.base;ctx.fill();
+  ctx.fillStyle=mat.light;
+  { const L=loops[0];let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;for(const p of L){mnx=Math.min(mnx,p[0]);mxx=Math.max(mxx,p[0]);mny=Math.min(mny,p[1]);mxy=Math.max(mxy,p[1])}
+    const tgt=[mnx,mny,mxx-mnx,mxy-mny];if(!hl)hl=tgt.slice();for(let i=0;i<4;i++)hl[i]+=(tgt[i]-hl[i])*.12;
+    const [hx,hy,w,h]=hl,sz=Math.min(w,h);
+    ctx.save();ctx.translate(hx+w*.28,hy+h*.22);ctx.rotate(-.5);ctx.beginPath();ctx.ellipse(0,0,sz*.17,sz*.075,0,0,7);ctx.fill();
+    ctx.beginPath();ctx.arc(sz*.24,sz*.08,sz*.035,0,7);ctx.fill();ctx.restore() }
+  ctx.restore();
+  ctx.lineJoin='round';ctx.strokeStyle=mat.line;ctx.lineWidth=lw;loopPath(loops);ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- audio ---------- */
+let AC=null,master=null,noiseBuf=null,muted=false;
+function audio(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;AC=new C();master=AC.createGain();master.gain.value=muted?0:.85;
+  const comp=AC.createDynamicsCompressor();master.connect(comp);comp.connect(AC.destination);
+  noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+  if(AC.state==='suspended')AC.resume()}
+const rnd=(a,b)=>a+Math.random()*(b-a),ok=()=>AC&&!muted;
+function env(g,t,a,p,d){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,p),t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d)}
+function sfxSquish(i){if(!ok())return;const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=noiseBuf;s.loop=true;
+  f.type='bandpass';f.Q.value=1.4;const f0=(380+i*450)*rnd(.85,1.15)*mat.pitch;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f0*.35,t+.18);
+  env(g,t,.01,.25*i+.05,.18);s.connect(f);f.connect(g);g.connect(master);s.start(t,Math.random()*.5);s.stop(t+.3);
+  const o=AC.createOscillator(),g2=AC.createGain();o.frequency.setValueAtTime(140,t);o.frequency.exponentialRampToValueAtTime(60,t+.15);env(g2,t,.005,.18*i+.03,.15);o.connect(g2);g2.connect(master);o.start(t);o.stop(t+.22)}
+function sfxCreak(i){if(!ok())return;const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=noiseBuf;s.loop=true;
+  f.type='bandpass';f.Q.value=7;f.frequency.setValueAtTime((420+i*520)*rnd(.9,1.1)*mat.pitch,t);f.frequency.linearRampToValueAtTime(560+i*560,t+.08);env(g,t,.01,.07,.08);s.connect(f);f.connect(g);g.connect(master);s.start(t,Math.random()*.5);s.stop(t+.12)}
+function sfxBoing(i){if(!ok())return;const t=AC.currentTime,o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),g=AC.createGain();
+  o.frequency.value=220*rnd(.94,1.06)*mat.pitch;l.frequency.value=11;lg.gain.value=26*i+6;l.connect(lg);lg.connect(o.frequency);env(g,t,.01,.16*i+.03,.4);
+  o.connect(g);g.connect(master);o.start(t);l.start(t);o.stop(t+.45);l.stop(t+.45)}
+function sfxShutter(){if(!ok())return;const t=AC.currentTime;[0,.07].forEach(d=>{const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=noiseBuf;f.type='highpass';f.frequency.value=2500;env(g,t+d,.002,.25,.04);s.connect(f);f.connect(g);g.connect(master);s.start(t+d);s.stop(t+d+.08)})}
+
+/* ---------- loop ---------- */
+let last=performance.now(),perf=0;
+function frame(t){
+  const dt=Math.min(1/30,(t-last)/1000);last=t;
+  for(const f of fingers.values()){
+    let ivx=(f.x-f.lx)/Math.max(dt,1e-3),ivy=(f.y-f.ly)/Math.max(dt,1e-3);const age=(performance.now()-f.t0)/1000;
+    {const sp0=Math.hypot(ivx,ivy),cap=age<.12?8:45;if(sp0>cap){ivx*=cap/sp0;ivy*=cap/sp0}}
+    f.vx=f.vx*.5+ivx*.5;f.vy=f.vy*.5+ivy*.5;
+    const sp=Math.hypot(ivx,ivy);f.ox=f.lx;f.oy=f.ly;f.lx=f.x;f.ly=f.y;
+    if(f.mode==='grab'){
+      if(sp<1.5)f.still+=dt;else f.still=0;
+      if(f.still>.18&&f.moved<10){ // held still on the slime: press in from the top
+        const col=Math.round(f.x)+2;let top=f.y;for(let j=2;j<GH;j++){if(gm[j*GW+col]>PV*.5){top=j-2;break}}
+        f.mode='press';f.top=top;f.depth=0;f.press=1;sfxSquish(.8)}
+      f.acc+=sp*dt;if(f.acc>2.5){f.acc=0;sfxCreak(Math.min(1,sp/40))}}
+    else if(f.mode==='press'){f.depth=Math.min(R*.5,f.depth+dt*R*.9);f.press=f.depth<R*.5?1:0;f.vx=ivx}
+    else{f.acc+=sp*dt;if(f.acc>3&&massAt(f.x,f.y)>PV*.3){f.acc=0;sfxSquish(.35)}}}
+  const t0=performance.now();
+  if(fingers.size)workT=.6;else workT-=dt;working=workT>0;
+  const nsub=Math.min(16,Math.max(SUB,Math.ceil(dt/.0021))),h=Math.min(dt/nsub,.0021);for(let s=0;s<nsub;s++)step(h,(s+1)/nsub);
+  for(const f of fingers.values()){f.ox=f.x;f.oy=f.y}
+  if(!isFinite(px[0])||!isFinite(py[0]))spawn();
+  perf=perf*.9+(performance.now()-t0)*.1;
+  draw();requestAnimationFrame(frame)}
+
+/* ---------- UI ---------- */
+const NAMES={bouncy:'Q彈',mochi:'麻糬',clay:'黏土'},keys=Object.keys(NAMES),keyOf=()=>keys.find(k=>MATS[k]===mat);
+keys.forEach(k=>document.getElementById('m-'+k).addEventListener('click',()=>{audio();mat=MATS[k];
+  keys.forEach(j=>document.getElementById('m-'+j).setAttribute('aria-pressed',String(j===k)));syncTune();sfxBoing(.4)}));
+document.getElementById('reset').addEventListener('click',()=>{audio();spawn();sfxSquish(.8)});
+const fields=['E','visc','yield'];
+const get={E:()=>mat.E,visc:()=>mat.visc,yield:()=>mat.yc},set={E:v=>mat.E=v,visc:v=>mat.visc=v,yield:v=>{mat.yc=v}};
+function syncTune(){document.getElementById('tune-mat').textContent=NAMES[keyOf()];
+  for(const f of fields){document.getElementById('t-'+f).value=get[f]();document.getElementById('o-'+f).textContent=f==='yield'?get[f]().toFixed(3):Math.round(get[f]())}
+  document.getElementById('t-out').value=JSON.stringify({手感:NAMES[keyOf()],硬度:Math.round(mat.E),黏稠:Math.round(mat.visc),回彈範圍:+mat.yc.toFixed(3)})}
+for(const f of fields)document.getElementById('t-'+f).addEventListener('input',e=>{set[f](+e.target.value);syncTune()});
+const tb=document.getElementById('tbtn'),tp=document.getElementById('tune');
+tb.addEventListener('click',()=>{tp.hidden=!tp.hidden;tb.setAttribute('aria-pressed',String(!tp.hidden));syncTune()});
+document.getElementById('t-default').addEventListener('click',()=>{Object.assign(MATS[keyOf()],DEF[keyOf()]);syncTune()});
+document.getElementById('t-copy').addEventListener('click',e=>{const ta=document.getElementById('t-out'),btn=e.currentTarget;
+  const done=()=>{btn.textContent='已複製';setTimeout(()=>btn.textContent='複製數值',1400)};
+  try{navigator.clipboard.writeText(ta.value).then(done,()=>{ta.focus();ta.select()})}catch(_){ta.focus();ta.select()}});
+const sb=document.getElementById('sound');
+sb.addEventListener('click',()=>{audio();muted=!muted;if(master)master.gain.value=muted?0:.85;sb.setAttribute('aria-pressed',String(muted));sb.setAttribute('aria-label',muted?'打開聲音':'關閉聲音');
+  sb.querySelector('.x').hidden=!muted;sb.querySelector('.w1').style.display=muted?'none':'';sb.querySelector('.w2').style.display=muted?'none':''});
+const flash=document.getElementById('flash'),photo=document.getElementById('photo'),shot=document.getElementById('shot');
+document.getElementById('cam').addEventListener('click',()=>{audio();draw();const off=document.createElement('canvas');off.width=cv.width;off.height=cv.height;const o=off.getContext('2d');o.drawImage(cv,0,0);
+  o.font=`700 ${16*DPR}px "Mochiy Pop One","Zen Maru Gothic",sans-serif`;o.fillStyle='rgba(60,100,50,.6)';o.textAlign='right';o.fillText('捏捏史萊姆',off.width-18*DPR,(GR*cell+R*cell*.6)*DPR);
+  try{shot.src=off.toDataURL('image/jpeg',.92)}catch(e){return}sfxShutter();flash.classList.remove('go');void flash.offsetWidth;flash.classList.add('go');setTimeout(()=>{photo.hidden=false},250)});
+document.getElementById('close').addEventListener('click',()=>{photo.hidden=true});
+const hintEl=document.getElementById('hint');setTimeout(()=>hintEl.classList.add('off'),7000);
+let rzT=null,lw=innerWidth,lh=innerHeight;addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(Math.abs(innerWidth-lw)>2||Math.abs(innerHeight-lh)>160){lw=innerWidth;lh=innerHeight;setup()}},150)});
+setup();syncTune();window.__perf=()=>({perf,NP});
+requestAnimationFrame(t=>{last=t;requestAnimationFrame(frame)});
+})();
+
+</script>
