@@ -4,7 +4,7 @@
 
 ## 目前狀態
 
-- `prototype/web/index.html`：**目前採用的手感原型**（程序化動畫：18 個控制點＋彈簧，不做物理模擬）。用 iPhone Safari 打開即可捏。
+- `prototype/web/index.html`：**目前採用的手感原型**（程序化動畫：18 個控制點＋彈簧，不做物理模擬）。用 iPhone Safari 打開即可捏。線上版（GitHub Pages）：<https://domyweb666.github.io/nienie-slime/prototype/web/index.html>。網頁版沒有觸覺、延遲與原生版不同，只能看形狀與手勢邏輯，不能當手感驗收。
 - `prototype/web/archive/`：試過但手感未達標的版本，僅供參考：
   - `mesh-v7.html`：三角網子軟體（大幅揉捏會打結）
   - `mpm-clay.html`：MPM 顆粒模擬（在 iPhone 上會崩裂、閃爍）
