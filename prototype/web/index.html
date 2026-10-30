@@ -55,7 +55,6 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 
 <div class="bar top">
   <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2</span></div>
-  <button class="round" id="b-float" aria-pressed="true" title="懸空／地面">☁️</button>
 </div>
 
 <div class="hint" id="hint">捏它、拉它、戳它。放著不管它也會動</div>
@@ -72,7 +71,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div class="tune hidden" id="tune">
   <div class="tune-head"><b>調整面板</b><span>長按「捏捏」開關</span></div>
   <div id="sliders"></div>
-  <div class="tune-actions"><button id="t-copy">複製數值</button><button id="t-close">收起</button></div>
+  <div class="tune-actions"><button id="b-float" aria-pressed="true">懸空（多米定案）</button><button id="t-copy">複製數值</button><button id="t-close">收起</button></div>
   <textarea id="t-out" readonly rows="3" aria-label="目前的手感數值"></textarea>
 </div>
 
@@ -389,7 +388,7 @@ function frame(now){
 function setMat(name){mat={...PRESETS[name]};for(const k of ['jelly','mochi','clay'])$('m-'+k).setAttribute('aria-pressed',String(k===name));syncSliders()}
 for(const k of ['jelly','mochi','clay'])$('m-'+k).addEventListener('click',()=>setMat(k));
 $('b-reset').addEventListener('click',()=>{setup()});
-$('b-float').addEventListener('click',()=>{FLOAT=!FLOAT;$('b-float').setAttribute('aria-pressed',String(FLOAT));$('b-float').textContent=FLOAT?'☁️':'🌱';setup()});
+$('b-float').addEventListener('click',()=>{FLOAT=!FLOAT;$('b-float').setAttribute('aria-pressed',String(FLOAT));$('b-float').textContent=FLOAT?'懸空（多米定案）':'地面（對照用）';setup();dump()});
 // 隱藏面板：長按標題 1.2 秒
 let pressT=null;
 $('brand').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{$('tune').classList.toggle('hidden')},1200)});
