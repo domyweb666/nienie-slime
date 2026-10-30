@@ -48,6 +48,12 @@
 - `.github/workflows/ios.yml` ← 編譯與上傳流程
 - `.uiux/04-手感/參數表-暫定.md` ← 參數與減少動態版數值
 
+## 🔄 2026-10-31 補記（第二會話）
+
+- 技術方案思考已寫進 `.uiux/04-手感/技術選型決定-暫定.md`（Rive 候選移除、塑形邊界表、寵物定位三選一、建議順序）；新增 `.uiux/lessons.md`
+- 多米選了**先只看網頁原型**。給他的方式：同一 Wi-Fi 下手機開 `http://192.168.0.173:8787/index.html`（電腦跑 `python -m http.server 8787` 在 `prototype/web/`）；GitHub Pages 尚未開，開了會是 `https://domyweb666.github.io/nienie-slime/prototype/web/index.html`
+- 待多米定：塑形指哪一種、寵物指哪一種、Bundle ID
+
 ## ⏭️ 下一步從哪繼續
 
 1. 先讀這份 `.vibe/HANDOFF.md`
