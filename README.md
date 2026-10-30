@@ -9,6 +9,7 @@
   - `mesh-v7.html`：三角網子軟體（大幅揉捏會打結）
   - `mpm-clay.html`：MPM 顆粒模擬（在 iPhone 上會崩裂、閃爍）
 - `.uiux/`：設計檔（核心動作卡、手感參數表、原型規格、測試方法、技術選型）。全部是暫定版。
+- `ios/`：SwiftUI 移植版，加上 Core Haptics 和 AVAudioEngine 合成音。編譯和上傳 TestFlight 的步驟寫在 `ios/README.md`。
 
 ## 下一步
 
