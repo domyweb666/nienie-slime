@@ -1,4 +1,4 @@
-# Handoff: 網頁手感原型已移植成 SwiftUI，雲端編譯通過，還沒裝上真機
+# Handoff: v1 放射狀 rig 多米實測不達標，已重做成 v2 形狀匹配網頁原型（Pages 可開），等多米手機試
 
 > 產出時間：2026-10-31 06:45
 > 前一會話的最後狀態，給下一個會話接續用
@@ -48,20 +48,28 @@
 - `.github/workflows/ios.yml` ← 編譯與上傳流程
 - `.uiux/04-手感/參數表-暫定.md` ← 參數與減少動態版數值
 
-## 🔄 2026-10-31 補記（第二會話）
+## 🔄 2026-10-31 第二會話
 
-- 技術方案思考已寫進 `.uiux/04-手感/技術選型決定-暫定.md`（Rive 候選移除、塑形邊界表、寵物定位三選一、建議順序）；新增 `.uiux/lessons.md`
-- 多米選了**先只看網頁原型**。給他的方式：同一 Wi-Fi 下手機開 `http://192.168.0.173:8787/index.html`（電腦跑 `python -m http.server 8787` 在 `prototype/web/`）；GitHub Pages 已開（2026-10-31，來源 main 根目錄），固定網址 `https://domyweb666.github.io/nienie-slime/prototype/web/index.html`；注意 Pages 吃 main，原型改了要合進 main 才會更新
-- 待多米定：塑形指哪一種、寵物指哪一種、Bundle ID
+- 多米在 Pages 上捏了 v1（18 點放射狀 rig）：描邊打結、回彈不順、合成音難聽、不是他要的塑形。成因與三條改道寫在 `.uiux/04-手感/技術選型決定-暫定.md`
+- 多米選「重做，形狀匹配」，另外補了三個新要求：**要愛不釋手、要像活物（沒碰也會動）、考慮懸空取消地面**
+- v2 已寫好：`prototype/web/index.html`（v1 搬到 `archive/radial-v1.html`）。形狀匹配＋塑性＋活物感＋懸空／地面切換＋三預設＋隱藏面板（長按「捏捏」）。**無音效**（等錄音）
+- Agent 程式自測：拉、壓、兩指、亂甩、放著，全部零自交、面積回 100%、放手回正。數字在技術選型檔「v2 實作紀錄」。**多米還沒摸過 v2**
+- GitHub Pages 已開（吃 main 根目錄）：`https://domyweb666.github.io/nienie-slime/prototype/web/index.html`。prototype 與文件已同步到 main
+- `CLAUDE.md` **已過時**（還寫著程序化 18 點、不做物理、不做寵物行為）。改核心配置檔前要先給多米看現況，所以這次沒動，下次要先處理
+- `ios/` 的 Swift 版是 v1 演算法，也過時了；等 v2 手感定案再重移植
 
 ## ⏭️ 下一步從哪繼續
 
-1. 先讀這份 `.vibe/HANDOFF.md`
-2. 問多米要走哪條測試路（TestFlight／Expo 版／網頁原型），先說清楚 TestFlight 內部測試不等於公開上架
-3. 如果選 TestFlight：照 `ios/README.md`「第一次上傳 TestFlight 要準備的東西」陪多米一步步做，Secrets 可用 `gh secret set <名稱> --repo domyweb666/nienie-slime` 設定，然後 `gh workflow run iOS --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，失敗就看 log 修簽名
-4. 如果選 Expo 版：先跟多米確認這會偏離 CLAUDE.md 定案的 Swift 路線，再開工
+1. 先讀這份 `.vibe/HANDOFF.md`，再讀 `.uiux/04-手感/技術選型決定-暫定.md`（成因表、改道候選、v2 實作紀錄、愛不釋手機制表）
+2. 問多米 v2 手機上捏的感覺，三件事：果凍／麻糬／黏土哪個對、懸空還是地面、哪裡還不像活物。他回報的東西記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
+3. 調參數：一次一個，用隱藏面板的「複製數值」把他調到喜歡的數值貼回來，寫進 `參數表-暫定.md`
+4. 跟多米一起更新 `CLAUDE.md`：先 cat 現況給他看，再改成 v2 的做法（形狀匹配、懸空、自己會動）
+5. 錄音：買史萊姆、iPhone 近錄四類聲音，Agent 做切片與觸發
+6. 以上定了再談移植 Swift（ios/ 要重寫 rig，Haptics／Audio 層可留）
 
 ## 🗑️ 這次會話的雜訊（下次別重新討論）
 
 - Expo Go 能不能跑 Swift：不能，已確認，別再查
 - 原型裡的拍照按鈕、相機相關 CSS 是舊版殘留，「不做清單」已排除拍照分享，移植版沒做
+- v1 為什麼打結、v2 為什麼選形狀匹配、線性 beta 為什麼關掉：都寫在技術選型檔與 lessons，別重新推導
+- 瀏覽器分頁在背景時 rAF 會被節流，程式自測要自己用固定 dt 呼叫 update()，不要靠 setTimeout 等

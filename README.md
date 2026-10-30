@@ -4,13 +4,16 @@
 
 ## 目前狀態
 
-- `prototype/web/index.html`：**目前採用的手感原型**（程序化動畫：18 個控制點＋彈簧，不做物理模擬）。用 iPhone Safari 打開即可捏。線上版（GitHub Pages）：<https://domyweb666.github.io/nienie-slime/prototype/web/index.html>。網頁版沒有觸覺、延遲與原生版不同，只能看形狀與手勢邏輯，不能當手感驗收。
+- `prototype/web/index.html`：**目前採用的手感原型 v2：形狀匹配軟體（Shape Matching）＋塑性＋活物感**。身體是約 160 顆粒子，每幀被拉回「最接近的剛體擺放」，數學上不會爆、不會打結；變形超過門檻會留形，放著慢慢回去；沒碰它會呼吸、慢搖、偶爾抖，預設懸空（右上角可切地面）。三種預設：果凍（不留形）、麻糬（留一點）、黏土（留很多）。長按「捏捏」開調整面板。這版沒有音效，等真實錄音切片。用 iPhone Safari 打開即可捏。線上版（GitHub Pages）：<https://domyweb666.github.io/nienie-slime/prototype/web/index.html>。網頁版沒有觸覺、延遲與原生版不同，只能看形狀與手勢邏輯，不能當手感驗收。
 - `prototype/web/archive/`：試過但手感未達標的版本，僅供參考：
   - `mesh-v7.html`：三角網子軟體（大幅揉捏會打結）
   - `mpm-clay.html`：MPM 顆粒模擬（在 iPhone 上會崩裂、閃爍）
+  - `radial-v1.html`：18 點放射狀程序化 rig（大幅拉扯描邊會自交、回彈各點獨立不像果凍、做不出塑形）
 - `.uiux/`：設計檔（核心動作卡、手感參數表、原型規格、測試方法、技術選型）。全部是暫定版。
-- `ios/`：SwiftUI 移植版，加上 Core Haptics 和 AVAudioEngine 合成音。編譯和上傳 TestFlight 的步驟寫在 `ios/README.md`。
+- `ios/`（在 `swiftui-port` 分支）：radial-v1 的 SwiftUI 移植版，加上 Core Haptics 和 AVAudioEngine 合成音。**演算法已過時**，等 v2 手感在網頁上定下來後要改移植 v2。編譯和上傳 TestFlight 的步驟寫在 `ios/README.md`。
 
 ## 下一步
 
-把網頁原型移植成 SwiftUI App，加上 Core Haptics 震動。詳見 `CLAUDE.md`。
+1. 多米用手機捏 v2 網頁原型，決定要果凍、麻糬還是黏土的手感，以及懸空還是地面。
+2. 買一盒真的史萊姆，錄四類聲音（按、拉、放手、持續揉），換掉合成音。
+3. 手感定了再把 v2 演算法移植成 Swift，加 Core Haptics。`CLAUDE.md` 的移植規格是 v1 的，要改。
