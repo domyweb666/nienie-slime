@@ -63,8 +63,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div class="bar bottom">
   <div class="mats" role="group" aria-label="手感">
     <button id="m-jelly" aria-pressed="false"><i style="background:#7FE0C2"></i>果凍</button>
-    <button id="m-mochi" aria-pressed="true"><i style="background:#C9B6FF"></i>麻糬</button>
-    <button id="m-clay" aria-pressed="false"><i style="background:#FFD86B"></i>黏土</button>
+    <button id="m-mochi" aria-pressed="false"><i style="background:#C9B6FF"></i>麻糬</button>
+    <button id="m-clay" aria-pressed="true"><i style="background:#FFD86B"></i>黏土</button>
   </div>
   <button class="round" id="b-reset" title="回原形">↺</button>
 </div>
@@ -114,7 +114,7 @@ const F=[
   ['gripRot','抓著時不轉','越大拉它時身體越不會歪掉',1,8,.5],
   ['life','活物感','沒碰時自己動的幅度',0,1.5,.05],
 ];
-let mat={...PRESETS.mochi};
+let mat={...PRESETS.clay};  // 多米 2026-10-31 選黏土
 let FLOAT=true;
 
 /* ---------- 世界 ---------- */
