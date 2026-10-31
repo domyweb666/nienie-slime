@@ -10,9 +10,11 @@ enum SlimeEvent {
     case tap                                 // VoiceOver / buttons
 }
 
-/// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.3
+/// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
 /// (v2.2 plus the first batch of 手感精修提案, 2026-11-01: press spread, dwell-gated plasticity,
-/// release strength by stretch, prediction fallback, animated reset):
+/// release strength by stretch, prediction fallback, animated reset; v2.4 second-batch candidates
+/// behind FeelParams defaults; v2.5 提案第 41 條: tentacle rungs and medial-axis constraint, so a
+/// tentacle pushed from its root toward its tip no longer folds over itself):
 /// a floating irregular blob with drooping tentacles, built from particles that are pulled
 /// back every substep to the best rigid fit of overlapping clusters. Plasticity keeps a
 /// molded shape (clay), tentacles spring back; idle breathing, wriggle, tentacle drift,
@@ -56,6 +58,17 @@ final class SlimeRig {
     }
     private var tent: [Tentacle] = []
     private var ph: [Double] = [0, 0, 0, 0]
+
+    /// 觸手橫檔 (提案第 41 條): a pair of boundary particles across a tentacle, with its rest width and the
+    /// rest length of the medial-axis link leading to it.
+    private struct Rung {
+        var a: Int, b: Int
+        var w0: Double
+        var hs: Double
+    }
+    private var rungs: [[Rung]] = []          // per tentacle, root to tip
+    private var rungSign: [Double] = []       // rest handedness: sign of cross(local axis, b − a)
+    private var rungRef: [(Int, Int)] = []    // the two body particles flanking each tentacle's boundary run
 
     private(set) var hiIdx = 0
     private var t = 0.0, lastTouch = -10.0, nextTwitch = 3.0, A0 = 1.0
@@ -274,6 +287,7 @@ final class SlimeRig {
             bndL.append(hypot(Q0X[jj] - Q0X[i], Q0Y[jj] - Q0Y[i]))
         }
         for k in 0..<bnd.count { BIDX[bnd[k]] = k }
+        buildRungs()
         // highlight rides on the upper-left of the blob
         var bd = 1e9
         for i in 0..<N where TID[i] < 0 {
@@ -305,6 +319,62 @@ final class SlimeRig {
         clusters.append(Cluster(idx: Array(0..<N), w: params.wGlobal))
         gi = clusters.count - 1
         builtSpace = params.cSpace; builtRad = params.cRad
+    }
+
+    /// 觸手橫檔 (提案第 41 條). A tentacle's boundary is one contiguous run of the ring: up one edge to the tip and
+    /// back down the other. Pair the two edges by position along the tentacle, remember the rest width, the rest
+    /// handedness and the rest spacing of the medial axis (rung midpoints), so the tentacle cannot fold over itself.
+    private func buildRungs() {
+        rungs = []; rungSign = []; rungRef = []
+        let nb = bnd.count
+        for k in tent.indices {
+            var pos: [Int] = []
+            for r in 0..<nb where TID[bnd[r]] == k { pos.append(r) }
+            if pos.count < 4 { rungs.append([]); rungSign.append(1); rungRef.append((bnd[0], bnd[0])); continue }
+            let inRun = Set(pos)
+            var start = pos[0]
+            for r in pos where !inRun.contains((r + nb - 1) % nb) { start = r; break }
+            var run: [Int] = []
+            for m in 0..<pos.count { run.append(bnd[(start + m) % nb]) }
+            var tipAt = 0
+            for m in 1..<run.count where TU[run[m]] > TU[run[tipAt]] { tipAt = m }
+            let edgeA = Array(run[0...tipAt]), edgeB = Array(run[tipAt...])
+            var list: [Rung] = []
+            for a in edgeA {
+                var best = -1, bd = 1e9
+                for b in edgeB where b != a {
+                    let d = abs(TU[b] - TU[a])
+                    if d < bd { bd = d; best = b }
+                }
+                if best < 0 { continue }
+                let w0 = hypot(Q0X[best] - Q0X[a], Q0Y[best] - Q0Y[a])
+                if w0 < h * 0.9 { continue }   // the very tip is too narrow to tell the sides apart
+                list.append(Rung(a: a, b: best, w0: w0, hs: 0))
+            }
+            list.sort { TU[$0.a] < TU[$1.a] }
+            var s = 0.0
+            for r in list.indices {
+                let p = list[max(0, r - 1)], q = list[min(list.count - 1, r + 1)], g = list[r]
+                let tx = Q0X[q.a] + Q0X[q.b] - Q0X[p.a] - Q0X[p.b], ty = Q0Y[q.a] + Q0Y[q.b] - Q0Y[p.a] - Q0Y[p.b]
+                let c = tx * (Q0Y[g.b] - Q0Y[g.a]) - ty * (Q0X[g.b] - Q0X[g.a])
+                s += c > 0 ? 1 : (c < 0 ? -1 : 0)
+            }
+            let ref = (bnd[(start + nb - 1) % nb], bnd[(start + pos.count) % nb])
+            for r in list.indices {
+                let g = list[r]
+                let mx: Double, my: Double
+                if r == 0 {
+                    mx = (Q0X[g.a] + Q0X[g.b] - Q0X[ref.0] - Q0X[ref.1]) * 0.5
+                    my = (Q0Y[g.a] + Q0Y[g.b] - Q0Y[ref.0] - Q0Y[ref.1]) * 0.5
+                } else {
+                    let p = list[r - 1]
+                    mx = (Q0X[g.a] + Q0X[g.b] - Q0X[p.a] - Q0X[p.b]) * 0.5
+                    my = (Q0Y[g.a] + Q0Y[g.b] - Q0Y[p.a] - Q0Y[p.b]) * 0.5
+                }
+                list[r].hs = max(h * 0.3, hypot(mx, my))
+            }
+            rungs.append(list); rungSign.append(s >= 0 ? 1 : -1); rungRef.append(ref)
+        }
     }
 
     private func polygonArea() -> Double {
@@ -704,6 +774,10 @@ final class SlimeRig {
         // 3c non-penetration inside a group (same tentacle / body): keeps tentacles from thinning or folding.
         //    Different groups may overlap (one in front of the other), otherwise a pulled-across tentacle gets stuck.
         collide()
+        // 3d tentacle rungs + medial axis (提案第 41 條): particle non-penetration only knows distances, not sides,
+        //    so a tentacle pushed root-to-tip could fold over itself; the rungs keep each edge on its own side and the
+        //    axis links keep advancing (the fold was the axis turning 180° within one link)
+        if mat.tentRung > 0 { tentacleRungs(mat) }
         // 4 home (float), bounds
         let hx = homeX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY + Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7)
@@ -759,6 +833,55 @@ final class SlimeRig {
                         X[i] -= dx * c * wi / sw; Y[i] -= dy * c * wi / sw
                         X[j] += dx * c * wj / sw; Y[j] += dy * c * wj / sw
                     }
+                }
+            }
+        }
+    }
+
+    private func tentacleRungs(_ mat: FeelParams) {
+        for k in rungs.indices {
+            let list = rungs[k], s0 = rungSign[k], nr = list.count
+            if nr < 2 { continue }
+            // width and side: b must stay on its own side of the local axis, at least tentRung of the rest width away
+            for r in 0..<nr {
+                let p = list[max(0, r - 1)], q = list[min(nr - 1, r + 1)], g = list[r]
+                var tx = X[q.a] + X[q.b] - X[p.a] - X[p.b], ty = Y[q.a] + Y[q.b] - Y[p.a] - Y[p.b]
+                let tl = max(1e-6, hypot(tx, ty)); tx /= tl; ty /= tl
+                let nx = -ty * s0, ny = tx * s0   // unit normal from a's side to b's side
+                let dx = X[g.b] - X[g.a], dy = Y[g.b] - Y[g.a], wmin = g.w0 * mat.tentRung
+                let wa = GRAB[g.a] ? 0.3 : 1.0, wb = GRAB[g.b] ? 0.3 : 1.0, sw = wa + wb
+                let cn = dx * nx + dy * ny
+                if cn < wmin {
+                    let delta = (wmin - cn) * 0.6
+                    X[g.a] -= nx * delta * wa / sw; Y[g.a] -= ny * delta * wa / sw
+                    X[g.b] += nx * delta * wb / sw; Y[g.b] += ny * delta * wb / sw
+                }
+            }
+            // medial axis: each link projects at least tentAxis of its rest length onto the previous link
+            // (the root link is measured from the body particles flanking the tentacle)
+            if mat.tentAxis > 0 {
+                let rp = rungRef[k]
+                for r in 0..<(nr - 1) {
+                    let g = list[r], q = list[r + 1]
+                    var ux: Double, uy: Double
+                    if r == 0 {
+                        ux = (X[g.a] + X[g.b]) * 0.5 - (X[rp.0] + X[rp.1]) * 0.5
+                        uy = (Y[g.a] + Y[g.b]) * 0.5 - (Y[rp.0] + Y[rp.1]) * 0.5
+                    } else {
+                        let p = list[r - 1]
+                        ux = (X[g.a] + X[g.b] - X[p.a] - X[p.b]) * 0.5
+                        uy = (Y[g.a] + Y[g.b] - Y[p.a] - Y[p.b]) * 0.5
+                    }
+                    let ul = max(1e-6, hypot(ux, uy)); ux /= ul; uy /= ul
+                    let sx = (X[q.a] + X[q.b] - X[g.a] - X[g.b]) * 0.5, sy = (Y[q.a] + Y[q.b] - Y[g.a] - Y[g.b]) * 0.5
+                    let s = sx * ux + sy * uy, hmin = q.hs * mat.tentAxis
+                    if s >= hmin { continue }
+                    let delta = (hmin - s) * 0.5
+                    let wq = (GRAB[q.a] || GRAB[q.b]) ? 0.3 : 1.0, wg = (GRAB[g.a] || GRAB[g.b]) ? 0.3 : 1.0, sw = wq + wg
+                    X[q.a] += ux * delta * wq / sw; Y[q.a] += uy * delta * wq / sw
+                    X[q.b] += ux * delta * wq / sw; Y[q.b] += uy * delta * wq / sw
+                    X[g.a] -= ux * delta * wg / sw; Y[g.a] -= uy * delta * wg / sw
+                    X[g.b] -= ux * delta * wg / sw; Y[g.b] -= uy * delta * wg / sw
                 }
             }
         }

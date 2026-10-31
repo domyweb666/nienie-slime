@@ -59,6 +59,9 @@ struct FeelParams: Equatable, Codable {
     var tickMin: Double = 0.10        // tick intensity when the finger is slow
     var tickMax: Double = 0.30        // tick intensity at 3 radii per second
     var tickSharp: Double = 0.4       // tick sharpness
+    // 提案第 41 條 (2026-11-01): tentacle rungs. 0 = the v2.4 behaviour, where a tentacle pushed root-to-tip could fold over itself
+    var tentRung: Double = 0.5        // the two edges of a tentacle stay on their own sides, at least this fraction of the rest width apart
+    var tentAxis: Double = 0.85       // each link of a tentacle's medial axis keeps advancing by at least this fraction of its rest length
     // sound
     var volMaster: Double = 0.9       // output volume
     var rubMax: Double = 0.7          // loudest the rub loop gets
@@ -144,6 +147,7 @@ struct Candidate: Identifiable {
         Candidate(id: 19, name: "19 碰到時凍住", hint: "活物感停住，不縮回標準姿勢") { p, _ in p.idleFreeze = 1 },
         Candidate(id: 2, name: "2 偶發特別回彈", hint: "每 8 次放手多晃一下") { p, _ in p.specialEvery = 8 },
         Candidate(id: 9, name: "9 接觸面積壓力", hint: "指腹壓得越扁攤得越開") { p, _ in p.pressRadiusGain = 1 },
+        Candidate(id: 41, name: "41 對照：關橫檔", hint: "v2.4 以前：觸手被壓縮會對折") { p, _ in p.tentRung = 0; p.tentAxis = 0 },
     ]
 }
 
@@ -172,6 +176,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.anchor, name: "抓著時的定身", hint: "越大身體越不會整團跟著手走、轉掉", range: 1...8, step: 0.5),
         TuneField(key: \.areaGain, name: "面積壓力", hint: "壓扁時旁邊鼓出來的程度", range: 0...1.5, step: 0.05),
         TuneField(key: \.gripRot, name: "抓著時不轉", hint: "越大拉它時身體越不會歪掉", range: 1...8, step: 0.5),
+        TuneField(key: \.tentRung, name: "觸手橫檔", hint: "兩邊成對的粒子不能翻到對面、寬度不低於靜止的幾成；0 關＝v2.4 以前（第 41 條）", range: 0...0.9, step: 0.05),
+        TuneField(key: \.tentAxis, name: "觸手中軸不折返", hint: "中軸每一節在上一節方向上至少前進靜止節距的幾成；0 關（第 41 條）", range: 0...1, step: 0.05),
 
         TuneField(key: \.pressBase, name: "按壓攤開（×半徑）", hint: "按下去那塊往四周攤多少（看得到的約一半）", range: 0...0.3, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.pressHold, name: "按住再攤（×半徑）", hint: "按住不動時再多攤多少", range: 0...0.3, step: 0.01, section: "按壓與記形"),
