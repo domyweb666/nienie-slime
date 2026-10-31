@@ -37,7 +37,7 @@
   const realRandom = Math.random;
   const saveClock = () => ({ t, lastTouch, nextTwitch, tLife, relaxUntil, wNext: WANDER.next, wMoving: WANDER.moving });
   function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; Math.random = realRandom; }
-  function resetAligned(wanderNext) { mat = { ...PRESETS.clay }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
+  function resetAligned(wanderNext) { mat = { ...PRESETS.clay }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
 
   // T1 輕按 0.1 秒：第一幀要動，放手後不留痕
   reset();
@@ -160,8 +160,48 @@
     res.T12_wander = { tail: PRESETS.clay.tail, movingFrames: run.moved, maxTailPt: +maxTail.toFixed(2), afterStopPt: +afterStop.toFixed(2), worstSelfX: run.worst, areaMin: +run.minA.toFixed(3), areaMax: +run.maxA.toFixed(3), controlSame: ctl.moved === run.moved };
     restoreClock(clock);
   }
+  // T13 兩指捏（第 24 條）：兩指在身體兩側抓住、相向靠近到起始距離的 35%，要有 squish（press 音）至少兩次；放手後零對折、面積回來（過程的對折幀只記錄）
+  reset(); fold = 0; overlap = 0;
+  { const d0 = R * 0.9; ev('pointerdown', 1, cx0 - d0 / 2, cy0); ev('pointerdown', 2, cx0 + d0 / 2, cy0); steps(2); log.splice(0);
+    for (let k = 1; k <= 40; k++) { const d = d0 * (1 - 0.65 * k / 40); ev('pointermove', 1, cx0 - d / 2, cy0); ev('pointermove', 2, cx0 + d / 2, cy0); steps(1); trk(); }
+    for (let k = 0; k < 30; k++) { steps(1); trk(); }
+    const during = snap(), squish = log.filter(e => e[0] === 'press').length;
+    ev('pointerup', 1, cx0 - d0 * 0.175, cy0); ev('pointerup', 2, cx0 + d0 * 0.175, cy0); steps(180);
+    res.T13_pinch = { squishEvents: squish, during, after3s: snap(), foldFrames: fold, overlapFrames: overlap }; log.splice(0); }
+
+  // T14 拉太遠滑脫（候選 25，開著）：拉到上限 1.3 倍停 0.3 秒，手指還按著就要脫手（最重的放手音、沒有粒子被抓著）；之後抬手不再第二次啵
+  reset(); mat.slip = 1; log.splice(0);
+  { const far = PRESETS.clay.maxPull * 1.3 * R; ev('pointerdown', 1, cx0, cy0);
+    for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx0 + far * k / 30, cy0); steps(1); }
+    for (let k = 0; k < 20; k++) steps(1);
+    const slipped = log.filter(e => e[0] === 'release'), grabbed = Array.from(GRAB).filter(Boolean).length;
+    log.splice(0); ev('pointerup', 1, cx0 + far, cy0); steps(60);
+    res.T14_slip = { slipRelease: slipped.length, slipGain: slipped.length ? slipped[0][1] : 0, grabbedAfterSlip: grabbed, popAfterLift: log.filter(e => e[0] === 'release').length, after1s: snap() }; log.splice(0); }
+
+  // T15 放手黏連（候選 26，0.12 秒）：慢慢移 0.3R 再抬手，啵要晚 6 幀以上才來、抬手那一刻那塊還被抓著；快甩抬手要當幀就啵
+  reset(); mat.stick = 0.12; log.splice(0);
+  { ev('pointerdown', 1, cx0, cy0); for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx0 + R * 0.3 * k / 30, cy0); steps(1); }
+    log.splice(0); ev('pointerup', 1, cx0 + R * 0.3, cy0); let popAt = -1; const heldAtLift = Array.from(GRAB).filter(Boolean).length;
+    for (let k = 0; k < 30; k++) { steps(1); if (popAt < 0 && log.some(e => e[0] === 'release')) popAt = k + 1; }
+    steps(60); const slow = { popFrame: popAt, heldAtLift, fingersLeft: fingers.size };
+    ev('pointerdown', 1, cx0, cy0); for (let k = 1; k <= 6; k++) { ev('pointermove', 1, cx0 + k * R * 0.25, cy0); steps(1); }
+    log.splice(0); ev('pointerup', 1, cx0 + R * 1.5, cy0); const fastImmediate = log.some(e => e[0] === 'release'); steps(60);
+    res.T15_stick = { slow, fastImmediate, after: snap() }; log.splice(0); }
+
+  // T16 第三批候選全開（21 回家慢、22 餘韻、23 呼吸三項、27 局部面積、33 家 0.46）：抓放三次加放著 5 秒也不壞
+  reset(); Object.assign(mat, { homeK: 0.003, afterglow: 0.25, breathT: 6, breathShape: 1, breathDeep: 1, localArea: 1, homeFrac: 0.46 }); steps(120);
+  { let worst16 = 0; const note = () => { worst16 = Math.max(worst16, classify()[0]); }; const c16x = globalC.xc, c16y = globalC.yc;
+    for (let r = 0; r < 3; r++) {
+      ev('pointerdown', 1, c16x, c16y);
+      for (let k = 1; k <= 20; k++) { ev('pointermove', 1, c16x + k * R * 0.08, c16y - k * R * 0.04); steps(1); note(); }
+      for (let k = 0; k < 20; k++) { steps(1); note(); }
+      ev('pointerup', 1, c16x + R * 1.6, c16y - R * 0.8); for (let k = 0; k < 90; k++) { steps(1); note(); }
+    }
+    let minA16 = 9, maxA16 = 0; for (let k = 0; k < 300; k++) { update(DT); if (k % 10 === 0) { note(); const a = area() / A0; minA16 = Math.min(minA16, a); maxA16 = Math.max(maxA16, a); } }
+    res.T16_batch3 = { worstSelfX: worst16, after: snap(), areaMin: +minA16.toFixed(3), areaMax: +maxA16.toFixed(3), releases: log.filter(e => e[0] === 'release').length }; log.splice(0); }
+
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
-  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames };
+  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames };
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -180,6 +220,11 @@
     compressionFoldsRare: res.T11_compressionGrid.heldFoldRuns <= 1 && res.T11_compressionGrid.foldFrames < 100,
     // 第 20 條：拖尾只是表演，走完要收回來、過程不能自交或漏面積
     wanderTailClean: res.T12_wander.worstSelfX === 0 && res.T12_wander.areaMin > 0.97 && res.T12_wander.areaMax < 1.03 && res.T12_wander.afterStopPt < 1.5 && res.T12_wander.controlSame,
+    // 第三批其餘（2026-11-01）：24 兩指捏要有 squish；25 滑脫要真的脫手、只啵一次；26 黏連要晚放、快甩不黏；候選全開也不壞
+    pinchSquishes: res.T13_pinch.squishEvents >= 2 && res.T13_pinch.after3s.fold === 0 && okArea(res.T13_pinch.after3s),
+    slipLetsGo: res.T14_slip.slipRelease === 1 && res.T14_slip.slipGain >= 0.99 && res.T14_slip.grabbedAfterSlip === 0 && res.T14_slip.popAfterLift === 0,
+    stickDelaysPop: res.T15_stick.slow.popFrame >= 6 && res.T15_stick.slow.heldAtLift > 0 && res.T15_stick.slow.fingersLeft === 0 && res.T15_stick.fastImmediate,
+    batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
   };
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
