@@ -64,6 +64,21 @@ struct FeelParams: Equatable, Codable {
     var tentAxis: Double = 0.85       // each link of a tentacle's medial axis keeps advancing by at least this fraction of its rest length
     // 提案第 20 條 (2026-11-01): while wandering the tentacles trail the motion
     var tail: Double = 0.12           // tentacle tail while wandering, in radii at the nominal wander speed (tips most); 0 = off
+    // 第三批其餘 (2026-11-01): all defaults are the control values
+    var homeK: Double = 0.02          // idle home spring per substep (候選 21: 0.003)
+    var afterglow: Double = 0         // seconds of extra wobble after a release, damping eases from 0.975 (候選 22: 0.25)
+    var breathT: Double = 3.8         // breathing period, seconds (候選 23a: 6)
+    var breathShape: Double = 0       // 1: inhale 40%, exhale 55%, pause 5% (候選 23b)
+    var breathDeep: Double = 0        // 1: a grab held over 10 s makes the next 20 s breathe deeper and slower (候選 23c)
+    var pinchSquish: Double = 1       // 1: squish events when two grabbing fingers close in (提案第 24 條)
+    var slip: Double = 0              // 1: pulling past 1.2× maxPull for 120 ms slips out of the fingers (候選 25)
+    var stick: Double = 0             // seconds a slow lift keeps holding before the release (候選 26: 0.1)
+    var localArea: Double = 0         // area pressure weighted towards the fingers (候選 27: 1)
+    var homeFrac: Double = 0.40       // home height as a fraction of the screen (候選 33: 0.46)
+    var inkVar: Double = 0            // outline width follows compression, 1.3× squashed, 0.8× stretched (候選 34)
+    var pressSharp: Double = 0.2      // sharpness of the press tap (提案第 15 條)
+    var hapSharpSquash: Double = 0    // sharpness taken away while squashing (候選 15: 0.05)
+    var popViaHaptics: Double = 0     // 1: the release pop plays as a Core Haptics audio event in the taps' pattern (候選 17)
     // sound
     var volMaster: Double = 0.9       // output volume
     var rubMax: Double = 0.7          // loudest the rub loop gets
@@ -150,6 +165,23 @@ struct Candidate: Identifiable {
         Candidate(id: 2, name: "2 偶發特別回彈", hint: "每 8 次放手多晃一下") { p, _ in p.specialEvery = 8 },
         Candidate(id: 9, name: "9 接觸面積壓力", hint: "指腹壓得越扁攤得越開") { p, _ in p.pressRadiusGain = 1 },
         Candidate(id: 41, name: "41 對照：關橫檔", hint: "v2.4 以前：觸手被壓縮會對折") { p, _ in p.tentRung = 0; p.tentAxis = 0 },
+        Candidate(id: 21, name: "21 回家慢", hint: "放手後半秒飄回去，不過衝") { p, _ in p.homeK = 0.003 },
+        Candidate(id: 22, name: "22 放手餘韻", hint: "放手後 0.25 秒多晃一下") { p, _ in p.afterglow = 0.25 },
+        Candidate(id: 23, name: "23 呼吸", hint: "6 秒一次、吸短吐長、被摸久變深") { p, _ in p.breathT = 6; p.breathShape = 1; p.breathDeep = 1 },
+        Candidate(id: 15, name: "15 銳利度跟材質", hint: "黏土 0.2、麻糬 0.3、果凍 0.45；拉 +0.15、壓 −0.05") { p, m in
+            switch m {
+            case .clay: p.hapSharp = 0.2
+            case .mochi: p.hapSharp = 0.3
+            case .jelly: p.hapSharp = 0.45
+            }
+            p.hapSharpStretch = 0.15; p.hapSharpSquash = 0.05
+        },
+        Candidate(id: 17, name: "17 啵走觸覺管線", hint: "放手音由 Core Haptics 播，跟震動同一個 pattern；要有錄音檔，第一次套了要重開 app") { p, _ in p.popViaHaptics = 1 },
+        Candidate(id: 25, name: "25 拉太遠滑脫", hint: "拉過上限 1.2 倍 0.12 秒就脫手") { p, _ in p.slip = 1 },
+        Candidate(id: 26, name: "26 放手黏連", hint: "慢抬手多黏 0.1 秒") { p, _ in p.stick = 0.1 },
+        Candidate(id: 27, name: "27 局部鼓", hint: "面積壓力集中在手指附近") { p, _ in p.localArea = 1 },
+        Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
+        Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
     ]
 }
 
@@ -180,6 +212,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.gripRot, name: "抓著時不轉", hint: "越大拉它時身體越不會歪掉", range: 1...8, step: 0.5),
         TuneField(key: \.tentRung, name: "觸手橫檔", hint: "兩邊成對的粒子不能翻到對面、寬度不低於靜止的幾成；0 關＝v2.4 以前（第 41 條）", range: 0...0.9, step: 0.05),
         TuneField(key: \.tentAxis, name: "觸手中軸不折返", hint: "中軸每一節在上一節方向上至少前進靜止節距的幾成；0 關（第 41 條）", range: 0...1, step: 0.05),
+        TuneField(key: \.homeK, name: "回家彈簧", hint: "放手後身體飄回家的彈簧（每小步）；0.02 原本，候選 21 是 0.003", range: 0.002...0.04, step: 0.001),
+        TuneField(key: \.afterglow, name: "放手餘韻（秒）", hint: "放手後幾秒內阻尼從 0.975 回到設定值，多晃一下；0 關，候選 22 是 0.25", range: 0...0.6, step: 0.05),
+        TuneField(key: \.pinchSquish, name: "兩指捏 squish", hint: "1：兩指靠近到起始距離 60% 發一次，之後每再縮 15% 一次（第 24 條）", range: 0...1, step: 1),
+        TuneField(key: \.slip, name: "拉太遠滑脫", hint: "1：拉超過上限 1.2 倍持續 0.12 秒就脫手（候選 25）", range: 0...1, step: 1),
+        TuneField(key: \.stick, name: "放手黏連（秒）", hint: "慢抬手時抓取多保持幾秒；0 關，候選 26 是 0.1", range: 0...0.2, step: 0.02),
+        TuneField(key: \.localArea, name: "局部面積壓力", hint: "面積壓力往手指附近集中的程度；0 全身平均，候選 27 是 1", range: 0...2, step: 0.1),
 
         TuneField(key: \.pressBase, name: "按壓攤開（×半徑）", hint: "按下去那塊往四周攤多少（看得到的約一半）", range: 0...0.3, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.pressHold, name: "按住再攤（×半徑）", hint: "按住不動時再多攤多少", range: 0...0.3, step: 0.01, section: "按壓與記形"),
@@ -201,6 +239,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.floppy, name: "觸手軟度", hint: "越大觸手末端越軟、越會甩", range: 0...0.9, step: 0.05, section: "活物感"),
         TuneField(key: \.idleFreeze, name: "碰到時凍住", hint: "1：活物感時鐘停住不歸零（候選 19）", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.specialEvery, name: "特別回彈", hint: "每幾次放手來一次特別 Q 的回彈，0 關（候選 2 是 8）", range: 0...12, step: 1, section: "活物感"),
+        TuneField(key: \.breathT, name: "呼吸週期（秒）", hint: "一次呼吸幾秒；原本 3.8，候選 23a 是 6", range: 2...8, step: 0.1, section: "活物感"),
+        TuneField(key: \.breathShape, name: "呼吸不對稱", hint: "1：吸 40%、吐 55%、停 5%；0 正弦（候選 23b）", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.breathDeep, name: "被摸久呼吸變深", hint: "1：連續抓超過 10 秒，放手後 20 秒內振幅 ×1.5、週期 ×1.2 再衰減（候選 23c）", range: 0...1, step: 1, section: "活物感"),
 
         TuneField(key: \.hapMax, name: "連續觸覺上限", hint: "捏的時候最多震多強", range: 0...1, step: 0.05, section: "觸覺"),
         TuneField(key: \.hapStatic, name: "連續觸覺：變形量比重", hint: "拉著不動也震的那部分", range: 0...1, step: 0.05, section: "觸覺"),
@@ -218,12 +259,17 @@ struct TuneField: Identifiable {
         TuneField(key: \.tickMin, name: "微震最輕", hint: "手慢時", range: 0...0.6, step: 0.02, section: "觸覺"),
         TuneField(key: \.tickMax, name: "微震最重", hint: "手快時（每秒 3 個半徑）", range: 0...0.8, step: 0.02, section: "觸覺"),
         TuneField(key: \.tickSharp, name: "微震銳利度", hint: "顆粒偏鈍還是偏脆", range: 0...1, step: 0.05, section: "觸覺"),
+        TuneField(key: \.pressSharp, name: "按下銳利度", hint: "手指碰到那一下的銳利度（第 15 條）", range: 0...1, step: 0.05, section: "觸覺"),
+        TuneField(key: \.hapSharpSquash, name: "壓扁銳利度減少", hint: "按壓攤開時銳利度減多少（候選 15 是 0.05）", range: 0...0.3, step: 0.01, section: "觸覺"),
+        TuneField(key: \.popViaHaptics, name: "啵走觸覺管線", hint: "1：放手音由 Core Haptics 播，跟震動同一個 pattern；要有錄音檔，第一次套了要重開 app（候選 17）", range: 0...1, step: 1, section: "觸覺"),
 
         TuneField(key: \.volMaster, name: "主音量", hint: "所有聲音一起", range: 0...1, step: 0.05, section: "聲音"),
         TuneField(key: \.rubMax, name: "揉的音量上限", hint: "揉最快時多大聲", range: 0...1, step: 0.05, section: "聲音"),
         TuneField(key: \.pitchJitter, name: "音高抖動", hint: "每次隨機差多少", range: 0...0.3, step: 0.01, section: "聲音"),
 
         TuneField(key: \.seed, name: "外形亂數種子", hint: "換一個數字就換一個形狀（會重置）", range: 1...30, step: 1, section: "外形"),
+        TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
+        TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),
     ]
 }
 

@@ -58,16 +58,23 @@ final class SlimeController: ObservableObject {
         switch e {
         case .press(let gain):
             sound.press(gain: gain)
-            haptics.transient(intensity: 0.25 + 0.35 * gain, sharpness: 0.2)
+            haptics.transient(intensity: 0.25 + 0.35 * gain, sharpness: p.pressSharp)
+        case .squish(let gain):
+            // 提案第 24 條: two fingers pinching closer
+            sound.press(gain: gain)
+            haptics.transient(intensity: 0.3 + 0.4 * gain, sharpness: 0.3)
         case .pull(let gain, let rate):
             sound.pull(gain: gain, rate: rate)
             haptics.transient(intensity: 0.15 + 0.2 * gain, sharpness: 0.5)
         case .release(let gain, let rate, let special):
             // special (偶發特別回彈): louder sample, one extra tap
-            sound.release(gain: special ? min(1, gain * 1.3) : gain, rate: rate)
+            let g = special ? min(1, gain * 1.3) : gain
+            // 候選 17: the pop plays as an audio event inside the haptic pattern instead of through AVAudioEngine
+            let viaHaptics = p.popViaHaptics >= 0.5 && haptics.popAudioReady
+            if !viaHaptics { sound.release(gain: g, rate: rate) }
             let s = max(0, min(1, (gain - 0.35) / 0.65))
             haptics.pop(strength: s, count: Int(p.popCount.rounded()) + (special ? 1 : 0), gap: p.popGap, decay: p.popDecay,
-                        sharpness: p.popSharp, minIntensity: p.popMin, maxIntensity: p.popMax)
+                        sharpness: p.popSharp, minIntensity: p.popMin, maxIntensity: p.popMax, audioVolume: viaHaptics ? g : nil)
         case .tick(let gain):
             haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp)
         case .tap:
@@ -87,7 +94,9 @@ final class SlimeController: ObservableObject {
         lastDeformation = deformation
         rateSmoothed += (rate - rateSmoothed) * (1 - exp(-dt / 0.04))
         let level = p.hapStatic * pow(deformation, 1.5) + p.hapRate * min(1, rateSmoothed / max(0.01, p.hapRateNorm))
-        haptics.updateContinuous(level: min(1, level) * p.hapMax, sharpness: p.hapSharp + p.hapSharpStretch * rig.stretchLevel)
+        // 提案第 15 條: sharpness rises when stretched, drops a little when squashing
+        haptics.updateContinuous(level: min(1, level) * p.hapMax,
+                                 sharpness: p.hapSharp + p.hapSharpStretch * rig.stretchLevel - p.hapSharpSquash * rig.squashLevel)
         haptics.flush()
     }
 
@@ -106,6 +115,7 @@ final class SlimeController: ObservableObject {
     private func pushParams() {
         rig.params = current
         syncAudio()
+        haptics.setAudioThroughHaptics(current.popViaHaptics >= 0.5, url: sound.releaseSampleURL)
     }
 
     private func syncAudio() {

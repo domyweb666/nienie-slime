@@ -7,6 +7,7 @@ enum SlimeEvent {
     case pull(gain: Double, rate: Double)    // stretched past another step
     case release(gain: Double, rate: Double, special: Bool) // let go; gain follows release strength; special = 偶發特別回彈
     case tick(gain: Double)                  // texture tick while kneading (提案第 13 條)
+    case squish(gain: Double)                // two grabbing fingers pinched closer (提案第 24 條)
     case tap                                 // VoiceOver / buttons
 }
 
@@ -75,6 +76,11 @@ final class SlimeRig {
     private var wanderX = 0.0, wanderY = 0.0, wanderNext = 3.0, wanderMoving = false
     private var wanderSX = 0.0, wanderSY = 0.0, wanderP = 0.0, wanderT = 1.0   // 提案第 20 條: start, progress and duration of the current walk
     private var wanderVX = 0.0, wanderVY = 0.0                                 // home velocity this frame (points per second), drives the tentacle tail
+    private var pinchA: ObjectIdentifier?, pinchB: ObjectIdentifier?, pinchD0 = 1.0, pinchNext = 0.6   // 提案第 24 條 two-finger squish
+    private var brPhase = 0.0, brPrev = 0.0, brAmp = 1.0, brWave = 0.0, brDeepAt = -99.0, brGrabStart = -1.0   // 提案第 23 條 breathing
+    private var AW: [Double] = []                                              // 候選 27 area-pressure weights
+    private var builtHome = -1.0                                               // 候選 33 home height fraction the body was built for
+    private var cellHead: [Int32] = [], cellNext: [Int32] = []                 // 第 36 條 collide grid, no per-substep allocation
     private var builtSeed = -1.0, builtFloppy = -1.0, builtSpace = -1.0, builtRad = -1.0
     private var relaxUntil = -1.0            // 揉回原形: until when the remembered shape eases back to the original
     private(set) var lastReleaseStrength = 0.0
@@ -99,6 +105,8 @@ final class SlimeRig {
         let tDown: Double                            // rig time when the finger landed (dwell for plasticity)
         var press = 0.0, hold = 0.0, pressOn = false // press spread (points), hold level 0...1
         var pushed = false                           // push mode: has it displaced anything yet
+        var over = 0.0                               // seconds past the slip threshold (候選 25)
+        var sticking = false, releaseAt = 0.0         // lifted slowly: still holding until releaseAt (候選 26)
         var mode: Mode
         var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
         init(x: Double, y: Double, mode: Mode, time: Double) {
@@ -200,7 +208,7 @@ final class SlimeRig {
             let a = -.pi / 2 + Double(i) / Double(fine) * .pi * 2, r = restR(a)
             poly.append((cos(a) * r, sin(a) * r))
         }
-        cy = H * 0.40
+        cy = H * params.homeFrac; builtHome = params.homeFrac   // 候選 33: 0.40H, or 0.46H for the one-hand test
         homeX = cx; homeY = cy
         h = R / 9
         var cum = [0.0]
@@ -302,6 +310,7 @@ final class SlimeRig {
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
+        brPhase = 0; brPrev = 0; brAmp = 1; brWave = 0; brDeepAt = -99; brGrabStart = -1; pinchA = nil; pinchB = nil
     }
 
     private func buildClusters() {
@@ -403,6 +412,17 @@ final class SlimeRig {
         return P
     }
 
+    /// 候選 34: per boundary segment, current spacing over rest spacing (below 1 = compressed).
+    func boundaryCompression() -> [Double] {
+        let n = bnd.count
+        var c = [Double](repeating: 1, count: n)
+        for i in 0..<n {
+            let a = bnd[i], b = bnd[(i + 1) % n]
+            c[i] = hypot(X[b] - X[a], Y[b] - Y[a]) / max(1e-6, hypot(Q0X[b] - Q0X[a], Q0Y[b] - Q0Y[a]))
+        }
+        return c
+    }
+
     var centroid: (x: Double, y: Double) { (clusters.isEmpty ? cx : clusters[gi].xc, clusters.isEmpty ? cy : clusters[gi].yc) }
     var bodyAngle: Double { clusters.isEmpty ? 0 : atan2(clusters[gi].sn, clusters[gi].cs) }
     var highlight: (x: Double, y: Double) { N > 0 ? (X[hiIdx], Y[hiIdx]) : (cx, cy) }
@@ -431,6 +451,7 @@ final class SlimeRig {
     /// `radius` is UITouch.majorRadius (contact size, points; 0 if unknown).
     func touchBegan(_ id: ObjectIdentifier, x: Double, y: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
         guard N > 0 else { return }
+        if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
         f.radius = radius; f.r0 = radius
@@ -476,10 +497,24 @@ final class SlimeRig {
     }
 
     func touchEnded(_ id: ObjectIdentifier, time: TimeInterval) {
+        guard let f = fingers[id] else { return }
+        // 候選 26 放手黏連: lifted slowly (under one radius per second) the grab holds on for `stick` seconds, the patch
+        // staying at the fingertip; a flick lets go at once. A tiny tick marks the stick, the pop comes at the real release
+        if f.mode == .grab && params.stick > 0 && !f.sticking && hypot(f.vxS, f.vyS) < R {
+            f.sticking = true; f.releaseAt = t + params.stick
+            f.hasPrediction = false; f.movedThisFrame = false
+            onEvent?(.tick(gain: 0))
+            return
+        }
+        release(id, quiet: false)
+    }
+
+    /// Lets a finger go. `quiet` skips the release pop (cancelled touches, a stuck finger pressed again).
+    private func release(_ id: ObjectIdentifier, quiet: Bool) {
         guard let f = fingers.removeValue(forKey: id) else { return }
         for m in f.mem { GRAB[m.i] = false }
         lastTouch = t
-        if f.mode == .grab {
+        if f.mode == .grab && !quiet {
             // release strength: how fast it was flicked (peak speed over the last ~80 ms) or how far it was
             // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
             let sv = min(1, f.peak / R / 6)
@@ -505,9 +540,7 @@ final class SlimeRig {
 
     /// The system took the touch away (edge gesture, call, app switch): let go quietly, no pop.
     func touchCancelled(_ id: ObjectIdentifier) {
-        guard let f = fingers.removeValue(forKey: id) else { return }
-        for m in f.mem { GRAB[m.i] = false }
-        lastTouch = t
+        release(id, quiet: true)
     }
 
     func cancelAllTouches() {
@@ -556,6 +589,9 @@ final class SlimeRig {
             buildClusters()
         }
         let mat = params
+        if mat.homeFrac != builtHome { builtHome = mat.homeFrac; cy = H * mat.homeFrac; homeY = cy }   // 候選 33
+        // 候選 26: a stuck finger lets go when its time is up
+        for (id, f) in fingers where f.sticking && t >= f.releaseAt { release(id, quiet: false) }
 
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
@@ -621,6 +657,37 @@ final class SlimeRig {
             }
         }
 
+        // 候選 25 拉太遠滑脫: raw pull past 1.2× the limit for 120 ms lets go (lift and press again to grab), heaviest pop
+        if mat.slip >= 0.5 {
+            for f in fingers.values where f.mode == .grab {
+                let raw = hypot(f.x - f.ax, f.y - f.ay) / R
+                if raw > mat.maxPull * 1.2 {
+                    f.over += dt
+                    if f.over >= 0.12 {
+                        for m in f.mem { GRAB[m.i] = false }
+                        f.mem = []; f.mode = .none; f.over = 0
+                        lastTouch = t; lastReleaseStrength = 1
+                        onEvent?(.release(gain: 1, rate: 1.1, special: false))
+                    }
+                } else {
+                    f.over = 0
+                }
+            }
+        }
+        // 提案第 24 條 兩指捏: two grabbing fingers closing to 60% of their starting distance fire a squish, then every further 15%
+        if mat.pinchSquish >= 0.5 {
+            let gs = fingers.filter { $0.value.mode == .grab }.sorted { $0.value.tDown < $1.value.tDown }
+            if gs.count >= 2 {
+                let (ia, a) = gs[0], (ib, b) = gs[1]
+                let d = hypot(a.rawX - b.rawX, a.rawY - b.rawY)
+                if pinchA != ia || pinchB != ib { pinchA = ia; pinchB = ib; pinchD0 = max(1, d); pinchNext = 0.6 }
+                let r = d / pinchD0
+                if r <= pinchNext { onEvent?(.squish(gain: 0.6 + 0.3 * (1 - r))); pinchNext -= 0.15 }
+            } else {
+                pinchA = nil; pinchB = nil
+            }
+        }
+
         // idle life: only when nobody is touching, fading in over a second after release
         let idle = fingers.isEmpty ? min(1, max(0, (t - lastTouch - 0.8) / 1.2)) : 0
         let L = idle * (reduceMotion ? 0.5 : 1)
@@ -630,6 +697,31 @@ final class SlimeRig {
         let freeze = mat.idleFreeze >= 0.5
         let Lamp = freeze ? (reduceMotion ? 0.5 : 1) : L
         let tl = freeze ? tLife : t
+        // 提案第 23 條 breathing: accumulated phase (the period can change without a jump); at the control values
+        // (3.8 s sine) this is exactly the old waveform
+        do {
+            var T = mat.breathT, amp = 1.0
+            if mat.breathDeep >= 0.5 {
+                // 23c: after a grab held longer than 10 s, the next 20 s breathe 1.5× deeper and 1.2× slower, fading linearly
+                let grabbing = fingers.values.contains { $0.mode == .grab }
+                if grabbing {
+                    if brGrabStart < 0 { brGrabStart = t }
+                } else {
+                    if brGrabStart >= 0 && t - brGrabStart > 10 { brDeepAt = t }
+                    brGrabStart = -1
+                }
+                let f = max(0, 1 - (t - brDeepAt) / 20)
+                amp = 1 + 0.5 * f; T *= 1 + 0.2 * f
+            }
+            brPhase += (tl - brPrev) / T; brPrev = tl; brAmp = amp
+            let ph = brPhase - floor(brPhase)
+            // 23b: inhale 40%, exhale 55%, pause 5%
+            if mat.breathShape >= 0.5 {
+                brWave = ph < 0.4 ? -cos(.pi * ph / 0.4) : (ph < 0.95 ? cos(.pi * (ph - 0.4) / 0.55) : -1)
+            } else {
+                brWave = sin(2 * .pi * ph)
+            }
+        }
 
         // wandering home (提案第 20、31 條): pick a spot, walk there with a smoothstep speed profile (6p(1−p): same average
         // speed and the same walk-then-rest rhythm as the constant-speed version), rest a while; stop when touched.
@@ -673,7 +765,14 @@ final class SlimeRig {
         let mat = params
         // 偶發特別回彈: for 0.35 s after a special release the body is stiffer and less damped, so it wobbles once more
         let special = t < specialUntil
-        let damp = min(0.995, mat.damp + (special ? 0.03 : 0)), alpha = mat.alpha * (special ? 1.25 : 1)
+        var damp = mat.damp + (special ? 0.03 : 0)
+        // 候選 22 放手餘韻: for `afterglow` seconds after a release the damping eases from 0.975 back to the setting
+        if mat.afterglow > 0 && fingers.isEmpty {
+            let since = t - lastTouch
+            if since < mat.afterglow { damp = max(damp, 0.975 - (0.975 - mat.damp) * since / mat.afterglow) }
+        }
+        damp = min(0.995, damp)
+        let alpha = mat.alpha * (special ? 1.25 : 1)
         // 1 Verlet
         for i in 0..<N {
             let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
@@ -705,7 +804,7 @@ final class SlimeRig {
             }
         }
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
-        let bs = Lamp * mat.life * 0.045 * sin(tl * 2 * .pi / 3.8), bsx = 1 + bs, bsy = 1 - bs * 0.85
+        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = 1 + bs, bsy = 1 - bs * 0.85   // 提案第 23 條: waveform from update()
         let wr = Lamp * mat.life * mat.wriggle * R, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
         // 提案第 20 條 tentacle tail: while wandering, the tentacles' reference positions trail the motion (tips most, u²),
         // scaled by the current speed so the smoothstep profile fades it in and out. Written on the reference shape like the
@@ -766,9 +865,32 @@ final class SlimeRig {
         let A = polygonArea()
         let ap = max(-0.12, min(0.12, (sqrt(A0 / A) - 1) * mat.areaGain))
         let gcx = clusters[gi].xc, gcy = clusters[gi].yc
+        // 候選 27 局部面積壓力: weight the area pressure towards the fingers (exp(−(d/1.2R)²), mean kept at 1 so the
+        // total area correction is unchanged)
+        var local = false
+        if mat.localArea > 0 && ap != 0 && !fingers.isEmpty {
+            let gs = fingers.values.filter { $0.mode == .grab }
+            if !gs.isEmpty {
+                local = true
+                if AW.count != N { AW = Array(repeating: 0, count: N) }
+                var sum = 0.0
+                let r2 = 1 / (1.44 * R * R)
+                for i in 0..<N {
+                    var g = 0.0
+                    for f in gs {
+                        let dx = X[i] - f.fx, dy = Y[i] - f.fy
+                        g = max(g, exp(-(dx * dx + dy * dy) * r2))
+                    }
+                    AW[i] = g; sum += g
+                }
+                let mean = sum / Double(N)
+                for i in 0..<N { AW[i] = max(0, 1 + mat.localArea * (AW[i] - mean)) }
+            }
+        }
         for i in 0..<N {
             var gx = GX[i] / GW[i], gy = GY[i] / GW[i]
-            gx = gcx + (gx - gcx) * (1 + ap); gy = gcy + (gy - gcy) * (1 + ap)
+            let api = local ? ap * AW[i] : ap
+            gx = gcx + (gx - gcx) * (1 + api); gy = gcy + (gy - gcy) * (1 + api)
             let ka = alpha * KF[i]
             X[i] += (gx - X[i]) * ka; Y[i] += (gy - Y[i]) * ka
         }
@@ -806,7 +928,8 @@ final class SlimeRig {
         // 4 home (float), bounds
         let hx = homeX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY + Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7)
-        let kh = 0.02 * (grabbing ? mat.anchor : 1), dx = hx - gcx, dy = hy - gcy
+        // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
+        let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hy - gcy
         let padT = 90.0, padB = H - 120, padL = 8.0, padR = W - 8
         for i in 0..<N {
             if !GRAB[i] { X[i] += dx * kh; Y[i] += dy * kh }
@@ -833,19 +956,24 @@ final class SlimeRig {
         // root towards its tip (compressing it) occasionally folds it for a few frames; widening the boundary-to-boundary
         // distance to 1.2h was tried and did not help. Candidate fixes: 手感精修提案 第 41 條.
         let dmin = h * 0.6, dmin2 = dmin * dmin, inv = 1 / dmin
-        var grid: [Int: [Int]] = [:]
-        grid.reserveCapacity(N)
-        func key(_ gx: Int, _ gy: Int) -> Int { gx &* 73856 &+ gy }
+        // 第 36 條: fixed-size hashed cell lists instead of a Dictionary built 240 times a second (no allocation per
+        // substep; a bucket collision only costs an extra distance check)
+        let buckets = 1024
+        if cellNext.count != N { cellNext = Array(repeating: -1, count: N); cellHead = Array(repeating: -1, count: buckets) }
+        for b in 0..<buckets { cellHead[b] = -1 }
+        func key(_ gx: Int, _ gy: Int) -> Int { ((gx &* 73856093) ^ (gy &* 19349663)) & (buckets - 1) }
         for i in 0..<N {
-            grid[key(Int(X[i] * inv), Int(Y[i] * inv)), default: []].append(i)
+            let b = key(Int(floor(X[i] * inv)), Int(floor(Y[i] * inv)))
+            cellNext[i] = cellHead[b]; cellHead[b] = Int32(i)
         }
         let nb = bnd.count
         for i in 0..<N {
-            let gx = Int(X[i] * inv), gy = Int(Y[i] * inv)
+            let gx = Int(floor(X[i] * inv)), gy = Int(floor(Y[i] * inv))
             for ox in -1...1 {
                 for oy in -1...1 {
-                    guard let cell = grid[key(gx + ox, gy + oy)] else { continue }
-                    for j in cell {
+                    var j = Int(cellHead[key(gx + ox, gy + oy)])
+                    while j >= 0 {
+                        defer { j = Int(cellNext[j]) }
                         if j <= i || TID[j] != TID[i] { continue }
                         if BIDX[i] >= 0 && BIDX[j] >= 0 {
                             let di = abs(BIDX[i] - BIDX[j])
@@ -1000,6 +1128,13 @@ final class SlimeRig {
     var stretchLevel: Double {
         var m = 0.0
         for f in fingers.values where f.mode == .grab { m = max(m, f.stretch / max(0.01, params.maxPull)) }
+        return min(1, m)
+    }
+
+    /// How deep the press spread is, 0...1 relative to pressBase (sharpness drops a little while squashing, 提案第 15 條).
+    var squashLevel: Double {
+        var m = 0.0
+        for f in fingers.values where f.mode == .grab { m = max(m, f.press / max(1, params.pressBase * R)) }
         return min(1, m)
     }
 

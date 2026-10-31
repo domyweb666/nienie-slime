@@ -31,6 +31,7 @@ final class SlimeView: UIView {
     private var touchesDown = 0
     private var lastTouchEnd: CFTimeInterval = -10
     private var frameRate: Float = 0
+    private var bandMode = false   // 候選 34: outline drawn as a filled band of varying width
     private var lastTimestamp: CFTimeInterval = 0
     private var laidOutSize: CGSize = .zero
 
@@ -103,7 +104,8 @@ final class SlimeView: UIView {
         shadeLayer.fillColor = colors.shade.cgColor
         baseLayer.fillColor = colors.base.cgColor
         highlightLayer.fillColor = colors.light.cgColor
-        outlineLayer.strokeColor = colors.line.cgColor
+        outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
+        outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
         CATransaction.commit()
     }
 
@@ -273,6 +275,44 @@ final class SlimeView: UIView {
         return path
     }
 
+    /// 候選 34: the outline as a filled band whose width follows each segment's compression (1.3× squashed, 0.8× stretched).
+    /// A CAShapeLayer stroke has one width, so the spline is sampled and offset to both sides into a ring polygon.
+    private func inkBand(_ P: [(x: Double, y: Double)], lw: Double, inkVar: Double) -> CGPath {
+        let n = P.count, c = rig.boundaryCompression()
+        let path = CGMutablePath()
+        guard n > 2, c.count == n else { return path }
+        var w = [Double](repeating: lw, count: n)
+        for i in 0..<n {
+            let f = c[i] < 1 ? 1 + 0.3 * min(1, (1 - c[i]) / 0.4) : 1 - 0.2 * min(1, (c[i] - 1) / 1.4)
+            w[i] = lw * (1 + inkVar * (f - 1))
+        }
+        func pt(_ i: Int) -> (x: Double, y: Double) { P[(i + n) % n] }
+        var outer: [CGPoint] = [], inner: [CGPoint] = []
+        outer.reserveCapacity(n * 3); inner.reserveCapacity(n * 3)
+        for i in 0..<n {
+            let p0 = pt(i - 1), p1 = pt(i), p2 = pt(i + 1), p3 = pt(i + 2)
+            let c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6
+            let c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6
+            let wa = (w[(i + n - 1) % n] + w[i]) * 0.5, wb = (w[i] + w[(i + 1) % n]) * 0.5
+            for s in 0..<3 {
+                let u = Double(s) / 3, mu = 1 - u
+                let b0 = mu * mu * mu, b1 = 3 * mu * mu * u, b2 = 3 * mu * u * u, b3 = u * u * u
+                let bx = b0 * p1.x + b1 * c1x + b2 * c2x + b3 * p2.x
+                let by = b0 * p1.y + b1 * c1y + b2 * c2y + b3 * p2.y
+                let d0 = 3 * mu * mu, d1 = 6 * mu * u, d2 = 3 * u * u
+                var tx = d0 * (c1x - p1.x) + d1 * (c2x - c1x) + d2 * (p2.x - c2x)
+                var ty = d0 * (c1y - p1.y) + d1 * (c2y - c1y) + d2 * (p2.y - c2y)
+                let tl = max(1e-6, hypot(tx, ty)); tx /= tl; ty /= tl
+                let hw = (wa + (wb - wa) * u) * 0.5
+                outer.append(CGPoint(x: bx - ty * hw, y: by + tx * hw))
+                inner.append(CGPoint(x: bx + ty * hw, y: by - tx * hw))
+            }
+        }
+        path.addLines(between: outer); path.closeSubpath()
+        path.addLines(between: Array(inner.reversed())); path.closeSubpath()
+        return path
+    }
+
     private func redraw() {
         let R = rig.R
         let P = rig.boundaryPoints()
@@ -308,8 +348,19 @@ final class SlimeView: UIView {
         hl.addEllipse(in: CGRect(x: -R * 0.035, y: -R * 0.035, width: R * 0.07, height: R * 0.07), transform: dot)
         highlightLayer.path = hl
 
-        outlineLayer.lineWidth = lw
-        outlineLayer.path = body
+        // 候選 34: outline width follows compression (a band path), else a plain stroke
+        let inkVar = rig.params.inkVar
+        if (inkVar > 0) != bandMode {
+            bandMode = inkVar > 0
+            outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
+            outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
+        }
+        if bandMode {
+            outlineLayer.path = inkBand(P, lw: lw, inkVar: inkVar)
+        } else {
+            outlineLayer.lineWidth = lw
+            outlineLayer.path = body
+        }
 
         CATransaction.commit()
     }

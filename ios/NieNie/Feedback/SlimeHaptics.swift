@@ -18,6 +18,10 @@ final class SlimeHaptics {
     private var baseSharpness: Float = 0.25
     private var continuousStartedAt: CFTimeInterval = 0
     private var pendingTicks: [(intensity: Float, sharpness: Float)] = []
+    // 候選 17: the release sample registered with the engine, played in the same pattern as the taps
+    private var popAudioID: CHHapticAudioResourceID?
+    private var popAudioURL: URL?
+    private(set) var popAudioReady = false
 
     /// Hysteresis (手感精修提案 第 16 條): the continuous player starts above `onThreshold`, and stops
     /// only below `offThreshold` after at least `minOn`, so the engine does not click on and off
@@ -30,7 +34,9 @@ final class SlimeHaptics {
         guard supported else { return }
         do {
             let e = try CHHapticEngine()
-            e.playsHapticsOnly = true
+            // 候選 17: audio events are allowed once 啵走觸覺管線 has been switched on. Apple: the flag only changes after
+            // an engine restart (docs checked 2026-11), so it is read at launch; haptics-only also starts playback faster
+            e.playsHapticsOnly = !UserDefaults.standard.bool(forKey: "audioThroughHaptics")
             e.isAutoShutdownEnabled = false
             e.stoppedHandler = { [weak self] _ in
                 DispatchQueue.main.async {
@@ -116,6 +122,19 @@ final class SlimeHaptics {
         }
     }
 
+    /// 候選 17. Registers the release sample so `pop` can play it as an audio event (sample-level sync with the taps).
+    /// The engine is created haptics-only unless this was switched on before, so the first time needs an app restart.
+    func setAudioThroughHaptics(_ on: Bool, url: URL?) {
+        if on { UserDefaults.standard.set(true, forKey: "audioThroughHaptics") }
+        guard on, let url, let engine, supported else { popAudioID = nil; popAudioReady = false; return }
+        if popAudioURL == url, popAudioID != nil { return }
+        startEngine()
+        guard engineRunning, !engine.playsHapticsOnly else { popAudioReady = false; return }
+        popAudioURL = url
+        popAudioID = try? engine.registerAudioResource(url, options: [:])
+        popAudioReady = popAudioID != nil
+    }
+
     func stopContinuous() {
         guard let player = continuous else { return }
         try? player.stop(atTime: CHHapticTimeImmediate)
@@ -148,9 +167,16 @@ final class SlimeHaptics {
 
     /// Release pop: `count` taps in one pattern, `gap` seconds apart, each `decay` of the previous
     /// (提案第 14 條: clay one, mochi two, jelly three). Intensity runs minIntensity...maxIntensity with `strength`.
-    func pop(strength: Double, count: Int, gap: Double, decay: Double, sharpness: Double, minIntensity: Double, maxIntensity: Double) {
+    func pop(strength: Double, count: Int, gap: Double, decay: Double, sharpness: Double, minIntensity: Double, maxIntensity: Double,
+             audioVolume: Double? = nil) {
         var amp = minIntensity + (maxIntensity - minIntensity) * max(0, min(1, strength))
         var events: [CHHapticEvent] = []
+        // 候選 17: the recorded pop as an audio event at time 0 of the same pattern (CHHapticEvent(audioResourceID:), docs checked 2026-11)
+        if let vol = audioVolume, let id = popAudioID {
+            events.append(CHHapticEvent(audioResourceID: id,
+                                        parameters: [CHHapticEventParameter(parameterID: .audioVolume, value: clamp01(vol))],
+                                        relativeTime: 0))
+        }
         for k in 0..<max(1, min(6, count)) {
             events.append(tap(intensity: amp, sharpness: sharpness, at: Double(k) * max(0.03, gap)))
             amp *= decay

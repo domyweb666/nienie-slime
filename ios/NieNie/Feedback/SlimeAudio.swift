@@ -12,6 +12,8 @@ protocol SlimeSoundSource: AnyObject {
     func release(gain: Double, rate: Double)
     /// Called every frame with the kneading level 0...1; 0 fades the loop out.
     func rub(level: Double)
+    /// 候選 17: the release sample's file, for Core Haptics to register (nil until there is a recording).
+    var releaseSampleURL: URL? { get }
 }
 
 /// Recorded-sample bank. Reads `manifest.json` from the app bundle (same format as the web
@@ -22,6 +24,7 @@ final class SlimeAudio: SlimeSoundSource {
     var muted = false { didSet { applyVolume() } }
     var master = 0.9 { didSet { applyVolume() } }
     var pitchJitter = 0.08
+    private(set) var releaseSampleURL: URL?
 
     private let engine = AVAudioEngine()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
@@ -101,6 +104,7 @@ final class SlimeAudio: SlimeSoundSource {
                 guard let fileURL = Bundle.main.url(forResource: base, withExtension: ext.isEmpty ? nil : ext),
                       let buffer = load(fileURL) else { continue }
                 buffers.append(buffer)
+                if kind == "release" && releaseSampleURL == nil { releaseSampleURL = fileURL }
             }
             bank[kind] = buffers
         }
