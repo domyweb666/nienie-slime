@@ -22,12 +22,11 @@
   1. TestFlight 內部測試（推薦；不公開、不審核、只有加進去的人能裝）
   2. 另做 Expo + React Native Skia 版（Expo Go 做不出連續震動，等於維護兩套，測到的手感不能代表 Swift 版）
   3. 先用 iPhone Safari 開網頁原型（沒觸覺）
-- TestFlight 進度（2026-10-31）：4 個 Secrets 都設了（名稱 `APPLE_TEAM_ID`、`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_PRIVATE_KEY`，.p8 那個多米取名 PRIVATE_KEY，workflow 已配合）。run 41177344171：金鑰驗證過、雲端簽名過、ARCHIVE SUCCEEDED，卡在 export「Error Downloading App Information」，原因是 App Store Connect 還沒建 App 紀錄（金鑰看到的 App 清單是空的）。多米在 ASC 建好 App 後重跑 `gh workflow run ios.yml --ref swiftui-port -f testflight=true` 即可
-- workflow 多了一步「Write API key and verify it with App Store Connect」：檢查三個值的格式（只印長度）、拿金鑰打 ASC API、沒有 App 紀錄就直接報錯，不用白打包
-- Issuer ID 第一次被貼成 7 字元的東西，靠這步才抓到；以後 Secrets 出錯先看這步的輸出
+- **TestFlight 已上傳成功**（2026-10-31，run 41180288580，build 0.1.0 (22)）。4 個 Secrets：`APPLE_TEAM_ID`、`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_PRIVATE_KEY`（.p8 那個多米取名 PRIVATE_KEY，workflow 已配合）。金鑰是多米重建的 Admin 團隊金鑰。之後要再上傳：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，build 號自動用 run number
+- 設定過程踩到的坑（細節在 `.uiux/lessons.md`）：Issuer ID 貼錯、App Store Connect 沒建 App、金鑰角色不是 Admin、workflow 檔只在 swiftui-port 上所以手動觸發 422。workflow 現在有「verify」步會在簽名前把這些一次報出來
 - Bundle ID 定為 `org.domyweb.qieji`（多米建 App 時用的；原本的 nienieslime 沒建成）
 - 待真機查證：系統觸覺關閉時 Core Haptics 會不會自動停震（iOS 沒 API 讀這個開關）
-- 雲端簽名：開發用簽名（archive）過了；發佈用簽名（export）在 run 41179042074 回「Cloud signing permission error」＋「No profiles for org.domyweb.qieji」，這是 API 金鑰角色不夠（要 Admin，或 App Manager 加勾「可取用雲端管理發佈憑證」）。多米要把金鑰改成 Admin，改不了就建新 Admin 金鑰並重設 `ASC_KEY_ID`、`ASC_PRIVATE_KEY`（Issuer ID 不變），再重跑
+- 雲端簽名（Admin 金鑰＋`-allowProvisioningUpdates`）實證可行：開發與發佈憑證、profile 都由 Xcode 在 CI 上自動建
 
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
@@ -66,7 +65,7 @@
 ## ⏭️ 下一步從哪繼續
 
 1. 先讀這份 `.vibe/HANDOFF.md`，再讀 `.uiux/04-手感/技術選型決定-暫定.md`（成因表、改道候選、v2 實作紀錄、愛不釋手機制表）
-2. 手感基準已定（v2.2，多米「都對」），Swift 版已移植並編譯通過。下一步是**裝上真機**：Secrets 與簽名都已通過，只差多米在 App Store Connect 建 App 紀錄（已建，Bundle ID `org.domyweb.qieji`）再重跑 workflow，這是閘門 3 的前置條件。他回報的東西記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
+2. 手感基準已定（v2.2，多米「都對」），Swift 版已移植並編譯通過。下一步是**裝上真機**：build 已在 App Store Connect 處理中（10 到 30 分鐘），多米把自己加成內部測試者、手機裝 TestFlight App 就能裝，這是閘門 3 的前置條件。他回報的東西記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
 3. 調參數：一次一個，用隱藏面板的「複製數值」把他調到喜歡的數值貼回來，寫進 `參數表-暫定.md`
 4. 真機裝上後先量：延遲（240fps 慢動作）、最舊機低電量最大幅度捏有沒有掉幀（掉幀就 `h = R / 9` 改 `R / 8` 減粒子）、Swift 版的手感跟網頁版一不一樣（粒子數、小步數不同）
 5. 錄音：**播放層已做好**（`sfx/manifest.json` 驅動，沒檔就安靜，測試音驗過）。等多米照 `.uiux/04-手感/錄音指南.md` 錄完丟進 `prototype/web/sfx/`，Agent 做切頭尾、rub 無縫循環、音量拉齊，填 manifest，推 main

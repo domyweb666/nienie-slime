@@ -13,3 +13,4 @@
 | 2026-10-31 | VibeRails | 連續六輪憑直覺猜原因全錯（彎、飄、互不穿透、繩子、密度） | 症狀跟多個改動同時出現時，不要猜：每次只回退一項做成對照檔，一輪跑完就知道 |
 | 2026-10-31 | VibeRails | 粒子互不穿透若跨群作用（不同觸手、觸手對身體），被手指拉過去的部分會卡住永遠解不開 | 互不穿透只在「不該變形的群內」用；跨群允許交疊，交給形狀匹配拉回原排列 |
 | 2026-10-31 | feel | Agent 用程式模擬手指的自測可以抓「壞掉」（自交、爆炸、面積漂移），但抓不到「好不好捏」 | 程式自測只當回歸測試（不壞），手感判斷一律真機＋新的手 |
+| 2026-10-31 | feel／CI | TestFlight 第一次上傳跑了 7 次 run 才過：Issuer ID 貼成 7 字元、App Store Connect 沒建 App、API 金鑰是 Developer 角色（export 回 Cloud signing permission error）、Bundle ID 建成別的名字、workflow 檔只在非預設分支（手動觸發 422）。每個錯都要等一到兩分鐘 archive 才看得到 | 簽名前先用金鑰直接打 ASC API：檢查三個值的格式、列出金鑰看得到的 App、對照 project.yml 的 Bundle ID，有錯在 10 秒內報出來；workflow_dispatch 的檔要在預設分支上才能手動觸發；Secrets 名稱以使用者實際取的為準，改 workflow 配合比請他重設快 |
