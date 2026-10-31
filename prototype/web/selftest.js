@@ -107,10 +107,27 @@
   { const l = log.splice(0); res.T10_candidates = { worstSelfX: worst10, first: first10, after: snap(), releases: l.filter(e => e[0] === 'release').map(e => e[1]) }; }
   mat = { ...PRESETS.clay };
 
+  // T11 壓縮觸手的 18 個情境（第 41 條的量法）：抓朝右那條觸手根部附近三個位置 × 軸線上下 × 三個拖的方向，逐幀記對折。
+  //     基準（v2.4 以前）是 8 個情境對折、282 幀、6 個握著時還在對折；橫檔＋中軸不折返之後 3 個情境、24 幀、0 個握著還在
+  { let scenFold = 0, frames = 0, heldRuns = 0, overlapF = 0; const grid = [];
+    for (const gx of [0.65, 0.8, 0.95]) for (const gy of [-0.1, 0.1]) for (const [vx, vy] of [[2.2, 0.8], [2.0, 0], [1.6, -0.6]]) grid.push([gx, gy, vx, vy]);
+    for (const [gx, gy, vx, vy] of grid) {
+      reset(); const cx1 = globalC.xc, cy1 = globalC.yc, sx = cx1 + gx * R, sy = cy1 + gy * R; let f = 0;
+      ev('pointerdown', 1, sx, sy);
+      for (let k = 1; k <= 45; k++) { ev('pointermove', 1, sx + vx * R * k / 45, sy + vy * R * k / 45); steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
+      for (let k = 0; k < 45; k++) { steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
+      if (classify()[0] > 0) heldRuns++;
+      ev('pointerup', 1, sx + vx * R, sy + vy * R); for (let k = 0; k < 150; k++) { steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
+      if (f > 0) scenFold++; frames += f;
+    }
+    log.splice(0);
+    res.T11_compressionGrid = { scenarios: grid.length, scenariosWithFold: scenFold, foldFrames: frames, heldFoldRuns: heldRuns, overlapFrames: overlapF };
+  }
+
   const okArea = s => s.area > 0.98 && s.area < 1.02;
   const rel = l => (l.find(e => e[0] === 'release') || [0, 0])[1];
-  // 已知限制（2026-11-01，提案第 41 條）：抓觸手根部往尖端推會壓縮觸手，偶爾對折幾幀（T3 大約一半的次數）。
-  // 修好之前只記錄不判死，免得這個回歸測試一直紅；交疊（跨群）是設計允許的，永遠只記錄
+  // 提案第 41 條（2026-11-01）：抓觸手根部往尖端推會壓縮觸手、對折。橫檔＋中軸不折返之後剩手指正好壓在接點上時的幾幀。
+  // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames };
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
@@ -125,6 +142,9 @@
     pushMakesPressSound: res.T6_push.sfx.some(e => e[0] === 'press'),
     cancelIsSilent: !res.T8_cancel.sfx.some(e => e[0] === 'release') && res.T8_cancel.fingersLeft === 0,
     candidatesDontBreak: res.T10_candidates.worstSelfX === 0 && okArea(res.T10_candidates.after) && res.T10_candidates.releases.length === 3,
+    // 第 41 條修好的標準：握著時不能還留著對折；短暫幾幀（手指正好壓在接點上）先容忍，數字記在 T11
+    // 2026-11-01 的水準：握著還在對折最多 1 個情境（手指正好壓在接點上）、對折幀數 100 以內；v2.4 以前是 6 個、282 幀
+    compressionFoldsRare: res.T11_compressionGrid.heldFoldRuns <= 1 && res.T11_compressionGrid.foldFrames < 100,
   };
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
