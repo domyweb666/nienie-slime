@@ -30,7 +30,7 @@
 
 以下都在 Apple 的網站上操作，用 Windows 瀏覽器就可以。TestFlight 內部測試不是公開上架：不經審核，只有你加進去的人（最多 100 人）能裝。
 
-1. 註冊 Bundle ID：到 developer.apple.com → Certificates, Identifiers & Profiles → Identifiers → 新增 App IDs，Bundle ID 填 `org.domyweb.nienieslime`。想換別的 ID，要一起改 `project.yml` 裡的 `PRODUCT_BUNDLE_IDENTIFIER`。
+1. 註冊 Bundle ID：到 developer.apple.com → Certificates, Identifiers & Profiles → Identifiers → 新增 App IDs，Bundle ID 填 `org.domyweb.qieji`（多米 2026-10-31 在 App Store Connect 建 App 時用的這個）。想換別的 ID，要一起改 `project.yml` 裡的 `PRODUCT_BUNDLE_IDENTIFIER`，workflow 會從那裡讀。
 2. 建立 App：到 App Store Connect → App → 新增 App，平台選 iOS，Bundle ID 選上一步那個，名稱填「捏捏史萊姆」。
 3. 建 API 金鑰：App Store Connect → 使用者與存取 → 整合 → App Store Connect API → 團隊金鑰 → 新增。角色選 Admin，因為雲端簽名要替你建立發佈憑證，權限低的角色做不到。`.p8` 檔只能下載一次，記下頁面上的 Key ID 和 Issuer ID。
 4. 找 Team ID：developer.apple.com → 帳號 → 會員資格詳細資料，十個字元那串。

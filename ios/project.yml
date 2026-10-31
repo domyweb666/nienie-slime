@@ -34,7 +34,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.domyweb.nienieslime
+        PRODUCT_BUNDLE_IDENTIFIER: org.domyweb.qieji
         PRODUCT_NAME: NieNieSlime
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -25,7 +25,7 @@
 - TestFlight 進度（2026-10-31）：4 個 Secrets 都設了（名稱 `APPLE_TEAM_ID`、`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_PRIVATE_KEY`，.p8 那個多米取名 PRIVATE_KEY，workflow 已配合）。run 41177344171：金鑰驗證過、雲端簽名過、ARCHIVE SUCCEEDED，卡在 export「Error Downloading App Information」，原因是 App Store Connect 還沒建 App 紀錄（金鑰看到的 App 清單是空的）。多米在 ASC 建好 App 後重跑 `gh workflow run ios.yml --ref swiftui-port -f testflight=true` 即可
 - workflow 多了一步「Write API key and verify it with App Store Connect」：檢查三個值的格式（只印長度）、拿金鑰打 ASC API、沒有 App 紀錄就直接報錯，不用白打包
 - Issuer ID 第一次被貼成 7 字元的東西，靠這步才抓到；以後 Secrets 出錯先看這步的輸出
-- Bundle ID 暫定 `org.domyweb.nienieslime`，多米還沒確認
+- Bundle ID 定為 `org.domyweb.qieji`（多米建 App 時用的；原本的 nienieslime 沒建成）
 - 待真機查證：系統觸覺關閉時 Core Haptics 會不會自動停震（iOS 沒 API 讀這個開關）
 - 雲端簽名（API 金鑰 Admin 角色＋`-allowProvisioningUpdates`）已實證可行，第一次就過
 
@@ -66,7 +66,7 @@
 ## ⏭️ 下一步從哪繼續
 
 1. 先讀這份 `.vibe/HANDOFF.md`，再讀 `.uiux/04-手感/技術選型決定-暫定.md`（成因表、改道候選、v2 實作紀錄、愛不釋手機制表）
-2. 手感基準已定（v2.2，多米「都對」），Swift 版已移植並編譯通過。下一步是**裝上真機**：Secrets 與簽名都已通過，只差多米在 App Store Connect 建 App 紀錄（Bundle ID `org.domyweb.nienieslime`）再重跑 workflow，這是閘門 3 的前置條件。他回報的東西記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
+2. 手感基準已定（v2.2，多米「都對」），Swift 版已移植並編譯通過。下一步是**裝上真機**：Secrets 與簽名都已通過，只差多米在 App Store Connect 建 App 紀錄（已建，Bundle ID `org.domyweb.qieji`）再重跑 workflow，這是閘門 3 的前置條件。他回報的東西記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
 3. 調參數：一次一個，用隱藏面板的「複製數值」把他調到喜歡的數值貼回來，寫進 `參數表-暫定.md`
 4. 真機裝上後先量：延遲（240fps 慢動作）、最舊機低電量最大幅度捏有沒有掉幀（掉幀就 `h = R / 9` 改 `R / 8` 減粒子）、Swift 版的手感跟網頁版一不一樣（粒子數、小步數不同）
 5. 錄音：**播放層已做好**（`sfx/manifest.json` 驅動，沒檔就安靜，測試音驗過）。等多米照 `.uiux/04-手感/錄音指南.md` 錄完丟進 `prototype/web/sfx/`，Agent 做切頭尾、rub 無縫循環、音量拉齊，填 manifest，推 main
