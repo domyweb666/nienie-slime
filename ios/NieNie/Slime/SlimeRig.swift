@@ -86,6 +86,10 @@ final class SlimeRig {
     private(set) var lastReleaseStrength = 0.0
     private var tLife = 0.0                                                // idle-life clock, runs only while untouched (提案第 19 條)
     private var releaseCount = 0, nextSpecial = 0, specialUntil = -1.0     // 偶發特別回彈 (提案第 2 條)
+    // 2026-11-01 多米真機回報 (build 46): idle morph coefficients for outline modes 2...5 and two roaming bumps, set once a frame
+    private var morphA = [Double](repeating: 0, count: 6), morphB = [Double](repeating: 0, count: 6)
+    private var bumpAng = [0.0, 0.0], bumpAmp = [0.0, 0.0]
+    private var rest0: [[(w: Double, s: Double)]] = []   // the original shape's own rung widths and axis advances (restFix thresholds)
 
     final class Finger {
         enum Mode { case grab, push, none }
@@ -336,7 +340,7 @@ final class SlimeRig {
     /// back down the other. Pair the two edges by position along the tentacle, remember the rest width, the rest
     /// handedness and the rest spacing of the medial axis (rung midpoints), so the tentacle cannot fold over itself.
     private func buildRungs() {
-        rungs = []; rungSign = []; rungRef = []
+        rungs = []; rungSign = []; rungRef = []; rest0 = []
         let nb = bnd.count
         for k in tent.indices {
             var pos: [Int] = []
@@ -752,6 +756,7 @@ final class SlimeRig {
             wanderNext = t + 2 + Double.random(in: 0..<3)
         }
 
+        if mat.morph >= 0.5 { morphCoef(tl) }
         let n = max(1, Int((dt * 240).rounded()))
         let sdt = dt / Double(n)
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
@@ -822,15 +827,34 @@ final class SlimeRig {
             var ex = QX[i], ey = QY[i]
             if wr != 0 {
                 let qx = ex * iR, qy = ey * iR
-                ex += wr * (0.6 * sin(1.7 * qy + tl * 1.3 + 0.3) + 0.4 * sin(2.3 * qx - tl * 1.0 + 1.7))
-                ey += wr * (0.6 * sin(1.9 * qx - tl * 1.1 + 2.1) + 0.4 * sin(2.1 * qy + tl * 1.6 + 0.6))
+                if mat.morph >= 0.5 {
+                    // outline modes 2...5 (coefficients from morphCoef) plus the roaming bumps: radial d, tangential g;
+                    // scaled down towards the centre so the whole field is a smooth map
+                    let r = hypot(qx, qy)
+                    if r > 1e-6 {
+                        let c1 = qx / r, s1 = qy / r, kw = wr * min(1, r)
+                        var cm = c1, sm = s1, d = 0.0, g = 0.0
+                        for m in 2...5 {
+                            let c = cm * c1 - sm * s1; sm = sm * c1 + cm * s1; cm = c
+                            d += morphA[m] * cm + morphB[m] * sm; g += morphB[m] * cm - morphA[m] * sm
+                        }
+                        d += bumpAt(c1, s1)
+                        ex += kw * (d * c1 - 0.3 * g * s1); ey += kw * (d * s1 + 0.3 * g * c1)
+                    }
+                } else {
+                    ex += wr * (0.6 * sin(1.7 * qy + tl * 1.3 + 0.3) + 0.4 * sin(2.3 * qx - tl * 1.0 + 1.7))
+                    ey += wr * (0.6 * sin(1.9 * qx - tl * 1.1 + 2.1) + 0.4 * sin(2.1 * qy + tl * 1.6 + 0.6))
+                }
             }
             let k = TID[i]
             if k >= 0 {
                 let tt = tent[k], u = TUB[i], u2 = u * u
                 if swA != 0 {
                     let kd = Double(k)
-                    let phv = (sin(tl * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(tl * 2 * .pi / (1.9 + kd * 0.4) + kd)) * swA * u2
+                    // morph: two smooth noises per tentacle, one swings the whole tentacle (u²), one bends its middle (sin πu · u)
+                    let phv = (mat.morph >= 0.5
+                        ? 1.1 * Self.vnoise(40 + 2 * k, tl / 2.4 + kd * 0.3) * u2 + 0.6 * Self.vnoise(41 + 2 * k, tl / 1.3 + kd * 0.7) * sin(.pi * u) * u
+                        : (sin(tl * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(tl * 2 * .pi / (1.9 + kd * 0.4) + kd)) * u2) * swA
                     ex += -tt.uy * phv; ey += tt.ux * phv
                 }
                 if tvx != 0 || tvy != 0 { ex -= tvx * u2; ey -= tvy * u2 }
@@ -1052,6 +1076,20 @@ final class SlimeRig {
                 GW[i] += c.w
             }
         }
+        // tentMem: a grabbed tentacle is measured in the whole-body frame, more so towards the tip (the root stays on the
+        // clusters like the body, so the junction does not get two frames). The clusters read a bent tentacle as a rotation
+        // and cancel it (measured: a 0.8R pull remembered 2.7 pt). Only the grabbed tentacle: an untouched one swinging
+        // would be remembered as bent (measured: holding the body 1.5 s bent the tentacles 52 pt)
+        if mat.tentMem > 0 && !tent.isEmpty {
+            var tg = [Bool](repeating: false, count: tent.count)
+            for i in 0..<N where GRAB[i] && TID[i] >= 0 { tg[TID[i]] = true }
+            let g = clusters[gi]
+            for i in 0..<N where TID[i] >= 0 && tg[TID[i]] {
+                let px = X[i] - g.xc, py = Y[i] - g.yc, c = GW[i], w = mat.tentMem * TUB[i]
+                RX[i] = RX[i] * (1 - w) + (g.qcx + g.cs * px + g.sn * py) * c * w
+                RY[i] = RY[i] * (1 - w) + (g.qcy - g.sn * px + g.cs * py) * c * w
+            }
+        }
         let touched = fingers.values.contains { $0.mode == .grab }
         if t < relaxUntil {
             // 揉回原形: the remembered shape eases back to the original over half a second; positions follow
@@ -1072,7 +1110,7 @@ final class SlimeRig {
                 for i in 0..<N {
                     let rx = RX[i] / GW[i], ry = RY[i] / GW[i], dx = rx - QX[i], dy = ry - QY[i], dl = hypot(dx, dy)
                     if dl > yl {
-                        let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] : 1)
+                        let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
                         QX[i] += dx * s; QY[i] += dy * s
                         let ex = QX[i] - Q0X[i], ey = QY[i] - Q0Y[i], el = hypot(ex, ey), lim = R * 1.1
                         if el > lim { QX[i] = Q0X[i] + ex * lim / el; QY[i] = Q0Y[i] + ey * lim / el }
@@ -1086,16 +1124,169 @@ final class SlimeRig {
             }
         }
         // tentacles barely remember: tips always spring back to their length and thickness (the body is the clay).
+        // tentMem 1 (clay, 多米 2026-11-01: a pinched foot snapped straight back) turns this off; they relax at `recover`.
         // Must happen before recentering, with Q0 zero-mean, or the junction drifts apart frame by frame.
-        let kt = min(1, 0.8 * dt)
-        for i in 0..<N where TID[i] >= 0 {
-            let w = kt * TU[i]
-            QX[i] += (Q0X[i] - QX[i]) * w; QY[i] += (Q0Y[i] - QY[i]) * w
+        let kt = min(1, 0.8 * (1 - mat.tentMem) * dt)
+        if kt > 0 {
+            for i in 0..<N where TID[i] >= 0 {
+                let w = kt * TU[i]
+                QX[i] += (Q0X[i] - QX[i]) * w; QY[i] += (Q0Y[i] - QY[i]) * w
+            }
         }
+        if mat.tentMem > 0 { restFix(mat) }
         var mx = 0.0, my = 0.0
         for i in 0..<N { mx += QX[i]; my += QY[i] }
         mx /= Double(N); my /= Double(N)
         for i in 0..<N { QX[i] -= mx; QY[i] -= my }
+    }
+
+    /// The remembered tentacles must not fold either (tentMem): rungs and medial axis on the rest shape, a cap on the
+    /// accumulated bend, and a rigid tip. Same rules as tentacleRungs, no finger weights.
+    private func restFix(_ mat: FeelParams) {
+        if rest0.count != rungs.count {
+            rest0 = rungs.indices.map { k in rungs[k].indices.map { r in restBase(k, r, Q0X, Q0Y) } }
+        }
+        func wrap(_ a: Double) -> Double { atan2(sin(a), cos(a)) }
+        for k in rungs.indices {
+            let list = rungs[k], s0 = rungSign[k], nr = list.count
+            if nr < 2 { continue }
+            // widths: no narrower than 80% of the original's own (remembered thin, the sides crossed while pushed)
+            if mat.tentRung > 0 {
+                for r in 0..<nr {
+                    let p = list[max(0, r - 1)], q = list[min(nr - 1, r + 1)], g = list[r]
+                    var tx = QX[q.a] + QX[q.b] - QX[p.a] - QX[p.b], ty = QY[q.a] + QY[q.b] - QY[p.a] - QY[p.b]
+                    let tl = max(1e-6, hypot(tx, ty)); tx /= tl; ty /= tl
+                    let nx = -ty * s0, ny = tx * s0
+                    let cn = (QX[g.b] - QX[g.a]) * nx + (QY[g.b] - QY[g.a]) * ny, wmin = rest0[k][r].w * 0.8
+                    if cn < wmin {
+                        let d = (wmin - cn) * 0.5
+                        QX[g.a] -= nx * d; QY[g.a] -= ny * d; QX[g.b] += nx * d; QY[g.b] += ny * d
+                    }
+                }
+            }
+            // axis: the rule or the original's own value, whichever is smaller (the original does not always satisfy
+            // the rule, and the rule alone kept pushing an untouched rest shape 6 pt off)
+            let rp = rungRef[k]
+            if mat.tentAxis > 0 {
+                for r in 0..<(nr - 1) {
+                    let g = list[r], q = list[r + 1]
+                    var ux: Double, uy: Double
+                    if r == 0 {
+                        ux = (QX[g.a] + QX[g.b] - QX[rp.0] - QX[rp.1]) * 0.5; uy = (QY[g.a] + QY[g.b] - QY[rp.0] - QY[rp.1]) * 0.5
+                    } else {
+                        let p = list[r - 1]
+                        ux = (QX[g.a] + QX[g.b] - QX[p.a] - QX[p.b]) * 0.5; uy = (QY[g.a] + QY[g.b] - QY[p.a] - QY[p.b]) * 0.5
+                    }
+                    let ul = max(1e-6, hypot(ux, uy)); ux /= ul; uy /= ul
+                    let sv = ((QX[q.a] + QX[q.b] - QX[g.a] - QX[g.b]) * ux + (QY[q.a] + QY[q.b] - QY[g.a] - QY[g.b]) * uy) * 0.5
+                    let hmin = min(q.hs * mat.tentAxis, rest0[k][r].s)
+                    if sv < hmin {
+                        let d = (hmin - sv) * 0.5
+                        QX[q.a] += ux * d; QY[q.a] += uy * d; QX[q.b] += ux * d; QY[q.b] += uy * d
+                        QX[g.a] -= ux * d; QY[g.a] -= uy * d; QX[g.b] -= ux * d; QY[g.b] -= uy * d
+                    }
+                }
+            }
+            // accumulated bend: measured from the first link, at most bendMax more than the original; past that the rest of
+            // the tentacle turns back about that joint. Per-link rules cannot stop a little turn per link curling the tip
+            // back onto the middle, and memory then curled it further (measured: the held folds in T11 were exactly that)
+            func mid(_ AX: [Double], _ AY: [Double], _ r: Int) -> (Double, Double) {
+                r < 0 ? ((AX[rp.0] + AX[rp.1]) * 0.5, (AY[rp.0] + AY[rp.1]) * 0.5)
+                      : ((AX[list[r].a] + AX[list[r].b]) * 0.5, (AY[list[r].a] + AY[list[r].b]) * 0.5)
+            }
+            func ang(_ AX: [Double], _ AY: [Double], _ r: Int) -> Double {
+                let p = mid(AX, AY, r - 1), q = mid(AX, AY, r)
+                return atan2(q.1 - p.1, q.0 - p.0)
+            }
+            if nr >= 3 {
+                let d0 = wrap(ang(QX, QY, 0) - ang(Q0X, Q0Y, 0))
+                for r in 2..<nr {
+                    let c = wrap(wrap(ang(QX, QY, r) - ang(Q0X, Q0Y, r)) - d0)
+                    if abs(c) <= Self.bendMax { continue }
+                    let ex = c - (c > 0 ? 1 : -1) * Self.bendMax, co = cos(-ex), sn = sin(-ex)
+                    let pv = mid(QX, QY, r - 1), ut = min(TU[list[r].a], TU[list[r].b]) - 1e-6
+                    for i in 0..<N where TID[i] == k && TU[i] >= ut {
+                        let ox = QX[i] - pv.0, oy = QY[i] - pv.1
+                        QX[i] = pv.0 + co * ox - sn * oy; QY[i] = pv.1 + sn * ox + co * oy
+                    }
+                }
+            }
+            // the last two or three rungs are almost zero wide and cannot hold the tip; remembered on its own it crumpled
+            // into a bow tie. From the third rung from the end the tip turns and moves with that link, in its original shape
+            let ai = max(1, nr - 3), g = list[ai], p = list[ai - 1], ut = max(TU[g.a], TU[g.b])
+            let m0x = (Q0X[g.a] + Q0X[g.b]) * 0.5, m0y = (Q0Y[g.a] + Q0Y[g.b]) * 0.5
+            let mx = (QX[g.a] + QX[g.b]) * 0.5, my = (QY[g.a] + QY[g.b]) * 0.5
+            let d0x = m0x - (Q0X[p.a] + Q0X[p.b]) * 0.5, d0y = m0y - (Q0Y[p.a] + Q0Y[p.b]) * 0.5
+            let dx = mx - (QX[p.a] + QX[p.b]) * 0.5, dy = my - (QY[p.a] + QY[p.b]) * 0.5
+            let an = atan2(d0x * dy - d0y * dx, d0x * dx + d0y * dy), c = cos(an), sn = sin(an)
+            for i in 0..<N where TID[i] == k && TU[i] > ut {
+                let ox = Q0X[i] - m0x, oy = Q0Y[i] - m0y
+                QX[i] = mx + c * ox - sn * oy; QY[i] = my + sn * ox + c * oy
+            }
+        }
+    }
+
+    /// Rung `r` of tentacle `k` on a shape: its width across the local axis, and how far the next rung advances along it.
+    private func restBase(_ k: Int, _ r: Int, _ AX: [Double], _ AY: [Double]) -> (w: Double, s: Double) {
+        let list = rungs[k], s0 = rungSign[k], nr = list.count, rp = rungRef[k]
+        let p = list[max(0, r - 1)], q = list[min(nr - 1, r + 1)], g = list[r]
+        var tx = AX[q.a] + AX[q.b] - AX[p.a] - AX[p.b], ty = AY[q.a] + AY[q.b] - AY[p.a] - AY[p.b]
+        let tl = max(1e-6, hypot(tx, ty)); tx /= tl; ty /= tl
+        let cn = (AX[g.b] - AX[g.a]) * (-ty * s0) + (AY[g.b] - AY[g.a]) * (tx * s0)
+        if r >= nr - 1 { return (cn, 1e9) }
+        let q2 = list[r + 1]
+        var ux: Double, uy: Double
+        if r == 0 {
+            ux = (AX[g.a] + AX[g.b] - AX[rp.0] - AX[rp.1]) * 0.5; uy = (AY[g.a] + AY[g.b] - AY[rp.0] - AY[rp.1]) * 0.5
+        } else {
+            let p1 = list[r - 1]
+            ux = (AX[g.a] + AX[g.b] - AX[p1.a] - AX[p1.b]) * 0.5; uy = (AY[g.a] + AY[g.b] - AY[p1.a] - AY[p1.b]) * 0.5
+        }
+        let ul = max(1e-6, hypot(ux, uy))
+        return (cn, ((AX[q2.a] + AX[q2.b] - AX[g.a] - AX[g.b]) * ux + (AY[q2.a] + AY[q2.b] - AY[g.a] - AY[g.b]) * uy) * 0.5 / ul)
+    }
+
+    // MARK: - Idle morph (2026-11-01 多米真機回報: it looked like one shape swaying)
+    // Outline modes 2...5, each coefficient on its own smooth noise (lattice noise, Catmull-Rom), higher modes faster and
+    // smaller; plus two bumps (or dents) roaming round the body. Uncorrelated, so the shape keeps changing and never comes
+    // back to the same few poses. A function of the clock only; same numbers as the web prototype
+
+    private static let morphW: [Double] = [0, 0, 1, 0.8, 0.55, 0.35], morphT: [Double] = [0, 0, 2.1, 1.7, 1.45, 1.25]
+    private static let bumpSig = 0.5, bumpMean = 0.5 / (2 * Double.pi).squareRoot()
+    private static let bendMax = 1.2
+
+    private static func hash1(_ n: Double) -> Double {
+        let s = sin(n * 127.1 + 311.7) * 43758.5453
+        return (s - floor(s)) * 2 - 1
+    }
+
+    private static func vnoise(_ ch: Int, _ x: Double) -> Double {
+        let i = floor(x), f = x - i, b = Double(ch * 1013)
+        let p0 = hash1(b + i - 1), p1 = hash1(b + i), p2 = hash1(b + i + 1), p3 = hash1(b + i + 2)
+        return 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (3 * p1 - p0 - 3 * p2 + p3) * f * f * f)
+    }
+
+    private func morphCoef(_ tl: Double) {
+        for m in 2...5 {
+            let dm = Double(m)
+            morphA[m] = Self.morphW[m] * Self.vnoise(2 * m, tl / Self.morphT[m] + dm * 0.37) / 1.3
+            morphB[m] = Self.morphW[m] * Self.vnoise(2 * m + 1, tl / Self.morphT[m] + dm * 0.61) / 1.3
+        }
+        for j in 0..<2 {
+            let dj = Double(j)
+            bumpAng[j] = dj * .pi + 3.5 * Self.vnoise(60 + 2 * j, tl / 3.3 + dj * 0.5)
+            bumpAmp[j] = 0.9 * Self.vnoise(61 + 2 * j, tl / 1.9 + dj * 0.3)
+        }
+    }
+
+    /// Radial push of the roaming bumps at direction (c1, s1); the mean is taken out so the area stays put to first order.
+    private func bumpAt(_ c1: Double, _ s1: Double) -> Double {
+        var d = 0.0
+        for j in 0..<2 {
+            let ca = cos(bumpAng[j]), sa = sin(bumpAng[j]), da = atan2(s1 * ca - c1 * sa, c1 * ca + s1 * sa)
+            d += bumpAmp[j] * (exp(-da * da / (2 * Self.bumpSig * Self.bumpSig)) - Self.bumpMean)
+        }
+        return d
     }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.

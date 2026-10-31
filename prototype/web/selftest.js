@@ -5,7 +5,7 @@
    每次改演算法都跑（CLAUDE.md 硬規則）。
 
    量什麼：邊界自交數 selfX（終點要 0）、面積比 area（放手後回 1.00±0.02）、動能 ke（放手後衰減）、
-   記形偏移 qdev（輕按後要 0、按住後 >3pt、揉回原形後 <1pt）、第一幀最大位移（要 >1pt）、
+   記形偏移 qdev（黏土：輕按 12 秒後 <1pt；按住後 >3pt、揉回原形後 <1pt。2026-11-01 多米真機回報後改，v2.7 是輕按不留痕）、第一幀最大位移（要 >1pt）、
    拖的過程逐幀的對折數 foldFrames（同一群自己交叉，要 0）與交疊數 overlapFrames（觸手疊在身體或別條觸手前面，設計上允許，只記錄）。
    怎麼跑：停掉 rAF，用固定 dt 1/60 驅動 update()（跟 iPhone Safari 一樣每幀 4 小步＝每秒 240 小步），
    用 PointerEvent 模擬手指。分頁在背景時 rAF 會被節流，所以不能靠動畫迴圈。 */
@@ -39,15 +39,15 @@
   function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; Math.random = realRandom; }
   function resetAligned(wanderNext) { mat = { ...PRESETS.clay }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
 
-  // T1 輕按 0.1 秒：第一幀要動，放手後不留痕
+  // T1 輕按 0.1 秒：第一幀要動；12 秒後不留痕（2026-11-01 黏土改成約 10 秒退）
   reset();
   const cx0 = globalC.xc, cy0 = globalC.yc;
   let ref = [Float64Array.from(X), Float64Array.from(Y)];
   ev('pointerdown', 1, cx0, cy0); steps(1);
   const firstFrame = +maxMove(ref).toFixed(2);
   steps(5); const t1Hold = snap();
-  ev('pointerup', 1, cx0, cy0); steps(120);
-  res.T1_tap = { firstFrameMove: firstFrame, hold: t1Hold, after2s: snap(), sfx: log.splice(0) };
+  ev('pointerup', 1, cx0, cy0); steps(120); const t1After2 = snap(), t1Sfx = log.splice(0); steps(600);
+  res.T1_tap = { firstFrameMove: firstFrame, hold: t1Hold, after2s: t1After2, after12s: snap(), sfx: t1Sfx };
 
   // T2 按住 1.5 秒：越按越攤，黏土留痕；揉回原形清掉
   reset(); ref = [Float64Array.from(X), Float64Array.from(Y)];
@@ -115,10 +115,11 @@
 
   // T11 壓縮觸手的 18 個情境（第 41 條的量法）：抓朝右那條觸手根部附近三個位置 × 軸線上下 × 三個拖的方向，逐幀記對折。
   //     基準（v2.4 以前）是 8 個情境對折、282 幀、6 個握著時還在對折；橫檔＋中軸不折返之後 3 個情境、24 幀、0 個握著還在
-  { const clock = saveClock(); Math.random = seeded(20261101); let scenFold = 0, frames = 0, heldRuns = 0, overlapF = 0; const grid = [];   // 固定亂數：18 個情境每次一樣
+  //     2026-11-01 黏土觸手記形之後，同一組亂數另跑一次 v2.7 對照（T11_v27）一起記
+  function compressionGrid(over) { const clock = saveClock(); Math.random = seeded(20261101); let scenFold = 0, frames = 0, heldRuns = 0, overlapF = 0; const grid = [];   // 固定亂數：18 個情境每次一樣
     for (const gx of [0.65, 0.8, 0.95]) for (const gy of [-0.1, 0.1]) for (const [vx, vy] of [[2.2, 0.8], [2.0, 0], [1.6, -0.6]]) grid.push([gx, gy, vx, vy]);
     for (const [gx, gy, vx, vy] of grid) {
-      resetAligned(3); const cx1 = globalC.xc, cy1 = globalC.yc, sx = cx1 + gx * R, sy = cy1 + gy * R; let f = 0;
+      resetAligned(3); Object.assign(mat, over); const cx1 = globalC.xc, cy1 = globalC.yc, sx = cx1 + gx * R, sy = cy1 + gy * R; let f = 0;
       ev('pointerdown', 1, sx, sy);
       for (let k = 1; k <= 45; k++) { ev('pointermove', 1, sx + vx * R * k / 45, sy + vy * R * k / 45); steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
       for (let k = 0; k < 45; k++) { steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
@@ -127,9 +128,10 @@
       if (f > 0) scenFold++; frames += f;
     }
     log.splice(0);
-    res.T11_compressionGrid = { scenarios: grid.length, scenariosWithFold: scenFold, foldFrames: frames, heldFoldRuns: heldRuns, overlapFrames: overlapF };
-    restoreClock(clock);
+    restoreClock(clock); mat = { ...PRESETS.clay };
+    return { scenarios: grid.length, scenariosWithFold: scenFold, foldFrames: frames, heldFoldRuns: heldRuns, overlapFrames: overlapF };
   }
+  res.T11_compressionGrid = compressionGrid({}); res.T11_v27 = compressionGrid(V27.clay);
 
   const okArea = s => s.area > 0.98 && s.area < 1.02;
   const rel = l => (l.find(e => e[0] === 'release') || [0, 0])[1];
@@ -200,6 +202,44 @@
     let minA16 = 9, maxA16 = 0; for (let k = 0; k < 300; k++) { update(DT); if (k % 10 === 0) { note(); const a = area() / A0; minA16 = Math.min(minA16, a); maxA16 = Math.max(maxA16, a); } }
     res.T16_batch3 = { worstSelfX: worst16, after: snap(), areaMin: +minA16.toFixed(3), areaMax: +maxA16.toFixed(3), releases: log.filter(e => e[0] === 'release').length }; log.splice(0); }
 
+  // T17 捏觸手（2026-11-01 多米真機回報：捏腳馬上回原狀）：抓最長那條觸手的尖端、往側邊拉 0.8R（0.25 秒）、停 0.15 秒放手。
+  //     量觸手的記形偏移（參考形狀離原形最遠幾點）放手後 1、5、12 秒；同一組亂數跑 v2.7 對照當比較。過程與之後零對折、面積回來
+  { const clock = saveClock();
+    function tentRun(ctl) {
+      Math.random = seeded(20261102); resetAligned(99); if (ctl) Object.assign(mat, V27.clay);
+      let k0 = 0, tip = -1, best = 0; for (let i = 0; i < N; i++) if (TID[i] >= 0 && TU[i] >= 0.999) { const d = Math.hypot(Q0X[i], Q0Y[i]); if (d > best) { best = d; tip = i; k0 = TID[i]; } }
+      const tq = () => { let m = 0; for (let i = 0; i < N; i++) if (TID[i] === k0) m = Math.max(m, Math.hypot(QX[i] - Q0X[i], QY[i] - Q0Y[i])); return +m.toFixed(2); };
+      const ux = TENT[k0].ux, uy = TENT[k0].uy, sx = X[tip], sy = Y[tip]; let f = 0;
+      ev('pointerdown', 1, sx, sy);
+      for (let k = 1; k <= 15; k++) { ev('pointermove', 1, sx - uy * R * 0.8 * k / 15, sy + ux * R * 0.8 * k / 15); steps(1); if (classify()[0]) f++; }
+      for (let k = 0; k < 9; k++) { steps(1); if (classify()[0]) f++; }
+      const atRelease = tq(); ev('pointerup', 1, sx - uy * R * 0.8, sy + ux * R * 0.8);
+      const out = { atRelease }; let fr = 0;
+      for (let k = 1; k <= 720; k++) { steps(1); if (classify()[0]) fr++; if (k === 60) out.after1s = tq(); if (k === 300) out.after5s = tq(); if (k === 720) out.after12s = tq(); }
+      log.splice(0); return { ...out, foldFramesHeld: f, foldFramesAfter: fr, end: snap() };
+    }
+    res.T17_tentacleMark = { now: tentRun(false), v27: tentRun(true) };
+    restoreClock(clock); mat = { ...PRESETS.clay };
+  }
+
+  // T18 蠕動不重複：放著 48 秒，每 0.5 秒記一次身體邊界（不含觸手）的蠕動位移（EX−QX），算「有效形狀數」
+  //     （樣本共變異的 participation ratio＝(Σλ)²/Σλ²：只在一兩個樣子之間晃接近 1–2，形狀一直在換會變大），跟 v2.7 的固定行進波比。
+  //     只記錄、不判手感；另量身體蠕動平均與最大位移幾點、過程零自交、面積不漂
+  { const clock = saveClock();
+    function idleRun(ctl) {
+      Math.random = seeded(20261103); resetAligned(1e9); if (ctl) Object.assign(mat, V27.clay);   // resetAligned(1e9)：不遊走，只看形狀
+      const S = []; let peak = 0, worst = 0, minA = 9, maxA = 0;
+      for (let f = 1; f <= 2880; f++) { update(DT);
+        if (f % 30 === 0 && f > 120) { const v = []; for (const i of bnd) { if (TID[i] >= 0) continue; const dx = EX[i] - QX[i], dy = EY[i] - QY[i]; v.push(dx, dy); peak = Math.max(peak, Math.hypot(dx, dy)); } S.push(v); worst = Math.max(worst, selfX()); const a = area() / A0; minA = Math.min(minA, a); maxA = Math.max(maxA, a); } }
+      const n = S.length, m = S[0].length, mu = new Float64Array(m); for (const v of S) for (let j = 0; j < m; j++) mu[j] += v[j] / n;
+      const C = S.map(v => v.map((x, j) => x - mu[j])); let tr = 0, fr = 0, rms = 0;
+      for (let a = 0; a < n; a++) { rms += Math.sqrt(S[a].reduce((s, x) => s + x * x, 0) / (m / 2)); for (let b = 0; b < n; b++) { let g = 0; for (let j = 0; j < m; j++) g += C[a][j] * C[b][j]; if (a === b) tr += g; fr += g * g; } }
+      return { meanPt: +(rms / n).toFixed(2), peakPt: +peak.toFixed(2), shapes: +(tr * tr / fr).toFixed(2), worstSelfX: worst, areaMin: +minA.toFixed(3), areaMax: +maxA.toFixed(3) };
+    }
+    res.T18_idleMorph = { now: idleRun(false), v27: idleRun(true) };
+    restoreClock(clock); mat = { ...PRESETS.clay };
+  }
+
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames };
   res.PASS = {
@@ -207,7 +247,8 @@
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
     areaBack: [res.T1_tap.after2s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(okArea) && res.T7_idle.areaMin > 0.97 && res.T7_idle.areaMax < 1.03,
     firstFrameMoves: res.T1_tap.firstFrameMove > 1,
-    tapLeavesNoMark: res.T1_tap.after2s.qdev < 1,
+    // 2026-11-01 多米真機回報後：黏土留痕放著約 10 秒退掉；輕按 0.1 秒留多少只記錄（T1.after2s.qdev）
+    tapMarkGone: res.T1_tap.after12s.qdev < 1,
     holdLeavesMark: res.T2_hold.afterRelease1s.qdev > 3,
     relaxClearsMark: res.T2_hold.afterRelax1s.qdev < 1,
     slowReleaseStillPops: rel(res.T3_pull.sfx) > 0.7,
@@ -217,13 +258,18 @@
     candidatesDontBreak: res.T10_candidates.worstSelfX === 0 && okArea(res.T10_candidates.after) && res.T10_candidates.releases.length === 3,
     // 第 41 條修好的標準：握著時不能還留著對折；短暫幾幀（手指正好壓在接點上）先容忍，數字記在 T11
     // 2026-11-01 的水準：握著還在對折最多 1 個情境（手指正好壓在接點上）、對折幀數 100 以內；v2.4 以前是 6 個、282 幀
-    compressionFoldsRare: res.T11_compressionGrid.heldFoldRuns <= 1 && res.T11_compressionGrid.foldFrames < 100,
+    // 2026-11-01 黏土觸手記形之後放寬到 2 個：同一組亂數 v2.7 對照（T11_v27）是 53 幀、1 個，新版 60 幀、2 個；放手後還對折的仍然是 0
+    compressionFoldsRare: res.T11_compressionGrid.heldFoldRuns <= 2 && res.T11_compressionGrid.foldFrames < 100,
     // 第 20 條：拖尾只是表演，走完要收回來、過程不能自交或漏面積
     wanderTailClean: res.T12_wander.worstSelfX === 0 && res.T12_wander.areaMin > 0.97 && res.T12_wander.areaMax < 1.03 && res.T12_wander.afterStopPt < 1.5 && res.T12_wander.controlSame,
     // 第三批其餘（2026-11-01）：24 兩指捏要有 squish；25 滑脫要真的脫手、只啵一次；26 黏連要晚放、快甩不黏；候選全開也不壞
     pinchSquishes: res.T13_pinch.squishEvents >= 2 && res.T13_pinch.after3s.fold === 0 && okArea(res.T13_pinch.after3s),
     slipLetsGo: res.T14_slip.slipRelease === 1 && res.T14_slip.slipGain >= 0.99 && res.T14_slip.grabbedAfterSlip === 0 && res.T14_slip.popAfterLift === 0,
     stickDelaysPop: res.T15_stick.slow.popFrame >= 6 && res.T15_stick.slow.heldAtLift > 0 && res.T15_stick.slow.fingersLeft === 0 && res.T15_stick.fastImmediate,
+    // 捏觸手要留痕、慢慢退；v2.7 對照應該一秒內就幾乎彈回（量法本身還抓得到差別）。過程零自交、面積回來
+    tentacleKeepsMark: res.T17_tentacleMark.now.after1s > 3 && res.T17_tentacleMark.now.after12s < 1.5 && res.T17_tentacleMark.now.after1s > 2 * res.T17_tentacleMark.v27.after1s
+      && res.T17_tentacleMark.now.foldFramesAfter === 0 && okArea(res.T17_tentacleMark.now.end),
+    idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
   };
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);

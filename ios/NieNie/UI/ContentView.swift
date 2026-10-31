@@ -19,14 +19,16 @@ struct ChipStyle: ButtonStyle {
         let pressed = configuration.isPressed
         return configuration.label
             .foregroundStyle(Palette.ink)
+            // the drop goes on the shape only: on the whole view it copies the glyphs 3 pt down (疊影, 2026-11-01 真機)
             .background(Group {
                 if circle {
                     Circle().fill(Palette.chip).overlay(Circle().stroke(Palette.ink, lineWidth: 2.5))
+                        .shadow(color: Palette.ink, radius: 0, x: 0, y: pressed ? 1 : 3)
                 } else {
                     Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5))
+                        .shadow(color: Palette.ink, radius: 0, x: 0, y: pressed ? 1 : 3)
                 }
             })
-            .shadow(color: Palette.ink, radius: 0, x: 0, y: pressed ? 1 : 3)
             .offset(y: pressed ? 2 : 0)
     }
 }
@@ -128,8 +130,8 @@ struct ContentView: View {
                 }
             }
             .padding(3)
-            .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
-            .shadow(color: Palette.ink, radius: 0, x: 0, y: 3)
+            .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5))
+                .shadow(color: Palette.ink, radius: 0, x: 0, y: 3))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("史萊姆手感")
 
