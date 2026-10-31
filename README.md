@@ -4,7 +4,7 @@
 
 ## 目前狀態
 
-- `prototype/web/index.html`：**目前採用的手感原型 v2.1：形狀匹配軟體（Shape Matching）＋塑性＋活物感＋觸手**。外形是癱軟的不規則團塊加 5 條垂下來的觸手（頭頂一個鼓包當方向感），約 380 顆粒子，每幀被拉回「最接近的剛體擺放」，數學上不會爆、不會打結；觸手越靠末端越軟，沒碰時各自用不同週期慢慢飄；變形超過門檻會留形，放著慢慢回去；會呼吸、慢搖、偶爾抖，懸空。預設黏土（另有果凍、麻糬）。長按「捏捏」開調整面板，「外形亂數種子」可換形狀。聲音讀 `prototype/web/sfx/manifest.json` 的錄音切片，還沒錄所以目前安靜；怎麼錄見 `.uiux/04-手感/錄音指南.md`。用 iPhone Safari 打開即可捏。線上版（GitHub Pages）：<https://domyweb666.github.io/nienie-slime/prototype/web/index.html>。網頁版沒有觸覺、延遲與原生版不同，只能看形狀與手勢邏輯，不能當手感驗收。
+- `prototype/web/index.html`：**目前採用的手感原型 v2.2：形狀匹配軟體（Shape Matching）＋塑性＋活物感＋觸手＋蠕動＋遊走**。外形是癱軟的不規則團塊加 5 條垂下來的觸手（頭頂一個鼓包當方向感），約 360 顆粒子，每幀被拉回「最接近的剛體擺放」，數學上不會爆、不會打結；粒子互不穿透所以觸手拉不成細線；觸手越靠末端越軟、記憶很淡會彈回，身體才留形；沒碰時整個輪廓被幾個慢速行進波掃過一直在蠕動，觸手各自飄，家會在畫面裡慢慢遊走，碰它就停；懸空。預設黏土（另有果凍、麻糬）。長按「捏捏」開調整面板，「外形亂數種子」可換形狀。聲音讀 `prototype/web/sfx/manifest.json` 的錄音切片，還沒錄所以目前安靜；怎麼錄見 `.uiux/04-手感/錄音指南.md`。用 iPhone Safari 打開即可捏。線上版（GitHub Pages）：<https://domyweb666.github.io/nienie-slime/prototype/web/index.html>。網頁版沒有觸覺、延遲與原生版不同，只能看形狀與手勢邏輯，不能當手感驗收。
 - `prototype/web/archive/`：試過但手感未達標的版本，僅供參考：
   - `mesh-v7.html`：三角網子軟體（大幅揉捏會打結）
   - `mpm-clay.html`：MPM 顆粒模擬（在 iPhone 上會崩裂、閃爍）
