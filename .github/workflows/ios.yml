@@ -59,12 +59,27 @@ jobs:
         run: |
           brew install xcodegen
           cd ios && xcodegen generate
+      - name: Check secrets are present
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          missing=""
+          [ -z "$TEAM_ID" ] && missing="$missing APPLE_TEAM_ID"
+          [ -z "$ASC_KEY_ID" ] && missing="$missing ASC_KEY_ID"
+          [ -z "$ASC_ISSUER_ID" ] && missing="$missing ASC_ISSUER_ID"
+          [ -z "$ASC_PRIVATE_KEY" ] && missing="$missing ASC_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub Secrets:$missing"
+            exit 1
+          fi
       - name: Write App Store Connect API key
         env:
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey.p8"
+          printf '%s
+' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/keys/AuthKey.p8"
+          head -c 27 "$RUNNER_TEMP/keys/AuthKey.p8" | grep -q "BEGIN PRIVATE KEY" || { echo "::error::ASC_PRIVATE_KEY does not look like a .p8 file (should start with -----BEGIN PRIVATE KEY-----)"; exit 1; }
           echo "ASC_KEY_PATH=$RUNNER_TEMP/keys/AuthKey.p8" >> "$GITHUB_ENV"
       - name: Archive (cloud-managed automatic signing)
         run: |

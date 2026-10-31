@@ -41,7 +41,7 @@
    | `APPLE_TEAM_ID` | Team ID |
    | `ASC_KEY_ID` | Key ID |
    | `ASC_ISSUER_ID` | Issuer ID |
-   | `ASC_KEY_P8` | `.p8` 檔的全部內容，連 BEGIN、END 兩行一起貼 |
+   | `ASC_PRIVATE_KEY` | `.p8` 檔的全部內容，連 BEGIN、END 兩行一起貼 |
 
 6. 上傳：GitHub → Actions → iOS → Run workflow，勾選 testflight 後執行。跑完後 App Store Connect 要再處理 10 到 30 分鐘，build 才會出現在 TestFlight 分頁。
 7. 把自己加成內部測試者，手機裝 TestFlight App 就能安裝。
