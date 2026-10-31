@@ -115,8 +115,9 @@ jobs:
               sys.exit(1)
           apps = [a["attributes"]["bundleId"] for a in d.get("data", [])]
           print("API key accepted. Apps visible to this key:", apps)
-          if "org.domyweb.nienieslime" not in apps:
-              print("::error::No App with Bundle ID org.domyweb.nienieslime exists in App Store Connect yet (the key sees: " + str(apps) + "). Create it first: App Store Connect → App → ＋ → 新增 App → iOS, Bundle ID org.domyweb.nienieslime, then rerun.")
+          bundle = re.search(r"PRODUCT_BUNDLE_IDENTIFIER:\s*(\S+)", open("ios/project.yml").read()).group(1)
+          if bundle not in apps:
+              print("::error::No App with Bundle ID " + bundle + " exists in App Store Connect yet (the key sees: " + str(apps) + "). Either create that App in App Store Connect, or change PRODUCT_BUNDLE_IDENTIFIER in ios/project.yml to one of the existing ones.")
               sys.exit(1)
           with open(os.environ["GITHUB_ENV"], "a") as f:
               f.write(f"ASC_KEY_PATH={tmp}/keys/AuthKey.p8" + chr(10))
