@@ -32,6 +32,12 @@
   function maxMove(ref) { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.hypot(X[i] - ref[0][i], Y[i] - ref[1][i])); return m; }
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
   function reset() { mat = { ...PRESETS.clay }; setup(); steps(60); }
+  // 固定亂數＋歸零時鐘，T11、T12 用：結果可重現。setup() 不重設時鐘；時鐘動過要還原，不然上一輪 T2 的 relaxUntil 留在未來，下一輪的記形會被當成「揉回原形」
+  function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const realRandom = Math.random;
+  const saveClock = () => ({ t, lastTouch, nextTwitch, tLife, relaxUntil, wNext: WANDER.next, wMoving: WANDER.moving });
+  function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; Math.random = realRandom; }
+  function resetAligned(wanderNext) { mat = { ...PRESETS.clay }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
 
   // T1 輕按 0.1 秒：第一幀要動，放手後不留痕
   reset();
@@ -109,10 +115,10 @@
 
   // T11 壓縮觸手的 18 個情境（第 41 條的量法）：抓朝右那條觸手根部附近三個位置 × 軸線上下 × 三個拖的方向，逐幀記對折。
   //     基準（v2.4 以前）是 8 個情境對折、282 幀、6 個握著時還在對折；橫檔＋中軸不折返之後 3 個情境、24 幀、0 個握著還在
-  { let scenFold = 0, frames = 0, heldRuns = 0, overlapF = 0; const grid = [];
+  { const clock = saveClock(); Math.random = seeded(20261101); let scenFold = 0, frames = 0, heldRuns = 0, overlapF = 0; const grid = [];   // 固定亂數：18 個情境每次一樣
     for (const gx of [0.65, 0.8, 0.95]) for (const gy of [-0.1, 0.1]) for (const [vx, vy] of [[2.2, 0.8], [2.0, 0], [1.6, -0.6]]) grid.push([gx, gy, vx, vy]);
     for (const [gx, gy, vx, vy] of grid) {
-      reset(); const cx1 = globalC.xc, cy1 = globalC.yc, sx = cx1 + gx * R, sy = cy1 + gy * R; let f = 0;
+      resetAligned(3); const cx1 = globalC.xc, cy1 = globalC.yc, sx = cx1 + gx * R, sy = cy1 + gy * R; let f = 0;
       ev('pointerdown', 1, sx, sy);
       for (let k = 1; k <= 45; k++) { ev('pointermove', 1, sx + vx * R * k / 45, sy + vy * R * k / 45); steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
       for (let k = 0; k < 45; k++) { steps(1); const [s, c] = classify(); if (s) f++; if (c) overlapF++; }
@@ -122,11 +128,38 @@
     }
     log.splice(0);
     res.T11_compressionGrid = { scenarios: grid.length, scenariosWithFold: scenFold, foldFrames: frames, heldFoldRuns: heldRuns, overlapFrames: overlapF };
+    restoreClock(clock);
   }
 
   const okArea = s => s.area > 0.98 && s.area < 1.02;
   const rel = l => (l.find(e => e[0] === 'release') || [0, 0])[1];
   // 提案第 41 條（2026-11-01）：抓觸手根部往尖端推會壓縮觸手、對折。橫檔＋中軸不折返之後剩手指正好壓在接點上時的幾幀。
+  // T12 遊走與拖尾（第 20 條）：同一組亂數跑兩次（關拖尾當對照、開拖尾），放著 20 秒逐幀比觸手尖端在身體座標裡的位置差，
+  //     投影到移動的反方向＝拖了幾點（maxTailPt）；走完停下 3 秒後差要回到 1.5pt 以內（afterStopPt；停下 1 到 2 秒內身體還在回正，量到 3.5pt）；過程零自交、面積不漂
+  {
+    const clock = saveClock();
+    function wanderRun(tail) {
+      Math.random = seeded(20261101); resetAligned(0); mat.tail = tail;   // 先歸零時鐘再暖身，兩次的亂數才會對齊
+      const tips = []; for (let k = 0; k < TENT.length; k++) { let b = -1; for (let i = 0; i < N; i++) if (TID[i] === k && (b < 0 || TU[i] > TU[b])) b = i; if (b >= 0) tips.push(b); }
+      const frames = []; let worst = 0, minA = 9, maxA = 0, stopAt = -9, moved = 0;
+      for (let f = 0; f < 1200; f++) { update(DT);
+        if (f % 4 === 0) { worst = Math.max(worst, selfX()); const a = area() / A0; minA = Math.min(minA, a); maxA = Math.max(maxA, a); }
+        let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } mx /= N; my /= N;
+        const ga = Math.atan2(globalC.sn, globalC.cs), ca = Math.cos(ga), sa = Math.sin(ga), wv = Math.hypot(WANDER.vx, WANDER.vy);
+        if (WANDER.moving) { stopAt = t; moved++; }
+        frames.push({ pos: tips.map(i => { const dx = X[i] - mx, dy = Y[i] - my; return [ca * dx + sa * dy, -sa * dx + ca * dy]; }), moving: WANDER.moving,
+          bx: wv > 1e-6 ? -(ca * WANDER.vx + sa * WANDER.vy) / wv : 0, by: wv > 1e-6 ? -(-sa * WANDER.vx + ca * WANDER.vy) / wv : 0, since: t - stopAt });
+      }
+      return { frames, worst, minA, maxA, moved };
+    }
+    const ctl = wanderRun(0), run = wanderRun(PRESETS.clay.tail);
+    let maxTail = 0, afterStop = 0;
+    for (let f = 0; f < run.frames.length; f++) { const a = ctl.frames[f], b = run.frames[f];
+      for (let k = 0; k < b.pos.length; k++) { const dx = b.pos[k][0] - a.pos[k][0], dy = b.pos[k][1] - a.pos[k][1];
+        if (b.moving) maxTail = Math.max(maxTail, dx * b.bx + dy * b.by); else if (b.since > 3) afterStop = Math.max(afterStop, Math.hypot(dx, dy)); } }
+    res.T12_wander = { tail: PRESETS.clay.tail, movingFrames: run.moved, maxTailPt: +maxTail.toFixed(2), afterStopPt: +afterStop.toFixed(2), worstSelfX: run.worst, areaMin: +run.minA.toFixed(3), areaMax: +run.maxA.toFixed(3), controlSame: ctl.moved === run.moved };
+    restoreClock(clock);
+  }
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames };
   res.PASS = {
@@ -145,6 +178,8 @@
     // 第 41 條修好的標準：握著時不能還留著對折；短暫幾幀（手指正好壓在接點上）先容忍，數字記在 T11
     // 2026-11-01 的水準：握著還在對折最多 1 個情境（手指正好壓在接點上）、對折幀數 100 以內；v2.4 以前是 6 個、282 幀
     compressionFoldsRare: res.T11_compressionGrid.heldFoldRuns <= 1 && res.T11_compressionGrid.foldFrames < 100,
+    // 第 20 條：拖尾只是表演，走完要收回來、過程不能自交或漏面積
+    wanderTailClean: res.T12_wander.worstSelfX === 0 && res.T12_wander.areaMin > 0.97 && res.T12_wander.areaMax < 1.03 && res.T12_wander.afterStopPt < 1.5 && res.T12_wander.controlSame,
   };
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
