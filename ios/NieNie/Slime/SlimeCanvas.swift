@@ -15,6 +15,8 @@ struct SlimeCanvas: UIViewRepresentable {
         let view = SlimeView(rig: controller.rig, colors: controller.material.colors)
         let controller = self.controller
         view.onFrame = { [weak controller] dt in controller?.frame(dt: dt) }
+        view.onStats = { [weak controller] s in controller?.report(s) }
+        view.latencyTest = controller.latencyTest
         context.coordinator.material = controller.material
         return view
     }
@@ -23,6 +25,9 @@ struct SlimeCanvas: UIViewRepresentable {
         if context.coordinator.material != controller.material {
             context.coordinator.material = controller.material
             view.colors = controller.material.colors
+        }
+        if view.latencyTest != controller.latencyTest {
+            view.latencyTest = controller.latencyTest
         }
     }
 }

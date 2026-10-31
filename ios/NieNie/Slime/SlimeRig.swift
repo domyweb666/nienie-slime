@@ -9,7 +9,9 @@ enum SlimeEvent {
     case tap                                 // VoiceOver / buttons
 }
 
-/// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.2:
+/// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.3
+/// (v2.2 plus the first batch of 手感精修提案, 2026-11-01: press spread, dwell-gated plasticity,
+/// release strength by stretch, prediction fallback, animated reset):
 /// a floating irregular blob with drooping tentacles, built from particles that are pulled
 /// back every substep to the best rigid fit of overlapping clusters. Plasticity keeps a
 /// molded shape (clay), tentacles spring back; idle breathing, wriggle, tentacle drift,
@@ -58,16 +60,31 @@ final class SlimeRig {
     private var t = 0.0, lastTouch = -10.0, nextTwitch = 3.0, A0 = 1.0
     private var wanderX = 0.0, wanderY = 0.0, wanderNext = 3.0, wanderMoving = false
     private var builtSeed = -1.0, builtFloppy = -1.0, builtSpace = -1.0, builtRad = -1.0
+    private var relaxUntil = -1.0            // 揉回原形: until when the remembered shape eases back to the original
+    private(set) var lastReleaseStrength = 0.0
 
     final class Finger {
         enum Mode { case grab, push, none }
-        var ax, ay, x, y, fx, fy, lx, ly: Double
-        var vx = 0.0, vy = 0.0
+        var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
+        var rawX, rawY, lastRawX, lastRawY: Double   // real finger position (never a prediction)
+        var predX = 0.0, predY = 0.0, hasPrediction = false, movedThisFrame = false
+        var vx = 0.0, vy = 0.0                       // raw per-frame velocity of the real finger
+        var vxS = 0.0, vyS = 0.0                     // ~30 ms smoothed
+        var peak = 0.0                               // ~80 ms decaying peak speed, for the release pop
+        var travel = 0.0, travelFrame = 0.0          // true distance travelled (coalesced touches): total, and since the last update
+        var speedC = 0.0                             // smoothed travel rate, drives the rub sound
+        var radius = 0.0                             // UITouch.majorRadius, points (0 = unknown)
         var step = 0
+        var stretch = 0.0                            // tanh-limited stretch at the last update, in radii
+        let tDown: Double                            // rig time when the finger landed (dwell for plasticity)
+        var press = 0.0, hold = 0.0, pressOn = false // press spread (points), hold level 0...1
+        var pushed = false                           // push mode: has it displaced anything yet
         var mode: Mode
-        var mem: [(i: Int, ox: Double, oy: Double, w: Double)] = []
-        init(x: Double, y: Double, mode: Mode) {
-            ax = x; ay = y; self.x = x; self.y = y; fx = x; fy = y; lx = x; ly = y
+        var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
+        init(x: Double, y: Double, mode: Mode, time: Double) {
+            ax = x; ay = y; self.x = x; self.y = y; fx = x; fy = y
+            rawX = x; rawY = y; lastRawX = x; lastRawY = y
+            tDown = time
             self.mode = mode
         }
     }
@@ -261,7 +278,7 @@ final class SlimeRig {
         fingers.removeAll()
         A0 = polygonArea()
         builtSeed = params.seed; builtFloppy = params.floppy
-        t = 0; lastTouch = -10; nextTwitch = 3
+        t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         wanderMoving = false; wanderNext = 3
     }
 
@@ -333,24 +350,29 @@ final class SlimeRig {
     }
 
     /// `allowed` is false for touches in the system-gesture bands near the screen edges.
-    func touchBegan(_ id: ObjectIdentifier, x: Double, y: Double, time: TimeInterval, allowed: Bool = true) {
+    /// `radius` is UITouch.majorRadius (contact size, points; 0 if unknown).
+    func touchBegan(_ id: ObjectIdentifier, x: Double, y: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
         guard N > 0 else { return }
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
-        let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push))
+        let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
+        f.radius = radius
         if grab {
+            // mem: particle, offset from the finger, follow weight, and the spread direction for the press
+            // (unit vector away from the finger × (1 − u²)², so the patch squashes flat under the finger)
             let gr = params.grabR * R
             for i in 0..<N where !GRAB[i] {
-                let d = hypot(X[i] - x, Y[i] - y)
+                let ox = X[i] - x, oy = Y[i] - y, d = hypot(ox, oy)
                 if d < gr {
-                    let u = d / gr
-                    f.mem.append((i, X[i] - x, Y[i] - y, exp(-u * u * 2.5) * (1 - u * u)))
+                    let u = d / gr, wp = (1 - u * u) * (1 - u * u), inv = d > 1e-6 ? wp / d : 0
+                    f.mem.append((i, ox, oy, exp(-u * u * 2.5) * (1 - u * u), ox * inv, oy * inv))
                     GRAB[i] = true
                 }
             }
             if f.mem.isEmpty {
                 let order = (0..<N).sorted { hypot(X[$0] - x, Y[$0] - y) < hypot(X[$1] - x, Y[$1] - y) }
                 for i in order.prefix(6) {
-                    f.mem.append((i, X[i] - x, Y[i] - y, 1))
+                    let ox = X[i] - x, oy = Y[i] - y, d = hypot(ox, oy), inv = d > 1e-6 ? 1 / d : 0
+                    f.mem.append((i, ox, oy, 1, ox * inv, oy * inv))
                     GRAB[i] = true
                 }
             }
@@ -359,10 +381,20 @@ final class SlimeRig {
         fingers[id] = f
     }
 
-    /// `x, y` is where the slime should chase (may be a predicted touch).
-    func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, distance: Double) {
+    /// `x, y` is the real finger position. `predictedX/Y` is the system's guess for the next frame; it is used
+    /// only on frames that received a fresh move event (Apple: predicted touches are temporary and must be
+    /// replaced as real touches arrive). `distance` is the true travelled distance from coalesced touches.
+    func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, predictedX: Double?, predictedY: Double?, distance: Double, radius: Double = 0) {
         guard let f = fingers[id] else { return }
-        f.x = x; f.y = y
+        f.rawX = x; f.rawY = y
+        if let predictedX, let predictedY {
+            f.predX = predictedX; f.predY = predictedY; f.hasPrediction = true
+        } else {
+            f.hasPrediction = false
+        }
+        f.movedThisFrame = true
+        f.travel += distance; f.travelFrame += distance
+        if radius > 0 { f.radius = radius }
     }
 
     func touchEnded(_ id: ObjectIdentifier, time: TimeInterval) {
@@ -370,9 +402,21 @@ final class SlimeRig {
         for m in f.mem { GRAB[m.i] = false }
         lastTouch = t
         if f.mode == .grab {
-            let sp = hypot(f.vx, f.vy) / R, s = min(1, sp / 6)
+            // release strength: how fast it was flicked (peak speed over the last ~80 ms) or how far it was
+            // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
+            let sv = min(1, f.peak / R / 6)
+            let ss = pow(min(1, f.stretch / max(0.01, params.maxPull)), 1.5)
+            let s = max(sv, ss)
+            lastReleaseStrength = s
             onEvent?(.release(gain: 0.35 + 0.65 * s, rate: 1 + 0.1 * s))
         }
+    }
+
+    /// The system took the touch away (edge gesture, call, app switch): let go quietly, no pop.
+    func touchCancelled(_ id: ObjectIdentifier) {
+        guard let f = fingers.removeValue(forKey: id) else { return }
+        for m in f.mem { GRAB[m.i] = false }
+        lastTouch = t
     }
 
     func cancelAllTouches() {
@@ -391,9 +435,16 @@ final class SlimeRig {
         for i in 0..<N where !GRAB[i] { PX[i] -= ix; PY[i] -= iy }
     }
 
+    /// Full rebuild (new seed). For the 揉回原形 button use `relax()`, which does not jump.
     func resetShape() {
         guard W > 0, H > 0 else { return }
         setup(width: W, height: H)
+    }
+
+    /// 揉回原形 without a jump: forget the molded shape over half a second and let the body ease back.
+    func relax() {
+        guard N > 0 else { return }
+        relaxUntil = t + 0.5
     }
 
     /// VoiceOver "拉長": tug the top upward.
@@ -417,6 +468,19 @@ final class SlimeRig {
 
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
+            // chase target: the prediction only on a frame that got a fresh move event, else the real finger,
+            // so the body never rests a step ahead of a finger that stopped (手感精修提案 第 7 條)
+            if f.movedThisFrame && f.hasPrediction { f.x = f.predX; f.y = f.predY } else { f.x = f.rawX; f.y = f.rawY }
+            f.movedThisFrame = false
+            // velocity from the real finger: raw, ~30 ms smoothed, and a ~80 ms decaying peak for the release pop
+            f.vx = (f.rawX - f.lastRawX) / dt; f.vy = (f.rawY - f.lastRawY) / dt
+            f.lastRawX = f.rawX; f.lastRawY = f.rawY
+            let kv = 1 - exp(-dt / 0.03)
+            f.vxS += (f.vx - f.vxS) * kv; f.vyS += (f.vy - f.vyS) * kv
+            f.peak = max(hypot(f.vx, f.vy), f.peak * exp(-dt / 0.08))
+            f.speedC += (f.travelFrame / dt - f.speedC) * kv
+            f.travelFrame = 0
+
             var ex = f.x - f.ax, ey = f.y - f.ay
             let el = hypot(ex, ey), lim = mat.maxPull * R
             if f.mode == .grab && el > 0 {
@@ -426,14 +490,25 @@ final class SlimeRig {
             let tx = f.ax + ex, ty = f.ay + ey
             let k = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
             f.fx += (tx - f.fx) * k; f.fy += (ty - f.fy) * k
-            f.vx = (f.x - f.lx) / dt; f.vy = (f.y - f.ly) / dt
-            f.lx = f.x; f.ly = f.y
             if f.mode == .grab {
                 let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
+                f.stretch = st
                 if step > f.step && st > 0.35 {
                     onEvent?(.pull(gain: min(1, 0.4 + st / 2), rate: 1 - 0.08 * min(1, st / 1.5)))
                 }
                 f.step = max(f.step, step)
+                // press (接觸點先凹): the grabbed patch spreads away from the finger. The first frame jumps to
+                // `pressFirst` of the target (the first frame must move), the rest follows with `pressRise`;
+                // holding still (slower than one radius per second) sinks it deeper over `pressHoldTime`.
+                let still = hypot(f.vxS, f.vyS) < R
+                f.hold = max(0, min(1, f.hold + (still ? dt / max(0.05, mat.pressHoldTime) : -dt / 0.3)))
+                let target = R * (mat.pressBase + mat.pressHold * f.hold)
+                if !f.pressOn {
+                    f.press = target * mat.pressFirst
+                    f.pressOn = true
+                } else {
+                    f.press += (target - f.press) * (1 - exp(-dt / max(0.005, mat.pressRise)))
+                }
             }
         }
 
@@ -482,20 +557,25 @@ final class SlimeRig {
         // 2 fingers
         for f in fingers.values {
             if f.mode == .grab {
+                // the patch follows the finger and, while pressed, spreads away from it (squashes flat)
                 for m in f.mem {
                     let k = 0.55 * m.w
-                    X[m.i] += (f.fx + m.ox - X[m.i]) * k
-                    Y[m.i] += (f.fy + m.oy - Y[m.i]) * k
+                    X[m.i] += (f.fx + m.ox + m.dx * f.press - X[m.i]) * k
+                    Y[m.i] += (f.fy + m.oy + m.dy * f.press - Y[m.i]) * k
                 }
             } else if f.mode == .push {
                 let rf = R * 0.22
+                var hit = false
                 for i in 0..<N {
                     let dx = X[i] - f.fx, dy = Y[i] - f.fy, d = hypot(dx, dy)
                     if d < rf && d > 1e-6 {
                         let s = (rf - d) / d
                         X[i] += dx * s; Y[i] += dy * s
+                        hit = true
                     }
                 }
+                // a finger pushing in from outside gets its sound and tap the first time it displaces anything
+                if hit && !f.pushed { f.pushed = true; onEvent?(.press(gain: 0.5)) }
             }
         }
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
@@ -646,8 +726,21 @@ final class SlimeRig {
             }
         }
         let touched = fingers.values.contains { $0.mode == .grab }
-        if touched {
-            let yl = mat.yield * R, kc = min(1, mat.creep * dt)
+        if t < relaxUntil {
+            // 揉回原形: the remembered shape eases back to the original over half a second; positions follow
+            // through shape matching, so nothing jumps (手感精修提案 第 28 條)
+            let kr = min(1, 6 * dt)
+            for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
+        } else if touched {
+            // only after dwelling: within `dwellLo` a light press or a quick flick springs back,
+            // from `dwellHi` on kneading remembers at full speed (輕按回彈，揉捏即留形)
+            var g = 0.0
+            let lo = mat.dwellLo, hi = max(lo + 0.001, mat.dwellHi)
+            for f in fingers.values where f.mode == .grab {
+                let x = max(0, min(1, (t - f.tDown - lo) / (hi - lo)))
+                g = max(g, x * x * (3 - 2 * x))
+            }
+            let yl = mat.yield * R, kc = min(1, mat.creep * dt * g)
             if kc > 0 {
                 for i in 0..<N {
                     let rx = RX[i] / GW[i], ry = RY[i] / GW[i], dx = rx - QX[i], dy = ry - QY[i], dl = hypot(dx, dy)
@@ -696,9 +789,13 @@ final class SlimeRig {
     /// Kneading level 0...1: how fast grabbing fingers move (drives the looped rub sound).
     func rubLevel() -> Double {
         var sp = 0.0
-        for f in fingers.values where f.mode == .grab { sp = max(sp, hypot(f.vx, f.vy) / R) }
+        // smoothed travel rate from coalesced touches (a per-frame difference flickers at 120 Hz)
+        for f in fingers.values where f.mode == .grab { sp = max(sp, f.speedC / R) }
         return fingers.isEmpty ? 0 : min(1, sp / 5) * 0.7
     }
+
+    /// Largest UITouch.majorRadius among the fingers down (for the panel readout).
+    var maxTouchRadius: Double { fingers.values.map { $0.radius }.max() ?? 0 }
 
     /// How far the body is from its rest fit right now, 0...1 (drives continuous haptics while touched).
     var deformation: Double {

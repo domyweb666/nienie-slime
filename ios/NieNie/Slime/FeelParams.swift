@@ -2,7 +2,7 @@ import UIKit
 
 /// Feel parameters, same names and meanings as the web prototype's `PRESETS`
 /// (prototype/web/index.html) and 參數表.
-struct FeelParams: Equatable {
+struct FeelParams: Equatable, Codable {
     var alpha: Double      // shape-matching stiffness per substep (0...1)
     var damp: Double       // Verlet velocity damping per substep
     var yield: Double      // deformation (in radii) before the body starts remembering a shape
@@ -24,6 +24,18 @@ struct FeelParams: Equatable {
     var wander: Double     // idle roaming speed, radii per second
     var floppy: Double     // how much softer tentacle tips are (0...0.9)
     var seed: Double       // shape seed (1...30); changing it rebuilds the body
+
+    // v2.3 press (接觸點先凹): the grabbed patch spreads away from the finger. The side view
+    // cannot show depth, so "pressing in" is drawn as squashing flat. Visible spread is about
+    // half the number (the finger constraint and shape matching meet in the middle).
+    var pressBase: Double = 0.12      // spread on contact, in radii
+    var pressHold: Double = 0.18      // extra spread while held still, in radii
+    var pressHoldTime: Double = 0.6   // seconds held still to reach the full extra spread
+    var pressRise: Double = 0.06      // time constant of the spread (s)
+    var pressFirst: Double = 0.5      // fraction of the target applied on the very first frame
+    // plasticity only after dwelling (輕按回彈，揉捏即留形)
+    var dwellLo: Double = 0.2         // seconds grabbed before the body starts remembering
+    var dwellHi: Double = 0.6         // seconds grabbed until it remembers at full speed
 }
 
 struct SlimeColors {
@@ -46,7 +58,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Same numbers as the prototype's PRESETS (2026-10-31, v2.2).
+    /// Same numbers as the prototype's PRESETS (2026-10-31, v2.2; press and dwell added 2026-11-01, v2.3).
     var defaults: FeelParams {
         switch self {
         case .jelly:
@@ -100,6 +112,13 @@ struct TuneField: Identifiable {
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
         TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠", range: 0.6...2.6, step: 0.05),
         TuneField(key: \.lag, name: "黏滯", hint: "跟手的延遲感（秒）", range: 0...0.3, step: 0.01),
+        TuneField(key: \.pressBase, name: "按壓攤開（×半徑）", hint: "按下去那塊往四周攤多少（看得到的約一半）", range: 0...0.3, step: 0.01),
+        TuneField(key: \.pressHold, name: "按住再攤（×半徑）", hint: "按住不動時再多攤多少", range: 0...0.3, step: 0.01),
+        TuneField(key: \.pressHoldTime, name: "按壓下沉時間", hint: "按住多久攤到最深（秒）", range: 0.1...2, step: 0.05),
+        TuneField(key: \.pressRise, name: "按壓時間常數", hint: "攤開多快到位（秒）", range: 0.01...0.3, step: 0.01),
+        TuneField(key: \.pressFirst, name: "按壓第一幀比例", hint: "按下那一幀先到目標的幾成", range: 0...1, step: 0.05),
+        TuneField(key: \.dwellLo, name: "定型停留起點", hint: "抓住幾秒後開始記形（秒）", range: 0...1, step: 0.05),
+        TuneField(key: \.dwellHi, name: "定型停留終點", hint: "抓住幾秒後全速記形（秒）", range: 0...2, step: 0.05),
         TuneField(key: \.wGlobal, name: "整體性", hint: "越大整團越像一塊", range: 0...1, step: 0.01),
         TuneField(key: \.cSpace, name: "區塊間距（×半徑）", hint: "越小區塊越多越軟", range: 0.15...0.7, step: 0.05),
         TuneField(key: \.cRad, name: "區塊半徑（×半徑）", hint: "越小越軟、越容易拉出一塊", range: 0.25...1, step: 0.01),

@@ -9,6 +9,23 @@ final class SlimeView: UIView {
     var onFrame: ((_ dt: Double) -> Void)?
     var usePredictedTouches = true
 
+    /// Readout for the hidden panel, refreshed twice a second (Domi has no Mac, so no Instruments).
+    struct FrameStats {
+        var hz = 0.0            // frames actually drawn per second
+        var maxFrameMs = 0.0    // longest frame in the last second
+        var dropped = 0         // frames longer than 1.5× the display's frame interval, last second
+        var workMs = 0.0        // physics + sound/haptics + drawing on the main thread, average, last second
+        var touchRadius = 0.0   // UITouch.majorRadius of the finger down, points
+    }
+    var onStats: ((FrameStats) -> Void)?
+    /// Latency test (3-4 做法三): the whole screen flashes white for exactly one frame when a finger lands, so
+    /// 240fps slow motion can count "finger touches → flash" (input to display) and "→ spread" (with physics).
+    var latencyTest = false
+    private let flashLayer = CALayer()
+    private var flashFrames = 0
+    private var frameLog: [(time: CFTimeInterval, dt: Double, work: Double, dropped: Bool)] = []
+    private var lastStatsTime: CFTimeInterval = 0
+
     private var link: CADisplayLink?
     private var lastTimestamp: CFTimeInterval = 0
     private var laidOutSize: CGSize = .zero
@@ -47,6 +64,9 @@ final class SlimeView: UIView {
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
+        flashLayer.backgroundColor = UIColor.white.cgColor
+        flashLayer.isHidden = true
+        layer.addSublayer(flashLayer)
         applyColors()
 
         isAccessibilityElement = true
@@ -60,7 +80,7 @@ final class SlimeView: UIView {
                 self?.rig.stretchUp(); return true
             },
             UIAccessibilityCustomAction(name: "揉回原形") { [weak self] _ in
-                self?.rig.resetShape(); self?.rig.onEvent?(.press(gain: 0.7)); return true
+                self?.rig.relax(); self?.rig.onEvent?(.press(gain: 0.7)); return true
             },
         ]
     }
@@ -105,7 +125,7 @@ final class SlimeView: UIView {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
-            for l in [shadowLayer, shadeLayer, litGroup, litMask, baseLayer, highlightLayer, outlineLayer] as [CALayer] {
+            for l in [shadowLayer, shadeLayer, litGroup, litMask, baseLayer, highlightLayer, outlineLayer, flashLayer] as [CALayer] {
                 l.frame = bounds
             }
             redraw()
@@ -120,9 +140,18 @@ final class SlimeView: UIView {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if latencyTest {
+            // shown from the touch handler itself, before any physics, so it measures the input-to-display pipeline
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            flashLayer.isHidden = false
+            flashFrames = 0
+            CATransaction.commit()
+        }
         for t in touches {
             let p = t.location(in: self)
-            rig.touchBegan(ObjectIdentifier(t), x: Double(p.x), y: Double(p.y), time: t.timestamp, allowed: touchAllowed(p))
+            rig.touchBegan(ObjectIdentifier(t), x: Double(p.x), y: Double(p.y), time: t.timestamp,
+                           allowed: touchAllowed(p), radius: Double(t.majorRadius))
         }
     }
 
@@ -137,12 +166,15 @@ final class SlimeView: UIView {
                 distance += Double(hypot(p.x - prev.x, p.y - prev.y))
                 prev = p
             }
-            // predicted touch: chase slightly ahead of the finger to hide latency
-            var target = t.location(in: self)
+            // predicted touch: handed over separately; the rig uses it only until the next event arrives
+            var px: Double?, py: Double?
             if usePredictedTouches, let predicted = event?.predictedTouches(for: t)?.last {
-                target = predicted.location(in: self)
+                let q = predicted.location(in: self)
+                px = Double(q.x); py = Double(q.y)
             }
-            rig.touchMoved(ObjectIdentifier(t), x: Double(target.x), y: Double(target.y), distance: distance)
+            let p = t.location(in: self)
+            rig.touchMoved(ObjectIdentifier(t), x: Double(p.x), y: Double(p.y), predictedX: px, predictedY: py,
+                           distance: distance, radius: Double(t.majorRadius))
         }
     }
 
@@ -150,8 +182,9 @@ final class SlimeView: UIView {
         for t in touches { rig.touchEnded(ObjectIdentifier(t), time: t.timestamp) }
     }
 
+    /// The system took the touch (edge gesture, call, app switch): let go without the release pop.
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { rig.touchEnded(ObjectIdentifier(t), time: t.timestamp) }
+        for t in touches { rig.touchCancelled(ObjectIdentifier(t)) }
     }
 
     // MARK: - Frame loop
@@ -159,11 +192,38 @@ final class SlimeView: UIView {
     @objc private func tick(_ link: CADisplayLink) {
         let now = link.timestamp
         let dt = lastTimestamp == 0 ? 1.0 / 120 : min(1.0 / 30, now - lastTimestamp)
+        let nominal = max(1.0 / 120, link.targetTimestamp - link.timestamp)
         lastTimestamp = now
         guard dt > 0, laidOutSize != .zero else { return }
+        // latency flash: visible for exactly one drawn frame
+        if !flashLayer.isHidden {
+            if flashFrames >= 1 {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                flashLayer.isHidden = true
+                CATransaction.commit()
+            } else {
+                flashFrames += 1
+            }
+        }
+        let t0 = CACurrentMediaTime()
         rig.update(dt)
         onFrame?(dt)
         redraw()
+        let work = CACurrentMediaTime() - t0
+        // frame readout over a one-second window
+        frameLog.append((time: now, dt: dt, work: work, dropped: dt > nominal * 1.5))
+        while let first = frameLog.first, now - first.time > 1 { frameLog.removeFirst() }
+        if now - lastStatsTime > 0.5, let onStats, let first = frameLog.first {
+            lastStatsTime = now
+            var s = FrameStats()
+            s.hz = Double(frameLog.count) / max(0.1, now - first.time + dt)
+            s.maxFrameMs = (frameLog.map { $0.dt }.max() ?? 0) * 1000
+            s.dropped = frameLog.filter { $0.dropped }.count
+            s.workMs = frameLog.map { $0.work }.reduce(0, +) / Double(frameLog.count) * 1000
+            s.touchRadius = rig.maxTouchRadius
+            onStats(s)
+        }
     }
 
     // MARK: - Drawing (flat cartoon)

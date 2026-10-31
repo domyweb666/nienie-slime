@@ -13,9 +13,16 @@ final class SlimeHaptics {
     private var engineRunning = false
     private var continuous: CHHapticAdvancedPatternPlayer?
     private var lastSentIntensity: Float = -1
+    private var continuousStartedAt: CFTimeInterval = 0
 
     let continuousSharpness: Float = 0.25
     let continuousMax: Double = 0.8
+    /// Hysteresis (手感精修提案 第 16 條): the continuous player starts above `onThreshold`, and stops
+    /// only below `offThreshold` after at least `minOn`, so the engine does not click on and off
+    /// while the deformation hovers around the threshold.
+    let onThreshold: Float = 0.03
+    let offThreshold: Float = 0.008
+    let minOn: CFTimeInterval = 0.12
 
     init() {
         guard supported else { return }
@@ -60,13 +67,10 @@ final class SlimeHaptics {
     func updateContinuous(deformation: Double) {
         guard enabled, supported else { return }
         let intensity = Float(min(continuousMax, pow(max(0, deformation), 1.5) * continuousMax))
-        if intensity < 0.01 {
-            stopContinuous()
-            return
-        }
-        startEngine()
-        guard let engine, engineRunning else { return }
         if continuous == nil {
+            guard intensity >= onThreshold else { return }
+            startEngine()
+            guard let engine, engineRunning else { return }
             do {
                 let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [
                     CHHapticEventParameter(parameterID: .hapticIntensity, value: 1),
@@ -79,9 +83,14 @@ final class SlimeHaptics {
                 try player.start(atTime: CHHapticTimeImmediate)
                 continuous = player
                 lastSentIntensity = intensity
+                continuousStartedAt = CACurrentMediaTime()
             } catch {
                 continuous = nil
             }
+            return
+        }
+        if intensity < offThreshold && CACurrentMediaTime() - continuousStartedAt >= minOn {
+            stopContinuous()
             return
         }
         // only send meaningful changes; flooding the engine every frame adds nothing
