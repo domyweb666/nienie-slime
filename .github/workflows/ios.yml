@@ -72,14 +72,56 @@ jobs:
             echo "::error::Missing GitHub Secrets:$missing"
             exit 1
           fi
-      - name: Write App Store Connect API key
+      - name: Write API key and verify it with App Store Connect
         env:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s\n' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/keys/AuthKey.p8"
-          head -c 27 "$RUNNER_TEMP/keys/AuthKey.p8" | grep -q "BEGIN PRIVATE KEY" || { echo "::error::ASC_PRIVATE_KEY does not look like a .p8 file (should start with -----BEGIN PRIVATE KEY-----)"; exit 1; }
-          echo "ASC_KEY_PATH=$RUNNER_TEMP/keys/AuthKey.p8" >> "$GITHUB_ENV"
+          python3 -m pip install -q pyjwt cryptography
+          python3 - <<'PY'
+          import os, re, sys, time, json, urllib.request, urllib.error, jwt
+          kid = os.environ["ASC_KEY_ID"].strip()
+          iss = os.environ["ASC_ISSUER_ID"].strip()
+          key = os.environ["ASC_PRIVATE_KEY"].strip().replace(chr(13), "")
+          tmp = os.environ["RUNNER_TEMP"]
+          print(f"Key ID: {len(kid)} chars (expect 10). Issuer ID: {len(iss)} chars (expect 36, a UUID with dashes). .p8: {key.count(chr(10)) + 1} lines (expect 6).")
+          problems = []
+          if not re.fullmatch(r"[0-9A-Z]{10}", kid):
+              problems.append("ASC_KEY_ID should be 10 uppercase letters/digits")
+          if not re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", iss):
+              problems.append("ASC_ISSUER_ID should be a UUID like 69a6de7e-xxxx-xxxx-xxxx-xxxxxxxxxxxx (not the Key ID, not the Team ID)")
+          if not key.startswith("-----BEGIN PRIVATE KEY-----") or not key.endswith("-----END PRIVATE KEY-----"):
+              problems.append("ASC_PRIVATE_KEY should be the whole .p8 file including the BEGIN/END lines")
+          for q in problems:
+              print(f"::error::{q}")
+          if problems:
+              sys.exit(1)
+          with open(f"{tmp}/keys/AuthKey.p8", "w") as f:
+              f.write(key + chr(10))
+          now = int(time.time())
+          token = jwt.encode({"iss": iss, "iat": now, "exp": now + 600, "aud": "appstoreconnect-v1"},
+                             key, algorithm="ES256", headers={"kid": kid, "typ": "JWT"})
+          req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/apps?limit=10",
+                                       headers={"Authorization": "Bearer " + token})
+          try:
+              with urllib.request.urlopen(req) as r:
+                  d = json.load(r)
+          except urllib.error.HTTPError as e:
+              body = e.read().decode(errors="replace")[:600]
+              print(f"::error::App Store Connect rejected this key: HTTP {e.code}. {body}")
+              if e.code == 401:
+                  print("::error::401 means Key ID / Issuer ID / .p8 do not belong together, or the key is an Individual key instead of a Team key. Recreate a Team key (使用者與存取 → 整合 → App Store Connect API → 團隊金鑰), role Admin, and set all three secrets from that same key.")
+              sys.exit(1)
+          apps = [a["attributes"]["bundleId"] for a in d.get("data", [])]
+          print("API key accepted. Apps visible to this key:", apps)
+          if "org.domyweb.nienieslime" not in apps:
+              print("::warning::org.domyweb.nienieslime is not among the apps this key can see. Create the App in App Store Connect with that Bundle ID first.")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"ASC_KEY_PATH={tmp}/keys/AuthKey.p8" + chr(10))
+              f.write(f"ASC_KEY_ID={kid}" + chr(10))
+              f.write(f"ASC_ISSUER_ID={iss}" + chr(10))
+              f.write("TEAM_ID=" + os.environ["TEAM_ID"].strip() + chr(10))
+          PY
       - name: Archive (cloud-managed automatic signing)
         run: |
           set -o pipefail
