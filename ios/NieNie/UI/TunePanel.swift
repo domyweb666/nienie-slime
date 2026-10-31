@@ -9,28 +9,12 @@ struct TunePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("調手感").font(.rounded(17, .heavy))
+                Text("調整面板").font(.rounded(17, .heavy))
                 Text(controller.material.name).font(.rounded(13)).foregroundStyle(Palette.inkSoft)
                 Spacer()
                 Button("收起") { isPresented = false }
                     .font(.rounded(13))
                     .foregroundStyle(Palette.inkSoft)
-            }
-
-            HStack(spacing: 6) {
-                Text("音效").font(.rounded(14))
-                Spacer()
-                ForEach(SoundStyle.allCases) { s in
-                    let on = controller.soundStyle == s
-                    Button(s.name) { controller.previewSoundStyle(s) }
-                        .font(.rounded(13))
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .foregroundStyle(on ? .white : Palette.ink)
-                        .background(Capsule().fill(on ? Palette.ink : .white))
-                        .overlay(Capsule().stroke(Palette.ink, lineWidth: 2))
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(on ? .isSelected : [])
-                }
             }
 
             ScrollView {
@@ -41,7 +25,7 @@ struct TunePanel: View {
                             HStack {
                                 Text(f.name).font(.rounded(14))
                                 Spacer()
-                                Text(String(format: "%.2f", value.wrappedValue))
+                                Text(String(format: f.step < 0.01 ? "%.3f" : "%.2f", value.wrappedValue))
                                     .font(.system(size: 13, weight: .medium, design: .monospaced))
                                     .foregroundStyle(Palette.inkSoft)
                             }

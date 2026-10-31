@@ -13,9 +13,8 @@ final class SlimeView: UIView {
     private var lastTimestamp: CFTimeInterval = 0
     private var laidOutSize: CGSize = .zero
 
-    private let backgroundLayer = CALayer()
-    private let groundShadowLayer = CAShapeLayer()
-    private let clipLayer = CALayer()            // cuts the body flat at the ground
+    private let skyLayer = CAGradientLayer()
+    private let shadowLayer = CAShapeLayer()
     private let shadeLayer = CAShapeLayer()      // whole body in the shade colour
     private let litGroup = CALayer()             // masked to the body
     private let litMask = CAShapeLayer()
@@ -34,33 +33,34 @@ final class SlimeView: UIView {
         isOpaque = true
         backgroundColor = UIColor(hex: 0xCDEBFA)
 
-        layer.addSublayer(backgroundLayer)
-        groundShadowLayer.fillColor = UIColor(red: 60 / 255, green: 110 / 255, blue: 50 / 255, alpha: 0.22).cgColor
-        layer.addSublayer(groundShadowLayer)
-        clipLayer.masksToBounds = true
-        layer.addSublayer(clipLayer)
-        clipLayer.addSublayer(shadeLayer)
+        skyLayer.colors = [UIColor(hex: 0xCDEBFA).cgColor, UIColor(hex: 0xE6F5FD).cgColor]
+        skyLayer.startPoint = CGPoint(x: 0.5, y: 0)
+        skyLayer.endPoint = CGPoint(x: 0.5, y: 1)
+        layer.addSublayer(skyLayer)
+        shadowLayer.fillColor = UIColor(red: 60 / 255, green: 90 / 255, blue: 40 / 255, alpha: 0.18).cgColor
+        layer.addSublayer(shadowLayer)
+        layer.addSublayer(shadeLayer)
         litGroup.mask = litMask
-        clipLayer.addSublayer(litGroup)
+        layer.addSublayer(litGroup)
         litGroup.addSublayer(baseLayer)
         litGroup.addSublayer(highlightLayer)
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
-        clipLayer.addSublayer(outlineLayer)
+        layer.addSublayer(outlineLayer)
         applyColors()
 
         isAccessibilityElement = true
-        accessibilityLabel = "史萊姆，可以揉、拉長、推回去"
+        accessibilityLabel = "史萊姆，可以捏、拉、甩它的觸手"
         accessibilityTraits = .allowsDirectInteraction
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "捏一下") { [weak self] _ in
-                self?.rig.bump(3.5); self?.rig.onEvent?(.squish(0.7)); return true
+                self?.rig.bump(2); self?.rig.onEvent?(.press(gain: 0.7)); return true
             },
             UIAccessibilityCustomAction(name: "拉長") { [weak self] _ in
                 self?.rig.stretchUp(); return true
             },
-            UIAccessibilityCustomAction(name: "揉圓") { [weak self] _ in
-                self?.rig.resetShape(); self?.rig.onEvent?(.squish(0.7)); return true
+            UIAccessibilityCustomAction(name: "揉回原形") { [weak self] _ in
+                self?.rig.resetShape(); self?.rig.onEvent?(.press(gain: 0.7)); return true
             },
         ]
     }
@@ -98,14 +98,16 @@ final class SlimeView: UIView {
         super.layoutSubviews()
         let size = bounds.size
         guard size.width > 0, size.height > 0 else { return }
-        // like the prototype: ignore small height changes, rebuild on real size changes
+        // ignore small height changes (keyboard, panels), rebuild on real size changes
         if abs(size.width - laidOutSize.width) > 2 || abs(size.height - laidOutSize.height) > 160 || laidOutSize == .zero {
             laidOutSize = size
             rig.setup(width: Double(size.width), height: Double(size.height))
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            for l in [backgroundLayer, groundShadowLayer] { l.frame = bounds }
-            backgroundLayer.contents = drawBackground(size: size).cgImage
+            skyLayer.frame = bounds
+            for l in [shadowLayer, shadeLayer, litGroup, litMask, baseLayer, highlightLayer, outlineLayer] as [CALayer] {
+                l.frame = bounds
+            }
             redraw()
             CATransaction.commit()
         }
@@ -159,8 +161,7 @@ final class SlimeView: UIView {
         let dt = lastTimestamp == 0 ? 1.0 / 120 : min(1.0 / 30, now - lastTimestamp)
         lastTimestamp = now
         guard dt > 0, laidOutSize != .zero else { return }
-        let n = max(1, Int(ceil(dt / 0.004)))
-        for _ in 0..<n { rig.update(dt / Double(n)) }
+        rig.update(dt)
         onFrame?(dt)
         redraw()
     }
@@ -168,9 +169,10 @@ final class SlimeView: UIView {
     // MARK: - Drawing (flat cartoon)
 
     private func bodyPath(_ P: [(x: Double, y: Double)], dx: Double = 0, dy: Double = 0) -> CGPath {
-        // closed Catmull-Rom spline through the control points
+        // closed Catmull-Rom spline through the boundary points
         let n = P.count
         let path = CGMutablePath()
+        guard n > 2 else { return path }
         func pt(_ i: Int) -> (x: Double, y: Double) { P[(i + n) % n] }
         path.move(to: CGPoint(x: P[0].x + dx, y: P[0].y + dy))
         for i in 0..<n {
@@ -184,83 +186,43 @@ final class SlimeView: UIView {
     }
 
     private func redraw() {
-        let K = SlimeRig.K, R = rig.R, ground = rig.ground, sq = rig.sq
-        let P = rig.points()
-        let lw = max(3, R * 0.055)
+        let R = rig.R
+        let P = rig.boundaryPoints()
+        guard !P.isEmpty else { return }
+        let lw = max(4, R * 0.034)
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        // soft shadow under the part touching the ground
-        var x0 = 1e9, x1 = -1e9
-        for p in P where p.y > ground - R * 0.3 { x0 = min(x0, p.x); x1 = max(x1, p.x) }
-        if x1 > x0 {
-            let rx = (x1 - x0) / 2 + R * 0.12, ry = R * 0.1
-            groundShadowLayer.path = CGPath(ellipseIn: CGRect(x: (x0 + x1) / 2 - rx, y: ground + R * 0.05 - ry,
-                                                              width: rx * 2, height: ry * 2), transform: nil)
-        } else {
-            groundShadowLayer.path = nil
-        }
+        var minX = 1e9, maxX = -1e9, maxY = -1e9
+        for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }
+        let c = rig.centroid
 
-        let clip = CGRect(x: 0, y: 0, width: bounds.width, height: CGFloat(ground + lw * 0.5))
-        if clipLayer.frame != clip {
-            clipLayer.frame = clip
-            for l in [shadeLayer, litGroup, litMask, baseLayer, highlightLayer, outlineLayer] as [CALayer] {
-                l.frame = CGRect(origin: .zero, size: bounds.size)
-            }
-        }
+        // floating: a soft shadow under the lowest point, fainter the higher it hangs
+        let sw = (maxX - minX) * 0.5
+        let sy = max(maxY, rig.cy + R * 1.2) + R * 0.35
+        let lift = max(0, min(1, (sy - maxY) / (R * 1.2)))
+        shadowLayer.opacity = Float((0.10 + 0.08 * (1 - lift)) / 0.18)
+        let rx = sw * (0.7 + 0.3 * (1 - lift)), ry = R * 0.11 * 0.8
+        shadowLayer.path = CGPath(ellipseIn: CGRect(x: c.x - rx, y: sy - ry, width: rx * 2, height: ry * 2), transform: nil)
 
         let body = bodyPath(P)
         shadeLayer.path = body
         litMask.path = body
-        baseLayer.path = bodyPath(P, dx: -R * 0.07, dy: -R * 0.1)
+        baseLayer.path = bodyPath(P, dx: -R * 0.07, dy: -R * 0.085)
 
-        // highlight rides on the upper-left part of the body
-        let a = P[Int((Double(K) * 0.82).rounded()) % K], b = P[Int((Double(K) * 0.9).rounded()) % K], c = P[0]
-        let hx = (a.x + b.x + c.x) / 3 + R * 0.25, hy = (a.y + b.y + c.y) / 3 + R * 0.22
-        let t = CGAffineTransform(translationX: hx, y: hy).rotated(by: -0.5).scaledBy(x: 1 + sq * 0.4, y: 1 - sq * 0.5)
+        // highlight rides on an upper-left particle and turns with the body
+        let hp = rig.highlight, ang = rig.bodyAngle
         let hl = CGMutablePath()
-        hl.addEllipse(in: CGRect(x: -R * 0.2, y: -R * 0.085, width: R * 0.4, height: R * 0.17), transform: t)
-        hl.addEllipse(in: CGRect(x: R * 0.27 - R * 0.04, y: R * 0.09 - R * 0.04, width: R * 0.08, height: R * 0.08), transform: t)
+        let t = CGAffineTransform(translationX: hp.x, y: hp.y).rotated(by: ang - 0.5)
+        hl.addEllipse(in: CGRect(x: -R * 0.17, y: -R * 0.085, width: R * 0.34, height: R * 0.17), transform: t)
+        let dot = CGAffineTransform(translationX: hp.x + cos(ang - 0.2) * R * 0.26, y: hp.y + sin(ang - 0.2) * R * 0.26)
+        hl.addEllipse(in: CGRect(x: -R * 0.035, y: -R * 0.035, width: R * 0.07, height: R * 0.07), transform: dot)
         highlightLayer.path = hl
 
         outlineLayer.lineWidth = lw
         outlineLayer.path = body
 
         CATransaction.commit()
-    }
-
-    /// Flat sunny field, drawn once per size (sky, clouds, grass).
-    private func drawBackground(size: CGSize) -> UIImage {
-        let W = Double(size.width), H = Double(size.height), R = rig.R
-        let hz = rig.ground - R * 0.55
-        let format = UIGraphicsImageRendererFormat.preferred()
-        format.opaque = true
-        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
-            let g = ctx.cgContext
-            g.setFillColor(UIColor(hex: 0xCDEBFA).cgColor)
-            g.fill(CGRect(x: 0, y: 0, width: W, height: hz))
-            g.setFillColor(UIColor(hex: 0xE6F6FF).cgColor)
-            for (u, v, s) in [(0.18, 0.18, 1.0), (0.72, 0.12, 0.8), (0.9, 0.3, 0.6)] {
-                let x = u * W, y = v * H, r = R * 0.45 * s
-                for (cx, cy, cr) in [(x, y, r), (x + r * 0.9, y + r * 0.15, r * 0.75), (x - r * 0.9, y + r * 0.2, r * 0.65)] {
-                    g.fillEllipse(in: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2))
-                }
-            }
-            g.setFillColor(UIColor(hex: 0xBFE6A8).cgColor)
-            g.fill(CGRect(x: 0, y: hz, width: W, height: H - hz))
-            g.setFillColor(UIColor(hex: 0xA9D98F).cgColor)
-            g.fill(CGRect(x: 0, y: hz, width: W, height: 4))
-            g.setStrokeColor(UIColor(hex: 0x97CB7C).cgColor)
-            g.setLineWidth(3)
-            g.setLineCap(.round)
-            for (u, v) in [(0.1, 0.84), (0.2, 0.95), (0.82, 0.86), (0.9, 0.97), (0.35, 1.02), (0.66, 1.05)] {
-                let x = u * W, y = hz + (H - hz) * (v - 0.75) * 1.6
-                g.move(to: CGPoint(x: x - 6, y: y)); g.addLine(to: CGPoint(x: x - 9, y: y - 9))
-                g.move(to: CGPoint(x: x, y: y)); g.addLine(to: CGPoint(x: x, y: y - 12))
-                g.move(to: CGPoint(x: x + 6, y: y)); g.addLine(to: CGPoint(x: x + 9, y: y - 9))
-            }
-            g.strokePath()
-        }
     }
 }

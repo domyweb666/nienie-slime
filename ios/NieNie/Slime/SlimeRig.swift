@@ -3,53 +3,72 @@ import Foundation
 /// Things the rig asks the outside world to play. Picture, sound and haptics
 /// all react to the same event in the same frame.
 enum SlimeEvent {
-    case squish(Double)   // touched / pressed (0...1)
-    case tap              // quick tap
-    case boing(Double)    // released after a pull or press (0...1)
-    case creak(Double)    // stretching past a step (0...1)
+    case press(gain: Double)                 // a finger landed on the body
+    case pull(gain: Double, rate: Double)    // stretched past another step
+    case release(gain: Double, rate: Double) // let go; gain follows release speed
+    case tap                                 // VoiceOver / buttons
 }
 
-/// Procedural slime: 18 control points, one spring each, gesture rules on top.
-/// A line-by-line port of `prototype/web/index.html` (designed deformation, not physics).
+/// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.2:
+/// a floating irregular blob with drooping tentacles, built from particles that are pulled
+/// back every substep to the best rigid fit of overlapping clusters. Plasticity keeps a
+/// molded shape (clay), tentacles spring back; idle breathing, wriggle, tentacle drift,
+/// twitches and wandering; boundary ring constraints and in-group non-penetration so it
+/// never tangles. Rules learned the hard way are in `.uiux/lessons.md` and CLAUDE.md.
 final class SlimeRig {
-    static let K = 18
-    private let K = SlimeRig.K
-
     var params: FeelParams
-    /// Reduce Motion: slower, calmer springs and no surprise bounce. Feedback stays on.
+    /// Reduce Motion: idle motion and twitches halved. Feedback stays on.
     var reduceMotion = false
     var onEvent: ((SlimeEvent) -> Void)?
 
-    private(set) var W = 0.0, H = 0.0, R = 100.0, ground = 0.0, cx = 0.0, cy = 0.0
+    private(set) var W = 0.0, H = 0.0, R = 100.0, cx = 0.0, cy = 0.0, h = 10.0
+    private(set) var homeX = 0.0, homeY = 0.0
+    private(set) var N = 0
 
-    private(set) var ang = [Double](repeating: 0, count: SlimeRig.K)  // rest angle
-    private(set) var r0 = [Double](repeating: 0, count: SlimeRig.K)   // rest radius
-    private var ox = [Double](repeating: 0, count: SlimeRig.K)        // current offset from rest
-    private var oy = [Double](repeating: 0, count: SlimeRig.K)
-    private var vx = [Double](repeating: 0, count: SlimeRig.K)
-    private var vy = [Double](repeating: 0, count: SlimeRig.K)
-    private var mx = [Double](repeating: 0, count: SlimeRig.K)        // remembered (molded) offset
-    private var my = [Double](repeating: 0, count: SlimeRig.K)
-    private var tx = [Double](repeating: 0, count: SlimeRig.K)        // target from fingers
-    private var ty = [Double](repeating: 0, count: SlimeRig.K)
-    private var tw = [Double](repeating: 0, count: SlimeRig.K)
-    private(set) var sq = 0.0   // whole-body squash spring (positive = flatter)
-    private var sqv = 0.0
-    private var releases = 0
+    // particle state (positions in view points)
+    private var X: [Double] = [], Y: [Double] = [], PX: [Double] = [], PY: [Double] = []
+    private var Q0X: [Double] = [], Q0Y: [Double] = []   // original rest shape (zero mean)
+    private var QX: [Double] = [], QY: [Double] = []     // remembered (plastic) rest shape
+    private var EX: [Double] = [], EY: [Double] = []     // rest shape with idle breathing / wriggle / drift
+    private var GX: [Double] = [], GY: [Double] = [], GW: [Double] = []
+    private var RX: [Double] = [], RY: [Double] = []
+    private var TU: [Double] = [], TUB: [Double] = [], KF: [Double] = []
+    private var TID: [Int] = [], BIDX: [Int] = []
+    private var GRAB: [Bool] = []
+
+    private(set) var bnd: [Int] = []     // boundary particle indices, in ring order
+    private var bndL: [Double] = []      // rest distance between ring neighbours
+
+    private struct Cluster {
+        var idx: [Int]
+        var w: Double
+        var cs = 1.0, sn = 0.0, xc = 0.0, yc = 0.0, qcx = 0.0, qcy = 0.0
+    }
+    private var clusters: [Cluster] = []
+    private var gi = 0   // index of the whole-body cluster
+
+    private struct Tentacle {
+        var a, ux, uy, L, w, curl, droop: Double
+        var uExit = 0.0
+    }
+    private var tent: [Tentacle] = []
+    private var ph: [Double] = [0, 0, 0, 0]
+
+    private(set) var hiIdx = 0
+    private var t = 0.0, lastTouch = -10.0, nextTwitch = 3.0, A0 = 1.0
+    private var wanderX = 0.0, wanderY = 0.0, wanderNext = 3.0, wanderMoving = false
+    private var builtSeed = -1.0, builtFloppy = -1.0, builtSpace = -1.0, builtRad = -1.0
 
     final class Finger {
-        enum Mode { case grab, press, push, none }
-        var x, y, sx, sy, lx, ly, fx, fy, bx, by: Double
-        var t0: TimeInterval
-        var moved = 0.0, still = 0.0, press = 0.0
-        var k: Int
+        enum Mode { case grab, push, none }
+        var ax, ay, x, y, fx, fy, lx, ly: Double
+        var vx = 0.0, vy = 0.0
+        var step = 0
         var mode: Mode
-        var ex = 0.0, ey = 0.0
-        var creak = 0
-
-        init(x: Double, y: Double, t0: TimeInterval, k: Int, mode: Mode) {
-            self.x = x; self.y = y; sx = x; sy = y; lx = x; ly = y; fx = x; fy = y; bx = x; by = y
-            self.t0 = t0; self.k = k; self.mode = mode
+        var mem: [(i: Int, ox: Double, oy: Double, w: Double)] = []
+        init(x: Double, y: Double, mode: Mode) {
+            ax = x; ay = y; self.x = x; self.y = y; fx = x; fy = y; lx = x; ly = y
+            self.mode = mode
         }
     }
     private(set) var fingers: [ObjectIdentifier: Finger] = [:]
@@ -58,288 +77,637 @@ final class SlimeRig {
         self.params = params
     }
 
-    // MARK: - Setup
+    // MARK: - Shape definition (irregular blob + drooping tentacles)
 
-    private func restR(_ a: Double) -> Double {
-        let c = cos(a), s = sin(a), ry = s < 0 ? R : R * 0.72
-        let ellipse = 1 / sqrt(pow(c / (R * 1.1), 2) + pow(s / ry, 2))
-        // the little pointy tip on top
-        return ellipse * (1 + 0.2 * exp(-pow((a + .pi / 2) / 0.32, 2)))
+    private struct LCG {
+        var x: Int
+        init(seed: Int) { x = seed * 9301 + 49297 }
+        mutating func next() -> Double {
+            x = (x * 9301 + 49297) % 233280
+            return Double(x) / 233280
+        }
     }
+
+    private func defineShape() {
+        var r = LCG(seed: Int(params.seed.rounded()) * 7 + 3)
+        ph = [r.next() * 6.28, r.next() * 6.28, r.next() * 6.28, (-72 + (r.next() - 0.5) * 30) * .pi / 180]
+        // screen coords, y down: 90° is straight down. Most hang below or sideways.
+        let base: [(Double, Double, Double)] = [(100, 2.1, 0.17), (55, 1.8, 0.15), (140, 1.65, 0.14), (8, 1.5, 0.14), (198, 1.35, 0.13)]
+        tent = base.map { item -> Tentacle in
+            let (deg, L, w) = item
+            let a = (deg + (r.next() - 0.5) * 22) * .pi / 180
+            let curl = (r.next() - 0.5) * 0.6
+            let droop = 0.15 + 0.3 * max(0, -sin(a))
+            return Tentacle(a: a, ux: cos(a), uy: sin(a), L: L * (0.85 + r.next() * 0.3), w: w * (0.85 + r.next() * 0.3),
+                            curl: curl, droop: droop)
+        }
+        for k in tent.indices {
+            let b = blobR(tent[k].a)
+            tent[k].uExit = min(0.8, max(0, (b * 0.95 - b * 0.35) / (tent[k].L - b * 0.35)))
+        }
+    }
+
+    /// Blob radius in units of R, with the head bump on top.
+    private func blobR(_ a: Double) -> Double {
+        var d = a - ph[3]
+        d = atan2(sin(d), cos(d))
+        return 0.78 + 0.10 * sin(2 * a + ph[0]) + 0.07 * sin(3 * a + ph[1]) + 0.04 * sin(5 * a + ph[2]) + 0.24 * exp(-pow(d / 0.38, 2))
+    }
+
+    /// Which tentacle a rest-space point is in, how far along it (0 root, 1 tip), and how close to the axis.
+    private func tentHit(_ x: Double, _ y: Double) -> (k: Int, u: Double, q: Double)? {
+        var best: (k: Int, u: Double, q: Double)?
+        for k in tent.indices {
+            let tt = tent[k], r0 = blobR(tt.a) * R * 0.35
+            let sx = tt.ux * r0, sy = tt.uy * r0, ex = tt.ux * tt.L * R, ey = tt.uy * tt.L * R
+            let dx = ex - sx, dy = ey - sy, len2 = dx * dx + dy * dy
+            var u = ((x - sx) * dx + (y - sy) * dy) / len2
+            u = max(0, min(1, u))
+            let px = sx + dx * u, py = sy + dy * u, d = hypot(x - px, y - py), w = tt.w * R * (1 - 0.12 * u)
+            if d < w && (best == nil || d / w < best!.q) { best = (k, u, d / w) }
+        }
+        return best
+    }
+
+    private func inside(_ x: Double, _ y: Double) -> Bool {
+        let a = atan2(y, x)
+        if hypot(x, y) < blobR(a) * R { return true }
+        return tentHit(x, y) != nil
+    }
+
+    /// Ray-march the union's outer radius along angle a.
+    private func restR(_ a: Double) -> Double {
+        let c = cos(a), s = sin(a), step = R / 150
+        var last = 0.0, tt = 0.0
+        while tt <= R * 2.6 {
+            if inside(c * tt, s * tt) { last = tt }
+            tt += step
+        }
+        return last
+    }
+
+    // MARK: - Setup
 
     func setup(width: Double, height: Double) {
         W = width; H = height
-        R = max(70, min(W * 0.3, H * 0.17, 190))
-        ground = min(H * 0.64, H - 140)
+        R = max(60, min(W * 0.26, H * 0.14, 160))
         cx = W / 2
-        for k in 0..<K {
-            ang[k] = -.pi / 2 + Double(k) / Double(K) * .pi * 2
-            r0[k] = restR(ang[k])
+        defineShape()
+
+        // boundary: scan a fine polar polygon, then resample evenly by arc length
+        // (angle-even sampling misses the thin tentacles)
+        let fine = 1440
+        var poly: [(Double, Double)] = []
+        poly.reserveCapacity(fine)
+        for i in 0..<fine {
+            let a = -.pi / 2 + Double(i) / Double(fine) * .pi * 2, r = restR(a)
+            poly.append((cos(a) * r, sin(a) * r))
         }
-        var maxY = -1e9
-        for k in 0..<K { maxY = max(maxY, sin(ang[k]) * r0[k]) }
-        cy = ground - maxY
-        for k in 0..<K { ox[k] = 0; oy[k] = 0; vx[k] = 0; vy[k] = 0; mx[k] = 0; my[k] = 0 }
-        sq = 0; sqv = 0
+        cy = H * 0.40
+        homeX = cx; homeY = cy
+        h = R / 9
+        var cum = [0.0]
+        cum.reserveCapacity(fine + 1)
+        for i in 1...fine {
+            let a = poly[i - 1], b = poly[i % fine]
+            cum.append(cum[i - 1] + hypot(b.0 - a.0, b.1 - a.1))
+        }
+        let per = cum[fine]
+        let M = max(60, Int((per / (h * 1.05)).rounded()))
+        var pts: [(Double, Double)] = []
+        bnd = []
+        var j = 0
+        for m in 0..<M {
+            let target = Double(m) / Double(M) * per
+            while cum[j + 1] < target { j += 1 }
+            let span = cum[j + 1] - cum[j]
+            let f = span > 0 ? (target - cum[j]) / span : 0
+            let a = poly[j], b = poly[(j + 1) % fine]
+            bnd.append(pts.count)
+            pts.append((a.0 + (b.0 - a.0) * f, a.1 + (b.1 - a.1) * f))
+        }
+        // interior: hex grid, kept away from the boundary
+        var row = 0
+        var gy = -2.7 * R
+        while gy <= 2.7 * R {
+            var gx = -2.7 * R + (row % 2 == 1 ? h / 2 : 0)
+            while gx <= 2.7 * R {
+                if inside(gx, gy) {
+                    var dmin = 1e9
+                    for b in 0..<M {
+                        let d = hypot(pts[b].0 - gx, pts[b].1 - gy)
+                        if d < dmin { dmin = d }
+                    }
+                    if dmin > h * 0.7 { pts.append((gx, gy)) }
+                }
+                gx += h
+            }
+            gy += h * 0.87
+            row += 1
+        }
+        N = pts.count
+
+        X = [Double](repeating: 0, count: N); Y = X; PX = X; PY = X
+        Q0X = X; Q0Y = X; QX = X; QY = X; EX = X; EY = X
+        GX = X; GY = X; GW = X; RX = X; RY = X
+        TU = X; TUB = X; KF = X
+        TID = [Int](repeating: -1, count: N); BIDX = [Int](repeating: -1, count: N)
+        GRAB = [Bool](repeating: false, count: N)
+
+        for i in 0..<N {
+            Q0X[i] = pts[i].0; Q0Y[i] = pts[i].1
+            let ht = tentHit(pts[i].0, pts[i].1)
+            let inBlob = hypot(pts[i].0, pts[i].1) < blobR(atan2(pts[i].1, pts[i].0)) * R * 0.9
+            if let ht, !inBlob {
+                TID[i] = ht.k; TU[i] = ht.u
+                let ue = tent[ht.k].uExit
+                TUB[i] = max(0, (ht.u - ue) / (1 - ue))
+                KF[i] = 1 - params.floppy * ht.u
+            } else {
+                TID[i] = -1; TU[i] = 0; TUB[i] = 0; KF[i] = 1
+            }
+        }
+        // rest pose: tentacles curl and droop. A smooth deformation of the rest shape starting at
+        // the junction (zero there), so boundary order stays valid.
+        for i in 0..<N {
+            let k = TID[i]
+            if k < 0 { continue }
+            let tt = tent[k], u = TUB[i], u2 = u * u
+            Q0X[i] += -tt.uy * tt.curl * u2 * R * 0.45
+            Q0Y[i] += tt.ux * tt.curl * u2 * R * 0.45 + tt.droop * u2 * R
+        }
+        // zero-mean rest shape: the same basis plasticity recenters to every frame
+        var mx = 0.0, my = 0.0
+        for i in 0..<N { mx += Q0X[i]; my += Q0Y[i] }
+        mx /= Double(N); my /= Double(N)
+        for i in 0..<N {
+            Q0X[i] -= mx; Q0Y[i] -= my
+            QX[i] = Q0X[i]; QY[i] = Q0Y[i]
+            X[i] = cx + Q0X[i]; Y[i] = cy + Q0Y[i]; PX[i] = X[i]; PY[i] = Y[i]
+        }
+        buildClusters()
+        bndL = []
+        for k in 0..<bnd.count {
+            let i = bnd[k], jj = bnd[(k + 1) % bnd.count]
+            bndL.append(hypot(Q0X[jj] - Q0X[i], Q0Y[jj] - Q0Y[i]))
+        }
+        for k in 0..<bnd.count { BIDX[bnd[k]] = k }
+        // highlight rides on the upper-left of the blob
+        var bd = 1e9
+        for i in 0..<N where TID[i] < 0 {
+            let d = hypot(Q0X[i] + R * 0.28, Q0Y[i] + R * 0.32)
+            if d < bd { bd = d; hiIdx = i }
+        }
         fingers.removeAll()
+        A0 = polygonArea()
+        builtSeed = params.seed; builtFloppy = params.floppy
+        t = 0; lastTouch = -10; nextTwitch = 3
+        wanderMoving = false; wanderNext = 3
     }
 
-    private func restX(_ k: Int) -> Double { cx + cos(ang[k]) * r0[k] }
-    private func restY(_ k: Int) -> Double { cy + sin(ang[k]) * r0[k] }
-
-    /// Where control point k is drawn. Squash: top comes down, sides go out.
-    func shape(_ k: Int) -> (x: Double, y: Double) {
-        let bx = cos(ang[k]) * r0[k], by = sin(ang[k]) * r0[k]
-        let sx = 1 + sq * 0.55, sy = 1 - sq
-        let x = cx + bx * sx + ox[k]
-        var y = cy + (by < 0 ? by * sy : by) + oy[k]
-        if y > ground { y = ground }
-        return (x, y)
+    private func buildClusters() {
+        clusters = []
+        let cs = R * params.cSpace, cr = R * params.cRad
+        var cy = -2.6 * R
+        while cy <= 2.6 * R {
+            var cx = -2.6 * R
+            while cx <= 2.6 * R {
+                var idx: [Int] = []
+                for i in 0..<N where hypot(Q0X[i] - cx, Q0Y[i] - cy) < cr { idx.append(i) }
+                if idx.count >= 5 { clusters.append(Cluster(idx: idx, w: 1)) }
+                cx += cs
+            }
+            cy += cs
+        }
+        clusters.append(Cluster(idx: Array(0..<N), w: params.wGlobal))
+        gi = clusters.count - 1
+        builtSpace = params.cSpace; builtRad = params.cRad
     }
 
-    func points() -> [(x: Double, y: Double)] {
-        (0..<K).map { shape($0) }
+    private func polygonArea() -> Double {
+        var A = 0.0
+        let n = bnd.count
+        for i in 0..<n {
+            let a = bnd[i], b = bnd[(i + 1) % n]
+            A += X[a] * Y[b] - X[b] * Y[a]
+        }
+        return abs(A) / 2
     }
+
+    // MARK: - Readouts for drawing
+
+    /// Boundary points, lightly smoothed (0.25 / 0.5 / 0.25) for the outline.
+    func boundaryPoints() -> [(x: Double, y: Double)] {
+        let n = bnd.count
+        var P: [(x: Double, y: Double)] = []
+        P.reserveCapacity(n)
+        for i in 0..<n {
+            let a = bnd[(i + n - 1) % n], b = bnd[i], c = bnd[(i + 1) % n]
+            P.append((X[a] * 0.25 + X[b] * 0.5 + X[c] * 0.25, Y[a] * 0.25 + Y[b] * 0.5 + Y[c] * 0.25))
+        }
+        return P
+    }
+
+    var centroid: (x: Double, y: Double) { (clusters.isEmpty ? cx : clusters[gi].xc, clusters.isEmpty ? cy : clusters[gi].yc) }
+    var bodyAngle: Double { clusters.isEmpty ? 0 : atan2(clusters[gi].sn, clusters[gi].cs) }
+    var highlight: (x: Double, y: Double) { N > 0 ? (X[hiIdx], Y[hiIdx]) : (cx, cy) }
 
     // MARK: - Fingers
 
     func insideBody(_ x: Double, _ y: Double) -> Bool {
         var c = false
-        var j = K - 1
-        for i in 0..<K {
-            let a = shape(i), b = shape(j)
-            if (a.y > y) != (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x { c.toggle() }
+        let n = bnd.count
+        guard n > 2 else { return false }
+        var j = n - 1
+        for i in 0..<n {
+            let ax = X[bnd[i]], ay = Y[bnd[i]], bx = X[bnd[j]], by = Y[bnd[j]]
+            if (ay > y) != (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax { c.toggle() }
             j = i
         }
         return c
     }
 
-    private func nearestBone(_ x: Double, _ y: Double) -> Int {
-        var best = 0, bd = 1e9
-        for k in 0..<K {
-            let p = shape(k), d = hypot(p.x - x, p.y - y)
-            if d < bd { bd = d; best = k }
-        }
-        return best
+    private func nearBody(_ x: Double, _ y: Double, _ rad: Double) -> Bool {
+        for i in bnd where hypot(X[i] - x, Y[i] - y) < rad { return true }
+        return false
     }
 
     /// `allowed` is false for touches in the system-gesture bands near the screen edges.
     func touchBegan(_ id: ObjectIdentifier, x: Double, y: Double, time: TimeInterval, allowed: Bool = true) {
-        let ins = insideBody(x, y), near = hypot(x - cx, y - (cy - R * 0.2)) < R * 2.2
-        let k = nearestBone(x, y), b = shape(k)
-        let mode: Finger.Mode = !allowed ? .none : (ins ? .grab : (near ? .push : .none))
-        let f = Finger(x: x, y: y, t0: time, k: k, mode: mode)
-        fingers[id] = f
-        if mode == .grab {
-            // first frame: the spot under the finger dips in right away
-            let dx = cx - b.x, dy = cy - b.y, l = hypot(dx, dy) == 0 ? 1 : hypot(dx, dy)
-            ox[k] += dx / l * R * 0.05; oy[k] += dy / l * R * 0.05
-            vx[k] += dx / l * R * 1.2; vy[k] += dy / l * R * 1.2
-            onEvent?(.squish(0.45))
+        guard N > 0 else { return }
+        let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
+        let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push))
+        if grab {
+            let gr = params.grabR * R
+            for i in 0..<N where !GRAB[i] {
+                let d = hypot(X[i] - x, Y[i] - y)
+                if d < gr {
+                    let u = d / gr
+                    f.mem.append((i, X[i] - x, Y[i] - y, exp(-u * u * 2.5) * (1 - u * u)))
+                    GRAB[i] = true
+                }
+            }
+            if f.mem.isEmpty {
+                let order = (0..<N).sorted { hypot(X[$0] - x, Y[$0] - y) < hypot(X[$1] - x, Y[$1] - y) }
+                for i in order.prefix(6) {
+                    f.mem.append((i, X[i] - x, Y[i] - y, 1))
+                    GRAB[i] = true
+                }
+            }
+            onEvent?(.press(gain: 0.7))
         }
+        fingers[id] = f
     }
 
-    /// `x, y` is where the slime should chase (may be a predicted touch);
-    /// `distance` is how far the real finger travelled since the last call.
+    /// `x, y` is where the slime should chase (may be a predicted touch).
     func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, distance: Double) {
         guard let f = fingers[id] else { return }
-        f.moved += distance
         f.x = x; f.y = y
     }
 
     func touchEnded(_ id: ObjectIdentifier, time: TimeInterval) {
         guard let f = fingers.removeValue(forKey: id) else { return }
-        guard f.mode == .grab || f.mode == .press else { return }
-        let quick = time - f.t0 < 0.22 && f.moved < 12
-        if quick {
-            sqv += reduceMotion ? 2 : 3.5
-            onEvent?(.tap)
-        } else {
-            let st = hypot(f.ex, f.ey) / R
-            onEvent?(.boing(min(1, 0.2 + st * 0.5 + f.press * 0.4)))
-            releases += 1
-            if releases % 8 == 0 && !reduceMotion {
-                // every so often, an extra jiggly bounce
-                sqv -= 4
-                for k in 0..<K {
-                    vx[k] += Double.random(in: -0.5...0.5) * R * 1.5
-                    vy[k] += Double.random(in: -0.5...0.5) * R * 1.5
-                }
-            }
+        for m in f.mem { GRAB[m.i] = false }
+        lastTouch = t
+        if f.mode == .grab {
+            let sp = hypot(f.vx, f.vy) / R, s = min(1, sp / 6)
+            onEvent?(.release(gain: 0.35 + 0.65 * s, rate: 1 + 0.1 * s))
         }
     }
 
-    func cancelAllTouches() { fingers.removeAll() }
+    func cancelAllTouches() {
+        for f in fingers.values { for m in f.mem { GRAB[m.i] = false } }
+        fingers.removeAll()
+        lastTouch = t
+    }
 
     // MARK: - External nudges (buttons, VoiceOver actions)
 
-    func bump(_ amount: Double = 3) { sqv += reduceMotion ? amount * 0.6 : amount }
+    /// Small whole-body shake.
+    func bump(_ amount: Double = 1) {
+        guard N > 0 else { return }
+        let amp = R * 0.0025 * amount * (reduceMotion ? 0.5 : 1)
+        let a = Double.random(in: 0..<(2 * .pi)), ix = cos(a) * amp, iy = sin(a) * amp
+        for i in 0..<N where !GRAB[i] { PX[i] -= ix; PY[i] -= iy }
+    }
 
     func resetShape() {
-        for k in 0..<K { mx[k] = 0; my[k] = 0 }
-        bump(3)
+        guard W > 0, H > 0 else { return }
+        setup(width: W, height: H)
     }
 
-    /// VoiceOver "拉長": tug the top upward as if pulled.
+    /// VoiceOver "拉長": tug the top upward.
     func stretchUp() {
-        for d in -3...3 {
-            let k = (d + K) % K, w = exp(-Double(d * d) / 2.2)
-            vy[k] -= R * 6 * w
-        }
-        onEvent?(.boing(0.6))
+        guard N > 0 else { return }
+        for i in 0..<N where Q0Y[i] < -R * 0.3 && !GRAB[i] { PY[i] += R * 0.02 }
+        onEvent?(.release(gain: 0.6, rate: 1))
     }
 
-    // MARK: - Per-frame rules
-
-    /// Spring constants, made calmer under Reduce Motion (參數表: 0.5 s, 0.9).
-    private var springParams: (response: Double, damping: Double) {
-        reduceMotion ? (max(params.response, 0.5), max(params.damping, 0.9)) : (params.response, params.damping)
-    }
+    // MARK: - Per-frame
 
     func update(_ dt: Double) {
+        guard N > 0 else { return }
+        t += dt
+        if params.seed != builtSeed || params.floppy != builtFloppy {
+            setup(width: W, height: H)
+        } else if params.cSpace != builtSpace || params.cRad != builtRad {
+            buildClusters()
+        }
         let mat = params
-        for k in 0..<K { tw[k] = 0; tx[k] = 0; ty[k] = 0 }
-        var sqT = 0.0
 
+        // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
-            let sp = hypot(f.x - f.lx, f.y - f.ly) / max(dt, 1e-3)
-            f.lx = f.x; f.ly = f.y
-            // sticky lag: the slime follows the finger a little behind
-            let kl = 1 - exp(-dt / max(0.005, mat.lag))
-            f.fx += (f.x - f.fx) * kl; f.fy += (f.y - f.fy) * kl
-
-            switch f.mode {
-            case .grab, .press:
-                if sp < R * 0.4 { f.still += dt } else { f.still = 0 }
-                if f.mode == .grab && f.still > 0.2 && f.moved < 12 {
-                    f.mode = .press
-                    var bk = 0, bd = 1e9
-                    for k in 0..<K {
-                        if sin(ang[k]) > -0.2 { continue }
-                        let d = abs(shape(k).x - f.x)
-                        if d < bd { bd = d; bk = k }
-                    }
-                    f.k = bk
-                    onEvent?(.squish(0.8))
-                }
-                if f.mode == .press {
-                    f.press = min(1, f.press + dt / 0.6)
-                    sqT = max(sqT, f.press * mat.press)
-                    let k = f.k, dx = cx - restX(k), dy = cy - restY(k)
-                    let l = hypot(dx, dy) == 0 ? 1 : hypot(dx, dy)
-                    addTarget(k, dx / l * R * 0.12 * f.press, dy / l * R * 0.12 * f.press, 1)
-                    continue
-                }
-                // pull: drag vector, softly limited
-                var ex = f.fx - f.sx, ey = f.fy - f.sy
-                let el = hypot(ex, ey), lim = mat.maxPull * R
-                let s = el > 0 ? lim * tanh(el / lim) / el : 0
+            var ex = f.x - f.ax, ey = f.y - f.ay
+            let el = hypot(ex, ey), lim = mat.maxPull * R
+            if f.mode == .grab && el > 0 {
+                let s = lim * tanh(el / lim) / el
                 ex *= s; ey *= s
-                f.ex = ex; f.ey = ey
-                // the grabbed point and its neighbours follow, weaker further away; the base gets thinner
-                let k0 = f.k
-                for d in -4...4 {
-                    let k = (k0 + d + K) % K, w = exp(-Double(d * d) / 2.2)
-                    var txk = mx[k] + ex * w, tyk = my[k] + ey * w
-                    if d != 0 && el > R * 0.2 {
-                        let nx = cos(ang[k0]), ny = sin(ang[k0])
-                        let side = -Double(d.signum()) * w * (1 - w) * mat.neck * min(1, el / R) * R * 0.5
-                        txk += -ny * side; tyk += nx * side
-                    }
-                    addTarget(k, txk, tyk, w)
+            }
+            let tx = f.ax + ex, ty = f.ay + ey
+            let k = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
+            f.fx += (tx - f.fx) * k; f.fy += (ty - f.fy) * k
+            f.vx = (f.x - f.lx) / dt; f.vy = (f.y - f.ly) / dt
+            f.lx = f.x; f.ly = f.y
+            if f.mode == .grab {
+                let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
+                if step > f.step && st > 0.35 {
+                    onEvent?(.pull(gain: min(1, 0.4 + st / 2), rate: 1 - 0.08 * min(1, st / 1.5)))
                 }
-                let st = el / R, step = Int(floor(st * 5))
-                if step > f.creak && st > 0.4 { onEvent?(.creak(min(1, st / 1.6))) }
-                f.creak = step
+                f.step = max(f.step, step)
+            }
+        }
 
-            case .push:
-                // finger outside: the edge it touches is pushed in
-                for k in 0..<K {
-                    let p = shape(k), d = hypot(p.x - f.x, p.y - f.y), rf = R * 0.2
-                    if d < rf + R * 0.25 {
-                        let dx = cx - p.x, dy = cy - p.y, l = hypot(dx, dy) == 0 ? 1 : hypot(dx, dy)
-                        let depth = max(0, rf + R * 0.25 - d)
-                        let w = min(1, depth / (R * 0.25))
-                        addTarget(k, ox[k] + dx / l * depth * 0.5, oy[k] + dy / l * depth * 0.5, w)
-                    }
+        // idle life: only when nobody is touching, fading in over a second after release
+        let idle = fingers.isEmpty ? min(1, max(0, (t - lastTouch - 0.8) / 1.2)) : 0
+        let L = idle * (reduceMotion ? 0.5 : 1)
+
+        // wandering home: pick a spot, walk there, rest a while; stop when touched
+        if L > 0.5 && mat.wander > 0 {
+            if !wanderMoving && t > wanderNext {
+                wanderX = cx + (Double.random(in: 0..<1) - 0.5) * W * 0.36
+                wanderY = cy + (Double.random(in: 0..<1) - 0.5) * H * 0.16
+                wanderMoving = true
+            }
+            if wanderMoving {
+                let sp = mat.wander * R * dt * L, ddx = wanderX - homeX, ddy = wanderY - homeY, dl = hypot(ddx, ddy)
+                if dl < sp * 2 {
+                    homeX = wanderX; homeY = wanderY
+                    wanderMoving = false
+                    wanderNext = t + 1.5 + Double.random(in: 0..<5)
+                } else {
+                    homeX += ddx / dl * sp; homeY += ddy / dl * sp
                 }
-
-            case .none:
-                break
             }
+        } else if !fingers.isEmpty {
+            wanderMoving = false
+            wanderNext = t + 2 + Double.random(in: 0..<3)
         }
 
-        // springs: each control point chases its target (touched) or its remembered shape (free)
-        let sp = springParams
-        let om = 2 * Double.pi / sp.response, kk = om * om, cc = 2 * sp.damping * om
-        for k in 0..<K {
-            let w = min(1, tw[k])
-            let gx = w > 0 ? tx[k] / max(tw[k], 1e-6) : mx[k]
-            let gy = w > 0 ? ty[k] / max(tw[k], 1e-6) : my[k]
-            let Gx = mx[k] + (gx - mx[k]) * w, Gy = my[k] + (gy - my[k]) * w
-            let ax = kk * (Gx - ox[k]) - cc * vx[k], ay = kk * (Gy - oy[k]) - cc * vy[k]
-            vx[k] += ax * dt; vy[k] += ay * dt
-            ox[k] += vx[k] * dt; oy[k] += vy[k] * dt
-            // keep it a clean shape: never fold inside out, never stretch absurdly
-            let rx = cos(ang[k]), ry = sin(ang[k])
-            let rad = ox[k] * rx + oy[k] * ry, tan = -ox[k] * ry + oy[k] * rx
-            let radC = max(-r0[k] * 0.7, min(R * 2, rad)), tanC = max(-R * 1.4, min(R * 1.4, tan))
-            ox[k] = radC * rx - tanC * ry; oy[k] = radC * ry + tanC * rx
-            // molding memory (mode C): long, big deformations are kept; then slowly relax back
-            let dx = ox[k] - mx[k], dy = oy[k] - my[k], dl = hypot(dx, dy), yl = mat.yield * R
-            if w > 0.05 && dl > yl {
-                let kc = min(1, mat.creep * dt * w)
-                mx[k] += dx * (1 - yl / dl) * kc; my[k] += dy * (1 - yl / dl) * kc
-            }
-            if w < 0.05 {
-                let kr = min(1, mat.recover * dt)
-                mx[k] *= 1 - kr; my[k] *= 1 - kr
-            }
-        }
-
-        // keep the area roughly constant: pulling one part out makes the rest a little slimmer
-        var A = 0.0, A0 = 0.0
-        for i in 0..<K {
-            let j = (i + 1) % K, a = shape(i), b = shape(j)
-            A += a.x * b.y - b.x * a.y
-            A0 += restX(i) * restY(j) - restX(j) * restY(i)
-        }
-        let ratio = A0 / A
-        if ratio.isFinite && ratio > 0 {
-            let adj = max(-0.08, min(0.08, sqrt(ratio) - 1))
-            for k in 0..<K where tw[k] < 0.3 {
-                ox[k] += cos(ang[k]) * r0[k] * adj * 0.15
-                oy[k] += sin(ang[k]) * r0[k] * adj * 0.15
-            }
-        }
-
-        let sk = kk * 0.8, sc = cc * 0.9
-        sqv += (sk * (sqT - sq) - sc * sqv) * dt
-        sq += sqv * dt
-        sq = max(-0.35, min(0.6, sq))
+        let n = max(1, Int((dt * 240).rounded()))
+        let sdt = dt / Double(n)
+        for _ in 0..<n { substep(sdt, L) }
+        plasticity(dt)
+        twitch(L)
     }
 
-    private func addTarget(_ k: Int, _ x: Double, _ y: Double, _ w: Double) {
-        tx[k] += x * w; ty[k] += y * w; tw[k] += w
+    private func substep(_ dt: Double, _ L: Double) {
+        let mat = params
+        let damp = mat.damp, alpha = mat.alpha
+        // 1 Verlet
+        for i in 0..<N {
+            let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
+            PX[i] = X[i]; PY[i] = Y[i]
+            X[i] += vx; Y[i] += vy
+        }
+        // 2 fingers
+        for f in fingers.values {
+            if f.mode == .grab {
+                for m in f.mem {
+                    let k = 0.55 * m.w
+                    X[m.i] += (f.fx + m.ox - X[m.i]) * k
+                    Y[m.i] += (f.fy + m.oy - Y[m.i]) * k
+                }
+            } else if f.mode == .push {
+                let rf = R * 0.22
+                for i in 0..<N {
+                    let dx = X[i] - f.fx, dy = Y[i] - f.fy, d = hypot(dx, dy)
+                    if d < rf && d > 1e-6 {
+                        let s = (rf - d) / d
+                        X[i] += dx * s; Y[i] += dy * s
+                    }
+                }
+            }
+        }
+        // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
+        let bs = L * mat.life * 0.045 * sin(t * 2 * .pi / 3.8), bsx = 1 + bs, bsy = 1 - bs * 0.85
+        let wr = L * mat.life * mat.wriggle * R, swA = L * mat.life * mat.drift * R, iR = 1 / R
+        for i in 0..<N {
+            var ex = QX[i], ey = QY[i]
+            if wr != 0 {
+                let qx = ex * iR, qy = ey * iR
+                ex += wr * (0.6 * sin(1.7 * qy + t * 1.3 + 0.3) + 0.4 * sin(2.3 * qx - t * 1.0 + 1.7))
+                ey += wr * (0.6 * sin(1.9 * qx - t * 1.1 + 2.1) + 0.4 * sin(2.1 * qy + t * 1.6 + 0.6))
+            }
+            let k = TID[i]
+            if k >= 0 && swA != 0 {
+                let tt = tent[k], u = TUB[i], kd = Double(k)
+                let phv = (sin(t * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(t * 2 * .pi / (1.9 + kd * 0.4) + kd)) * swA * u * u
+                ex += -tt.uy * phv; ey += tt.ux * phv
+            }
+            EX[i] = ex; EY[i] = ey
+        }
+        // 3 shape matching: each cluster's best rigid fit pulls its particles
+        for i in 0..<N { GX[i] = 0; GY[i] = 0; GW[i] = 0 }
+        clusters[gi].w = mat.wGlobal
+        for c in 0..<clusters.count {
+            let idx = clusters[c].idx, n = Double(idx.count)
+            var xc = 0.0, yc = 0.0, qcx = 0.0, qcy = 0.0
+            for i in idx { xc += X[i]; yc += Y[i]; qcx += EX[i]; qcy += EY[i] }
+            xc /= n; yc /= n; qcx /= n; qcy /= n
+            var a = 0.0, b = 0.0, cc = 0.0, d = 0.0
+            for i in idx {
+                let px = X[i] - xc, py = Y[i] - yc, qx = (EX[i] - qcx) * bsx, qy = (EY[i] - qcy) * bsy
+                a += px * qx; b += px * qy; cc += py * qx; d += py * qy
+            }
+            let ang = atan2(cc - b, a + d), cs = cos(ang), sn = sin(ang)
+            clusters[c].cs = cs; clusters[c].sn = sn; clusters[c].xc = xc; clusters[c].yc = yc
+            clusters[c].qcx = qcx; clusters[c].qcy = qcy
+            let w = clusters[c].w
+            for i in idx {
+                let qx = (EX[i] - qcx) * bsx, qy = (EY[i] - qcy) * bsy
+                GX[i] += (xc + cs * qx - sn * qy) * w
+                GY[i] += (yc + sn * qx + cs * qy) * w
+                GW[i] += w
+            }
+        }
+        // area pressure: when squashed or stretched the area drops, push goals outward so sides bulge
+        let A = polygonArea()
+        let ap = max(-0.12, min(0.12, (sqrt(A0 / A) - 1) * mat.areaGain))
+        let gcx = clusters[gi].xc, gcy = clusters[gi].yc
+        for i in 0..<N {
+            var gx = GX[i] / GW[i], gy = GY[i] / GW[i]
+            gx = gcx + (gx - gcx) * (1 + ap); gy = gcy + (gy - gcy) * (1 + ap)
+            let ka = alpha * KF[i]
+            X[i] += (gx - X[i]) * ka; Y[i] += (gy - Y[i]) * ka
+        }
+        // upright: turn back head-up. Kinematic (position and previous position together), so no overshoot.
+        let gAng = atan2(clusters[gi].sn, clusters[gi].cs)
+        let grabbing = !fingers.isEmpty
+        let rotK = -gAng * min(0.2, mat.upright * (grabbing ? mat.anchor * mat.gripRot : 1))
+        if rotK != 0 { rotateFree(by: rotK, around: gcx, gcy) }
+        // idle sway: pure performance displacement, no velocity left behind
+        let sway = L * mat.life * 0.0009 * sin(t * 2 * .pi / 5.3)
+        if sway != 0 { rotateFree(by: sway, around: gcx, gcy) }
+        // 3b boundary ring: neighbours keep their distance within [0.6, 2.4] (tentacles 1.7) of rest
+        let nb = bnd.count
+        for _ in 0..<2 {
+            for k in 0..<nb {
+                let i = bnd[k], j = bnd[(k + 1) % nb]
+                let tentacle = TID[i] >= 0 || TID[j] >= 0
+                let dx = X[j] - X[i], dy = Y[j] - Y[i]
+                let d = max(1e-6, hypot(dx, dy)), l0 = bndL[k], lo = l0 * 0.6, hi = l0 * (tentacle ? 1.7 : 2.4)
+                var c = 0.0
+                if d > hi { c = (d - hi) / d } else if d < lo { c = (d - lo) / d }
+                if c == 0 { continue }
+                let wi = GRAB[i] ? 0.15 : 0.5, wj = GRAB[j] ? 0.15 : 0.5, sw = wi + wj
+                X[i] += dx * c * wi / sw; Y[i] += dy * c * wi / sw
+                X[j] -= dx * c * wj / sw; Y[j] -= dy * c * wj / sw
+            }
+        }
+        // 3c non-penetration inside a group (same tentacle / body): keeps tentacles from thinning or folding.
+        //    Different groups may overlap (one in front of the other), otherwise a pulled-across tentacle gets stuck.
+        collide()
+        // 4 home (float), bounds
+        let hx = homeX + L * mat.life * R * 0.035 * sin(t * 2 * .pi / 7.3)
+        let hy = homeY + L * mat.life * R * 0.05 * sin(t * 2 * .pi / 4.7)
+        let kh = 0.02 * (grabbing ? mat.anchor : 1), dx = hx - gcx, dy = hy - gcy
+        let padT = 90.0, padB = H - 120, padL = 8.0, padR = W - 8
+        for i in 0..<N {
+            if !GRAB[i] { X[i] += dx * kh; Y[i] += dy * kh }
+            if Y[i] < padT { Y[i] = padT }
+            if Y[i] > padB { Y[i] = padB }
+            if X[i] < padL { X[i] = padL }
+            if X[i] > padR { X[i] = padR }
+        }
+    }
+
+    private func rotateFree(by ang: Double, around cx: Double, _ cy: Double) {
+        let c = cos(ang), s = sin(ang)
+        for i in 0..<N where !GRAB[i] {
+            var dx = X[i] - cx, dy = Y[i] - cy
+            X[i] = cx + dx * c - dy * s; Y[i] = cy + dx * s + dy * c
+            dx = PX[i] - cx; dy = PY[i] - cy
+            PX[i] = cx + dx * c - dy * s; PY[i] = cy + dx * s + dy * c
+        }
+    }
+
+    private func collide() {
+        let dmin = h * 0.6, dmin2 = dmin * dmin, inv = 1 / dmin
+        var grid: [Int: [Int]] = [:]
+        grid.reserveCapacity(N)
+        func key(_ gx: Int, _ gy: Int) -> Int { gx &* 73856 &+ gy }
+        for i in 0..<N {
+            grid[key(Int(X[i] * inv), Int(Y[i] * inv)), default: []].append(i)
+        }
+        let nb = bnd.count
+        for i in 0..<N {
+            let gx = Int(X[i] * inv), gy = Int(Y[i] * inv)
+            for ox in -1...1 {
+                for oy in -1...1 {
+                    guard let cell = grid[key(gx + ox, gy + oy)] else { continue }
+                    for j in cell {
+                        if j <= i || TID[j] != TID[i] { continue }
+                        if BIDX[i] >= 0 && BIDX[j] >= 0 {
+                            let di = abs(BIDX[i] - BIDX[j])
+                            if min(di, nb - di) <= 8 { continue }
+                        }
+                        let dx = X[j] - X[i], dy = Y[j] - Y[i], d2 = dx * dx + dy * dy
+                        if d2 >= dmin2 || d2 < 1e-9 { continue }
+                        let d = sqrt(d2), c = (dmin - d) / d
+                        let wi = GRAB[i] ? 0.3 : 1.0, wj = GRAB[j] ? 0.3 : 1.0, sw = wi + wj
+                        X[i] -= dx * c * wi / sw; Y[i] -= dy * c * wi / sw
+                        X[j] += dx * c * wj / sw; Y[j] += dy * c * wj / sw
+                    }
+                }
+            }
+        }
+    }
+
+    private func plasticity(_ dt: Double) {
+        let mat = params
+        // where each particle sits in rest space right now (rotation only, averaged over its clusters)
+        for i in 0..<N { RX[i] = 0; RY[i] = 0; GW[i] = 0 }
+        for c in clusters {
+            for i in c.idx {
+                let px = X[i] - c.xc, py = Y[i] - c.yc
+                RX[i] += (c.qcx + c.cs * px + c.sn * py) * c.w
+                RY[i] += (c.qcy - c.sn * px + c.cs * py) * c.w
+                GW[i] += c.w
+            }
+        }
+        let touched = fingers.values.contains { $0.mode == .grab }
+        if touched {
+            let yl = mat.yield * R, kc = min(1, mat.creep * dt)
+            if kc > 0 {
+                for i in 0..<N {
+                    let rx = RX[i] / GW[i], ry = RY[i] / GW[i], dx = rx - QX[i], dy = ry - QY[i], dl = hypot(dx, dy)
+                    if dl > yl {
+                        let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] : 1)
+                        QX[i] += dx * s; QY[i] += dy * s
+                        let ex = QX[i] - Q0X[i], ey = QY[i] - Q0Y[i], el = hypot(ex, ey), lim = R * 1.1
+                        if el > lim { QX[i] = Q0X[i] + ex * lim / el; QY[i] = Q0Y[i] + ey * lim / el }
+                    }
+                }
+            }
+        } else {
+            let kr = min(1, mat.recover * dt)
+            if kr > 0 {
+                for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
+            }
+        }
+        // tentacles barely remember: tips always spring back to their length and thickness (the body is the clay).
+        // Must happen before recentering, with Q0 zero-mean, or the junction drifts apart frame by frame.
+        let kt = min(1, 0.8 * dt)
+        for i in 0..<N where TID[i] >= 0 {
+            let w = kt * TU[i]
+            QX[i] += (Q0X[i] - QX[i]) * w; QY[i] += (Q0Y[i] - QY[i]) * w
+        }
+        var mx = 0.0, my = 0.0
+        for i in 0..<N { mx += QX[i]; my += QY[i] }
+        mx /= Double(N); my /= Double(N)
+        for i in 0..<N { QX[i] -= mx; QY[i] -= my }
+    }
+
+    /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
+    private func twitch(_ L: Double) {
+        if t < nextTwitch { return }
+        nextTwitch = t + 2.2 + Double.random(in: 0..<4.5)
+        if L < 0.5 || params.life <= 0 { return }
+        let amp = R * 0.0012 * params.life * (reduceMotion ? 0.5 : 1)   // per-substep displacement = velocity
+        let whole = Double.random(in: 0..<1) < 0.25
+        let c = whole ? clusters[gi] : clusters[Int.random(in: 0..<max(1, clusters.count - 1))]
+        let a = Double.random(in: 0..<(2 * .pi)), s = whole ? 0.6 : 1.0
+        let ix = cos(a) * amp * s, iy = sin(a) * amp * s
+        for i in c.idx where !GRAB[i] { PX[i] -= ix; PY[i] -= iy }
     }
 
     // MARK: - Readouts for sound and haptics
 
-    /// How fast active fingers are moving, 0...1 (drives the kneading sound bed).
-    func kneadSpeed(dt: Double) -> Double {
-        var spd = 0.0
-        for f in fingers.values where f.mode != .none {
-            spd += hypot(f.x - f.bx, f.y - f.by) / max(dt, 1e-3)
-            f.bx = f.x; f.by = f.y
-        }
-        return min(1, spd / (R * 6))
+    /// Kneading level 0...1: how fast grabbing fingers move (drives the looped rub sound).
+    func rubLevel() -> Double {
+        var sp = 0.0
+        for f in fingers.values where f.mode == .grab { sp = max(sp, hypot(f.vx, f.vy) / R) }
+        return fingers.isEmpty ? 0 : min(1, sp / 5) * 0.7
     }
 
-    /// How deformed the body is right now, 0...1 (drives continuous haptics).
+    /// How far the body is from its rest fit right now, 0...1 (drives continuous haptics while touched).
     var deformation: Double {
+        guard N > 0 else { return 0 }
         var m = 0.0
-        for k in 0..<K { m = max(m, hypot(ox[k] - mx[k], oy[k] - my[k])) }
-        return min(1, max(abs(sq) / 0.45, m / (R * 1.2)))
+        for i in 0..<N where GW[i] > 0 {
+            m = max(m, hypot(X[i] - GX[i] / GW[i], Y[i] - GY[i] / GW[i]))
+        }
+        return min(1, m / (R * 0.6))
     }
 
     var isTouched: Bool { fingers.values.contains { $0.mode != .none } }

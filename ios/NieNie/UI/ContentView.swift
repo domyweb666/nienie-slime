@@ -43,7 +43,7 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 topBar
-                Text("抓住拉・按住壓・從旁邊推")
+                Text("捏它、拉它、甩它的觸手。放著不管它也會飄")
                     .font(.rounded(14))
                     .foregroundStyle(Palette.ink)
                     .padding(.horizontal, 16).padding(.vertical, 8)
