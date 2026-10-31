@@ -55,6 +55,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 
 <div class="bar top">
   <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.1</span></div>
+  <button class="round" id="b-mute" aria-pressed="false" title="聲音">🔈</button>
 </div>
 
 <div class="hint" id="hint">捏它、拉它、甩它的觸手。放著不管它也會飄</div>
@@ -83,7 +84,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    - 永遠拉得回來、不爆、不打結（輪廓由邊界粒子依原始順序連成）
    - 塑性：變形超過 yield 就慢慢改參考形狀（留形）；沒碰時參考形狀回原樣
    - 活物：沒碰時呼吸、慢搖、偶爾抖、懸空時上下浮
-   - 音效：這版拿掉，等真實錄音切片
+   - 音效：真實錄音切片。讀 sfx/manifest.json，分四類（press 按、pull 拉、release 放手、rub 持續揉），
+     每類多段隨機挑、音高 ±8%、音量跟動作強度。沒有檔案就安靜。錄法見 .uiux/04-手感/錄音指南.md
    ========================================================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
@@ -215,6 +217,29 @@ function buildClusters(){
   lastC={cSpace:mat.cSpace,cRad:mat.cRad};
 }
 
+/* ---------- 聲音：真實錄音切片（sfx/manifest.json），沒有檔案就安靜 ---------- */
+const SFX={ctx:null,manifest:null,buf:{press:[],pull:[],release:[],rub:[]},master:null,muted:false,rubSrc:null,rubGain:null,pitchJit:.08};
+fetch('sfx/manifest.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(m=>{SFX.manifest=m}).catch(()=>{});
+function sfxInit(){ // iOS 規定：要在第一次觸碰裡建立音訊
+  if(SFX.ctx||!SFX.manifest)return;const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+  SFX.ctx=new C();SFX.master=SFX.ctx.createGain();SFX.master.gain.value=SFX.muted?0:.9;SFX.master.connect(SFX.ctx.destination);
+  for(const k of Object.keys(SFX.buf))for(const f of (SFX.manifest[k]||[]))
+    fetch('sfx/'+f).then(r=>r.arrayBuffer()).then(ab=>SFX.ctx.decodeAudioData(ab)).then(b=>SFX.buf[k].push(b)).catch(()=>{});
+}
+function sfxPlay(kind,gain=1,rate=1){const c=SFX.ctx;if(!c||SFX.muted)return;const list=SFX.buf[kind];if(!list.length)return;
+  if(c.state==='suspended')c.resume();
+  const b=list[Math.floor(Math.random()*list.length)],src=c.createBufferSource(),g=c.createGain();
+  src.buffer=b;src.playbackRate.value=rate*(1+(Math.random()*2-1)*SFX.pitchJit);g.gain.value=Math.max(0,Math.min(1,gain));
+  src.connect(g);g.connect(SFX.master);src.start()}
+function sfxRub(level){ // 持續揉：一段 loop，音量跟手指速度
+  const c=SFX.ctx;if(!c)return;
+  if(!SFX.rubSrc){const list=SFX.buf.rub;if(!list.length||level<=0)return;const src=c.createBufferSource(),g=c.createGain();
+    src.buffer=list[Math.floor(Math.random()*list.length)];src.loop=true;src.playbackRate.value=1+(Math.random()*2-1)*SFX.pitchJit;
+    g.gain.value=0;src.connect(g);g.connect(SFX.master);src.start();SFX.rubSrc=src;SFX.rubGain=g}
+  SFX.rubGain.gain.setTargetAtTime(SFX.muted?0:level,c.currentTime,.06)}
+$('b-mute').addEventListener('click',()=>{SFX.muted=!SFX.muted;$('b-mute').setAttribute('aria-pressed',String(SFX.muted));$('b-mute').textContent=SFX.muted?'🔇':'🔈';
+  if(SFX.master)SFX.master.gain.setTargetAtTime(SFX.muted?0:.9,SFX.ctx.currentTime,.02)});
+
 /* ---------- 手指 ---------- */
 const fingers=new Map();
 function pos(e){const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
@@ -226,7 +251,8 @@ function down(e){
   if(e.target!==cv)return;
   const p=pos(e);
   const grab=insideBody(p.x,p.y)||nearBody(p.x,p.y,R*.22);
-  const f={id:e.pointerId,ax:p.x,ay:p.y,x:p.x,y:p.y,fx:p.x,fy:p.y,mode:grab?'grab':'push',mem:[]};
+  const f={id:e.pointerId,ax:p.x,ay:p.y,x:p.x,y:p.y,fx:p.x,fy:p.y,lx:p.x,ly:p.y,vx:0,vy:0,step:0,mode:grab?'grab':'push',mem:[]};
+  sfxInit();if(grab)sfxPlay('press',.7)
   if(grab){
     const gr=mat.grabR*R;
     for(let i=0;i<N;i++){const d=Math.hypot(X[i]-p.x,Y[i]-p.y);if(d<gr&&!GRAB[i]){const u=d/gr;f.mem.push([i,X[i]-p.x,Y[i]-p.y,Math.exp(-u*u*2.5)*(1-u*u)]);GRAB[i]=1}}
@@ -237,7 +263,9 @@ function down(e){
   $('hint').classList.add('off');
 }
 function move(e){const f=fingers.get(e.pointerId);if(!f)return;const p=pos(e);f.x=p.x;f.y=p.y}
-function up(e){const f=fingers.get(e.pointerId);if(!f)return;for(const m of f.mem)GRAB[m[0]]=0;fingers.delete(e.pointerId);lastTouch=t}
+function up(e){const f=fingers.get(e.pointerId);if(!f)return;for(const m of f.mem)GRAB[m[0]]=0;fingers.delete(e.pointerId);lastTouch=t;
+  if(f.mode==='grab'){const sp=Math.hypot(f.vx,f.vy)/R;sfxPlay('release',.35+.65*Math.min(1,sp/6),1+.1*Math.min(1,sp/6))}
+  if(!fingers.size)sfxRub(0)}
 cv.addEventListener('pointerdown',down);cv.addEventListener('pointermove',move);
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 
@@ -373,7 +401,12 @@ function update(dt){
     if(f.mode==='grab'&&el>0){const s=lim*Math.tanh(el/lim)/el;ex*=s;ey*=s}
     const tx=f.ax+ex,ty=f.ay+ey,k=mat.lag>0?1-Math.exp(-dt/mat.lag):1;
     f.fx+=(tx-f.fx)*k;f.fy+=(ty-f.fy)*k;
+    f.vx=(f.x-f.lx)/dt;f.vy=(f.y-f.ly)/dt;f.lx=f.x;f.ly=f.y;
+    if(f.mode==='grab'){const st=Math.hypot(ex,ey)/R,step=Math.floor(st*2.5);if(step>f.step&&st>.35)sfxPlay('pull',Math.min(1,.4+st/2),1-.08*Math.min(1,st/1.5));f.step=Math.max(f.step,step)}
   }
+  { // 持續揉：抓著時手指速度越快越大聲
+    let sp=0;for(const f of fingers.values())if(f.mode==='grab')sp=Math.max(sp,Math.hypot(f.vx,f.vy)/R);
+    sfxRub(fingers.size?Math.min(1,sp/5)*.7:0)}
   // 活物感：沒人碰才開，放手後 1 秒內淡入
   const idle=fingers.size?0:Math.min(1,Math.max(0,(t-lastTouch-.8)/1.2));
   const L=idle*(REDUCED?.5:1);
