@@ -73,6 +73,8 @@ final class SlimeRig {
     private(set) var hiIdx = 0
     private var t = 0.0, lastTouch = -10.0, nextTwitch = 3.0, A0 = 1.0
     private var wanderX = 0.0, wanderY = 0.0, wanderNext = 3.0, wanderMoving = false
+    private var wanderSX = 0.0, wanderSY = 0.0, wanderP = 0.0, wanderT = 1.0   // 提案第 20 條: start, progress and duration of the current walk
+    private var wanderVX = 0.0, wanderVY = 0.0                                 // home velocity this frame (points per second), drives the tentacle tail
     private var builtSeed = -1.0, builtFloppy = -1.0, builtSpace = -1.0, builtRad = -1.0
     private var relaxUntil = -1.0            // 揉回原形: until when the remembered shape eases back to the original
     private(set) var lastReleaseStrength = 0.0
@@ -299,7 +301,7 @@ final class SlimeRig {
         builtSeed = params.seed; builtFloppy = params.floppy
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
-        wanderMoving = false; wanderNext = 3
+        wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
     }
 
     private func buildClusters() {
@@ -629,21 +631,28 @@ final class SlimeRig {
         let Lamp = freeze ? (reduceMotion ? 0.5 : 1) : L
         let tl = freeze ? tLife : t
 
-        // wandering home: pick a spot, walk there, rest a while; stop when touched
+        // wandering home (提案第 20、31 條): pick a spot, walk there with a smoothstep speed profile (6p(1−p): same average
+        // speed and the same walk-then-rest rhythm as the constant-speed version), rest a while; stop when touched.
+        // Reduce Motion halves the speed again (×0.25 together with L)
+        wanderVX = 0; wanderVY = 0
         if L > 0.5 && mat.wander > 0 {
             if !wanderMoving && t > wanderNext {
+                wanderSX = homeX; wanderSY = homeY
                 wanderX = cx + (Double.random(in: 0..<1) - 0.5) * W * 0.36
                 wanderY = cy + (Double.random(in: 0..<1) - 0.5) * H * 0.16
+                wanderT = max(0.5, hypot(wanderX - homeX, wanderY - homeY) / (mat.wander * R * (reduceMotion ? 0.5 : 1)))
+                wanderP = 0
                 wanderMoving = true
             }
             if wanderMoving {
-                let sp = mat.wander * R * dt * L, ddx = wanderX - homeX, ddy = wanderY - homeY, dl = hypot(ddx, ddy)
-                if dl < sp * 2 {
-                    homeX = wanderX; homeY = wanderY
+                wanderP = min(1, wanderP + dt * L / wanderT)
+                let p = wanderP, e = p * p * (3 - 2 * p)
+                let nx = wanderSX + (wanderX - wanderSX) * e, ny = wanderSY + (wanderY - wanderSY) * e
+                wanderVX = (nx - homeX) / dt; wanderVY = (ny - homeY) / dt
+                homeX = nx; homeY = ny
+                if p >= 1 {
                     wanderMoving = false
                     wanderNext = t + 1.5 + Double.random(in: 0..<5)
-                } else {
-                    homeX += ddx / dl * sp; homeY += ddy / dl * sp
                 }
             }
         } else if !fingers.isEmpty {
@@ -698,6 +707,18 @@ final class SlimeRig {
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
         let bs = Lamp * mat.life * 0.045 * sin(tl * 2 * .pi / 3.8), bsx = 1 + bs, bsy = 1 - bs * 0.85
         let wr = Lamp * mat.life * mat.wriggle * R, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
+        // 提案第 20 條 tentacle tail: while wandering, the tentacles' reference positions trail the motion (tips most, u²),
+        // scaled by the current speed so the smoothstep profile fades it in and out. Written on the reference shape like the
+        // drift; weakening the home pull on the tips instead (the proposal's variant b) was measured to bend the rest pose
+        // for good (10 pt a second after stopping), this version settles within 3 s
+        var tvx = 0.0, tvy = 0.0
+        let wv = hypot(wanderVX, wanderVY)
+        if mat.tail > 0 && wv > 1e-6 && mat.wander > 0 {
+            let ga = atan2(clusters[gi].sn, clusters[gi].cs), ca = cos(ga), sa = sin(ga)
+            let s = mat.tail * R * min(1.5, wv / (mat.wander * R)) / wv
+            tvx = (ca * wanderVX + sa * wanderVY) * s
+            tvy = (-sa * wanderVX + ca * wanderVY) * s
+        }
         for i in 0..<N {
             var ex = QX[i], ey = QY[i]
             if wr != 0 {
@@ -706,10 +727,14 @@ final class SlimeRig {
                 ey += wr * (0.6 * sin(1.9 * qx - tl * 1.1 + 2.1) + 0.4 * sin(2.1 * qy + tl * 1.6 + 0.6))
             }
             let k = TID[i]
-            if k >= 0 && swA != 0 {
-                let tt = tent[k], u = TUB[i], kd = Double(k)
-                let phv = (sin(tl * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(tl * 2 * .pi / (1.9 + kd * 0.4) + kd)) * swA * u * u
-                ex += -tt.uy * phv; ey += tt.ux * phv
+            if k >= 0 {
+                let tt = tent[k], u = TUB[i], u2 = u * u
+                if swA != 0 {
+                    let kd = Double(k)
+                    let phv = (sin(tl * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(tl * 2 * .pi / (1.9 + kd * 0.4) + kd)) * swA * u2
+                    ex += -tt.uy * phv; ey += tt.ux * phv
+                }
+                if tvx != 0 || tvy != 0 { ex -= tvx * u2; ey -= tvy * u2 }
             }
             EX[i] = ex; EY[i] = ey
         }

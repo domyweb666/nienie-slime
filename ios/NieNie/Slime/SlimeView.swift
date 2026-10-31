@@ -4,7 +4,7 @@ import UIKit
 /// with fixed small substeps, then redraws a handful of CAShapeLayers.
 final class SlimeView: UIView {
     let rig: SlimeRig
-    var colors: SlimeColors { didSet { applyColors() } }
+    var colors: SlimeColors { didSet { applyColors(animated: !rig.reduceMotion) } }
     /// Fires once per frame, after the rig stepped, so sound/haptics read the same state as the picture.
     var onFrame: ((_ dt: Double) -> Void)?
     var usePredictedTouches = true
@@ -27,6 +27,10 @@ final class SlimeView: UIView {
     private var lastStatsTime: CFTimeInterval = 0
 
     private var link: CADisplayLink?
+    // 提案第 35 條: 120Hz only while a finger is down (and for a second after); 60Hz idle so a three-minute toy does not heat up
+    private var touchesDown = 0
+    private var lastTouchEnd: CFTimeInterval = -10
+    private var frameRate: Float = 0
     private var lastTimestamp: CFTimeInterval = 0
     private var laidOutSize: CGSize = .zero
 
@@ -87,9 +91,15 @@ final class SlimeView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    private func applyColors() {
+    /// 提案第 30 條: a material switch fades its colours over 0.25 s (hard cut at setup and with Reduce Motion).
+    private func applyColors(animated: Bool = false) {
         CATransaction.begin()
-        CATransaction.setDisableActions(true)
+        if animated {
+            CATransaction.setAnimationDuration(0.25)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
+        } else {
+            CATransaction.setDisableActions(true)
+        }
         shadeLayer.fillColor = colors.shade.cgColor
         baseLayer.fillColor = colors.base.cgColor
         highlightLayer.fillColor = colors.light.cgColor
@@ -105,6 +115,7 @@ final class SlimeView: UIView {
             guard link == nil else { return }
             let l = CADisplayLink(target: self, selector: #selector(tick(_:)))
             l.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+            frameRate = 120
             l.add(to: .main, forMode: .common)
             link = l
             lastTimestamp = 0
@@ -140,6 +151,8 @@ final class SlimeView: UIView {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchesDown += touches.count
+        setFrameRate(120)
         if latencyTest {
             // shown from the touch handler itself, before any physics, so it measures the input-to-display pipeline
             CATransaction.begin()
@@ -180,11 +193,25 @@ final class SlimeView: UIView {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         for t in touches { rig.touchEnded(ObjectIdentifier(t), time: t.timestamp) }
+        touchesDown = max(0, touchesDown - touches.count)
+        lastTouchEnd = CACurrentMediaTime()
     }
 
     /// The system took the touch (edge gesture, call, app switch): let go without the release pop.
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         for t in touches { rig.touchCancelled(ObjectIdentifier(t)) }
+        touchesDown = max(0, touchesDown - touches.count)
+        lastTouchEnd = CACurrentMediaTime()
+    }
+
+    /// 提案第 35 條. The latency test keeps 120Hz so the slow-motion count measures the 120Hz pipeline; from idle the
+    /// first frame after a touch can be one 60Hz frame (up to 8 ms) later, which the panel's Hz readout also shows.
+    private func setFrameRate(_ hz: Float) {
+        guard hz != frameRate, let l = link else { return }
+        frameRate = hz
+        l.preferredFrameRateRange = hz >= 120
+            ? CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+            : CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
     }
 
     // MARK: - Frame loop
@@ -192,6 +219,7 @@ final class SlimeView: UIView {
     @objc private func tick(_ link: CADisplayLink) {
         let now = link.timestamp
         let dt = lastTimestamp == 0 ? 1.0 / 120 : min(1.0 / 30, now - lastTimestamp)
+        setFrameRate(touchesDown > 0 || latencyTest || now - lastTouchEnd < 1 ? 120 : 60)
         let nominal = max(1.0 / 120, link.targetTimestamp - link.timestamp)
         lastTimestamp = now
         guard dt > 0, laidOutSize != .zero else { return }

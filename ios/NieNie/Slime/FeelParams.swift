@@ -62,6 +62,8 @@ struct FeelParams: Equatable, Codable {
     // 提案第 41 條 (2026-11-01): tentacle rungs. 0 = the v2.4 behaviour, where a tentacle pushed root-to-tip could fold over itself
     var tentRung: Double = 0.5        // the two edges of a tentacle stay on their own sides, at least this fraction of the rest width apart
     var tentAxis: Double = 0.85       // each link of a tentacle's medial axis keeps advancing by at least this fraction of its rest length
+    // 提案第 20 條 (2026-11-01): while wandering the tentacles trail the motion
+    var tail: Double = 0.12           // tentacle tail while wandering, in radii at the nominal wander speed (tips most); 0 = off
     // sound
     var volMaster: Double = 0.9       // output volume
     var rubMax: Double = 0.7          // loudest the rub loop gets
@@ -195,6 +197,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.drift, name: "觸手飄動", hint: "沒碰時觸手擺動的幅度（×半徑）", range: 0...0.4, step: 0.01, section: "活物感"),
         TuneField(key: \.wriggle, name: "蠕動", hint: "沒碰時整個身體輪廓慢慢變形的幅度（×半徑）", range: 0...0.2, step: 0.01, section: "活物感"),
         TuneField(key: \.wander, name: "遊走", hint: "沒碰時在畫面裡移動的速度（×半徑／秒）", range: 0...1, step: 0.05, section: "活物感"),
+        TuneField(key: \.tail, name: "遊走拖尾（×半徑）", hint: "遊走時觸手往移動反方向拖的量，照速度自己淡入淡出；0 關（第 20 條）", range: 0...0.4, step: 0.02, section: "活物感"),
         TuneField(key: \.floppy, name: "觸手軟度", hint: "越大觸手末端越軟、越會甩", range: 0...0.9, step: 0.05, section: "活物感"),
         TuneField(key: \.idleFreeze, name: "碰到時凍住", hint: "1：活物感時鐘停住不歸零（候選 19）", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.specialEvery, name: "特別回彈", hint: "每幾次放手來一次特別 Q 的回彈，0 關（候選 2 是 8）", range: 0...12, step: 1, section: "活物感"),

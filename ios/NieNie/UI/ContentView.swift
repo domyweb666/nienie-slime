@@ -33,7 +33,12 @@ struct ChipStyle: ButtonStyle {
 
 struct ContentView: View {
     @EnvironmentObject var controller: SlimeController
-    @State private var showHint = true
+    @State private var showHint: Bool
+
+    init() {
+        // 提案第 32 條: the hint shows on the first three launches only
+        _showHint = State(initialValue: UserDefaults.standard.integer(forKey: "launchCount") < 3)
+    }
     @State private var showTune = false
 
     var body: some View {
@@ -64,6 +69,8 @@ struct ContentView: View {
             .padding(.bottom, 18)
         }
         .task {
+            UserDefaults.standard.set(UserDefaults.standard.integer(forKey: "launchCount") + 1, forKey: "launchCount")
+            guard showHint else { return }
             try? await Task.sleep(nanoseconds: 7_000_000_000)
             withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.6)) { showHint = false }
         }
