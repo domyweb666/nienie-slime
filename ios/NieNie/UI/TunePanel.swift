@@ -1,15 +1,15 @@
 import SwiftUI
 
 /// Hidden tuning panel: one slider per feel parameter, live while you squish, copyable values.
-/// Also the blind-test slots (1 號 / 2 號), the frame readout and the latency flash
-/// (手感精修提案 第 37、39、40 條).
+/// Also the blind-test slots (1 號 / 2 號), the second-batch 候選 buttons, the frame readout and the
+/// latency flash (手感精修提案 第 37、38、39、40 條).
 struct TunePanel: View {
     @EnvironmentObject var controller: SlimeController
     @Binding var isPresented: Bool
     @State private var copied = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("調整面板").font(.rounded(17, .heavy))
                 Text(controller.material.name).font(.rounded(13)).foregroundStyle(Palette.inkSoft)
@@ -38,6 +38,18 @@ struct TunePanel: View {
                     .foregroundStyle(Palette.inkSoft)
             }
 
+            // second-batch candidates, one at a time: 存 1 (control) → 套候選 → 存 2 → 切 1／切 2
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Candidate.batch2) { c in
+                        chip(c.name) { controller.applyCandidate(c) }
+                    }
+                }
+            }
+            Text("候選一次只套一條：存 1（對照）→ 套候選 → 存 2 → 切 1／切 2 盲測")
+                .font(.rounded(11, .medium))
+                .foregroundStyle(Palette.inkSoft)
+
             Toggle(isOn: $controller.latencyTest) {
                 Text("延遲測試：按下時閃白一幀").font(.rounded(13))
             }
@@ -45,25 +57,31 @@ struct TunePanel: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    ForEach(TuneField.all) { f in
-                        let value = controller.binding(for: f)
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text(f.name).font(.rounded(14))
-                                Spacer()
-                                Text(String(format: f.step < 0.01 ? "%.3f" : "%.2f", value.wrappedValue))
-                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                    .foregroundStyle(Palette.inkSoft)
+                    ForEach(TuneField.sections, id: \.self) { section in
+                        Text(section)
+                            .font(.rounded(12, .heavy))
+                            .foregroundStyle(Palette.inkSoft)
+                            .padding(.top, 4)
+                        ForEach(TuneField.all.filter { $0.section == section }) { f in
+                            let value = controller.binding(for: f)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(f.name).font(.rounded(14))
+                                    Spacer()
+                                    Text(String(format: f.step < 0.01 ? "%.3f" : "%.2f", value.wrappedValue))
+                                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                        .foregroundStyle(Palette.inkSoft)
+                                }
+                                Text(f.hint).font(.rounded(11.5, .medium)).foregroundStyle(Palette.inkSoft)
+                                Slider(value: value, in: f.range, step: f.step)
+                                    .tint(Palette.ink)
+                                    .accessibilityLabel(f.name)
                             }
-                            Text(f.hint).font(.rounded(11.5, .medium)).foregroundStyle(Palette.inkSoft)
-                            Slider(value: value, in: f.range, step: f.step)
-                                .tint(Palette.ink)
-                                .accessibilityLabel(f.name)
                         }
                     }
                 }
             }
-            .frame(maxHeight: 260)
+            .frame(maxHeight: 220)
 
             HStack(spacing: 8) {
                 Button {
@@ -90,6 +108,7 @@ struct TunePanel: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(Palette.ink)
                 .textSelection(.enabled)
+                .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(6)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(white: 0.8), lineWidth: 1.5))

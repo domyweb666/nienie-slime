@@ -21,6 +21,10 @@ final class SlimeController: ObservableObject {
     /// Frame readout for the hidden panel, refreshed a couple of times a second by the view.
     @Published private(set) var stats = SlimeView.FrameStats()
 
+    // continuous-haptic shaping state (提案第 12 條)
+    private var lastDeformation = 0.0
+    private var rateSmoothed = 0.0
+
     init() {
         var p: [SlimeMaterial: FeelParams] = [:]
         for m in SlimeMaterial.allCases { p[m] = m.defaults }
@@ -29,6 +33,7 @@ final class SlimeController: ObservableObject {
         rig.reduceMotion = reduceMotion
         rig.onEvent = { [weak self] e in self?.handle(e) }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
+        syncAudio()
 
         NotificationCenter.default.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification,
                                                object: nil, queue: .main) { [weak self] _ in
@@ -49,6 +54,7 @@ final class SlimeController: ObservableObject {
     // MARK: - Events → sound + haptics (same event, same frame)
 
     private func handle(_ e: SlimeEvent) {
+        let p = current
         switch e {
         case .press(let gain):
             sound.press(gain: gain)
@@ -56,9 +62,14 @@ final class SlimeController: ObservableObject {
         case .pull(let gain, let rate):
             sound.pull(gain: gain, rate: rate)
             haptics.transient(intensity: 0.15 + 0.2 * gain, sharpness: 0.5)
-        case .release(let gain, let rate):
-            sound.release(gain: gain, rate: rate)
-            haptics.pop(strength: (gain - 0.35) / 0.65)
+        case .release(let gain, let rate, let special):
+            // special (偶發特別回彈): louder sample, one extra tap
+            sound.release(gain: special ? min(1, gain * 1.3) : gain, rate: rate)
+            let s = max(0, min(1, (gain - 0.35) / 0.65))
+            haptics.pop(strength: s, count: Int(p.popCount.rounded()) + (special ? 1 : 0), gap: p.popGap, decay: p.popDecay,
+                        sharpness: p.popSharp, minIntensity: p.popMin, maxIntensity: p.popMax)
+        case .tick(let gain):
+            haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp)
         case .tap:
             sound.press(gain: 0.5)
             haptics.transient(intensity: 0.45, sharpness: 0.35)
@@ -67,8 +78,17 @@ final class SlimeController: ObservableObject {
 
     /// Called by the slime view once per display frame, after the rig stepped.
     func frame(dt: Double) {
-        sound.rub(level: rig.rubLevel())
-        haptics.updateContinuous(deformation: rig.isTouched ? rig.deformation : 0)
+        let p = current
+        sound.rub(level: rig.rubLevel() * p.rubMax)
+        // continuous haptic from the deformation and/or its rate of change (提案第 12 條); with the default
+        // weights (static 1, rate 0) this is the old intensity = deformation^1.5 × hapMax
+        let deformation = rig.isTouched ? rig.deformation : 0
+        let rate = abs(deformation - lastDeformation) / max(1e-4, dt)
+        lastDeformation = deformation
+        rateSmoothed += (rate - rateSmoothed) * (1 - exp(-dt / 0.04))
+        let level = p.hapStatic * pow(deformation, 1.5) + p.hapRate * min(1, rateSmoothed / max(0.01, p.hapRateNorm))
+        haptics.updateContinuous(level: min(1, level) * p.hapMax, sharpness: p.hapSharp + p.hapSharpStretch * rig.stretchLevel)
+        haptics.flush()
     }
 
     func report(_ s: SlimeView.FrameStats) { stats = s }
@@ -81,11 +101,23 @@ final class SlimeController: ObservableObject {
                stats.hz, stats.maxFrameMs, stats.dropped, stats.workMs, stats.touchRadius, audioBufferMs)
     }
 
+    // MARK: - Parameter plumbing
+
+    private func pushParams() {
+        rig.params = current
+        syncAudio()
+    }
+
+    private func syncAudio() {
+        sound.master = current.volMaster
+        sound.pitchJitter = current.pitchJitter
+    }
+
     // MARK: - Buttons
 
     func select(_ m: SlimeMaterial) {
         material = m
-        rig.params = current
+        pushParams()
         activeSlot = nil
         rig.bump(2)
         sound.press(gain: 0.5)
@@ -107,7 +139,7 @@ final class SlimeController: ObservableObject {
                 var p = self.current
                 p[keyPath: field.key] = v
                 self.params[self.material] = p
-                self.rig.params = p
+                self.pushParams()
                 self.activeSlot = nil
             }
         )
@@ -115,8 +147,18 @@ final class SlimeController: ObservableObject {
 
     func restoreDefaults() {
         params[material] = material.defaults
-        rig.params = current
+        pushParams()
         activeSlot = nil
+    }
+
+    /// Apply one second-batch candidate on top of the current numbers (one at a time for blind tests).
+    func applyCandidate(_ c: Candidate) {
+        var p = current
+        c.apply(&p, material)
+        params[material] = p
+        pushParams()
+        activeSlot = nil
+        rig.bump(1)
     }
 
     // MARK: - Blind-test slots
@@ -134,7 +176,7 @@ final class SlimeController: ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: Self.slotKey(n)),
               let p = try? JSONDecoder().decode(FeelParams.self, from: data) else { return }
         params[material] = p
-        rig.params = p
+        pushParams()
         activeSlot = n
         rig.bump(1)
     }

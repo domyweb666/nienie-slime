@@ -2,9 +2,10 @@ import CoreHaptics
 import UIKit
 
 /// Two kinds of haptics (2-4 #5):
-/// - continuous: one long event whose intensity follows how deformed the slime is
-///   (intensity = deformation^1.5, 0...0.8, sharpness ~0.25)
-/// - transient: the "pop" on release, stronger when released harder
+/// - continuous: one long event whose intensity and sharpness the controller drives every frame
+///   (from deformation and, with candidate 12, its rate of change)
+/// - transient: the release "pop" (one or more taps in one pattern) and, with candidate 13,
+///   texture ticks while kneading
 final class SlimeHaptics {
     var enabled = true { didSet { if !enabled { stopContinuous() } } }
 
@@ -13,13 +14,14 @@ final class SlimeHaptics {
     private var engineRunning = false
     private var continuous: CHHapticAdvancedPatternPlayer?
     private var lastSentIntensity: Float = -1
+    private var lastSentSharpness: Float = -1
+    private var baseSharpness: Float = 0.25
     private var continuousStartedAt: CFTimeInterval = 0
+    private var pendingTicks: [(intensity: Float, sharpness: Float)] = []
 
-    let continuousSharpness: Float = 0.25
-    let continuousMax: Double = 0.8
     /// Hysteresis (手感精修提案 第 16 條): the continuous player starts above `onThreshold`, and stops
     /// only below `offThreshold` after at least `minOn`, so the engine does not click on and off
-    /// while the deformation hovers around the threshold.
+    /// while the level hovers around the threshold.
     let onThreshold: Float = 0.03
     let offThreshold: Float = 0.008
     let minOn: CFTimeInterval = 0.12
@@ -63,10 +65,13 @@ final class SlimeHaptics {
         }
     }
 
-    /// Called every frame. `deformation` is 0...1; pass 0 when no finger is on the slime.
-    func updateContinuous(deformation: Double) {
+    private func clamp01(_ v: Double) -> Float { Float(max(0, min(1, v))) }
+
+    /// Called every frame. `level` is the final 0...1 intensity (the controller shapes it from the
+    /// deformation and its rate, 提案第 12 條); `sharpness` 0...1.
+    func updateContinuous(level: Double, sharpness: Double) {
         guard enabled, supported else { return }
-        let intensity = Float(min(continuousMax, pow(max(0, deformation), 1.5) * continuousMax))
+        let intensity = clamp01(level), sharp = clamp01(sharpness)
         if continuous == nil {
             guard intensity >= onThreshold else { return }
             startEngine()
@@ -74,7 +79,7 @@ final class SlimeHaptics {
             do {
                 let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [
                     CHHapticEventParameter(parameterID: .hapticIntensity, value: 1),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: continuousSharpness),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: sharp),
                 ], relativeTime: 0, duration: 60)
                 let player = try engine.makeAdvancedPlayer(with: CHHapticPattern(events: [event], parameters: []))
                 player.loopEnabled = true
@@ -83,6 +88,8 @@ final class SlimeHaptics {
                 try player.start(atTime: CHHapticTimeImmediate)
                 continuous = player
                 lastSentIntensity = intensity
+                lastSentSharpness = sharp
+                baseSharpness = sharp
                 continuousStartedAt = CACurrentMediaTime()
             } catch {
                 continuous = nil
@@ -94,10 +101,18 @@ final class SlimeHaptics {
             return
         }
         // only send meaningful changes; flooding the engine every frame adds nothing
+        var params: [CHHapticDynamicParameter] = []
         if abs(intensity - lastSentIntensity) > 0.015 {
-            try? continuous?.sendParameters([CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0)],
-                                            atTime: CHHapticTimeImmediate)
+            params.append(CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0))
             lastSentIntensity = intensity
+        }
+        if abs(sharp - lastSentSharpness) > 0.02 {
+            // the sharpness control is an offset added to the event's own sharpness (−1...1)
+            params.append(CHHapticDynamicParameter(parameterID: .hapticSharpnessControl, value: sharp - baseSharpness, relativeTime: 0))
+            lastSentSharpness = sharp
+        }
+        if !params.isEmpty {
+            try? continuous?.sendParameters(params, atTime: CHHapticTimeImmediate)
         }
     }
 
@@ -106,25 +121,56 @@ final class SlimeHaptics {
         try? player.stop(atTime: CHHapticTimeImmediate)
         continuous = nil
         lastSentIntensity = -1
+        lastSentSharpness = -1
     }
 
-    /// One-shot tap. `intensity` 0...1.
-    func transient(intensity: Double, sharpness: Double) {
-        guard enabled, supported else { return }
+    private func play(_ events: [CHHapticEvent]) {
+        guard !events.isEmpty, enabled, supported else { return }
         startEngine()
         guard let engine, engineRunning else { return }
-        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [
-            CHHapticEventParameter(parameterID: .hapticIntensity, value: Float(max(0, min(1, intensity)))),
-            CHHapticEventParameter(parameterID: .hapticSharpness, value: Float(max(0, min(1, sharpness)))),
-        ], relativeTime: 0)
         do {
-            let player = try engine.makePlayer(with: CHHapticPattern(events: [event], parameters: []))
+            let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: []))
             try player.start(atTime: CHHapticTimeImmediate)
         } catch {}
     }
 
-    /// Release "pop": 0.3...0.7 depending on how hard it was let go (參數表).
-    func pop(strength: Double) {
-        transient(intensity: 0.3 + 0.4 * max(0, min(1, strength)), sharpness: 0.45)
+    private func tap(intensity: Double, sharpness: Double, at time: Double) -> CHHapticEvent {
+        CHHapticEvent(eventType: .hapticTransient, parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: clamp01(intensity)),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: clamp01(sharpness)),
+        ], relativeTime: time)
+    }
+
+    /// One-shot tap. `intensity` 0...1.
+    func transient(intensity: Double, sharpness: Double) {
+        play([tap(intensity: intensity, sharpness: sharpness, at: 0)])
+    }
+
+    /// Release pop: `count` taps in one pattern, `gap` seconds apart, each `decay` of the previous
+    /// (提案第 14 條: clay one, mochi two, jelly three). Intensity runs minIntensity...maxIntensity with `strength`.
+    func pop(strength: Double, count: Int, gap: Double, decay: Double, sharpness: Double, minIntensity: Double, maxIntensity: Double) {
+        var amp = minIntensity + (maxIntensity - minIntensity) * max(0, min(1, strength))
+        var events: [CHHapticEvent] = []
+        for k in 0..<max(1, min(6, count)) {
+            events.append(tap(intensity: amp, sharpness: sharpness, at: Double(k) * max(0.03, gap)))
+            amp *= decay
+        }
+        play(events)
+    }
+
+    /// Texture tick (提案第 13 條): queued; `flush()` plays everything queued this frame as one pattern.
+    func tick(intensity: Double, sharpness: Double) {
+        pendingTicks.append((clamp01(intensity), clamp01(sharpness)))
+    }
+
+    func flush() {
+        guard !pendingTicks.isEmpty else { return }
+        let ticks = pendingTicks
+        pendingTicks.removeAll()
+        var events: [CHHapticEvent] = []
+        for (k, t) in ticks.enumerated() {
+            events.append(tap(intensity: Double(t.intensity), sharpness: Double(t.sharpness), at: Double(k) * 0.004))
+        }
+        play(events)
     }
 }

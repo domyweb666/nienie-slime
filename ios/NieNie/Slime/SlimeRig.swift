@@ -5,7 +5,8 @@ import Foundation
 enum SlimeEvent {
     case press(gain: Double)                 // a finger landed on the body
     case pull(gain: Double, rate: Double)    // stretched past another step
-    case release(gain: Double, rate: Double) // let go; gain follows release speed
+    case release(gain: Double, rate: Double, special: Bool) // let go; gain follows release strength; special = 偶發特別回彈
+    case tick(gain: Double)                  // texture tick while kneading (提案第 13 條)
     case tap                                 // VoiceOver / buttons
 }
 
@@ -62,6 +63,8 @@ final class SlimeRig {
     private var builtSeed = -1.0, builtFloppy = -1.0, builtSpace = -1.0, builtRad = -1.0
     private var relaxUntil = -1.0            // 揉回原形: until when the remembered shape eases back to the original
     private(set) var lastReleaseStrength = 0.0
+    private var tLife = 0.0                                                // idle-life clock, runs only while untouched (提案第 19 條)
+    private var releaseCount = 0, nextSpecial = 0, specialUntil = -1.0     // 偶發特別回彈 (提案第 2 條)
 
     final class Finger {
         enum Mode { case grab, push, none }
@@ -74,6 +77,8 @@ final class SlimeRig {
         var travel = 0.0, travelFrame = 0.0          // true distance travelled (coalesced touches): total, and since the last update
         var speedC = 0.0                             // smoothed travel rate, drives the rub sound
         var radius = 0.0                             // UITouch.majorRadius, points (0 = unknown)
+        var r0 = 0.0, prS = 0.0                      // radius baseline at landing, smoothed radius pressure 0...1 (提案第 9 條)
+        var tickAt = 0.0, tickNext = 0.0             // texture ticks: travel at the last tick, spacing to the next (提案第 13 條)
         var step = 0
         var stretch = 0.0                            // tanh-limited stretch at the last update, in radii
         let tDown: Double                            // rig time when the finger landed (dwell for plasticity)
@@ -279,6 +284,7 @@ final class SlimeRig {
         A0 = polygonArea()
         builtSeed = params.seed; builtFloppy = params.floppy
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
+        tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3
     }
 
@@ -355,7 +361,7 @@ final class SlimeRig {
         guard N > 0 else { return }
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
-        f.radius = radius
+        f.radius = radius; f.r0 = radius
         if grab {
             // mem: particle, offset from the finger, follow weight, and the spread direction for the press
             // (unit vector away from the finger × (1 − u²)², so the patch squashes flat under the finger)
@@ -406,9 +412,22 @@ final class SlimeRig {
             // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
             let sv = min(1, f.peak / R / 6)
             let ss = pow(min(1, f.stretch / max(0.01, params.maxPull)), 1.5)
-            let s = max(sv, ss)
+            var s = max(sv, ss)
+            // 偶發特別回彈 (提案第 2 條): every `specialEvery` releases (±2) one comes back extra bouncy for 0.35 s
+            var special = false
+            releaseCount += 1
+            if params.specialEvery > 0 {
+                let every = Int(params.specialEvery.rounded())
+                if nextSpecial == 0 { nextSpecial = max(1, every + Int.random(in: -2...2)) }
+                if releaseCount >= nextSpecial {
+                    special = true
+                    specialUntil = t + 0.35
+                    nextSpecial = max(releaseCount + 1, releaseCount + every + Int.random(in: -2...2))
+                    s = min(1, s * 1.3)
+                }
+            }
             lastReleaseStrength = s
-            onEvent?(.release(gain: 0.35 + 0.65 * s, rate: 1 + 0.1 * s))
+            onEvent?(.release(gain: 0.35 + 0.65 * s, rate: 1 + 0.1 * s, special: special))
         }
     }
 
@@ -451,7 +470,7 @@ final class SlimeRig {
     func stretchUp() {
         guard N > 0 else { return }
         for i in 0..<N where Q0Y[i] < -R * 0.3 && !GRAB[i] { PY[i] += R * 0.02 }
-        onEvent?(.release(gain: 0.6, rate: 1))
+        onEvent?(.release(gain: 0.6, rate: 1, special: false))
     }
 
     // MARK: - Per-frame
@@ -502,12 +521,30 @@ final class SlimeRig {
                 // holding still (slower than one radius per second) sinks it deeper over `pressHoldTime`.
                 let still = hypot(f.vxS, f.vyS) < R
                 f.hold = max(0, min(1, f.hold + (still ? dt / max(0.05, mat.pressHoldTime) : -dt / 0.3)))
-                let target = R * (mat.pressBase + mat.pressHold * f.hold)
+                // 提案第 9 條: contact size (majorRadius) as pressure. Baseline = smallest radius in the first
+                // 100 ms after landing; every extra 8 pt of radius is one unit, smoothed over 50 ms.
+                if f.radius > 0 {
+                    if f.r0 <= 0 || (t - f.tDown < 0.1 && f.radius < f.r0) { f.r0 = f.radius }
+                    let pr = max(0, min(1, (f.radius - f.r0) / 8))
+                    f.prS += (pr - f.prS) * (1 - exp(-dt / 0.05))
+                }
+                let target = R * (mat.pressBase + mat.pressHold * f.hold + 0.15 * mat.pressRadiusGain * f.prS)
                 if !f.pressOn {
                     f.press = target * mat.pressFirst
                     f.pressOn = true
                 } else {
                     f.press += (target - f.press) * (1 - exp(-dt / max(0.005, mat.pressRise)))
+                }
+                // 提案第 13 條: texture ticks, one every `tickSpacing` points of real travel (±30%), at most two a frame
+                if mat.tickSpacing > 0 {
+                    if f.tickNext <= 0 { f.tickNext = mat.tickSpacing; f.tickAt = f.travel }
+                    var ticks = 0
+                    while f.travel - f.tickAt >= f.tickNext && ticks < 2 {
+                        f.tickAt += f.tickNext
+                        f.tickNext = mat.tickSpacing * (0.7 + 0.6 * Double.random(in: 0..<1))
+                        ticks += 1
+                        onEvent?(.tick(gain: min(1, f.speedC / (R * 3))))
+                    }
                 }
             }
         }
@@ -515,6 +552,12 @@ final class SlimeRig {
         // idle life: only when nobody is touching, fading in over a second after release
         let idle = fingers.isEmpty ? min(1, max(0, (t - lastTouch - 0.8) / 1.2)) : 0
         let L = idle * (reduceMotion ? 0.5 : 1)
+        // 提案第 19 條: with idleFreeze the idle motion keeps its amplitude and only its clock stops while touched
+        // (the body holds its breath instead of snapping to the rest pose); L still gates twitch, wander and sway
+        tLife += dt * L
+        let freeze = mat.idleFreeze >= 0.5
+        let Lamp = freeze ? (reduceMotion ? 0.5 : 1) : L
+        let tl = freeze ? tLife : t
 
         // wandering home: pick a spot, walk there, rest a while; stop when touched
         if L > 0.5 && mat.wander > 0 {
@@ -540,14 +583,18 @@ final class SlimeRig {
 
         let n = max(1, Int((dt * 240).rounded()))
         let sdt = dt / Double(n)
-        for _ in 0..<n { substep(sdt, L) }
+        for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         plasticity(dt)
         twitch(L)
     }
 
-    private func substep(_ dt: Double, _ L: Double) {
+    /// `L` gates rate-like idle motion (sway, twitch gating); `Lamp` and `tl` are the amplitude and clock
+    /// of the phase-based idle motion (breathing, wriggle, drift, float), frozen while touched with idleFreeze.
+    private func substep(_ dt: Double, _ L: Double, _ Lamp: Double, _ tl: Double) {
         let mat = params
-        let damp = mat.damp, alpha = mat.alpha
+        // 偶發特別回彈: for 0.35 s after a special release the body is stiffer and less damped, so it wobbles once more
+        let special = t < specialUntil
+        let damp = min(0.995, mat.damp + (special ? 0.03 : 0)), alpha = mat.alpha * (special ? 1.25 : 1)
         // 1 Verlet
         for i in 0..<N {
             let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
@@ -579,19 +626,19 @@ final class SlimeRig {
             }
         }
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
-        let bs = L * mat.life * 0.045 * sin(t * 2 * .pi / 3.8), bsx = 1 + bs, bsy = 1 - bs * 0.85
-        let wr = L * mat.life * mat.wriggle * R, swA = L * mat.life * mat.drift * R, iR = 1 / R
+        let bs = Lamp * mat.life * 0.045 * sin(tl * 2 * .pi / 3.8), bsx = 1 + bs, bsy = 1 - bs * 0.85
+        let wr = Lamp * mat.life * mat.wriggle * R, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
         for i in 0..<N {
             var ex = QX[i], ey = QY[i]
             if wr != 0 {
                 let qx = ex * iR, qy = ey * iR
-                ex += wr * (0.6 * sin(1.7 * qy + t * 1.3 + 0.3) + 0.4 * sin(2.3 * qx - t * 1.0 + 1.7))
-                ey += wr * (0.6 * sin(1.9 * qx - t * 1.1 + 2.1) + 0.4 * sin(2.1 * qy + t * 1.6 + 0.6))
+                ex += wr * (0.6 * sin(1.7 * qy + tl * 1.3 + 0.3) + 0.4 * sin(2.3 * qx - tl * 1.0 + 1.7))
+                ey += wr * (0.6 * sin(1.9 * qx - tl * 1.1 + 2.1) + 0.4 * sin(2.1 * qy + tl * 1.6 + 0.6))
             }
             let k = TID[i]
             if k >= 0 && swA != 0 {
                 let tt = tent[k], u = TUB[i], kd = Double(k)
-                let phv = (sin(t * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(t * 2 * .pi / (1.9 + kd * 0.4) + kd)) * swA * u * u
+                let phv = (sin(tl * 2 * .pi / (4.2 + kd * 0.9) + kd * 2.1) + 0.35 * sin(tl * 2 * .pi / (1.9 + kd * 0.4) + kd)) * swA * u * u
                 ex += -tt.uy * phv; ey += tt.ux * phv
             }
             EX[i] = ex; EY[i] = ey
@@ -658,8 +705,8 @@ final class SlimeRig {
         //    Different groups may overlap (one in front of the other), otherwise a pulled-across tentacle gets stuck.
         collide()
         // 4 home (float), bounds
-        let hx = homeX + L * mat.life * R * 0.035 * sin(t * 2 * .pi / 7.3)
-        let hy = homeY + L * mat.life * R * 0.05 * sin(t * 2 * .pi / 4.7)
+        let hx = homeX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
+        let hy = homeY + Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7)
         let kh = 0.02 * (grabbing ? mat.anchor : 1), dx = hx - gcx, dy = hy - gcy
         let padT = 90.0, padB = H - 120, padL = 8.0, padR = W - 8
         for i in 0..<N {
@@ -682,6 +729,10 @@ final class SlimeRig {
     }
 
     private func collide() {
+        // 0.6h is below every rest spacing, so it never fights shape matching.
+        // Known limit (2026-11-01): particle non-penetration cannot stop a *segment* crossing. Pushing a tentacle's
+        // root towards its tip (compressing it) occasionally folds it for a few frames; widening the boundary-to-boundary
+        // distance to 1.2h was tried and did not help. Candidate fixes: 手感精修提案 第 41 條.
         let dmin = h * 0.6, dmin2 = dmin * dmin, inv = 1 / dmin
         var grid: [Int: [Int]] = [:]
         grid.reserveCapacity(N)
@@ -791,11 +842,18 @@ final class SlimeRig {
         var sp = 0.0
         // smoothed travel rate from coalesced touches (a per-frame difference flickers at 120 Hz)
         for f in fingers.values where f.mode == .grab { sp = max(sp, f.speedC / R) }
-        return fingers.isEmpty ? 0 : min(1, sp / 5) * 0.7
+        return fingers.isEmpty ? 0 : min(1, sp / 5)   // the controller scales this by `rubMax`
     }
 
     /// Largest UITouch.majorRadius among the fingers down (for the panel readout).
     var maxTouchRadius: Double { fingers.values.map { $0.radius }.max() ?? 0 }
+
+    /// How close the most-stretched grabbing finger is to the stretch limit, 0...1 (sharpness bonus, 提案第 15 條).
+    var stretchLevel: Double {
+        var m = 0.0
+        for f in fingers.values where f.mode == .grab { m = max(m, f.stretch / max(0.01, params.maxPull)) }
+        return min(1, m)
+    }
 
     /// How far the body is from its rest fit right now, 0...1 (drives continuous haptics while touched).
     var deformation: Double {

@@ -5,6 +5,8 @@ import UIKit
 /// press (finger lands), pull (stretched past a step), release (let go), rub (looped while kneading).
 protocol SlimeSoundSource: AnyObject {
     var muted: Bool { get set }
+    var master: Double { get set }
+    var pitchJitter: Double { get set }
     func press(gain: Double)
     func pull(gain: Double, rate: Double)
     func release(gain: Double, rate: Double)
@@ -14,12 +16,12 @@ protocol SlimeSoundSource: AnyObject {
 
 /// Recorded-sample bank. Reads `manifest.json` from the app bundle (same format as the web
 /// prototype: {"press":[...], "pull":[...], "release":[...], "rub":[...]}) and the listed audio
-/// files next to it. Each play picks a random take and shifts pitch by ±8%. With no files it
+/// files next to it. Each play picks a random take and shifts pitch by ±`pitchJitter`. With no files it
 /// stays silent. Uses the `.ambient` session, so the ring/silent switch mutes it.
 final class SlimeAudio: SlimeSoundSource {
-    var muted = false {
-        didSet { engine.mainMixerNode.outputVolume = muted ? 0 : 0.9 }
-    }
+    var muted = false { didSet { applyVolume() } }
+    var master = 0.9 { didSet { applyVolume() } }
+    var pitchJitter = 0.08
 
     private let engine = AVAudioEngine()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
@@ -35,11 +37,12 @@ final class SlimeAudio: SlimeSoundSource {
     private var rubPlaying = false
     private var rubTarget = 0.0
 
-    let pitchJitter = 0.08
-
     init() {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+        // 提案第 10 條: a short IO buffer so the sound lands closer to the touch and the haptic
+        // (the default is around 20 ms; the real value shows in the panel readout)
+        try? session.setPreferredIOBufferDuration(0.005)
         try? session.setActive(true)
 
         for _ in 0..<6 {
@@ -48,7 +51,7 @@ final class SlimeAudio: SlimeSoundSource {
             voices.append(v)
         }
         attach(rubVoice)
-        engine.mainMixerNode.outputVolume = 0.9
+        applyVolume()
         engine.prepare()
         loadBank()
         startEngine()
@@ -66,6 +69,10 @@ final class SlimeAudio: SlimeSoundSource {
         nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.startEngine()
         }
+    }
+
+    private func applyVolume() {
+        engine.mainMixerNode.outputVolume = muted ? 0 : Float(max(0, min(1, master)))
     }
 
     private func attach(_ v: Voice) {
@@ -128,6 +135,8 @@ final class SlimeAudio: SlimeSoundSource {
 
     // MARK: - Playing
 
+    private func jitter() -> Double { 1 + Double.random(in: -pitchJitter...pitchJitter) }
+
     private func play(_ kind: String, gain: Double, rate: Double) {
         guard !muted, let takes = bank[kind], !takes.isEmpty else { return }
         startEngine()
@@ -135,7 +144,7 @@ final class SlimeAudio: SlimeSoundSource {
         let v = voices[nextVoice]
         nextVoice = (nextVoice + 1) % voices.count
         v.player.stop()
-        v.speed.rate = Float(rate * (1 + Double.random(in: -pitchJitter...pitchJitter)))
+        v.speed.rate = Float(rate * jitter())
         v.player.volume = Float(max(0, min(1, gain)))
         v.player.scheduleBuffer(takes[Int.random(in: 0..<takes.count)], at: nil, options: [], completionHandler: nil)
         v.player.play()
@@ -152,7 +161,7 @@ final class SlimeAudio: SlimeSoundSource {
             startEngine()
             guard engine.isRunning else { return }
             rubVoice.player.stop()
-            rubVoice.speed.rate = Float(1 + Double.random(in: -pitchJitter...pitchJitter))
+            rubVoice.speed.rate = Float(jitter())
             rubVoice.player.volume = 0
             rubVoice.player.scheduleBuffer(takes[Int.random(in: 0..<takes.count)], at: nil, options: [.loops], completionHandler: nil)
             rubVoice.player.play()
