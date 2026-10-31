@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.1 觸手</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.2 蠕動</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -54,7 +54,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.1</span></div>
+  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.2</span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="聲音">🔈</button>
 </div>
 
@@ -92,9 +92,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.10},
-  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.10},
-  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:3,  recover:.03, grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.08},
+  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.07,wander:.25},
+  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.07,wander:.25},
+  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:3,  recover:.03, grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.06,wander:.22},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -114,7 +114,9 @@ const F=[
   ['areaGain','面積壓力','壓扁時旁邊鼓出來的程度',0,1.5,.05],
   ['gripRot','抓著時不轉','越大拉它時身體越不會歪掉',1,8,.5],
   ['life','活物感','沒碰時自己動的幅度',0,1.5,.05],
-  ['drift','觸手飄動','沒碰時觸手擺動的幅度（×半徑）',0,.3,.01],
+  ['drift','觸手飄動','沒碰時觸手擺動的幅度（×半徑）',0,.4,.01],
+  ['wriggle','蠕動','沒碰時整個身體輪廓慢慢變形的幅度（×半徑）',0,.2,.01],
+  ['wander','遊走','沒碰時在畫面裡移動的速度（×半徑／秒）',0,1,.05],
   ['floppy','觸手軟度','越大觸手末端越軟、越會甩',0,.9,.05],
   ['seed','外形亂數種子','換一個數字就換一個形狀（會重置）',1,30,1],
 ];
@@ -123,15 +125,17 @@ let FLOAT=true;
 
 /* ---------- 世界 ---------- */
 let W,H,DPR,R,CX,CY,GROUND,HOMEX,HOMEY,h;
-let N=0,X,Y,PX,PY,Q0X,Q0Y,QX,QY,GX,GY,GW,RX,RY,GRAB,TID,TU,KF,EX,EY;
+let N=0,X,Y,PX,PY,Q0X,Q0Y,QX,QY,GX,GY,GW,RX,RY,GRAB,TID,TU,TUB,KF,EX,EY;
 let bnd=[];          // 邊界粒子索引，依角度順序
 let bndL=[];         // 相鄰邊界粒子的靜止距離
+let BIDX;            // 每顆粒子在邊界環上的序號，-1 = 內部
 let clusters=[];     // {idx,w,cs,sn,xc,yc,qcx,qcy}
 let globalC=null;
 let hiIdx=0;         // 亮光跟著哪顆粒子
 let lastC={cSpace:0,cRad:0};
 let lastShape={seed:7,floppy:0};
 let t=0,last=0,lastTouch=-10,nextTwitch=3,A0=1;
+const WANDER={dx:0,dy:0,next:3,moving:false};
 
 /* ---------- 外形：癱軟的不規則團塊＋觸手（多米 10-31：要觸手、不要完整形體） ---------- */
 let TENT=[],PH=[];   // 觸手定義、團塊的亂數相位
@@ -145,7 +149,8 @@ function defineShape(){
   TENT=base.map(([deg,L,w])=>{const a=(deg+(r()-.5)*22)*Math.PI/180;
     // curl：靜止時就彎（正負隨機）；droop：越橫、越朝上的觸手越往下垂
     const curl=(r()-.5)*.6,droop=.15+.3*Math.max(0,-Math.sin(a));
-    return{a,ux:Math.cos(a),uy:Math.sin(a),L:L*(.85+r()*.3),w:w*(.85+r()*.3),curl,droop}});
+    return{a,ux:Math.cos(a),uy:Math.sin(a),L:L*(.85+r()*.3),w:w*(.85+r()*.3),curl,droop,uExit:0}});
+  for(const t of TENT){const b=blobR(t.a);t.uExit=Math.min(.8,Math.max(0,(b*.95-b*.35)/(t.L-b*.35)))}
 }
 function blobR(a){let d=a-PH[3];d=Math.atan2(Math.sin(d),Math.cos(d));
   return .78+.10*Math.sin(2*a+PH[0])+.07*Math.sin(3*a+PH[1])+.04*Math.sin(5*a+PH[2])+.24*Math.exp(-((d/.38)**2))}   // ×R，最後一項是頭頂鼓包
@@ -153,7 +158,7 @@ function blobR(a){let d=a-PH[3];d=Math.atan2(Math.sin(d),Math.cos(d));
 function tentHit(x,y){let best=null;
   for(let k=0;k<TENT.length;k++){const t=TENT[k],r0=blobR(t.a)*R*.35,sx=t.ux*r0,sy=t.uy*r0,ex=t.ux*t.L*R,ey=t.uy*t.L*R;
     const dx=ex-sx,dy=ey-sy,len2=dx*dx+dy*dy;let u=((x-sx)*dx+(y-sy)*dy)/len2;u=Math.max(0,Math.min(1,u));
-    const px=sx+dx*u,py=sy+dy*u,d=Math.hypot(x-px,y-py),w=t.w*R*(1-.22*u);
+    const px=sx+dx*u,py=sy+dy*u,d=Math.hypot(x-px,y-py),w=t.w*R*(1-.12*u);
     if(d<w&&(!best||d/w<best.q))best={k,u,q:d/w}}
   return best}
 function inside(x,y){const a=Math.atan2(y,x);if(Math.hypot(x,y)<blobR(a)*R)return true;return tentHit(x,y)!==null}
@@ -180,23 +185,27 @@ function setup(){
     for(let gx=-2.7*R+(row%2?h/2:0);gx<=2.7*R;gx+=h){
       if(!inside(gx,gy))continue;
       let dmin=1e9;for(let b=0;b<M;b++){const d=Math.hypot(pts[b][0]-gx,pts[b][1]-gy);if(d<dmin)dmin=d}
-      if(dmin>h*.62)pts.push([gx,gy]);
+      if(dmin>h*.7)pts.push([gx,gy]);
     }
   }
   N=pts.length;
   X=new Float64Array(N);Y=new Float64Array(N);PX=new Float64Array(N);PY=new Float64Array(N);
   Q0X=new Float64Array(N);Q0Y=new Float64Array(N);QX=new Float64Array(N);QY=new Float64Array(N);
   GX=new Float64Array(N);GY=new Float64Array(N);GW=new Float64Array(N);RX=new Float64Array(N);RY=new Float64Array(N);
-  GRAB=new Uint8Array(N);TID=new Int8Array(N);TU=new Float64Array(N);KF=new Float64Array(N);EX=new Float64Array(N);EY=new Float64Array(N);
+  GRAB=new Uint8Array(N);TID=new Int8Array(N);TU=new Float64Array(N);TUB=new Float64Array(N);KF=new Float64Array(N);EX=new Float64Array(N);EY=new Float64Array(N);
   for(let i=0;i<N;i++){Q0X[i]=QX[i]=pts[i][0];Q0Y[i]=QY[i]=pts[i][1];X[i]=PX[i]=CX+pts[i][0];Y[i]=PY[i]=CY+pts[i][1];
     const ht=tentHit(pts[i][0],pts[i][1]);const inBlob=Math.hypot(pts[i][0],pts[i][1])<blobR(Math.atan2(pts[i][1],pts[i][0]))*R*.9;
-    if(ht&&!inBlob){TID[i]=ht.k;TU[i]=ht.u;KF[i]=1-mat.floppy*ht.u}else{TID[i]=-1;TU[i]=0;KF[i]=1}}
+    if(ht&&!inBlob){TID[i]=ht.k;TU[i]=ht.u;const ue=TENT[ht.k].uExit;TUB[i]=Math.max(0,(ht.u-ue)/(1-ue));KF[i]=1-mat.floppy*ht.u}else{TID[i]=-1;TU[i]=0;TUB[i]=0;KF[i]=1}}
   // 靜止姿態：觸手彎＋垂。對參考形狀做平滑形變，邊界與內部一起動，所以邊界順序仍然成立
-  for(let i=0;i<N;i++){const k=TID[i];if(k<0)continue;const tt=TENT[k],u=TU[i],u2=u*u;
+  for(let i=0;i<N;i++){const k=TID[i];if(k<0)continue;const tt=TENT[k],u=TUB[i],u2=u*u;
     const bx=-tt.uy*tt.curl*u2*R*.45,by=tt.ux*tt.curl*u2*R*.45+tt.droop*u2*R;
     Q0X[i]+=bx;Q0Y[i]+=by;QX[i]=Q0X[i];QY[i]=Q0Y[i];X[i]=PX[i]=CX+Q0X[i];Y[i]=PY[i]=CY+Q0Y[i]}
+  // Q0 置中成零均值（跟 plasticity 每幀的置中同一個基準；否則觸手記憶淡化會把觸手拉向另一個基準，交界被一點一點拉開）
+  {let mx=0,my=0;for(let i=0;i<N;i++){mx+=Q0X[i];my+=Q0Y[i]}mx/=N;my/=N;
+    for(let i=0;i<N;i++){Q0X[i]-=mx;Q0Y[i]-=my;QX[i]=Q0X[i];QY[i]=Q0Y[i];X[i]=PX[i]=CX+Q0X[i];Y[i]=PY[i]=CY+Q0Y[i]}}
   buildClusters();
   bndL=bnd.map((i,k)=>{const j=bnd[(k+1)%bnd.length];return Math.hypot(Q0X[j]-Q0X[i],Q0Y[j]-Q0Y[i])});
+  BIDX=new Int32Array(N).fill(-1);bnd.forEach((i,k)=>{BIDX[i]=k});
   // 亮光粒子：團塊左上
   let bd=1e9;for(let i=0;i<N;i++){if(TID[i]>=0)continue;const d=Math.hypot(Q0X[i]+R*.28,Q0Y[i]+R*.32);if(d<bd){bd=d;hiIdx=i}}
   fingers.clear();GRAB.fill(0);lastShape={seed:mat.seed,floppy:mat.floppy};
@@ -287,12 +296,17 @@ function substep(dt,L){
     }
   }
   // 活物：呼吸。寫在「參考形狀」上（所有區塊一致），不是寫在目標上，否則小區塊會跟著滑開拉不回來
-  const bs=L*mat.life*.03*Math.sin(t*2*Math.PI/3.8),bsx=1+bs,bsy=1-bs*.85;
-  // 活物：觸手飄。每條觸手不同週期與相位，末端擺幅大；也寫在參考形狀上
-  const swA=L*mat.life*mat.drift*R;
-  for(let i=0;i<N;i++){EX[i]=QX[i];EY[i]=QY[i];const k=TID[i];if(k<0||swA===0)continue;
-    const tt=TENT[k],ph=Math.sin(t*2*Math.PI/(4.2+k*.9)+k*2.1)*swA*TU[i]*TU[i];
-    EX[i]+=-tt.uy*ph;EY[i]+=tt.ux*ph}
+  const bs=L*mat.life*.045*Math.sin(t*2*Math.PI/3.8),bsx=1+bs,bsy=1-bs*.85;
+  // 活物：蠕動。幾個慢速行進波掃過參考形狀，輪廓每一刻都在變（多米：平常就要在蠕動）
+  const wr=L*mat.life*mat.wriggle*R,swA=L*mat.life*mat.drift*R,iR=1/R;
+  for(let i=0;i<N;i++){let ex=QX[i],ey=QY[i];
+    if(wr!==0){const qx=ex*iR,qy=ey*iR;
+      ex+=wr*(.6*Math.sin(1.7*qy+t*1.3+.3)+.4*Math.sin(2.3*qx-t*1.0+1.7));
+      ey+=wr*(.6*Math.sin(1.9*qx-t*1.1+2.1)+.4*Math.sin(2.1*qy+t*1.6+.6))}
+    const k=TID[i];
+    if(k>=0&&swA!==0){const tt=TENT[k],u=TUB[i],ph=(Math.sin(t*2*Math.PI/(4.2+k*.9)+k*2.1)+.35*Math.sin(t*2*Math.PI/(1.9+k*.4)+k))*swA*u*u;
+      ex+=-tt.uy*ph;ey+=tt.ux*ph}
+    EX[i]=ex;EY[i]=ey}
   // 3 形狀匹配
   GX.fill(0);GY.fill(0);GW.fill(0);
   globalC.w=mat.wGlobal;
@@ -343,10 +357,23 @@ function substep(dt,L){
   if(sway!==0)for(let i=0;i<N;i++){if(GRAB[i])continue;const dx=X[i]-cx,dy=Y[i]-cy,mx=-dy*sway,my=dx*sway;X[i]+=mx;Y[i]+=my;PX[i]+=mx;PY[i]+=my}
   // 3b 邊界像一條繩子：相鄰邊界粒子距離夾在 [0.55, 2.4] 倍靜止距離，一顆不能被單獨拽走（防自交）
   {const n=bnd.length;for(let pass=0;pass<2;pass++)for(let k=0;k<n;k++){const i=bnd[k],j=bnd[(k+1)%n];
-    const dx=X[j]-X[i],dy=Y[j]-Y[i],d=Math.hypot(dx,dy)||1e-6,l0=bndL[k],lo=l0*.55,hi=l0*2.4;
+    const tent=TID[i]>=0||TID[j]>=0;
+    const dx=X[j]-X[i],dy=Y[j]-Y[i],d=Math.hypot(dx,dy)||1e-6,l0=bndL[k],lo=l0*.6,hi=l0*(tent?1.7:2.4);
     let c=0;if(d>hi)c=(d-hi)/d;else if(d<lo)c=(d-lo)/d;if(c===0)continue;
     const wi=GRAB[i]?.15:.5,wj=GRAB[j]?.15:.5,sw=wi+wj;
     X[i]+=dx*c*wi/sw;Y[i]+=dy*c*wi/sw;X[j]-=dx*c*wj/sw;Y[j]-=dy*c*wj/sw}}
+  // 3c 粒子互不穿透：最小距離 0.6h（靜止時最近的兩顆約 0.7h，所以靜止時不作用），用格子雜湊找鄰居。只在「同一條觸手內」與「身體內」擋（防拉細、防對折）；
+  //    不同觸手之間、觸手與身體之間允許交疊（2D 裡就是一條在前面），否則拉過去的觸手會被卡住解不開
+  {const dmin=h*.6,dmin2=dmin*dmin,cs=dmin,inv=1/cs;const grid=new Map();   // 0.6h：低於任何靜止間距，不會跟形狀匹配打架
+    for(let i=0;i<N;i++){const key=((X[i]*inv)|0)*73856+((Y[i]*inv)|0);let a=grid.get(key);if(!a){a=[];grid.set(key,a)}a.push(i)}
+    for(let i=0;i<N;i++){const gx=(X[i]*inv)|0,gy=(Y[i]*inv)|0;
+      for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const a=grid.get((gx+ox)*73856+(gy+oy));if(!a)continue;
+        for(const j of a){if(j<=i||TID[j]!==TID[i])continue;
+          // 邊界環上相鄰幾顆（凹角處直線距離本來就近）交給繩子約束管，不在這裡推，否則凹角會被推成一個圈
+          if(BIDX[i]>=0&&BIDX[j]>=0){const nb=bnd.length,di=Math.abs(BIDX[i]-BIDX[j]);if(Math.min(di,nb-di)<=8)continue}
+          const dx=X[j]-X[i],dy=Y[j]-Y[i],d2=dx*dx+dy*dy;if(d2>=dmin2||d2<1e-9)continue;
+          const d=Math.sqrt(d2),c=(dmin-d)/d,wi=GRAB[i]?.3:1,wj=GRAB[j]?.3:1,sw=wi+wj;
+          X[i]-=dx*c*wi/sw;Y[i]-=dy*c*wi/sw;X[j]+=dx*c*wj/sw;Y[j]+=dy*c*wj/sw}}}}
   // 4 回家（懸空時較強），邊界，地面
   const hx=HOMEX+L*mat.life*R*.035*Math.sin(t*2*Math.PI/7.3),hy=HOMEY+(FLOAT?L*mat.life*R*.05*Math.sin(t*2*Math.PI/4.7):0);
   const kh=(FLOAT?.02:.006)*(grabbing?mat.anchor:1),dx=hx-cx,dy=hy-cy;
@@ -368,13 +395,15 @@ function plasticity(dt){
   if(touched){
     const yl=mat.yield*R,kc=Math.min(1,mat.creep*dt);
     if(kc>0)for(let i=0;i<N;i++){const rx=RX[i]/cnt[i],ry=RY[i]/cnt[i],dx=rx-QX[i],dy=ry-QY[i],dl=Math.hypot(dx,dy);
-      if(dl>yl){const s=(1-yl/dl)*kc;QX[i]+=dx*s;QY[i]+=dy*s;
+      if(dl>yl){const s=(1-yl/dl)*kc*(TID[i]>=0?1-.85*TU[i]:1);QX[i]+=dx*s;QY[i]+=dy*s;
         const ex=QX[i]-Q0X[i],ey=QY[i]-Q0Y[i],el=Math.hypot(ex,ey),lim=R*1.1;
         if(el>lim){QX[i]=Q0X[i]+ex*lim/el;QY[i]=Q0Y[i]+ey*lim/el}}}
   }else{
     const kr=Math.min(1,mat.recover*dt);
     if(kr>0)for(let i=0;i<N;i++){QX[i]+=(Q0X[i]-QX[i])*kr;QY[i]+=(Q0Y[i]-QY[i])*kr}
   }
+  // 觸手的記憶很淡：不管有沒有被碰，末端都會慢慢彈回原本的長度與粗細（身體才是黏土）
+  {const kt=Math.min(1,.8*dt);for(let i=0;i<N;i++){if(TID[i]<0)continue;const w=kt*TU[i];QX[i]+=(Q0X[i]-QX[i])*w;QY[i]+=(Q0Y[i]-QY[i])*w}}
   // 參考形狀重新置中，避免慢慢漂
   let mx=0,my=0;for(let i=0;i<N;i++){mx+=QX[i];my+=QY[i]}mx/=N;my/=N;
   for(let i=0;i<N;i++){QX[i]-=mx;QY[i]-=my}
@@ -410,6 +439,13 @@ function update(dt){
   // 活物感：沒人碰才開，放手後 1 秒內淡入
   const idle=fingers.size?0:Math.min(1,Math.max(0,(t-lastTouch-.8)/1.2));
   const L=idle*(REDUCED?.5:1);
+  // 活物：遊走。沒碰時家會慢慢移動，走一段、停一下；碰它就停在原地
+  if(L>.5&&mat.wander>0){
+    if(!WANDER.moving&&t>WANDER.next){WANDER.dx=CX+(Math.random()-.5)*W*.36;WANDER.dy=CY+(Math.random()-.5)*H*.16;WANDER.moving=true}
+    if(WANDER.moving){const sp=mat.wander*R*dt*L,ddx=WANDER.dx-HOMEX,ddy=WANDER.dy-HOMEY,dl=Math.hypot(ddx,ddy);
+      if(dl<sp*2){HOMEX=WANDER.dx;HOMEY=WANDER.dy;WANDER.moving=false;WANDER.next=t+1.5+Math.random()*5}
+      else{HOMEX+=ddx/dl*sp;HOMEY+=ddy/dl*sp}}
+  }else if(fingers.size){WANDER.moving=false;WANDER.next=t+2+Math.random()*3}
   const sdt=dt/SUB;
   for(let s=0;s<SUB;s++)substep(sdt,L);
   plasticity(dt);
