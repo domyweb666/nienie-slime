@@ -39,7 +39,9 @@ v2.3（2026-11-01，手感精修提案第一批）加的：按下去那塊往四
 
 ## 第一次上傳 TestFlight 要準備的東西
 
-2026-10-31 已照這份走完一次，build 0.1.0 (22) 上傳成功。之後只要做第 6 步。
+2026-10-31 已照這份走完一次，build 0.1.0 (22) 上傳成功；2026-11-01 build 0.2.0 (29)、(35) 也成功。之後只要做第 6 步。
+
+簽名的做法（2026-11-01 改）：archive 那步不簽名，export 時才用雲端管理的 Apple Distribution 憑證簽。原本 archive 用自動簽名，每次全新的 CI 機器都會新建一張 Apple Development 憑證，Apple 兩張就滿額（run #33 失敗）。帳號裡 CI 建的那幾張 Development 憑證可以到 developer.apple.com → Certificates 刪掉，留著也沒影響。
 
 以下都在 Apple 的網站上操作，用 Windows 瀏覽器就可以。TestFlight 內部測試不是公開上架：不經審核，只有你加進去的人（最多 100 人）能裝。
 

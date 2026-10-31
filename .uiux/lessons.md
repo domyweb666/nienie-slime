@@ -18,3 +18,4 @@
 | 2026-11-01 | feel／CI | 觸發 TestFlight 上傳（workflow_dispatch）之後又推了一個 docs commit 到同一分支，workflow 的 concurrency 設 cancel-in-progress，上傳 run #26 被新 push 的編譯 run 取消，要重新觸發 | 要上傳 TestFlight 時，先把該推的全部推完、等編譯過，再觸發 dispatch；觸發後到上傳完成之前不推同一分支 |
 | 2026-11-01 | feel／VibeRails | 之前的程式自測只在動作「終點」量自交，抓不到過程：抓觸手根部往尖端推（壓縮）時，大約一半的次數中途對折幾幀，v2.2 就有，Agent 一直寫「零自交」 | 自測要逐幀量，而且分「對折」（同一群自己交叉，壞）與「交疊」（觸手疊在身體前面，設計允許）；一次跑 12 次看比例，單次零不算零 |
 | 2026-11-01 | VibeRails | 想用「邊界對邊界互不穿透距離 0.6h 改 1.2h」擋對折，12 次對照沒變好（6 比 5），有幾次終點還多了自交；粒子式互不穿透只知道距離不知道方向，兩顆已經交換邊之後再推開是推往錯的方向 | 粒子式約束擋不住線段交叉；要擋對折得用方向（邊界法線）或讓觸手軸向不可壓縮。改硬規則前先 12 次統計對照，沒有變好就還原 |
+| 2026-11-01 | CI | TestFlight 第三次上傳（run #33）在 archive 失敗：Apple 回「reached the maximum number of certificates」。每次 CI 是全新機器，自動簽名每跑一次就新建一張 Apple Development 憑證，兩次就滿額 | archive 不簽名（CODE_SIGNING_ALLOWED=NO），export 時才用雲端管理的 Apple Distribution 簽；run #35 實證可行。CI 上任何「每次新建」的東西都要想它有沒有額度 |

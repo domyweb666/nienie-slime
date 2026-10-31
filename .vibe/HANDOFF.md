@@ -7,7 +7,8 @@
 - 回歸自測改成逐幀量，分「對折」與「交疊」，候選開著也測；預設值十項照樣全過
 - **新發現（第 41 條）**：抓觸手根部往尖端推會壓縮觸手，約一半次數中途對折幾幀，v2.2 就有（關掉按壓一樣），放手後消。邊界對邊界互不穿透 1.2h 試過沒用，已還原。修法會改手感，排第三批
 - commit：web、iOS 各一個在 `swiftui-port`，web 那個 cherry-pick 到 `main`；lessons 加兩列
-- **全部沒在真機跑過。** 雲端編譯與 TestFlight 結果看本檔最後一段「第四會話結果」
+- 雲端編譯成功、零警告（run 41226494127）。第一次 TestFlight 上傳（run #33）在 archive 失敗：Apple 回「Your account has reached the maximum number of certificates」。成因：每次 CI 都是全新機器，自動簽名每跑一次就新建一張 Apple Development 憑證，第 22、29 號兩次成功後額度滿了。改 workflow：archive 不簽名（`CODE_SIGNING_ALLOWED=NO`），export 時才用雲端管理的 Apple Distribution 簽，**run #35 成功，build 0.2.0 (35) 已上傳 App Store Connect**（commit 8ed8815）。以後不會再建 Development 憑證；帳號裡已有的那幾張可以到 developer.apple.com → Certificates 刪掉，不刪也沒影響
+- **全部沒在真機跑過。**
 
 > 產出時間：2026-11-01（第三會話；前兩個會話的紀錄保留在下面）
 > 前一會話的最後狀態，給下一個會話接續用
@@ -35,7 +36,7 @@
 - 設定過程踩到的坑（細節在 `.uiux/lessons.md`）：Issuer ID 貼錯、App Store Connect 沒建 App、金鑰角色不是 Admin、workflow 檔只在 swiftui-port 上所以手動觸發 422。workflow 現在有「verify」步會在簽名前把這些一次報出來
 - Bundle ID 定為 `org.domyweb.qieji`（多米建 App 時用的；原本的 nienieslime 沒建成）
 - 待真機查證：系統觸覺關閉時 Core Haptics 會不會自動停震（iOS 沒 API 讀這個開關）
-- 雲端簽名（Admin 金鑰＋`-allowProvisioningUpdates`）實證可行：開發與發佈憑證、profile 都由 Xcode 在 CI 上自動建
+- 雲端簽名（Admin 金鑰＋`-allowProvisioningUpdates`）實證可行：開發與發佈憑證、profile 都由 Xcode 在 CI 上自動建。2026-11-01 補：Development 憑證每跑一次新建一張、兩次就滿額（run #33 失敗），改成 archive 不簽名、export 才簽（run #35 過），以後只用雲端管理的發佈憑證
 
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
@@ -86,7 +87,7 @@
 ## ⏭️ 下一步從哪繼續
 
 1. 先讀這份 `.vibe/HANDOFF.md`，再讀 `.uiux/04-手感/手感精修提案-暫定.md`（第一批做了什麼、第二批要盲測什麼）
-2. build 0.2.0 (29) 已上傳 App Store Connect，處理 10 到 30 分鐘後出現在 TestFlight；多米是內部測試者就能裝。之後要再上傳：先把要推的全推完、等編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，觸發後到上傳完成前不要再推同分支
+2. **build 0.2.0 (35)**（v2.4，含第二批候選）已上傳 App Store Connect，處理 10 到 30 分鐘後出現在 TestFlight；多米是內部測試者就能裝（build 29 是 v2.3，沒有候選按鈕）。之後要再上傳：先把要推的全推完、等編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，觸發後到上傳完成前不要再推同分支
 3. 多米裝真機後先做閘門 3 的前兩條：面板開「延遲測試」，240fps 慢動作數「碰到→閃白」與「碰到→攤開」各幾格；最舊機低電量最大幅度捏，看面板讀數有沒有掉幀。回報記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
 4. 第二批候選已在面板上：一次套一條盲測（存 1 對照 → 套候選 → 存 2 → 切 1／切 2）。順序建議 6、12、13、14、19、2、9；18 是反向對照；每條的結果記進 `手感測試紀錄-暫定.md`，定案的值貼回 `參數表-暫定.md`
 4b. 第三批先看第 41 條（觸手被壓縮時對折）：三個候選修法都要 12 次統計對照再盲測
