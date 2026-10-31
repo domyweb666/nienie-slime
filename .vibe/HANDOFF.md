@@ -27,7 +27,7 @@
 - Issuer ID 第一次被貼成 7 字元的東西，靠這步才抓到；以後 Secrets 出錯先看這步的輸出
 - Bundle ID 定為 `org.domyweb.qieji`（多米建 App 時用的；原本的 nienieslime 沒建成）
 - 待真機查證：系統觸覺關閉時 Core Haptics 會不會自動停震（iOS 沒 API 讀這個開關）
-- 雲端簽名（API 金鑰 Admin 角色＋`-allowProvisioningUpdates`）已實證可行，第一次就過
+- 雲端簽名：開發用簽名（archive）過了；發佈用簽名（export）在 run 41179042074 回「Cloud signing permission error」＋「No profiles for org.domyweb.qieji」，這是 API 金鑰角色不夠（要 Admin，或 App Manager 加勾「可取用雲端管理發佈憑證」）。多米要把金鑰改成 Admin，改不了就建新 Admin 金鑰並重設 `ASC_KEY_ID`、`ASC_PRIVATE_KEY`（Issuer ID 不變），再重跑
 
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
