@@ -1,15 +1,17 @@
 # 捏捏史萊姆 iOS 版
 
-`prototype/web/index.html`（v2.2 形狀匹配）的 SwiftUI 移植版。演算法照網頁原型：粒子身體、重疊的剛體區塊、面積壓力、邊界繩子、群內互不穿透、黏土塑性、觸手記憶淡化、呼吸蠕動飄動抖動遊走。參數一樣是 `PRESETS` 那三組，預設黏土。
+`prototype/web/index.html`（v2.3 形狀匹配）的 SwiftUI 移植版。演算法照網頁原型：粒子身體、重疊的剛體區塊、面積壓力、邊界繩子、群內互不穿透、黏土塑性、觸手記憶淡化、呼吸蠕動飄動抖動遊走。參數一樣是 `PRESETS` 那三組，預設黏土。
+
+v2.3（2026-11-01，手感精修提案第一批）加的：按下去那塊往四周攤開（接觸點先凹）、放手強度看拉伸量與速度取大、抓住 0.2 秒內純彈性 0.6 秒後才記形、揉回原形用動畫不瞬移、取消觸控不啵、預測觸控停下來就回真實位置、揉的音量用 coalesced 距離、連續觸覺遲滯、面板的盲測槽位與幀時間讀數與閃白延遲測試、啟動畫面天空色。全部還沒在真機看過。
 
 ## 檔案在哪
 
 | 檔案 | 內容 |
 |---|---|
 | `NieNie/Slime/SlimeRig.swift` | 外形定義（不規則團塊＋觸手）、粒子、區塊、形狀匹配、繩子、互不穿透、塑性、活物感、遊走、手指。對應原型的 `defineShape()`、`setup()`、`substep()`、`plasticity()`、`twitch()` |
-| `NieNie/Slime/SlimeView.swift` | UIKit 畫面：120Hz CADisplayLink、多指、coalesced 與 predicted touches、CAShapeLayer 繪圖（懸空、影子跟最低點、亮光跟身體轉）。對應 `draw()` |
-| `NieNie/Slime/FeelParams.swift` | 三種預設（果凍／麻糬／黏土）與調整面板的滑桿清單，名字跟原型一樣 |
-| `NieNie/Feedback/SlimeHaptics.swift` | Core Haptics：連續震動跟變形量走，放手時一下「啵」 |
+| `NieNie/Slime/SlimeView.swift` | UIKit 畫面：120Hz CADisplayLink、多指、coalesced 與 predicted touches（預測只在有新事件那幀用）、CAShapeLayer 繪圖（懸空、影子跟最低點、亮光跟身體轉）、幀時間讀數、閃白延遲測試。對應 `draw()` |
+| `NieNie/Slime/FeelParams.swift` | 三種預設（果凍／麻糬／黏土）與調整面板的滑桿清單，名字跟原型一樣；v2.3 加按壓五個與停留門檻兩個參數 |
+| `NieNie/Feedback/SlimeHaptics.swift` | Core Haptics：連續震動跟變形量走（開 0.03、關 0.008、至少 120 毫秒的遲滯），放手時一下「啵」 |
 | `NieNie/Feedback/SlimeAudio.swift` | 錄音切片播放：讀 bundle 裡的 `manifest.json`，四類各多段隨機挑、音高 ±8%、揉的時候循環播。沒有檔案就安靜 |
 | `NieNie/App/SlimeController.swift` | 把同一個事件同時送到畫面、聲音、觸覺 |
 | `NieNie/UI/` | 按鈕列與隱藏調整面板 |
@@ -17,6 +19,12 @@
 | `project.yml` | XcodeGen 設定。`.xcodeproj` 不進 repo，由雲端 Mac 產生 |
 
 隱藏調整面板：長按左上角「捏捏」標題 1.2 秒。用長按是因為三指手勢會撞到系統的復原與拷貝手勢。
+
+面板最上面三樣是測試工具（手感精修提案第 37、39、40 條）：
+
+- 讀數一行：實際 Hz、最近一秒最長一幀的毫秒、掉幀數、主執行緒每幀算的毫秒、手指接觸半徑（`majorRadius`）、音訊緩衝毫秒。掉幀看這裡，不用 Instruments。
+- 「存 1」「存 2」把目前數值存成 1 號 2 號（存在 UserDefaults），「切 1」「切 2」切換，畫面只顯示幾號不顯示數值，給盲測用。動任何滑桿就離開槽位。
+- 「延遲測試」開關：手指按下那一幀整個畫面閃白一幀。用 240fps 慢動作同時拍手指和螢幕，數「指尖碰到→閃白」（輸入到畫面的管線延遲）與「碰到→攤開」（含物理）各幾格，每格約 4 毫秒。
 
 ## 錄音怎麼放進來
 
@@ -50,7 +58,7 @@
 
 ## 還沒確認的事
 
-- 全部還沒在真機跑過：延遲、掉幀、觸覺、聲音都是未驗證。
+- 全部還沒在真機跑過：延遲、掉幀、觸覺、聲音都是未驗證。v2.3 的按壓看起來大不大、`majorRadius` 在你的手機上跳得多厲害、閃白有沒有剛好一幀，也都要真機看。
 - 效能：網頁版在電腦上每幀約 1 毫秒；Swift 版每幀 3 到 5 個小步，每步跑 70 個區塊、360 顆粒子、互不穿透格子。最舊機（iPhone XS／XR／SE 2）開低電量要實測，掉幀就先減粒子（`h = R / 9` 改 `R / 8`）或區塊。
 - 系統設定裡的「系統觸覺」關掉後，Core Haptics 會不會自動停震。iOS 沒有 API 可以讀這個開關，要用真機關掉試一次。
 - 減少動態的溫和版：活物感與抖動減半，回饋照常。實際感覺要真機看。
