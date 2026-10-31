@@ -77,8 +77,9 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          python3 -m pip install -q pyjwt cryptography
-          python3 - <<'PY'
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q pyjwt cryptography
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
           import os, re, sys, time, json, urllib.request, urllib.error, jwt
           kid = os.environ["ASC_KEY_ID"].strip()
           iss = os.environ["ASC_ISSUER_ID"].strip()
