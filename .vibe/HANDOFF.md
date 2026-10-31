@@ -71,13 +71,13 @@
 - 網頁版回歸自測全過（第 0c 輪，`手感測試紀錄-暫定.md`），腳本存成 `prototype/web/selftest.js`
 - commit：提案 5701081、web 3c57123、iOS f895a06（`swiftui-port`）；web 那個 cherry-pick 成 2e1fe13 推上 `main`（Pages 已是 v2.3）
 - 參數表逐列對過程式並改寫（黏土數字以程式為準）；lessons 加一列「換演算法要逐列對參數表」
-- Swift 版 f895a06 雲端編譯 **成功**（GitHub Actions run 41223390965）；TestFlight 上傳在本會話結尾觸發，結果看 `gh run list --repo domyweb666/nienie-slime --workflow ios.yml`
+- Swift 版雲端編譯成功（run 41223390965，零警告）；TestFlight 上傳成功（run 41223922362，**build 0.2.0 (29)**，commit d2f6cc1）。第一次觸發的 run #26 被我自己接著推的 docs commit 取消（workflow 有 cancel-in-progress），重觸發才過，lessons 已記
 - **全部沒在真機跑過。**
 
 ## ⏭️ 下一步從哪繼續
 
 1. 先讀這份 `.vibe/HANDOFF.md`，再讀 `.uiux/04-手感/手感精修提案-暫定.md`（第一批做了什麼、第二批要盲測什麼）
-2. 確認 `swiftui-port` 最新 commit 的 GitHub Actions 編譯有過；過了就上傳 TestFlight：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`（build 號自動用 run number）
+2. build 0.2.0 (29) 已上傳 App Store Connect，處理 10 到 30 分鐘後出現在 TestFlight；多米是內部測試者就能裝。之後要再上傳：先把要推的全推完、等編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，觸發後到上傳完成前不要再推同分支
 3. 多米裝真機後先做閘門 3 的前兩條：面板開「延遲測試」，240fps 慢動作數「碰到→閃白」與「碰到→攤開」各幾格；最舊機低電量最大幅度捏，看面板讀數有沒有掉幀。回報記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
 4. 第二批照提案順序一次一個盲測：6（lag 0.12 對 0.03）、12（觸覺跟變化率）、13（質地微震）、14（啵的次數）、18、19、2、9、10、38。用面板的存 1／存 2 做成 1 號 2 號
 5. 錄音：播放層已做好，等多米照 `.uiux/04-手感/錄音指南.md` 錄完丟進 `prototype/web/sfx/` 與 `ios/NieNie/Resources/`
