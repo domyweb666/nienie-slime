@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.2 蠕動</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.3 按壓</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -54,7 +54,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.2</span></div>
+  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.3</span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="聲音">🔈</button>
 </div>
 
@@ -84,6 +84,9 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    - 永遠拉得回來、不爆、不打結（輪廓由邊界粒子依原始順序連成）
    - 塑性：變形超過 yield 就慢慢改參考形狀（留形）；沒碰時參考形狀回原樣
    - 活物：沒碰時呼吸、慢搖、偶爾抖、懸空時上下浮
+   - v2.3（手感精修提案第一批，2026-11-01）：按下去那塊往四周攤開（接觸點先凹，側視圖用壓扁表現）；
+     放手強度看「拉多遠」與「甩多快」取大；抓住 0.2 秒內純彈性、0.6 秒後才全速記形（輕按回彈，揉捏即留形）；
+     揉回原形用動畫不瞬移；系統收走觸控時安靜放開
    - 音效：真實錄音切片。讀 sfx/manifest.json，分四類（press 按、pull 拉、release 放手、rub 持續揉），
      每類多段隨機挑、音高 ±8%、音量跟動作強度。沒有檔案就安靜。錄法見 .uiux/04-手感/錄音指南.md
    ========================================================= */
@@ -92,9 +95,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.07,wander:.25},
-  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.07,wander:.25},
-  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:3,  recover:.03, grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.06,wander:.22},
+  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.07,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6},
+  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.07,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6},
+  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:3,  recover:.03, grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.06,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -106,6 +109,13 @@ const F=[
   ['grabR','抓取範圍（×半徑）','一指抓到多大一塊',.2,.8,.01],
   ['maxPull','拉伸上限（×半徑）','最多拉多遠',.6,2.6,.05],
   ['lag','黏滯','跟手的延遲感（秒）',0,.3,.01],
+  ['pressBase','按壓攤開（×半徑）','按下去那塊往四周攤多少（看得到的約一半）',0,.3,.01],
+  ['pressHold','按住再攤（×半徑）','按住不動時再多攤多少',0,.3,.01],
+  ['pressHoldTime','按壓下沉時間','按住多久攤到最深（秒）',.1,2,.05],
+  ['pressRise','按壓時間常數','攤開多快到位（秒）',.01,.3,.01],
+  ['pressFirst','按壓第一幀比例','按下那一幀先到目標的幾成',0,1,.05],
+  ['dwellLo','定型停留起點','抓住幾秒後開始記形（秒）',0,1,.05],
+  ['dwellHi','定型停留終點','抓住幾秒後全速記形（秒）',0,2,.05],
   ['wGlobal','整體性','越大整團越像一塊',0,1,.01],
   ['cSpace','區塊間距（×半徑）','越小區塊越多越軟',.15,.7,.05],
   ['cRad','區塊半徑（×半徑）','越小越軟、越容易拉出一塊',.25,1,.01],
@@ -134,7 +144,7 @@ let globalC=null;
 let hiIdx=0;         // 亮光跟著哪顆粒子
 let lastC={cSpace:0,cRad:0};
 let lastShape={seed:7,floppy:0};
-let t=0,last=0,lastTouch=-10,nextTwitch=3,A0=1;
+let t=0,last=0,lastTouch=-10,nextTwitch=3,A0=1,relaxUntil=-1;
 const WANDER={dx:0,dy:0,next:3,moving:false};
 
 /* ---------- 外形：癱軟的不規則團塊＋觸手（多米 10-31：要觸手、不要完整形體） ---------- */
@@ -260,23 +270,28 @@ function down(e){
   if(e.target!==cv)return;
   const p=pos(e);
   const grab=insideBody(p.x,p.y)||nearBody(p.x,p.y,R*.22);
-  const f={id:e.pointerId,ax:p.x,ay:p.y,x:p.x,y:p.y,fx:p.x,fy:p.y,lx:p.x,ly:p.y,vx:0,vy:0,step:0,mode:grab?'grab':'push',mem:[]};
+  const f={id:e.pointerId,ax:p.x,ay:p.y,x:p.x,y:p.y,fx:p.x,fy:p.y,lx:p.x,ly:p.y,vx:0,vy:0,vxS:0,vyS:0,peak:0,stretch:0,
+    tDown:t,press:0,pressOn:false,hold:0,pushed:false,step:0,mode:grab?'grab':'push',mem:[]};
   sfxInit();if(grab)sfxPlay('press',.7)
   if(grab){
+    // mem：[粒子, 相對手指的偏移 ox oy, 跟手權重 w, 攤開方向 dx dy（單位向量 × (1-u²)²，按壓用）]
     const gr=mat.grabR*R;
-    for(let i=0;i<N;i++){const d=Math.hypot(X[i]-p.x,Y[i]-p.y);if(d<gr&&!GRAB[i]){const u=d/gr;f.mem.push([i,X[i]-p.x,Y[i]-p.y,Math.exp(-u*u*2.5)*(1-u*u)]);GRAB[i]=1}}
+    for(let i=0;i<N;i++){const ox=X[i]-p.x,oy=Y[i]-p.y,d=Math.hypot(ox,oy);if(d<gr&&!GRAB[i]){const u=d/gr,wp=(1-u*u)**2,inv=d>1e-6?wp/d:0;f.mem.push([i,ox,oy,Math.exp(-u*u*2.5)*(1-u*u),ox*inv,oy*inv]);GRAB[i]=1}}
     if(!f.mem.length){const o=[];for(let i=0;i<N;i++)o.push([Math.hypot(X[i]-p.x,Y[i]-p.y),i]);o.sort((a,b)=>a[0]-b[0]);
-      for(let k=0;k<6;k++){const i=o[k][1];f.mem.push([i,X[i]-p.x,Y[i]-p.y,1]);GRAB[i]=1}}
+      for(let k=0;k<6;k++){const i=o[k][1],ox=X[i]-p.x,oy=Y[i]-p.y,d=Math.hypot(ox,oy),inv=d>1e-6?1/d:0;f.mem.push([i,ox,oy,1,ox*inv,oy*inv]);GRAB[i]=1}}
   }
   fingers.set(e.pointerId,f);try{cv.setPointerCapture(e.pointerId)}catch(_){}
   $('hint').classList.add('off');
 }
 function move(e){const f=fingers.get(e.pointerId);if(!f)return;const p=pos(e);f.x=p.x;f.y=p.y}
 function up(e){const f=fingers.get(e.pointerId);if(!f)return;for(const m of f.mem)GRAB[m[0]]=0;fingers.delete(e.pointerId);lastTouch=t;
-  if(f.mode==='grab'){const sp=Math.hypot(f.vx,f.vy)/R;sfxPlay('release',.35+.65*Math.min(1,sp/6),1+.1*Math.min(1,sp/6))}
+  // 放手強度：甩多快（最近 80 毫秒的峰值速度）與拉多遠（tanh 後的拉伸 ÷ 上限）取大，慢慢鬆手也有啵
+  if(f.mode==='grab'){const sv=Math.min(1,f.peak/R/6),ss=Math.min(1,f.stretch/mat.maxPull)**1.5,s=Math.max(sv,ss);sfxPlay('release',.35+.65*s,1+.1*s)}
   if(!fingers.size)sfxRub(0)}
+function cancel(e){ // 系統把觸控收走（手勢、來電）：安靜放開，不啵
+  const f=fingers.get(e.pointerId);if(!f)return;for(const m of f.mem)GRAB[m[0]]=0;fingers.delete(e.pointerId);lastTouch=t;if(!fingers.size)sfxRub(0)}
 cv.addEventListener('pointerdown',down);cv.addEventListener('pointermove',move);
-cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',cancel);
 
 /* ---------- 物理 ---------- */
 const SUB=4;
@@ -288,11 +303,13 @@ function substep(dt,L){
   // 2 手指
   for(const f of fingers.values()){
     if(f.mode==='grab'){
-      for(const [i,ox,oy,w] of f.mem){const tx=f.fx+ox,ty=f.fy+oy,k=.55*w;X[i]+=(tx-X[i])*k;Y[i]+=(ty-Y[i])*k}
+      // 按壓：被抓那塊沿「手指→粒子」方向多攤開 press（接觸點先凹；側視圖裡按進去畫不出深度，用壓扁表現）
+      for(const [i,ox,oy,w,dx,dy] of f.mem){const tx=f.fx+ox+dx*f.press,ty=f.fy+oy+dy*f.press,k=.55*w;X[i]+=(tx-X[i])*k;Y[i]+=(ty-Y[i])*k}
     }else{
-      const rf=R*.22;
+      const rf=R*.22;let hit=false;
       for(let i=0;i<N;i++){const dx=X[i]-f.fx,dy=Y[i]-f.fy,d=Math.hypot(dx,dy);
-        if(d<rf&&d>1e-6){const s=(rf-d)/d;X[i]+=dx*s;Y[i]+=dy*s}}
+        if(d<rf&&d>1e-6){const s=(rf-d)/d;X[i]+=dx*s;Y[i]+=dy*s;hit=true}}
+      if(hit&&!f.pushed){f.pushed=true;sfxPlay('press',.5)}  // 從外面推進來第一次碰到也要有聲音
     }
   }
   // 活物：呼吸。寫在「參考形狀」上（所有區塊一致），不是寫在目標上，否則小區塊會跟著滑開拉不回來
@@ -391,9 +408,15 @@ function plasticity(dt){
   for(const c of clusters){const {idx,cs,sn,xc,yc,qcx,qcy,w}=c;
     for(let k=0;k<idx.length;k++){const i=idx[k],px=X[i]-xc,py=Y[i]-yc;
       RX[i]+=(qcx+cs*px+sn*py)*w;RY[i]+=(qcy-sn*px+cs*py)*w;cnt[i]+=w}}
-  const touched=[...fingers.values()].some(f=>f.mode==='grab');
-  if(touched){
-    const yl=mat.yield*R,kc=Math.min(1,mat.creep*dt);
+  const grabs=[...fingers.values()].filter(f=>f.mode==='grab'),touched=grabs.length>0;
+  if(t<relaxUntil){
+    // 揉回原形：記住的形狀半秒內淡回原樣，位置不動，身體自己揉回去（不瞬移）
+    const kr=Math.min(1,6*dt);for(let i=0;i<N;i++){QX[i]+=(Q0X[i]-QX[i])*kr;QY[i]+=(Q0Y[i]-QY[i])*kr}
+  }else if(touched){
+    // 只有抓住一陣子才開始記形：dwellLo 秒內純彈性（輕按、快彈都回彈），dwellHi 秒後全速（揉捏即留形）
+    let g=0;const lo=mat.dwellLo,hi=Math.max(lo+1e-3,mat.dwellHi);
+    for(const f of grabs){const x=Math.max(0,Math.min(1,(t-f.tDown-lo)/(hi-lo)));g=Math.max(g,x*x*(3-2*x))}
+    const yl=mat.yield*R,kc=Math.min(1,mat.creep*dt*g);
     if(kc>0)for(let i=0;i<N;i++){const rx=RX[i]/cnt[i],ry=RY[i]/cnt[i],dx=rx-QX[i],dy=ry-QY[i],dl=Math.hypot(dx,dy);
       if(dl>yl){const s=(1-yl/dl)*kc*(TID[i]>=0?1-.85*TU[i]:1);QX[i]+=dx*s;QY[i]+=dy*s;
         const ex=QX[i]-Q0X[i],ey=QY[i]-Q0Y[i],el=Math.hypot(ex,ey),lim=R*1.1;
@@ -408,6 +431,7 @@ function plasticity(dt){
   let mx=0,my=0;for(let i=0;i<N;i++){mx+=QX[i];my+=QY[i]}mx/=N;my/=N;
   for(let i=0;i<N;i++){QX[i]-=mx;QY[i]-=my}
 }
+function relax(){relaxUntil=t+.5}   // 「揉回原形」按鈕：半秒內記憶淡回 Q0，換種子才重建
 function twitch(L){
   // 偶爾抖一下：隨機一個區塊得到一個小衝量；偶爾整團輕晃
   if(t<nextTwitch)return;
@@ -430,11 +454,17 @@ function update(dt){
     if(f.mode==='grab'&&el>0){const s=lim*Math.tanh(el/lim)/el;ex*=s;ey*=s}
     const tx=f.ax+ex,ty=f.ay+ey,k=mat.lag>0?1-Math.exp(-dt/mat.lag):1;
     f.fx+=(tx-f.fx)*k;f.fy+=(ty-f.fy)*k;
+    // 速度：單幀差分太吵，另存 30 毫秒平滑版與 80 毫秒衰減峰值（放手強度用峰值，揉的音量用平滑版）
     f.vx=(f.x-f.lx)/dt;f.vy=(f.y-f.ly)/dt;f.lx=f.x;f.ly=f.y;
-    if(f.mode==='grab'){const st=Math.hypot(ex,ey)/R,step=Math.floor(st*2.5);if(step>f.step&&st>.35)sfxPlay('pull',Math.min(1,.4+st/2),1-.08*Math.min(1,st/1.5));f.step=Math.max(f.step,step)}
+    {const kv=1-Math.exp(-dt/.03);f.vxS+=(f.vx-f.vxS)*kv;f.vyS+=(f.vy-f.vyS)*kv;f.peak=Math.max(Math.hypot(f.vx,f.vy),f.peak*Math.exp(-dt/.08))}
+    if(f.mode==='grab'){const st=Math.hypot(ex,ey)/R,step=Math.floor(st*2.5);f.stretch=st;if(step>f.step&&st>.35)sfxPlay('pull',Math.min(1,.4+st/2),1-.08*Math.min(1,st/1.5));f.step=Math.max(f.step,step);
+      // 按壓（接觸點先凹）：按下那幀先到目標的 pressFirst，之後用 pressRise 補完；按住不動（慢於每秒一個半徑）再慢慢攤深
+      const still=Math.hypot(f.vxS,f.vyS)<R;f.hold=Math.max(0,Math.min(1,f.hold+(still?dt/Math.max(.05,mat.pressHoldTime):-dt/.3)));
+      const target=R*(mat.pressBase+mat.pressHold*f.hold);
+      if(!f.pressOn){f.press=target*mat.pressFirst;f.pressOn=true}else f.press+=(target-f.press)*(1-Math.exp(-dt/Math.max(.005,mat.pressRise)))}
   }
-  { // 持續揉：抓著時手指速度越快越大聲
-    let sp=0;for(const f of fingers.values())if(f.mode==='grab')sp=Math.max(sp,Math.hypot(f.vx,f.vy)/R);
+  { // 持續揉：抓著時手指速度越快越大聲（用平滑速度，單幀差分會抖）
+    let sp=0;for(const f of fingers.values())if(f.mode==='grab')sp=Math.max(sp,Math.hypot(f.vxS,f.vyS)/R);
     sfxRub(fingers.size?Math.min(1,sp/5)*.7:0)}
   // 活物感：沒人碰才開，放手後 1 秒內淡入
   const idle=fingers.size?0:Math.min(1,Math.max(0,(t-lastTouch-.8)/1.2));
@@ -502,7 +532,7 @@ function frame(now){
 /* ---------- UI ---------- */
 function setMat(name){mat={...PRESETS[name]};for(const k of ['jelly','mochi','clay'])$('m-'+k).setAttribute('aria-pressed',String(k===name));syncSliders()}
 for(const k of ['jelly','mochi','clay'])$('m-'+k).addEventListener('click',()=>setMat(k));
-$('b-reset').addEventListener('click',()=>{setup()});
+$('b-reset').addEventListener('click',()=>{relax()});   // 揉回原形：用動畫不瞬移（換種子才走 setup）
 $('b-float').addEventListener('click',()=>{FLOAT=!FLOAT;$('b-float').setAttribute('aria-pressed',String(FLOAT));$('b-float').textContent=FLOAT?'懸空（多米定案）':'地面（對照用）';setup();dump()});
 // 隱藏面板：長按標題 1.2 秒
 let pressT=null;
