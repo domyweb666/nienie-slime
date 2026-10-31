@@ -6,7 +6,7 @@
   - 兩版都有：21 回家彈簧 homeK（候選 0.003）、22 放手餘韻 afterglow（0.25 秒）、23 呼吸 breathT／breathShape／breathDeep（6 秒、吸短吐長、被摸久變深）、24 兩指捏 squish 事件（預設開，pinchSquish）、25 拉太遠滑脫 slip、26 放手黏連 stick（0.1 秒）、27 局部面積壓力 localArea、33 家的高度 homeFrac（0.46）、34 描邊粗細隨壓縮 inkVar（帶狀多邊形填色）
   - 只在 Swift：15 銳利度跟材質（hapSharpSquash、pressSharp 上面板，候選一次套三種材質的數字）、17 啵走觸覺管線（popViaHaptics：release 樣本註冊成 Core Haptics audio resource，跟 transient 同一個 pattern；API 照 Apple 文件查過；要有錄音檔，第一次套了要重開 app）、36 collide() 改固定大小雜湊格子（不再每小步配記憶體；其餘等真機讀數）
 - selftest 加 T13 兩指捏、T14 滑脫、T15 黏連、T16 候選全開；T11、T12 的歸零清單補上呼吸相位與特別回彈時鐘（新測試跑完第二輪才漏出來）。3 次全過
-- commit：web、iOS、docs 在 `swiftui-port`，web 與 docs cherry-pick 到 `main`；雲端編譯與 TestFlight：上傳後補 run 號與 build 號
+- commit：web、iOS、docs 在 `swiftui-port`，web 與 docs cherry-pick 到 `main`；雲端編譯 run #44 成功、零 Swift 警告；TestFlight run #46 成功，**build 0.2.0 (46)** 已上傳 App Store Connect（commit 8f28c5f）
 - **沒在真機跑過。** 這 12 條每一條好不好都要真機；26 排最後，17 要先有錄音檔
 
 ## 🔄 2026-11-01 第五會話（續）：第三批前五條（v2.6）
@@ -114,7 +114,7 @@
 ## ⏭️ 下一步從哪繼續
 
 1. 先讀這份 `.vibe/HANDOFF.md`，再讀 `.uiux/04-手感/手感精修提案-暫定.md`（第一批做了什麼、第二批要盲測什麼）
-2. **build 0.2.0 (35)**（v2.4，含第二批候選）已上傳 App Store Connect；**build 0.2.0 (43)** 是 v2.6（第三批前五條），build 40 是 v2.5（第 41 條修好，面板多「41 對照」）。處理 10 到 30 分鐘後出現在 TestFlight；多米是內部測試者就能裝（build 29 是 v2.3，沒有候選按鈕）。之後要再上傳：先把要推的全推完、等編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，觸發後到上傳完成前不要再推同分支
+2. **build 0.2.0 (35)**（v2.4，含第二批候選）已上傳 App Store Connect；**build 0.2.0 (46)** 是 v2.7（提案 41 條的程式全做完，第三批候選都在面板），build 43 是 v2.6，build 40 是 v2.5（第 41 條修好，面板多「41 對照」）。處理 10 到 30 分鐘後出現在 TestFlight；多米是內部測試者就能裝（build 29 是 v2.3，沒有候選按鈕）。之後要再上傳：先把要推的全推完、等編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，觸發後到上傳完成前不要再推同分支
 3. 多米裝真機後先做閘門 3 的前兩條：面板開「延遲測試」，240fps 慢動作數「碰到→閃白」與「碰到→攤開」各幾格；最舊機低電量最大幅度捏，看面板讀數有沒有掉幀（沒碰時 Hz 讀 60 是第 35 條的待機降頻，碰到要回 120；延遲測試開著固定 120）。回報記進 `手感測試紀錄-暫定.md`（標「自測，非盲測」）
 4. 第二批候選已在面板上：一次套一條盲測（存 1 對照 → 套候選 → 存 2 → 切 1／切 2）。順序建議 6、12、13、14、19、2、9；18 與 41 是反向對照（41 對照＝關掉橫檔，修前的行為，試抓觸手根部往尖端推、用力拉長觸手）；第三批候選也在面板（21、22、23、15、17、25、26、27、33、34），26 排最後、17 要先有錄音檔；每條的結果記進 `手感測試紀錄-暫定.md`，定案的值貼回 `參數表-暫定.md`
 4b. 第三批先看第 41 條（觸手被壓縮時對折）：三個候選修法都要 12 次統計對照再盲測
