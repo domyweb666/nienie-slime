@@ -119,6 +119,14 @@ jobs:
           if bundle not in apps:
               print("::error::No App with Bundle ID " + bundle + " exists in App Store Connect yet (the key sees: " + str(apps) + "). Either create that App in App Store Connect, or change PRODUCT_BUNDLE_IDENTIFIER in ios/project.yml to one of the existing ones.")
               sys.exit(1)
+          # 2026-11-01: builds went into another app (茄記) for a day because the Bundle ID belonged to it.
+          # The App Store Connect name must contain the app's display name.
+          asc_name = next(a["attributes"]["name"] for a in d["data"] if a["attributes"]["bundleId"] == bundle)
+          display = re.search(r"CFBundleDisplayName:\s*(\S+)", open("ios/project.yml").read()).group(1)
+          if display not in asc_name:
+              print(f"::error::Bundle ID {bundle} belongs to the App Store Connect app named '{asc_name}', not '{display}'. Uploading would put this build into that other app. Register a Bundle ID for {display}, create its App in App Store Connect, and set PRODUCT_BUNDLE_IDENTIFIER in ios/project.yml.")
+              sys.exit(1)
+          print(f"Bundle ID {bundle} -> App Store Connect app '{asc_name}'")
           with open(os.environ["GITHUB_ENV"], "a") as f:
               f.write(f"ASC_KEY_PATH={tmp}/keys/AuthKey.p8" + chr(10))
               f.write(f"ASC_KEY_ID={kid}" + chr(10))

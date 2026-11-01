@@ -14,6 +14,7 @@
 | 2026-10-31 | VibeRails | 粒子互不穿透若跨群作用（不同觸手、觸手對身體），被手指拉過去的部分會卡住永遠解不開 | 互不穿透只在「不該變形的群內」用；跨群允許交疊，交給形狀匹配拉回原排列 |
 | 2026-10-31 | feel | Agent 用程式模擬手指的自測可以抓「壞掉」（自交、爆炸、面積漂移），但抓不到「好不好捏」 | 程式自測只當回歸測試（不壞），手感判斷一律真機＋新的手 |
 | 2026-10-31 | feel／CI | TestFlight 第一次上傳跑了 7 次 run 才過：Issuer ID 貼成 7 字元、App Store Connect 沒建 App、API 金鑰是 Developer 角色（export 回 Cloud signing permission error）、Bundle ID 建成別的名字、workflow 檔只在非預設分支（手動觸發 422）。每個錯都要等一到兩分鐘 archive 才看得到 | 簽名前先用金鑰直接打 ASC API：檢查三個值的格式、列出金鑰看得到的 App、對照 project.yml 的 Bundle ID，有錯在 10 秒內報出來；workflow_dispatch 的檔要在預設分支上才能手動觸發；Secrets 名稱以使用者實際取的為準，改 workflow 配合比請他重設快 |
+| 2026-11-01 | CI | Bundle ID 用了 `org.domyweb.qieji`，那是多米另一個 App「茄記」的。workflow 只檢查「金鑰看得到這個 Bundle ID 的 App」，沒看 App 名字，所以好幾個 build 傳進茄記的 TestFlight 都沒被擋，多米自己發現才改成 `org.domyweb.nienieslime` | verify 步驟要對照 App Store Connect 的 App 名稱與 `CFBundleDisplayName`，名字對不上就報錯（已加）；第一次設 Bundle ID 時先問多米「這個 ID 是給哪個 App 的」，帳號裡有別的 App 就不要從清單裡挑一個湊合 |
 | 2026-10-31 | feel | v2 重寫演算法、再移植 Swift，參數表上的「接觸點先凹」「偶發特別回彈」都沒搬過去；「黏滯延遲」表上 0.06、程式 0.12。兩版推上 main、多米摸過、Swift 編譯過，一路沒人拿參數表逐列對過程式 | 每次換演算法或移植，拿參數表逐列對程式，列出「表有程式沒有」「表與程式數值不同」兩張清單寫進手感測試紀錄；對不上的先補或改表，再推 |
 | 2026-11-01 | feel／CI | 觸發 TestFlight 上傳（workflow_dispatch）之後又推了一個 docs commit 到同一分支，workflow 的 concurrency 設 cancel-in-progress，上傳 run #26 被新 push 的編譯 run 取消，要重新觸發 | 要上傳 TestFlight 時，先把該推的全部推完、等編譯過，再觸發 dispatch；觸發後到上傳完成之前不推同一分支 |
 | 2026-11-01 | feel／VibeRails | 之前的程式自測只在動作「終點」量自交，抓不到過程：抓觸手根部往尖端推（壓縮）時，大約一半的次數中途對折幾幀，v2.2 就有，Agent 一直寫「零自交」 | 自測要逐幀量，而且分「對折」（同一群自己交叉，壞）與「交疊」（觸手疊在身體前面，設計允許）；一次跑 12 次看比例，單次零不算零 |
