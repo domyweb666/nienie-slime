@@ -1690,6 +1690,12 @@ final class SlimeRig {
         return fingers.isEmpty ? 0 : min(1, sp / 5)   // the controller scales this by `rubMax`
     }
 
+    /// Stretch (radii, tanh-limited) of the most-stretched grabbing finger: drives the strand loop's pitch, brightness and loudness.
+    var pullStretch: Double { fingers.values.filter { $0.mode == .grab }.map(\.stretch).max() ?? 0 }
+
+    /// Any finger holding the body (not pushing from outside).
+    var isGrabbing: Bool { fingers.values.contains { $0.mode == .grab } }
+
     /// Largest UITouch.majorRadius among the fingers down (for the panel readout).
     var maxTouchRadius: Double { fingers.values.map { $0.radius }.max() ?? 0 }
 

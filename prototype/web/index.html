@@ -77,6 +77,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <textarea id="t-out" readonly rows="3" aria-label="目前的手感數值"></textarea>
 </div>
 
+<script src="sfx/engine.js"></script>
 <script>
 'use strict';
 /* =========================================================
@@ -111,8 +112,9 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    - v2.13（多米 2026-11-01：鏡頭無限拉遠、拉多大推多遠）：鏡頭沒有下限、沒有牆；黏土拉伸 20R、記形 12R；點加密到每個半徑 12 個（拉到 8R 時外圈太疏、尾端交叉）；抓著時鏡頭留邊，形狀佔畫面七成就開始退（camFill 0.7）。面板「v2.12 對照」換回去。量法在 T26
    - v2.14（多米真機 build 59，2026-11-01）：黏土回原形 0.05（回彈太快）；從身體裡面抓也拉得動（grabReach：手指一動往拉的方向補抓一條到外圈）。量法在 T27、T28
    - v2.15（多米真機 build 61，2026-11-01）：手指在世界裡只跟著真正的移動走（鏡頭退時停著的手指不再被往外帶，抽搐的源頭）；黏土拉伸 7R、記形 5R（超過約 8.5R 會抖）；點一下留凹痕（dent）。量法在 T29、T30
-   - 音效：真實錄音切片。讀 sfx/manifest.json，分四類（press 按、pull 拉、release 放手、rub 持續揉），
-     每類多段隨機挑、音高 ±8%、音量跟動作強度。沒有檔案就安靜。錄法見 .uiux/04-手感/錄音指南.md
+   - 音效（v2 分層，2026-11-01）：sfx/engine.js 讀 sfx/manifest.json。按、放手各拆 body／wet／air 三層，依力道決定哪幾層響、多大聲、多高、多亮；
+     拉是連續的黏絲 loop（拉越長越高越亮、拉越快越大聲）加細絲斷裂；揉是 loop（拉遠了讓位給拉絲）；放手後有餘韻（小氣泡或嘶）。
+     對應表在 .uiux/04-手感/音效參數對應-暫定.md，Swift 的 SlimeAudio 照同一張表。沒有檔案就安靜
    ========================================================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
@@ -381,28 +383,13 @@ function buildClusters(){
   lastC={cSpace:mat.cSpace,cRad:mat.cRad};
 }
 
-/* ---------- 聲音：真實錄音切片（sfx/manifest.json），沒有檔案就安靜 ---------- */
-const SFX={ctx:null,manifest:null,buf:{press:[],pull:[],release:[],rub:[]},master:null,muted:false,rubSrc:null,rubGain:null,pitchJit:.08};
-fetch('sfx/manifest.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(m=>{SFX.manifest=m}).catch(()=>{});
-function sfxInit(){ // iOS 規定：要在第一次觸碰裡建立音訊
-  if(SFX.ctx||!SFX.manifest)return;const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-  SFX.ctx=new C();SFX.master=SFX.ctx.createGain();SFX.master.gain.value=SFX.muted?0:.9;SFX.master.connect(SFX.ctx.destination);
-  for(const k of Object.keys(SFX.buf))for(const f of (SFX.manifest[k]||[]))
-    fetch('sfx/'+f).then(r=>r.arrayBuffer()).then(ab=>SFX.ctx.decodeAudioData(ab)).then(b=>SFX.buf[k].push(b)).catch(()=>{});
-}
-function sfxPlay(kind,gain=1,rate=1){const c=SFX.ctx;if(!c||SFX.muted)return;const list=SFX.buf[kind];if(!list.length)return;
-  if(c.state==='suspended')c.resume();
-  const b=list[Math.floor(Math.random()*list.length)],src=c.createBufferSource(),g=c.createGain();
-  src.buffer=b;src.playbackRate.value=rate*(1+(Math.random()*2-1)*SFX.pitchJit);g.gain.value=Math.max(0,Math.min(1,gain));
-  src.connect(g);g.connect(SFX.master);src.start()}
-function sfxRub(level){ // 持續揉：一段 loop，音量跟手指速度
-  const c=SFX.ctx;if(!c)return;
-  if(!SFX.rubSrc){const list=SFX.buf.rub;if(!list.length||level<=0)return;const src=c.createBufferSource(),g=c.createGain();
-    src.buffer=list[Math.floor(Math.random()*list.length)];src.loop=true;src.playbackRate.value=1+(Math.random()*2-1)*SFX.pitchJit;
-    g.gain.value=0;src.connect(g);g.connect(SFX.master);src.start();SFX.rubSrc=src;SFX.rubGain=g}
-  SFX.rubGain.gain.setTargetAtTime(SFX.muted?0:level,c.currentTime,.06)}
-$('b-mute').addEventListener('click',()=>{SFX.muted=!SFX.muted;$('b-mute').setAttribute('aria-pressed',String(SFX.muted));$('b-mute').textContent=SFX.muted?'🔇':'🔈';
-  if(SFX.master)SFX.master.gain.setTargetAtTime(SFX.muted?0:.9,SFX.ctx.currentTime,.02)});
+/* ---------- 聲音：分層音效（sfx/engine.js，v2 2026-11-01），物理參數決定每層多大聲、多高、多亮；沒有檔案就安靜 ---------- */
+const SFX=window.SlimeSfx||null;if(SFX)SFX.load('sfx/');
+let sfxRubLevel=0;
+function sfxInit(){if(SFX)SFX.init()} // iOS 規定：要在第一次觸碰裡建立音訊
+function sfxPlay(kind,gain=1){if(!SFX)return;if(kind==='press')SFX.press(gain);else if(kind==='release')SFX.release(gain);else if(kind==='pull')SFX.strand(gain)}
+function sfxRub(level){sfxRubLevel=level} // 真正的播放在每幀的 SFX.frame
+$('b-mute').addEventListener('click',()=>{const m=!(SFX&&SFX.muted);if(SFX)SFX.setMuted(m);$('b-mute').setAttribute('aria-pressed',String(m));$('b-mute').textContent=m?'🔇':'🔈'});
 
 /* ---------- 手指 ---------- */
 const fingers=new Map();
@@ -832,7 +819,10 @@ function update(dt){
     else{PINCH.a=-1;PINCH.b=-1}}
   { // 持續揉：抓著時手指速度越快越大聲（用平滑速度，單幀差分會抖）
     let sp=0;for(const f of fingers.values())if(f.mode==='grab')sp=Math.max(sp,Math.hypot(f.vxS,f.vyS)/R);
-    sfxRub(fingers.size?Math.min(1,sp/5)*.7:0)}
+    sfxRub(fingers.size?Math.min(1,sp/5)*.7:0);
+    // 拉絲 loop、細絲、餘韻都在這裡跟著物理走（拉伸用拉最長那根抓的手指）
+    let stMax=0,grabbing=false;for(const f of fingers.values())if(f.mode==='grab'){grabbing=true;stMax=Math.max(stMax,f.stretch||0)}
+    if(SFX)SFX.frame(dt,{rub:sfxRubLevel,stretch:stMax,grabbing})}
   // 活物感：沒人碰才開，放手後 1 秒內淡入
   const idle=fingers.size?0:Math.min(1,Math.max(0,(t-lastTouch-.8)/1.2));
   const L=idle*(REDUCED?.5:1);

@@ -120,6 +120,9 @@ struct FeelParams: Equatable, Codable {
     var volMaster: Double = 0.9       // output volume
     var rubMax: Double = 0.7          // loudest the rub loop gets
     var pitchJitter: Double = 0.08    // random pitch ±
+    var sndPullMax: Double = 0.6      // loudest the stretching-strand loop gets (v2 layered sound)
+    var sndSettle: Double = 1         // after-release tail: bubbles after a pull, a small hiss after a long press; 0 = off
+    var sndPressSize: Double = 0.5    // how much contact size (majorRadius) changes the press sound; 0 = off
 }
 
 struct SlimeColors {
@@ -349,6 +352,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.volMaster, name: "主音量", hint: "所有聲音一起", range: 0...1, step: 0.05, section: "聲音"),
         TuneField(key: \.rubMax, name: "揉的音量上限", hint: "揉最快時多大聲", range: 0...1, step: 0.05, section: "聲音"),
         TuneField(key: \.pitchJitter, name: "音高抖動", hint: "每次隨機差多少", range: 0...0.3, step: 0.01, section: "聲音"),
+        TuneField(key: \.sndPullMax, name: "拉絲音量上限", hint: "拉的時候連續黏絲聲最大多大聲；拉越快越大聲、停住幾乎沒聲", range: 0...1, step: 0.05, section: "聲音"),
+        TuneField(key: \.sndSettle, name: "放手餘韻", hint: "拉過放手冒小氣泡、按久放手一聲小嘶的音量；0 關", range: 0...2, step: 0.1, section: "聲音"),
+        TuneField(key: \.sndPressSize, name: "按的音量跟接觸面積", hint: "指尖輕、指腹重的差多少；0 關", range: 0...1, step: 0.05, section: "聲音"),
 
         TuneField(key: \.seed, name: "外形亂數種子", hint: "換一個數字就換一個形狀（會重置）", range: 1...30, step: 1, section: "外形"),
         TuneField(key: \.bodySize, name: "身體大小", hint: "半徑是畫面寬的幾成（會重置）；以前 0.26，0.22 留空間拉長、攤平", range: 0.15...0.3, step: 0.01, section: "外形"),

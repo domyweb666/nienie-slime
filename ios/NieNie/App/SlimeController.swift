@@ -45,7 +45,7 @@ final class SlimeController: ObservableObject {
                                                object: nil, queue: .main) { [weak self] _ in
             self?.rig.cancelAllTouches()
             self?.haptics.stopContinuous()
-            self?.sound.rub(level: 0)
+            self?.sound.stopAll()
         }
     }
 
@@ -57,28 +57,30 @@ final class SlimeController: ObservableObject {
         let p = current
         switch e {
         case .press(let gain):
-            sound.press(gain: gain)
+            sound.press(intensity: pressIntensity(gain, radius: rig.maxTouchRadius, weight: p.sndPressSize))
             haptics.transient(intensity: 0.25 + 0.35 * gain, sharpness: p.pressSharp)
         case .squish(let gain):
             // 提案第 24 條: two fingers pinching closer
-            sound.press(gain: gain)
+            sound.press(intensity: gain)
             haptics.transient(intensity: 0.3 + 0.4 * gain, sharpness: 0.3)
         case .pull(let gain, let rate):
-            sound.pull(gain: gain, rate: rate)
+            _ = rate   // pitch now follows the stretch inside the audio (v2 layered sound)
+            sound.strand(gain: gain)
             haptics.transient(intensity: 0.15 + 0.2 * gain, sharpness: 0.5)
         case .release(let gain, let rate, let special):
             // special (偶發特別回彈): louder sample, one extra tap
             let g = special ? min(1, gain * 1.3) : gain
             // 候選 17: the pop plays as an audio event inside the haptic pattern instead of through AVAudioEngine
             let viaHaptics = p.popViaHaptics >= 0.5 && haptics.popAudioReady
-            if !viaHaptics { sound.release(gain: g, rate: rate) }
+            _ = rate
+            if !viaHaptics { sound.release(gain: g) }
             let s = max(0, min(1, (gain - 0.35) / 0.65))
             haptics.pop(strength: s, count: Int(p.popCount.rounded()) + (special ? 1 : 0), gap: p.popGap, decay: p.popDecay,
                         sharpness: p.popSharp, minIntensity: p.popMin, maxIntensity: p.popMax, audioVolume: viaHaptics ? g : nil)
         case .tick(let gain):
             haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp)
         case .tap:
-            sound.press(gain: 0.5)
+            sound.press(intensity: 0.5)
             haptics.transient(intensity: 0.45, sharpness: 0.35)
         }
     }
@@ -86,7 +88,8 @@ final class SlimeController: ObservableObject {
     /// Called by the slime view once per display frame, after the rig stepped.
     func frame(dt: Double) {
         let p = current
-        sound.rub(level: rig.rubLevel() * p.rubMax)
+        // v2 layered sound: the strand loop, strands, rub loop and the after-release tail all follow the physics here
+        sound.frame(dt: dt, rub: rig.rubLevel() * p.rubMax, stretch: rig.pullStretch, grabbing: rig.isGrabbing)
         // continuous haptic from the deformation and/or its rate of change (提案第 12 條); with the default
         // weights (static 1, rate 0) this is the old intensity = deformation^1.5 × hapMax
         let deformation = rig.isTouched ? rig.deformation : 0
@@ -121,6 +124,17 @@ final class SlimeController: ObservableObject {
     private func syncAudio() {
         sound.master = current.volMaster
         sound.pitchJitter = current.pitchJitter
+        sound.pullMax = current.sndPullMax
+        sound.rubMax = current.rubMax
+        sound.settleAmt = current.sndSettle
+    }
+
+    /// Press loudness from how the finger landed and how big its contact patch is (UITouch.majorRadius):
+    /// a fingertip (~18 pt) plays lighter, a flat finger pad (~42 pt) heavier. 0 = unknown radius → unchanged.
+    private func pressIntensity(_ gain: Double, radius: Double, weight: Double) -> Double {
+        guard radius > 0 else { return gain }
+        let size = max(0, min(1, (radius - 18) / 24))
+        return max(0, min(1, gain * (1 + weight * (0.8 * size - 0.4))))
     }
 
     // MARK: - Buttons
@@ -130,14 +144,14 @@ final class SlimeController: ObservableObject {
         pushParams()
         activeSlot = nil
         rig.bump(2)
-        sound.press(gain: 0.5)
+        sound.press(intensity: 0.5)
     }
 
     /// 揉回原形: the remembered shape fades back over half a second, no jump (手感精修提案 第 28 條).
     func resetShape() {
         rig.relax()
         rig.bump(1)
-        sound.press(gain: 0.7)
+        sound.press(intensity: 0.7)
     }
 
     // MARK: - Tuning panel
