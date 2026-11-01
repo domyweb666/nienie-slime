@@ -342,8 +342,25 @@
     res.T25_edgeHold = { reachR: +((e1 - e0) / R).toFixed(2), zoomMin: +zMin.toFixed(2), zoomAfter12s: +CAM.z.toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T26 鏡頭無限拉遠（v2.13，多米：鏡頭可以無限拉遠，拉多大推多遠）：抓身體最右邊、手指拖到畫面右緣停 8 秒，
+  //     量寬幾個 R、鏡頭縮到多少（v2.12 卡在約 5.8R、0.67）、整隻每幀都在畫面裡；按著時的交叉幀數只記錄（拉到 8R 時尾端偶爾摺幾幀，
+  //     每個半徑 12 個點已經少很多），放手那半秒是按著時帶過來的、只記錄；放手 0.5 秒後要零交叉、面積回來、鏡頭回 1 倍附近
+  { const clock = saveClock(); Math.random = seeded(20261113); resetAligned(1e9); nextTwitch = 1e9;
+    const v = viewV(), sxOf = x => (x - CAM.x) * CAM.z + v.x, syOf = y => (y - CAM.y) * CAM.z + v.y;
+    let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b];
+    let holdX = 0, worstHold = 0, worstEarly = 0, worstRel = 0, zMin = 1, off = 0, wMax = 0;
+    ev('pointerdown', 1, sx, sy); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, sx + (W - 12 - sx) * k / 40, sy); steps(1); }
+    for (let k = 0; k < 480; k++) { steps(1); zMin = Math.min(zMin, CAM.z);
+      if (k % 3 === 0) { const c = selfX(); if (c) holdX++; worstHold = Math.max(worstHold, c); }
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); }
+      wMax = Math.max(wMax, (x1 - x0) / R); if (sxOf(x0) < 0 || sxOf(x1) > W || syOf(y0) < 0 || syOf(y1) > H) off++; }
+    ev('pointerup', 1, W - 12, sy);
+    for (let k = 0; k < 720; k++) { steps(1); if (k < 30) worstEarly = Math.max(worstEarly, selfX()); else if (k % 6 === 0) worstRel = Math.max(worstRel, selfX()); }
+    res.T26_zoomUnlimited = { widthMaxR: +wMax.toFixed(2), zoomMin: +zMin.toFixed(2), offScreenFrames: off, holdCrossFrames: holdX, worstHoldX: worstHold, worstFirstHalfSecX: worstEarly, worstReleaseX: worstRel, zoomAfter12s: +CAM.z.toFixed(2), end: snap() }; log.splice(0);
+    restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
-  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames };
+  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames, T26_firstHalfSecX: res.T26_zoomUnlimited.worstFirstHalfSecX };
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -379,6 +396,8 @@
     pressFlattens: res.T23_pressFlat.heldAspectX > 1.5 && res.T23_pressFlat.after1sAspectX > 1.3 && res.T23_pressFlat.floorPassPt < 3 && res.T23_pressFlat.worstSelfX === 0 && okArea(res.T23_pressFlat.end),
     noCrossing: res.T24_dragAcross.guard.worstAfter === 0 && res.T24_dragAcross.guard.crossFrames <= res.T24_dragAcross.noGuard.crossFrames,
     // 鏡頭跟著拉遠：按在畫面右緣 3 秒要伸出 2.5R 以上（以前卡在 1.1R），放手 12 秒鏡頭回到 0.95 以上
+    // 鏡頭無限拉遠：寬過 7R、鏡頭縮過 v2.12 的下限 0.45、整隻一直在畫面裡；放手 0.5 秒後零交叉、面積回來、鏡頭回 0.95 以上
+    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end) && res.T26_zoomUnlimited.zoomAfter12s > 0.95,
     edgeHoldStretches: res.T25_edgeHold.reachR > 2.5 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.zoomAfter12s > 0.95 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
