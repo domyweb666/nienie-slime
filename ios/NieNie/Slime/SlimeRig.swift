@@ -44,6 +44,7 @@ final class SlimeRig {
 
     private(set) var bnd: [Int] = []     // boundary particle indices, in ring order
     private var bndL: [Double] = []      // rest distance between ring neighbours
+    private var bndL2: [Double] = []     // rest distance between ring particles two apart (no folding back)
 
     private struct Cluster {
         var idx: [Int]
@@ -97,6 +98,7 @@ final class SlimeRig {
     private var podE: [(ca: Double, sa: Double, amp: Double, sig: Double, bend: Double)] = []
     private var brJw = 0.0, brLift = 0.0          // jellyfish contraction 0...1, and the lift it gave (points)
     private var GWT: [Double] = []                // grab weight of each particle this substep (grabHold)
+    private var flatOn = false, flatFloor = 0.0, flatQB = 0.0   // press flat: pressing now, table height, remembered bottom below the centroid
     private var builtLimbs = -1.0, builtSize = -1.0
 
     final class Finger {
@@ -119,6 +121,7 @@ final class SlimeRig {
         var pushed = false                           // push mode: has it displaced anything yet
         var over = 0.0                               // seconds past the slip threshold (候選 25)
         var sticking = false, releaseAt = 0.0         // lifted slowly: still holding until releaseAt (候選 26)
+        var flatOn = false, h0 = 1.0, bot = 0.0, flat = 1.0   // press flat: began on the upper half; height and bottom then; current squash
         var mode: Mode
         var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
         init(x: Double, y: Double, mode: Mode, time: Double) {
@@ -312,6 +315,10 @@ final class SlimeRig {
             let i = bnd[k], jj = bnd[(k + 1) % bnd.count]
             bndL.append(hypot(Q0X[jj] - Q0X[i], Q0Y[jj] - Q0Y[i]))
         }
+        bndL2 = (0..<bnd.count).map { k in
+            let i = bnd[k], j = bnd[(k + 2) % bnd.count]
+            return hypot(Q0X[j] - Q0X[i], Q0Y[j] - Q0Y[i])
+        }
         for k in 0..<bnd.count { BIDX[bnd[k]] = k }
         buildRungs()
         // highlight rides on the upper-left of the blob
@@ -323,7 +330,7 @@ final class SlimeRig {
         fingers.removeAll()
         A0 = polygonArea()
         builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize
-        pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0
+        pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0; flatOn = false
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
@@ -493,6 +500,13 @@ final class SlimeRig {
                 }
             }
             onEvent?(.press(gain: 0.7))
+            // press flat (多米 2026-11-01: wanted to see it): a press counts only if it lands on the upper half; remember the
+            // height and the bottom then (the invisible table is at that bottom)
+            if params.pressFlat > 0 {
+                var y0 = 1e9, y1 = -1e9
+                for i in bnd { y0 = min(y0, Y[i]); y1 = max(y1, Y[i]) }
+                if y < clusters[gi].yc { f.flatOn = true; f.h0 = max(R * 0.5, y1 - y0); f.bot = y1; f.flat = 1 }
+            }
         }
         fingers[id] = f
     }
@@ -632,7 +646,9 @@ final class SlimeRig {
                 let s = lim * tanh(el / lim) / el
                 ex *= s; ey *= s
             }
-            let tx = f.ax + ex, ty = f.ay + ey
+            // the finger keeps 0.35R off the walls: a held patch pressed flat against a wall crossed on release (4 of 6 trials)
+            let mw = R * 0.35
+            let tx = max(8 + mw, min(W - 8 - mw, f.ax + ex)), ty = max(90 + mw, min(H - 120 - mw, f.ay + ey))
             let k = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
             f.fx += (tx - f.fx) * k; f.fy += (ty - f.fy) * k
             if f.mode == .grab {
@@ -675,6 +691,20 @@ final class SlimeRig {
             }
         }
 
+        // press flat: as far as the finger went down (relative to the height when it began) the remembered shape squashes,
+        // wider by the inverse (area kept). The table is the bottom at the start; while pressing, home moves to "bottom on the
+        // table"; on release the table goes, home comes back, it floats up, and the flat shape relaxes at `recover`
+        flatOn = false
+        for f in fingers.values where f.flatOn && f.mode == .grab {
+            let target = max(mat.flatMin, 1 - max(0, f.fy - f.ay) / f.h0)
+            if abs(target - f.flat) > 1e-4 {
+                let r = target / f.flat
+                for i in 0..<N { QY[i] *= r; QX[i] /= r }
+                f.flat = target
+            }
+            flatOn = true; flatFloor = f.bot
+        }
+        if flatOn { var qb = -1e9; for i in bnd { qb = max(qb, QY[i]) }; flatQB = qb }
         // 候選 25 拉太遠滑脫: raw pull past 1.2× the limit for 120 ms lets go (lift and press again to grab), heaviest pop
         if mat.slip >= 0.5 {
             for f in fingers.values where f.mode == .grab {
@@ -858,7 +888,7 @@ final class SlimeRig {
             if f.mode == .grab {
                 // the patch follows the finger and, while pressed, spreads away from it (squashes flat)
                 for m in f.mem {
-                    let k = 0.55 * m.w
+                    let k = min(0.95, mat.grabK * m.w)   // grabK: clay 1.2, the whole patch follows (多米: could not pick up the middle)
                     X[m.i] += (f.fx + m.ox + m.dx * f.press - X[m.i]) * k
                     Y[m.i] += (f.fy + m.oy + m.dy * f.press - Y[m.i]) * k
                     if m.w > GWT[m.i] { GWT[m.i] = m.w }
@@ -1031,6 +1061,18 @@ final class SlimeRig {
                 X[j] -= dx * c * wj / sw; Y[j] -= dy * c * wj / sw
             }
         }
+        // no folding back (2026-11-01: next to the held point the ring folded into a little Z, like a flap turned up): two ring
+        // particles one apart stay at least 0.6 of their rest distance apart, so a sharp fold-back cannot form
+        if mat.ringGuard > 0 {
+            for k in 0..<nb {
+                let i = bnd[k], j = bnd[(k + 2) % nb]
+                let dx = X[j] - X[i], dy = Y[j] - Y[i], d = max(1e-6, hypot(dx, dy)), lo = bndL2[k] * 0.6
+                if d >= lo { continue }
+                let c = (d - lo) / d, wi = GRAB[i] ? 0.15 : 0.5, wj = GRAB[j] ? 0.15 : 0.5, sw = wi + wj
+                X[i] += dx * c * wi / sw; Y[i] += dy * c * wi / sw
+                X[j] -= dx * c * wj / sw; Y[j] -= dy * c * wj / sw
+            }
+        }
         // 3c non-penetration inside a group (same tentacle / body): keeps tentacles from thinning or folding.
         //    Different groups may overlap (one in front of the other), otherwise a pulled-across tentacle gets stuck.
         collide()
@@ -1042,15 +1084,18 @@ final class SlimeRig {
         let hx = homeX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
-        let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hy - gcy
+        let hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
+        let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hyF - gcy
         let padT = 90.0, padB = H - 120, padL = 8.0, padR = W - 8
         for i in 0..<N {
             if !GRAB[i] { X[i] += dx * kh; Y[i] += dy * kh }
+            if flatOn && Y[i] > flatFloor { Y[i] = flatFloor; PY[i] = Y[i] }   // the invisible table: no sinking, no bounce, free to slide
             if Y[i] < padT { Y[i] = padT }
             if Y[i] > padB { Y[i] = padB }
             if X[i] < padL { X[i] = padL }
             if X[i] > padR { X[i] = padR }
         }
+        if mat.ringGuard > 0 { ringGuard(); ringUnkink() }   // no boundary through boundary, little knots straightened; after the walls
     }
 
     private func rotateFree(by ang: Double, around cx: Double, _ cy: Double) {
@@ -1172,7 +1217,7 @@ final class SlimeRig {
         // nearMem: near the fingers (Gaussian, about 1.1R) the body is measured in the whole-body frame too. A pulled-out lump
         // reads as a rotation to the clusters and is cancelled (measured: a 0.9R pull remembered 7 pt)
         if mat.nearMem > 0 {
-            let g = clusters[gi], gs = fingers.values.filter { $0.mode == .grab }, k2 = 1 / (2.5 * R * R)
+            let g = clusters[gi], gs = fingers.values.filter { $0.mode == .grab }, k2 = 1 / (mat.nearR * mat.nearR * R * R)   // clay 3 = the whole lump
             if !gs.isEmpty {
                 for i in 0..<N {
                     var wf = 0.0
@@ -1201,7 +1246,7 @@ final class SlimeRig {
             // through shape matching, so nothing jumps (手感精修提案 第 28 條)
             let kr = min(1, 6 * dt)
             for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
-        } else if touched {
+        } else if touched && !(mat.ringGuard > 0 && ringCrossed()) {   // no memory on a crossed frame: a crossing must not become the shape
             // only after dwelling: within `dwellLo` a light press or a quick flick springs back,
             // from `dwellHi` on kneading remembers at full speed (輕按回彈，揉捏即留形)
             var g = 0.0
@@ -1406,6 +1451,88 @@ final class SlimeRig {
             d += bumpAmp[j] * (exp(-da * da / (2 * Self.bumpSig * Self.bumpSig)) - Self.bumpMean)
         }
         return d
+    }
+
+    /// No boundary through boundary (多米 2026-11-01: a pulled strand crossed the body and looked about to break). Particle
+    /// non-penetration only stops point against point; once stretched the ring is sparse and another edge slips between two points.
+    /// A ring particle keeps 0.45h from the other ring segments of its own group, on the side it was on last substep (PX). Judging
+    /// by "the outside" (a solid body's ring point should be outside any other segment) was tried: across a thin strand the two
+    /// edges are inside each other by the strand's thickness, and that pushed them into crossing. Runs after the walls; the crossings
+    /// came from the walls (the held patch pressed flat against a wall), so the finger also keeps off the walls
+    private static func segX(_ ax: Double, _ ay: Double, _ bx: Double, _ by: Double,
+                             _ cx: Double, _ cy: Double, _ dx: Double, _ dy: Double) -> Bool {
+        let d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx)
+        if abs(d) < 1e-12 { return false }
+        let u = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d, v = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d
+        return u > 0 && u < 1 && v > 0 && v < 1
+    }
+
+    /// Any crossing inside one group of the boundary ring (a tentacle, or the body).
+    private func ringCrossed() -> Bool {
+        let n = bnd.count
+        for i in 0..<n {
+            let a = bnd[i], b = bnd[(i + 1) % n]
+            for j in (i + 2)..<max(i + 2, n) {
+                if i == 0 && j == n - 1 { continue }
+                let p = bnd[j], q = bnd[(j + 1) % n]
+                if TID[a] == TID[p] && TID[b] == TID[q] && Self.segX(X[a], Y[a], X[b], Y[b], X[p], Y[p], X[q], Y[q]) { return true }
+            }
+        }
+        return false
+    }
+
+    /// Little knots straightened (2026-11-01: next to the held point two or three ring particles swapped order into a little Z the
+    /// one-apart distance rule could not stop): if two ring segments 2 to 5 apart cross, the particles between are laid back on
+    /// the straight line between the ends (position and previous position move together, the velocity stays)
+    private func ringUnkink() {
+        let n = bnd.count
+        for i in 0..<n {
+            let a = bnd[i], b = bnd[(i + 1) % n]
+            for s in 2...5 {
+                let j = (i + s) % n, p = bnd[j], q = bnd[(j + 1) % n]
+                if TID[a] != TID[p] { continue }
+                if !Self.segX(X[a], Y[a], X[b], Y[b], X[p], Y[p], X[q], Y[q]) { continue }
+                for m in 1...s {
+                    let c = bnd[(i + m) % n], f = Double(m) / Double(s + 1)
+                    let dx = X[a] + (X[q] - X[a]) * f - X[c], dy = Y[a] + (Y[q] - Y[a]) * f - Y[c]
+                    X[c] += dx; Y[c] += dy; PX[c] += dx; PY[c] += dy
+                }
+                break
+            }
+        }
+    }
+
+    private func ringGuard() {
+        let nb = bnd.count, dm = h * 0.45, far = dm * 4
+        for k in 0..<nb {
+            let p = bnd[k], xp = X[p], yp = Y[p]
+            for m in 0..<nb {
+                if m == k || (m + 1) % nb == k { continue }
+                let a = bnd[m], b = bnd[(m + 1) % nb]
+                if TID[a] != TID[p] || TID[b] != TID[p] { continue }
+                let xa = X[a], ya = Y[a], xb = X[b], yb = Y[b]
+                if xp < min(xa, xb) - far || xp > max(xa, xb) + far || yp < min(ya, yb) - far || yp > max(ya, yb) + far { continue }
+                let ex = xb - xa, ey = yb - ya, l2 = ex * ex + ey * ey
+                if l2 < 1e-9 { continue }
+                let u = ((xp - xa) * ex + (yp - ya) * ey) / l2
+                if u <= 0 || u >= 1 { continue }
+                let l = l2.squareRoot(), sn = ((xp - xa) * -ey + (yp - ya) * ex) / l
+                let pex = PX[b] - PX[a], pey = PY[b] - PY[a], pl = max(1e-9, hypot(pex, pey))
+                let sp = ((PX[p] - PX[a]) * -pey + (PY[p] - PY[a]) * pex) / pl
+                if abs(sp) > far { continue }
+                let side = sp >= 0 ? 1.0 : -1.0, cur = sn * side
+                if cur >= dm { continue }
+                // a pair that has really crossed (p's own two segments cut this one) is left to shape matching, which pulls it back
+                // to the uncrossed remembered shape; judged by the last substep alone, a crossing got locked in
+                let pm = bnd[(k + nb - 1) % nb], pn = bnd[(k + 1) % nb]
+                if Self.segX(X[pm], Y[pm], xp, yp, xa, ya, xb, yb) || Self.segX(xp, yp, X[pn], Y[pn], xa, ya, xb, yb) { continue }
+                let nx = -ey / l * side, ny = ex / l * side, push = dm - cur
+                let wp = GRAB[p] ? 0.3 : 1.0, wa = GRAB[a] ? 0.3 : 1.0, wb = GRAB[b] ? 0.3 : 1.0, ws = wp + wa * (1 - u) + wb * u
+                X[p] += nx * push * wp / ws; Y[p] += ny * push * wp / ws
+                X[a] -= nx * push * wa * (1 - u) / ws; Y[a] -= ny * push * wa * (1 - u) / ws
+                X[b] -= nx * push * wb * u / ws; Y[b] -= ny * push * wb * u / ws
+            }
+        }
     }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.

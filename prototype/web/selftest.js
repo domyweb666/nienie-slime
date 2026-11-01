@@ -256,18 +256,21 @@
     res.T19_pods = { spawned: seen.size, upper, anglesDeg: angs, maxOutPt: +maxOut.toFixed(1), worstSelfX: worst, areaMin: +minA.toFixed(3), areaMax: +maxA.toFixed(3) };
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
-  // T20 水母呼吸（2026-11-01 多米：規律的律動，像水母）：關掉偽足與蠕動，放著 15 秒，逐幀量身體寬高比（二階矩）與重心高度。
+  // T20 水母呼吸（2026-11-01 多米：規律的律動，像水母）：關掉偽足與蠕動，放著 30 秒，逐幀量身體寬高比（二階矩）與重心高度。
   //     收縮＝寬高比的谷底；量週期平均與標準差、寬高比擺幅、收縮佔一個週期的比例（從峰到谷）、上浮幾點
   { const clock = saveClock(); Math.random = seeded(20261105); resetAligned(1e9, { pods: 0, wriggle: 0 }); nextTwitch = 1e9;
     const asp = [], cy = [];
-    for (let f = 1; f <= 900; f++) { update(DT);
+    for (let f = 1; f <= 1800; f++) { update(DT);   // 30 秒：幅度調小之後 15 秒只量得到 3 個週期，標準差被雜訊撐大
       let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } mx /= N; my /= N;
-      let ixx = 0, iyy = 0; for (let i = 0; i < N; i++) { ixx += (X[i] - mx) ** 2; iyy += (Y[i] - my) ** 2; }
+      // 在身體自己的座標裡量（扣掉整身轉動）：身體 5.3 秒一次的慢搖會改變畫面座標的寬高比，跟 3 秒的呼吸疊成假的不規律（量過標準差 0.18 秒）
+      const ga = Math.atan2(globalC.sn, globalC.cs), gc = Math.cos(ga), gs = Math.sin(ga);
+      let ixx = 0, iyy = 0; for (let i = 0; i < N; i++) { const dx = X[i] - mx, dy = Y[i] - my, bx = gc * dx + gs * dy, by = -gs * dx + gc * dy; ixx += bx * bx; iyy += by * by; }
       asp.push(Math.sqrt(ixx / iyy)); cy.push(my); }
+    { const sm = asp.map((_, f) => { let s = 0, n = 0; for (let k = Math.max(0, f - 3); k <= Math.min(asp.length - 1, f + 3); k++) { s += asp[k]; n++; } return s / n; }); asp.splice(0, asp.length, ...sm); }   // 7 幀平均：幅度調小之後，谷底被逐幀雜訊拉偏（週期標準差 0.17 秒），先平滑再找
     const mins = [], maxs = []; for (let f = 2; f < asp.length - 2; f++) { if (asp[f] < asp[f - 1] && asp[f] <= asp[f + 1] && asp[f] < asp[f - 2] && asp[f] <= asp[f + 2]) mins.push(f); if (asp[f] > asp[f - 1] && asp[f] >= asp[f + 1] && asp[f] > asp[f - 2] && asp[f] >= asp[f + 2]) maxs.push(f); }
     const sig = (arr, keep) => { const o = []; for (const f of arr) if (!o.length || f - o[o.length - 1] > 60) o.push(f); else if (keep(f, o[o.length - 1])) o[o.length - 1] = f; return o; };
     const lo = sig(mins, (a, b) => asp[a] < asp[b]), hi = sig(maxs, (a, b) => asp[a] > asp[b]);
-    const per = []; for (let k = 1; k < lo.length; k++) per.push((lo[k] - lo[k - 1]) * DT);
+    const per = []; for (let k = 2; k < lo.length; k++) per.push((lo[k] - lo[k - 1]) * DT);   // 第一個週期是起步的過渡，不算
     const pm = per.reduce((s, x) => s + x, 0) / Math.max(1, per.length), ps = Math.sqrt(per.reduce((s, x) => s + (x - pm) ** 2, 0) / Math.max(1, per.length));
     const share = []; for (const m of lo) { const h = hi.filter(x => x < m).pop(); if (h !== undefined) share.push((m - h) * DT / pm); }
     const tail = asp.slice(120), cyt = cy.slice(120);
@@ -300,6 +303,34 @@
     res.T22_flatten = { heldAspectX: +held.toFixed(2), after1sAspectX: +a1.toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T23 一壓就攤平（2026-11-01 多米想看看）：單指按在頂端往內 0.15R、往下壓 1R（1 秒）、停 1 秒放手，
+  //     量握著與放手 1 秒的寬高比（原本的倍數）、握著時最低點有沒有穿過桌面（點）、零自交、面積回來
+  { const clock = saveClock(); Math.random = seeded(20261108); resetAligned(1e9); nextTwitch = 1e9;
+    const box = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); } return [x0, x1, y0, y1]; };
+    const b0 = box(), a0 = (b0[1] - b0[0]) / (b0[3] - b0[2]); let top = -1; for (const i of bnd) if (top < 0 || Y[i] < Y[top]) top = i;
+    const sx = X[top], sy = Y[top] + R * 0.15; let worst = 0, below = 0; ev('pointerdown', 1, sx, sy);
+    for (let k = 1; k <= 60; k++) { ev('pointermove', 1, sx, sy + R * k / 60); steps(1); worst = Math.max(worst, selfX()); below = Math.max(below, box()[3] - b0[3]); }
+    for (let k = 0; k < 60; k++) { steps(1); worst = Math.max(worst, selfX()); below = Math.max(below, box()[3] - b0[3]); }
+    const bh = box(), held = ((bh[1] - bh[0]) / (bh[3] - bh[2])) / a0; ev('pointerup', 1, sx, sy + R); steps(60);
+    const b1 = box(), a1 = ((b1[1] - b1[0]) / (b1[3] - b1[2])) / a0; for (let k = 0; k < 120; k++) { steps(1); worst = Math.max(worst, selfX()); }
+    res.T23_pressFlat = { heldAspectX: +held.toFixed(2), after1sAspectX: +a1.toFixed(2), floorPassPt: +below.toFixed(1), worstSelfX: worst, end: snap() }; log.splice(0);
+    restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T24 拉長再從中間拖過身體（2026-11-01 多米：交叉時像快壞掉）：往下拉 2.5R、放手 0.3 秒，抓那條的中間往左上拖過身體（1 秒）、停 0.5 秒放手。
+  //     逐幀數自交，ringGuard 開／關各跑一次比
+  { const clock = saveClock();
+    function crossRun(guard) { Math.random = seeded(20261109); resetAligned(1e9, { ringGuard: guard }); nextTwitch = 1e9;
+      let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] > Y[bi]) bi = i; const sx = X[bi], sy = Y[bi] - R * 0.15; let during = 0, frames = 0;
+      ev('pointerdown', 1, sx, sy); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, sx, sy + R * 2.5 * k / 40); steps(1); } ev('pointerup', 1, sx, sy + R * 2.5); steps(18);
+      const my = sy + R * 1.4; let xs = []; for (const i of bnd) if (Math.abs(Y[i] - my) < R * 0.2) xs.push(X[i]); const mx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : sx;
+      ev('pointerdown', 1, mx, my);
+      for (let k = 1; k <= 60; k++) { ev('pointermove', 1, mx - R * 1.6 * k / 60, my - R * 2.6 * k / 60); steps(1); const c = selfX(); during = Math.max(during, c); if (c) frames++; }
+      for (let k = 0; k < 30; k++) { steps(1); const c = selfX(); during = Math.max(during, c); if (c) frames++; }
+      ev('pointerup', 1, mx - R * 1.6, my - R * 2.6); let after = 0; for (let k = 0; k < 120; k++) { steps(1); const c = selfX(); after = Math.max(after, c); if (c) frames++; }
+      log.splice(0); return { worstDuring: during, worstAfter: after, crossFrames: frames, end: snap() }; }
+    res.T24_dragAcross = { guard: crossRun(1), noGuard: crossRun(0) };
+    restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames };
   res.PASS = {
@@ -328,11 +359,14 @@
     stickDelaysPop: res.T15_stick.slow.popFrame >= 6 && res.T15_stick.slow.heldAtLift > 0 && res.T15_stick.slow.fingersLeft === 0 && res.T15_stick.fastImmediate,
     // 捏觸手要留痕、慢慢退；v2.7 對照應該一秒內就幾乎彈回（量法本身還抓得到差別）。過程零自交、面積回來
     pullKeepsMark: res.T17_pullMark.now.after1s > 3 && res.T17_pullMark.now.after12s < 1.5 && res.T17_pullMark.now.foldFramesAfter === 0 && okArea(res.T17_pullMark.now.end),
-    podsGrowAnywhere: res.T19_pods.spawned >= 4 && res.T19_pods.upper > 0 && res.T19_pods.worstSelfX === 0 && res.T19_pods.areaMin > 0.95 && res.T19_pods.areaMax < 1.05 && res.T19_pods.maxOutPt > 0.4 * res.R,
+    podsGrowAnywhere: res.T19_pods.spawned >= 4 && res.T19_pods.upper > 0 && res.T19_pods.worstSelfX === 0 && res.T19_pods.areaMin > 0.95 && res.T19_pods.areaMax < 1.05 && res.T19_pods.maxOutPt > 0.25 * res.R,
     // 2026-11-01 多米：要能拉很長、攤很扁。往下拉 2.5R 握著要伸出 2R 以上、放手半秒還留 1.5R（之後照 recover 約 10 秒退）；
     // 兩指攤開放手 1 秒寬高比還是原本 1.3 倍以上；都不能自交、面積要回來
     sculptLong: res.T21_longPull.heldR > 2 && res.T21_longPull.after05sR > 1.5 && res.T21_longPull.worstSelfX === 0 && okArea(res.T21_longPull.end),
     sculptFlat: res.T22_flatten.after1sAspectX > 1.3 && res.T22_flatten.worstSelfX === 0 && okArea(res.T22_flatten.end),
+    // 一壓就攤平：握著寬高比 1.5 倍以上、放手 1 秒還有 1.3 倍、最低點不穿過桌面超過 3 點；邊不能穿邊：拖過身體時交叉幀數比關掉時少、放手後沒有交叉
+    pressFlattens: res.T23_pressFlat.heldAspectX > 1.5 && res.T23_pressFlat.after1sAspectX > 1.3 && res.T23_pressFlat.floorPassPt < 3 && res.T23_pressFlat.worstSelfX === 0 && okArea(res.T23_pressFlat.end),
+    noCrossing: res.T24_dragAcross.guard.worstAfter === 0 && res.T24_dragAcross.guard.crossFrames <= res.T24_dragAcross.noGuard.crossFrames,
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
