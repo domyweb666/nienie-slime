@@ -33,14 +33,14 @@
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
-  function reset() { mat = { ...PRESETS.clay, emo: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測
+  function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
   WANDER.moving = false; WANDER.next = t + 5; steps(60); }
   // 固定亂數＋歸零時鐘，T11、T12 用：結果可重現。setup() 不重設時鐘；時鐘動過要還原，不然上一輪 T2 的 relaxUntil 留在未來，下一輪的記形會被當成「揉回原形」
   function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const realRandom = Math.random;
   const saveClock = () => ({ t, lastTouch, nextTwitch, tLife, relaxUntil, wNext: WANDER.next, wMoving: WANDER.moving });
   function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; Math.random = realRandom; }
-  function resetAligned(wanderNext, over) { mat = { ...PRESETS.clay, emo: 0, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
+  function resetAligned(wanderNext, over) { mat = { ...PRESETS.clay, emo: 0, life2: 0, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
 
   // T1 輕按 0.1 秒：第一幀要動；12 秒後不留痕（2026-11-01 黏土改成約 10 秒退）
   reset();
@@ -446,6 +446,47 @@
     r33.foldFrames = xf; r33.end = snap();
     res.T33_mood = r33; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T34 活物感（v2.19，多米 build 73：沒有活物感、不像生物）。a 放著不碰 120 秒：休息（沒走、沒探）佔 0.35 到 0.65（v2.18 量到 0.02），有探有走，零自交、面積不漂；
+  //     b 按住中間 4 秒：呼吸還在（寬高比起伏是沒碰時的 0.35 以上，lifeHeld 0 時 0.15 以下）；放手 1 秒記形偏移不比 lifeHeld 0 多 1pt 以上（呼吸沒被記進形狀）；
+  //     c 晚一拍才縮：按下 0.05 秒面積跟 lifeFlinch 0 差不到 1.5%、0.3 秒時小 4% 以上；連按 5 下（間隔 0.6 秒），第 5 下不到第 1 下的三成；
+  //     d 一縮一衝：叫它往右走 1.5 個畫面寬，八成以上的下速度高峰落在這一下開始 0.35 秒內（收縮推它走），方向有變（最大減最小 > 8 度），停在目標 0.5R 內，零自交、面積不漂；
+  //     e 碰它右邊 1.8R 的空白處：0.6 秒內有一條偽足朝右（30 度內），按著時呼吸縮放還在變（沒凍住）；
+  //     f 抓右緣拉 1.6R 放手：0.25 到 0.45 秒開始甩、0.4 到 0.8 秒往手指離開的方向探（30 度內）。全程零對折
+  { const clock = saveClock(); Math.random = seeded(20261121); const r34 = {}; let xf = 0;
+    const L2 = o => resetAligned(1e9, { life2: 1, ...o });
+    const aspect = () => { let mx = 0, my = 0; for (const i of bnd) { mx += X[i]; my += Y[i]; } mx /= bnd.length; my /= bnd.length; const ga = Math.atan2(globalC.sn, globalC.cs), gc = Math.cos(ga), gs = Math.sin(ga); let ixx = 0, iyy = 0; for (const i of bnd) { const dx = X[i] - mx, dy = Y[i] - my, bx = gc * dx + gs * dy, by = -gs * dx + gc * dy; ixx += bx * bx; iyy += by * by; } return Math.sqrt(ixx / iyy); };
+    { L2({ emo: 1 }); const S = { rest: 0, look: 0, go: 0, arrive: 0 }, seen = new Set(); let goes = 0, prev = '', worst = 0, minA = 9, maxA = 0;
+      for (let f = 0; f < 7200; f++) { steps(1); S[LIFE.st]++; if (LIFE.st === 'go' && prev !== 'go') goes++; prev = LIFE.st; for (const s of LIFE.sns) seen.add(s);
+        if (f % 20 === 0) { worst = Math.max(worst, selfX()); const a = area() / A0; minA = Math.min(minA, a); maxA = Math.max(maxA, a); } }
+      r34.idle = { restFrac: +(S.rest / 7200).toFixed(2), lookFrac: +(S.look / 7200).toFixed(2), goFrac: +(S.go / 7200).toFixed(2), goes, sniffs: seen.size, worstSelfX: worst, areaMin: +minA.toFixed(3), areaMax: +maxA.toFixed(3) }; }
+    const held = o => { L2({ pods: 0, wriggle: 0, ...o }); LIFE.until = 1e9; let lo = 9, hi = 0; for (let k = 0; k < 360; k++) { steps(1); const a = aspect(); lo = Math.min(lo, a); hi = Math.max(hi, a); } const idle = hi - lo;
+      const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(60); lo = 9; hi = 0; for (let k = 0; k < 240; k++) { steps(1); if (classify()[0]) xf++; const a = aspect(); lo = Math.min(lo, a); hi = Math.max(hi, a); }
+      ev('pointerup', 1, cx, cy); steps(60); return { ratio: +((hi - lo) / idle).toFixed(2), qdev1s: +qdev().toFixed(2) }; };
+    { const on = held({}), off = held({ lifeHeld: 0 }); r34.held = { ratio: on.ratio, ratioOff: off.ratio, qdev1s: on.qdev1s, qdev1sOff: off.qdev1s }; }
+    const tapA = o => { L2(o); LIFE.until = 1e9; const cx = globalC.xc, cy = globalC.yc, a0 = area(); ev('pointerdown', 1, cx, cy); steps(3); const a05 = area() / a0; steps(15); const a30 = area() / a0; ev('pointerup', 1, cx, cy); steps(60); return { a05, a30 }; };
+    { const on = tapA({}), off = tapA({ lifeFlinch: 0 }); L2({}); LIFE.until = 1e9; const amps = [], cx = globalC.xc, cy = globalC.yc;
+      for (let n = 0; n < 5; n++) { ev('pointerdown', 1, cx, cy); steps(6); ev('pointerup', 1, cx, cy); steps(30); amps.push(FLN.last); }
+      r34.flinch = { at05: +(on.a05 / off.a05).toFixed(3), at30: +(on.a30 / off.a30).toFixed(3), fifthOverFirst: +(amps[4] / amps[0]).toFixed(2) }; }
+    { L2({ dash: 0 }); LIFE.until = 1e9; const tx = HOMEX + W * 1.5, ty = HOMEY; Object.assign(GAIT, { on: true, tx, ty, dash: false, ph: -1, prep: 0, v: 0, h: 0, k: 1, str: 1, last: false, off: 0 }); LIFE.st = 'go'; WANDER.moving = true;
+      const cen = () => { let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } return [mx / N, my / N]; };
+      let [px, py] = cen(), fr = 0, cur = null, lastPh = -2, worst = 0, minA = 9, maxA = 0; const st = [];
+      while ((GAIT.on || LIFE.st === 'arrive') && fr < 1800) { steps(1); fr++; const [x, y] = cen(), v = Math.hypot(x - px, y - py) / DT / R; px = x; py = y;
+        if (GAIT.on && GAIT.ph >= 0) { if (cur === null || GAIT.ph < lastPh) { cur = { v: 0, ph: 0, h: GAIT.h }; st.push(cur); } lastPh = GAIT.ph; if (v > cur.v) { cur.v = v; cur.ph = GAIT.ph; } }
+        if (fr % 6 === 0) { worst = Math.max(worst, selfX()); const a = area() / A0; minA = Math.min(minA, a); maxA = Math.max(maxA, a); } }
+      const hs = st.map(s => s.h * 180 / Math.PI);
+      r34.gait = { strokes: st.length, peakInContraction: +(st.filter(s => s.ph <= 0.35).length / Math.max(1, st.length)).toFixed(2), peakSpeedR: +Math.max(...st.map(s => s.v)).toFixed(2), headingSpreadDeg: +(Math.max(...hs) - Math.min(...hs)).toFixed(0), endDistR: +(Math.hypot(HOMEX - tx, HOMEY - ty) / R).toFixed(2), sec: +(fr / 60).toFixed(1), worstSelfX: worst, areaMin: +minA.toFixed(3), areaMax: +maxA.toFixed(3) }; }
+    { L2({}); LIFE.until = 1e9; const bx = globalC.xc + 1.8 * R, by = globalC.yc; ev('pointerdown', 4, bx, by); let best = 0, ang = 180, lo = 9, hi = 0;
+      for (let k = 0; k < 120; k++) { steps(1); lo = Math.min(lo, PSM[3]); hi = Math.max(hi, PSM[3]); if (k < 36) for (const s of LIFE.sns) { const e = sniffEnv(s); if (e > best) { best = e; ang = Math.abs(Math.atan2(Math.sin(s.a), Math.cos(s.a))) * 180 / Math.PI; } } }
+      ev('pointerup', 4, bx, by); r34.blank = { sniffEnv06s: +best.toFixed(2), angDeg: +ang.toFixed(0), breathRange: +(hi - lo).toFixed(4) }; }
+    { L2({}); LIFE.until = 1e9; let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b], v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+      let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);   // 手指用累加位移（鏡頭會動）
+      for (let k = 1; k <= 60; k++) { const tx = sx + 1.6 * R * Math.min(1, k / 30); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; }
+      const t0 = t; ev('pointerup', 1, q[0], q[1]); let att = -1, attAng = 180;
+      for (let k = 0; k < 90; k++) { steps(1); if (classify()[0]) xf++; if (att < 0) for (const s of LIFE.sns) if (sniffEnv(s) > 0.05) { att = t - t0; attAng = Math.abs(Math.atan2(Math.sin(s.a), Math.cos(s.a))) * 180 / Math.PI; } }
+      r34.release = { shakeAt: +(SHK.t0 - t0).toFixed(2), attendAt: +att.toFixed(2), attendAngDeg: +attAng.toFixed(0), end: snap() }; }
+    r34.foldFrames = xf;
+    res.T34_life = r34; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -475,6 +516,7 @@
 
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
+  const L9 = res.T34_life;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -522,6 +564,14 @@
     introFollow: res.T32_introFollow.introLands === 4 && res.T32_introFollow.landAspect < 0.9 && res.T32_introFollow.introSec < 3.2 && okArea(res.T32_introFollow.afterIntro) && res.T32_introFollow.skipOff && Math.abs(res.T32_introFollow.skipScale - 1) < 0.01 && res.T32_introFollow.skipFingers === 0 && res.T32_introFollow.followOutPt > 0 && res.T32_introFollow.followEndOff < PRESETS.clay.followStop + 0.1 && res.T32_introFollow.grabCamMovePt < 1 && res.T32_introFollow.foldFrames === 0,
     // 情緒：拉扯想逃（strain > 0.8、舒服變負、放手往反方向逃 0.4 畫面寬以上）、輕揉呼嚕（舒服、呼嚕 > 0.3、放手開心小跳）、連戳 3 下閃開；零對折、面積回來
     moodWorks: res.T33_mood.strainHeld > 0.8 && res.T33_mood.moodPulled < 0 && res.T33_mood.fleeStarted && res.T33_mood.fledW > 0.4 && okArea(res.T33_mood.afterFlee) && res.T33_mood.purrMax > 0.3 && res.T33_mood.comfortMax > 0.3 && res.T33_mood.happyHop && res.T33_mood.dartStarted && res.T33_mood.dartW > 0.15 && res.T33_mood.foldFrames === 0,
+    // v2.19 活物感：休息 0.35 到 0.65、有探有走；碰著呼吸還在、沒被記進形狀；晚一拍才縮、會習慣；一縮一衝的速度高峰在收縮那段、路線彎、走得到；
+    // 碰旁邊空白處會探、不凍住；拉完甩一甩、探手指離開的地方；全程零對折
+    lifeV219: L9.idle.restFrac > 0.35 && L9.idle.restFrac < 0.65 && L9.idle.sniffs >= 4 && L9.idle.goes >= 2 && L9.idle.worstSelfX === 0 && L9.idle.areaMin > 0.97 && L9.idle.areaMax < 1.03
+      && L9.held.ratio > 0.35 && L9.held.ratioOff < 0.15 && L9.held.qdev1s < L9.held.qdev1sOff + 1
+      && Math.abs(L9.flinch.at05 - 1) < 0.015 && L9.flinch.at30 < 0.96 && L9.flinch.fifthOverFirst < 0.3
+      && L9.gait.strokes >= 8 && L9.gait.peakInContraction >= 0.8 && L9.gait.headingSpreadDeg > 8 && L9.gait.endDistR < 0.5 && L9.gait.worstSelfX === 0 && L9.gait.areaMin > 0.97 && L9.gait.areaMax < 1.03
+      && L9.blank.sniffEnv06s > 0.3 && L9.blank.angDeg < 30 && L9.blank.breathRange > 0.005
+      && L9.release.shakeAt > 0.25 && L9.release.shakeAt < 0.45 && L9.release.attendAt > 0.4 && L9.release.attendAt < 0.8 && L9.release.attendAngDeg < 30 && L9.release.end.selfX === 0 && L9.foldFrames === 0,
     dentOnTap: res.T30_dent.heldDepth > 0.5 && res.T30_dent.after1s > 0.5 && res.T30_dent.after15s > 0.15 && res.T30_dent.after15s < res.T30_dent.after1s && res.T30_dent.dentsAfterPull === 0,
     // 從中間往右、往上拉 2R，那一側外圈要跟出去 1.5R 以上（v2.13 是 -0.08R）；零自交、面積回來
     pullFromMiddle: ['right', 'up'].every(k => res.T27_pullFromMiddle[k].edgeMovedR > 1.5 && res.T27_pullFromMiddle[k].worstSelfX === 0 && okArea(res.T27_pullFromMiddle[k].end)),
