@@ -410,6 +410,23 @@
     r31.foldFrames = xf; r31.end = snap();
     res.T31_press = r31; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T32 開場與鏡頭跟隨（v2.17，多米：打開時從遠處一跳一跳跑過來；鏡頭不要釘在中間，史萊姆會跑出畫面，鏡頭慢慢跟）：
+  //     開場要落地 4 次、落地那幾幀高寬比壓到平常的 0.9 以下、3.2 秒內結束、全程零對折、結束後面積回來；途中碰一下直接到家（0.5 秒內大小回到 1）；
+  //     家往右移 0.6 個畫面寬：身體要有一段跑出畫面、4 秒後鏡頭追到中心附近（0.2 個半畫面內）；抓著時鏡頭不動
+  { const clock = saveClock(); Math.random = seeded(20261119); const r32 = {}; let xf = 0;
+    const asp = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); } return (y1 - y0) / (x1 - x0); };
+    resetAligned(1e9); nextTwitch = 1e9; const a0 = asp(); startIntro(); let lands = 0, prev = INTRO.ph, minA = 9, fr = 0;
+    while (INTRO.on && fr < 600) { steps(1); fr++; if (classify()[0]) xf++; if (INTRO.ph === 'land' && prev !== 'land') lands++; if (INTRO.ph === 'land') minA = Math.min(minA, asp()); prev = INTRO.ph; }
+    steps(120); r32.introLands = lands; r32.introSec = +(fr / 60).toFixed(2); r32.landAspect = +(minA / a0).toFixed(2); r32.afterIntro = snap();
+    resetAligned(1e9); nextTwitch = 1e9; startIntro(); steps(40); { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 2, cx, cy); ev('pointerup', 2, cx, cy); }
+    steps(30); r32.skipOff = !INTRO.on; r32.skipScale = +IV.s.toFixed(3); r32.skipFingers = fingers.size;
+    resetAligned(1e9); nextTwitch = 1e9; WANDER.next = 1e9; const v = viewV(), H0 = HOMEX, half = (W - 16) / 2; let outMax = -1e9;
+    for (let k = 1; k <= 240; k++) { HOMEX = H0 + W * 0.6 * Math.min(1, k / 150); steps(1); if (classify()[0]) xf++; let x1 = -1e9; for (const i of bnd) x1 = Math.max(x1, (X[i] - CAM.x) * CAM.z + v.x); outMax = Math.max(outMax, x1 - W); }
+    r32.followOutPt = +outMax.toFixed(0); r32.followEndOff = +(Math.abs((globalC.xc - CAM.x) * CAM.z) / half).toFixed(2);
+    { const cx = (globalC.xc - CAM.x) * CAM.z + v.x, cy = (globalC.yc - CAM.y) * CAM.z + v.y, c0 = CAM.x; ev('pointerdown', 3, cx, cy); steps(60); r32.grabCamMovePt = +Math.abs(CAM.x - c0).toFixed(2); ev('pointerup', 3, cx, cy); steps(60); }
+    r32.foldFrames = xf; r32.end = snap();
+    res.T32_introFollow = r32; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -482,6 +499,8 @@
     // 點一下：按 0.1 秒凹痕深過 0.5、1 秒後還在、15 秒淡了但還看得到（0.15 以上）；拉開的那次凹痕收掉
     // 按壓：整團變大 4% 到 15%、關掉時不變；按 3 秒的最遠位移不超過 1.5 秒的 1.3 倍；黏土放手 1 秒凹痕還在；果凍過頭彈、1 秒收乾淨；零自交
     pressReal: res.T31_press.clayArea08 > 1.04 && res.T31_press.clayArea08 < 1.15 && res.T31_press.offArea08 < 1.01 && res.T31_press.clayMove3 < res.T31_press.clayMove15 * 1.3 && res.T31_press.clayDent1s > 0.5 && res.T31_press.jellyOvershoot < -0.1 && res.T31_press.jellyDentsAfter1s === 0 && res.T31_press.foldFrames === 0,
+    // 開場：落地 4 次、落地壓扁到 0.9 以下、3.2 秒內、碰一下直接到家；鏡頭跟隨：會跑出畫面、4 秒後追到中心附近、抓著時鏡頭不動；全程零對折
+    introFollow: res.T32_introFollow.introLands === 4 && res.T32_introFollow.landAspect < 0.9 && res.T32_introFollow.introSec < 3.2 && okArea(res.T32_introFollow.afterIntro) && res.T32_introFollow.skipOff && Math.abs(res.T32_introFollow.skipScale - 1) < 0.01 && res.T32_introFollow.skipFingers === 0 && res.T32_introFollow.followOutPt > 0 && res.T32_introFollow.followEndOff < 0.2 && res.T32_introFollow.grabCamMovePt < 1 && res.T32_introFollow.foldFrames === 0,
     dentOnTap: res.T30_dent.heldDepth > 0.5 && res.T30_dent.after1s > 0.5 && res.T30_dent.after15s > 0.15 && res.T30_dent.after15s < res.T30_dent.after1s && res.T30_dent.dentsAfterPull === 0,
     // 從中間往右、往上拉 2R，那一側外圈要跟出去 1.5R 以上（v2.13 是 -0.08R）；零自交、面積回來
     pullFromMiddle: ['right', 'up'].every(k => res.T27_pullFromMiddle[k].edgeMovedR > 1.5 && res.T27_pullFromMiddle[k].worstSelfX === 0 && okArea(res.T27_pullFromMiddle[k].end)),
