@@ -108,9 +108,14 @@ final class SlimeController: ObservableObject {
             if purrClock >= 0.5 { purrClock = 0; purrSecond = 0.09; haptics.transient(intensity: 0.12 + 0.25 * min(1, pk), sharpness: 0.05) }
             if purrSecond > 0 { purrSecond -= dt; if purrSecond <= 0 { haptics.transient(intensity: 0.07 + 0.15 * min(1, pk), sharpness: 0.05) } }
         } else { purrClock = 0.5; purrSecond = 0 }
+        // v2.19 A4: held still for 0.8 s, each breath comes through the finger as one very soft tap (the purr takes over once it purrs)
+        if p.life2 >= 0.5 && p.lifeHeld >= 0.5 && pk <= 0.05 && rig.heldStill > 0.8 && rig.breathBeat != lastBreathBeat {
+            haptics.transient(intensity: 0.11, sharpness: 0.05)
+        }
+        lastBreathBeat = rig.breathBeat
         haptics.flush()
     }
-    private var purrClock = 0.5, purrSecond = 0.0
+    private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0
 
     func report(_ s: SlimeView.FrameStats) { stats = s }
 

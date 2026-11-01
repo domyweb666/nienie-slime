@@ -134,6 +134,18 @@ struct FeelParams: Equatable, Codable {
     var followSpeed: Double = 1.4     // follow spring (rad/s), critically damped; 1.4 catches up in about 2 s
     var dash: Double = 0.25           // chance a wander walks far and fast (2.5× speed); the camera lags and it leaves the screen a bit
     var specks: Double = 1            // 1: faint fixed specks far behind (parallax 0.55) so a moving camera reads as moving
+    // v2.19 (多米 build 73: no sense of life, it does not read as a creature; is the shadow needed?) .uiux/04-手感/活物感提案-暫定.md
+    var life2: Double = 1             // master: the A1...A8 below; 0 = v2.18 (the switches below only count while this is 1)
+    var lifeRest: Double = 1          // A1 A2: mostly resting (breath only, wriggle down), a pseudopod sniffs a direction, 65% then go that way; 0: v2.18 walk-and-pause, random pods, twitches
+    var lifeGait: Double = 1          // A3: it moves by contracting (gather, each stroke surges forward then glides, a curved path, a bump on arrival); 0: v2.18 glide
+    var lifeHeld: Double = 1          // A4: keeps breathing while held; a finger on empty space does not freeze it
+    var lifeFlinch: Double = 1        // A5: flinches 0.1...0.25 s after a touch and gets used to it; shakes off after a hard pull
+    var lifeBreath: Double = 1        // A6: each breath a little different, a sigh every 30...90 s, panting after running
+    var lifeAttend: Double = 1        // A7: sniffs toward where your finger left, and toward a touch on empty space nearby (does not walk there)
+    var shadow: Double = 0            // A8: 1 draws the shadow (v2.18); 0 none (floating and walking every way, a shadow contradicts the space). Always drawn with life2 0
+    var heldBreath: Double = 0.75     // breathing while held, share of normal (the pinned middle eats some: 0.75 reads as about 0.6)
+    var restWrig: Double = 0.3        // wriggle while resting, share of normal (looking 0.6, walking 0.5)
+    var flinchAmp: Double = 0.05      // how much the flinch shrinks it (resting ×1.2, comfortable ×0.5, each flinch ×0.55, back with a 7 s time constant)
     var dens: Double = 12             // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -200,7 +212,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
-        p.camFollow = 0; p.wander = 0.22; p.emo = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18
+        p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
@@ -265,7 +277,8 @@ struct Candidate: Identifiable {
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
-            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+        Candidate(id: 218, name: "v2.18 對照（沒有 v2.19 活物感）", hint: "一直在動、被拖著滑過去、一碰全停、固定節拍呼吸、隨機偽足、有影子") { p, _ in p.life2 = 0 },
         Candidate(id: 216, name: "v2.16 對照（鏡頭釘在中間）", hint: "鏡頭不跟、整隻一定在畫面裡、遊走只在中間一小塊") { p, _ in p.camFollow = 0 },
         Candidate(id: 215, name: "v2.15 對照（月牙凹痕）", hint: "按壓只有那一小塊攤開、凹痕是左上一彎硬邊月牙、0.08 秒到底，放手不分材質一樣淡") { p, _ in p.press2 = 0 },
         Candidate(id: 270, name: "v2.7 對照（舊外形）", hint: "海星外形五條觸手、固定行進波蠕動、正弦呼吸、黏土輕捏回彈") { p, m in m.applyV27(&p) },
@@ -300,6 +313,17 @@ struct TuneField: Identifiable {
         TuneField(key: \.followSpeed, name: "鏡頭追的快慢", hint: "彈簧頻率（每秒弧度）；1.4 約 2 秒追上，越大越緊", range: 0.4...5, step: 0.1),
         TuneField(key: \.dash, name: "走遠的機率", hint: "每次遊走有多少機率走遠、走快（2.5 倍速），鏡頭跟不上就會跑出畫面一點", range: 0...1, step: 0.05),
         TuneField(key: \.specks, name: "背景光點", hint: "1：遠處固定的淡光點，鏡頭動的時候看得出來", range: 0...1, step: 1),
+        TuneField(key: \.life2, name: "活物 v2.19", hint: "1：動靜分明、一縮一衝地走、碰著也在呼吸、晚一拍才縮、會喘、會探你碰的地方、沒有影子；0 回 v2.18（底下 A1 到 A8 只在這裡是 1 時有用）", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.lifeRest, name: "A1 A2 休息與張望", hint: "1：大半時間休息（只呼吸、蠕動變小）；伸一條偽足探一個方向，七成往那邊走；0：v2.18 的走走停停、隨機偽足、偶爾抖", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.lifeGait, name: "A3 一縮一衝", hint: "1：走路靠收縮出力（先蓄力、每一下收縮往前衝再滑停、路線彎、到了往前晃一下）；0：v2.18 平滑滑過去", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.lifeHeld, name: "A4 碰著也在呼吸", hint: "1：抓著按著時呼吸照跑，按住不動時每次吸氣輕輕震一下；按在空白處不會整隻凍住；0：v2.18 一碰全停", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.lifeFlinch, name: "A5 晚一拍才縮", hint: "1：碰到 0.1 到 0.25 秒後自己縮一下，連續碰會習慣、越縮越小；大力拉完放手甩一甩；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.lifeBreath, name: "A6 呼吸像生理", hint: "1：每一下快慢不同、30 到 90 秒一次大口呼吸、跑完會喘；0：v2.18 固定節拍", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.lifeAttend, name: "A7 探你碰的地方", hint: "1：放手後往你手指離開的地方探一下；碰它旁邊的空白處，它轉過去探（不走過去）；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.shadow, name: "A8 影子", hint: "1：畫影子（v2.18）；0：不畫（v2.19）。活物總開關 0 時一律畫", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
+        TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
+        TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）", range: 0...0.15, step: 0.01, section: "活物感"),
         TuneField(key: \.press2, name: "按壓真實版", hint: "1：v2.16 按壓（整團壓薄攤開、凹痕跟著身體變形、先快後慢地沉、放手依材質回彈、亮光被擠開、影子變深）；0 是 v2.15 的月牙凹痕", range: 0...1, step: 1),
         TuneField(key: \.pressArea, name: "壓薄攤開：面積", hint: "按到底時整團面積多幾成（從正面按下去前後變薄，看起來變大一圈）", range: 0...0.15, step: 0.01),
         TuneField(key: \.pressSpread, name: "壓薄攤開：手指附近（×半徑）", hint: "手指周圍那圈往外推多少（離手指約 0.3R 推最多）", range: 0...0.3, step: 0.01),

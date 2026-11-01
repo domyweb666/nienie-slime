@@ -139,6 +139,33 @@ final class SlimeRig {
     private var introMini = false
     /// Purr strength 0...1 (the controller turns it into soft taps).
     private(set) var purr = 0.0
+    // v2.19 活物感 (多米 build 73: no sense of life, it does not read as a creature; .uiux/04-手感/活物感提案-暫定.md).
+    // rest / look / go / arrive (A1, A2). sniffs: pseudopods reaching out to sniff (a = screen angle, L length, T1 out, T2 hold, T3 back;
+    // cut: touched or flinching, drawn in within 0.15 s); att: a point queued to sniff at (A7); lifeWrg: wriggle share; goFade: the
+    // jellyfish pulse fades while walking (the contraction is the walking); lifeUntil −1 = choose on the next frame
+    private enum LifeState { case rest, look, go, arrive }
+    private struct Sniff { var a, L, t0, T1, T2, T3, ph: Double; var cut = 0.0, eCut = 0.0 }
+    private var lifeSt = LifeState.rest, lifeUntil = -1.0, lifeLooks = 0, lifeNoGo = false, sniffs: [Sniff] = []
+    private var attOn = false, attAt = 0.0, attX = 0.0, attY = 0.0
+    private var lifeWrg = 1.0, goFade = 0.0, lastDir = 0.0
+    private var arrT = -9.0, arrH = 0.0, arrA = 0.0, arrK = 0.0, arrK0 = 1.0, arrOff = 0.0
+    // gait (A3): ph < 0 gathering before setting off; each stroke P s, the first c s contract and surge, then relax and glide;
+    // k = stretch along the heading; off = the gathering draw-back
+    private var gaitOn = false, gaitTX = 0.0, gaitTY = 0.0, gaitDash = false, gaitPh = -1.0, gaitPrep = 0.0
+    private var gaitV = 0.0, gaitVP = 0.0, gaitH = 0.0, gaitK = 1.0, gaitStr = 1.0, gaitLast = false, gaitOff = 0.0
+    // flinch (A5): at = when, t0 = started, amp, H = habituation (×0.55 a flinch, back with a 7 s time constant), s = current scale,
+    // pre = what it was doing before the touch (resting flinches more)
+    private var flAt = -9.0, flT0 = -9.0, flAmp = 0.0, flH = 1.0, flS = 1.0, flPre = LifeState.rest
+    private var shkAt = -9.0, shkT0 = -9.0, shkAmp = 0.0, shkTh = 0.0      // shaking off after a hard pull; th = how far it is turned now
+    // breath (A6): exert = panting 0...1 (4 s time constant, 8...10 s to normal); a sigh every 30...90 s, then a 1 s pause
+    private var exert = 0.0, sighNext = -1.0, sighCyc = -1, pauseUntil = -9.0, brAmpX = 1.0, brCyc = 0
+    private var strK = 1.0, strH = 0.0                                     // stretched along the heading while walking or fleeing (area kept)
+    private var psm = (a: 1.0, b: 0.0, c: 0.0, d: 1.0)                     // this substep's performed scaling of the rest shape; memory takes it off
+    private var lifeLB = 1.0                                               // breathing amplitude (it goes on while held)
+    private var SX2: [Double] = [], SY2: [Double] = []                     // where the performed scaling alone would put each particle in rest space
+    /// v2.19 A4: one count per breath (each contraction), for the soft tap while held still.
+    private(set) var breathBeat = 0
+    private func lv(_ v: Double) -> Bool { params.life2 >= 0.5 && v >= 0.5 }
 
     /// Four hops in place at home: squash to gather before take-off (rest shape wider and lower), stretch in the air, the landing left
     /// to gravity and the floor (it really hits it, so no two wobbles are alike). Distance is drawn: it starts up-right at 0.15×, each
@@ -220,7 +247,14 @@ final class SlimeRig {
             let p = min(1, (t - escT0) / escT), e = 1 - pow(1 - p, 3)
             let nx = escSX + (escDX - escSX) * e, ny = escSY + (escDY - escSY) * e
             wanderVX = (nx - homeX) / dt; wanderVY = (ny - homeY) / dt; homeX = nx; homeY = ny
-            if p >= 1 { escOn = false; cowerUntil = t + 1.2 + Double.random(in: 0..<0.8); wanderNext = max(wanderNext, t + 2 + Double.random(in: 0..<1.5)) }
+            if lv(params.lifeGait) { strK = 1 + 0.15 * pow(1 - p, 2) * (reduceMotion ? 0.5 : 1); strH = atan2(escDY - escSY, escDX - escSX) }   // v2.19: stretched along the dash
+            if p >= 1 {
+                escOn = false; cowerUntil = t + 1.2 + Double.random(in: 0..<0.8); wanderNext = max(wanderNext, t + 2 + Double.random(in: 0..<1.5))
+                if params.life2 >= 0.5 {   // v2.19 A6: out of breath after running away
+                    if lv(params.lifeBreath) { exert = max(exert, 0.8) }
+                    lifeSt = .rest; lifeUntil = cowerUntil + 1 + Double.random(in: 0..<1)
+                }
+            }
         }
     }
     private func endIntro() {
@@ -330,6 +364,7 @@ final class SlimeRig {
         var radius = 0.0                             // UITouch.majorRadius, points (0 = unknown)
         var r0 = 0.0, prS = 0.0                      // radius baseline at landing, smoothed radius pressure 0...1 (提案第 9 條)
         var gentleT = 0.0, strainT = 0.0             // v2.18: how long it has been a gentle stroke / a hard pull
+        var hitT = -9.0, stillT = 0.0                // v2.19: last time a push touched the body (A4); how long it has been held still (breath tap)
         var tickAt = 0.0, tickNext = 0.0             // texture ticks: travel at the last tick, spacing to the next (提案第 13 條)
         var step = 0
         var stretch = 0.0                            // tanh-limited stretch at the last update, in radii
@@ -560,6 +595,11 @@ final class SlimeRig {
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
         brPhase = 0; brPrev = 0; brAmp = 1; brWave = 0; brDeepAt = -99; brGrabStart = -1; pinchA = nil; pinchB = nil
+        // v2.19
+        lifeSt = .rest; lifeUntil = -1; lifeLooks = 0; lifeNoGo = false; sniffs = []; attOn = false; lifeWrg = 1; goFade = 0; arrT = -9; arrOff = 0
+        gaitOn = false; gaitK = 1; gaitOff = 0; gaitV = 0; flAt = -9; flT0 = -9; flAmp = 0; flH = 1; flS = 1; shkAt = -9; shkT0 = -9; shkAmp = 0; shkTh = 0
+        exert = 0; sighNext = -1; sighCyc = -1; pauseUntil = -9; brAmpX = 1; brCyc = 0; strK = 1; psm = (1, 0, 0, 1); lifeLB = 1
+        SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
     }
 
     private func buildClusters() {
@@ -807,6 +847,15 @@ final class SlimeRig {
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         if grab { escOn = false }   // v2.18: caught, it stops running
+        // v2.19: caught, the sniffing pseudopods draw in and it stops walking; A5 the dent still shows at once (below) and 0.1...0.25 s
+        // later it flinches by itself; A7 a touch on empty space within 3R makes it turn and sniff that way 0.3 s later
+        if grab && lv(params.lifeFlinch) && !(flAt > t) { flAt = t + 0.1 + Double.random(in: 0..<0.15); flPre = lifeSt }
+        if grab && params.life2 >= 0.5 { cutSniffs(); gaitOn = false; gaitK = 1; wanderMoving = false; lifeSt = .rest; lifeUntil = -1 }
+        if !grab && allowed && lv(params.lifeAttend) {
+            var db = 1e9
+            for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }
+            if db < R * 3 { attOn = true; attAt = t + 0.3; attX = x; attY = y }
+        }
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
         f.radius = radius; f.r0 = radius
         f.sx = sx; f.sy = sy
@@ -907,8 +956,9 @@ final class SlimeRig {
         guard let f = fingers.removeValue(forKey: id) else { return }
         for m in f.mem { GRAB[m.i] = false }
         for dn in dentList where dn.finger == id { dn.finger = nil }
-        lastTouch = t
+        if !lv(params.lifeHeld) || f.mode == .grab || f.hitT > -9 { lastTouch = t }   // v2.19 A4: a finger that never touched the body does not restart the fade-in
         if f.mode == .grab && !quiet { moodRelease(f) }
+        if f.mode == .grab && !quiet && params.life2 >= 0.5 { lifeRelease(f) }
         if f.mode == .grab && !quiet {
             // release strength: how fast it was flicked (peak speed over the last ~80 ms) or how far it was
             // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
@@ -1054,6 +1104,7 @@ final class SlimeRig {
             f.peak = max(hypot(f.vx, f.vy), f.peak * exp(-dt / 0.08))
             f.speedC += (f.travelFrame / dt - f.speedC) * kv
             f.travelFrame = 0
+            f.stillT = hypot(f.vxS, f.vyS) < R * 0.5 ? f.stillT + dt : 0   // v2.19 A4: held still long enough, each breath taps softly
 
             var ex = f.x - f.ax, ey = f.y - f.ay
             let el = hypot(ex, ey), lim = mat.maxPull * R
@@ -1152,7 +1203,10 @@ final class SlimeRig {
         }
 
         // idle life: only when nobody is touching, fading in over a second after release
-        let idle = fingers.isEmpty ? min(1, max(0, (t - lastTouch - 0.8) / 1.2)) : 0
+        // v2.19 A4: only a finger really on the body (grabbing, or pushing it) counts; a finger on empty space does not freeze it
+        var engaged = false
+        for f in fingers.values where !lv(mat.lifeHeld) || f.mode == .grab || t - f.hitT < 0.3 { engaged = true }
+        let idle = engaged ? 0 : min(1, max(0, (t - lastTouch - 0.8) / 1.2))
         let L = idle * (reduceMotion ? 0.5 : 1)
         // 提案第 19 條: with idleFreeze the idle motion keeps its amplitude and only its clock stops while touched
         // (the body holds its breath instead of snapping to the rest pose); L still gates twitch, wander and sway
@@ -1160,6 +1214,14 @@ final class SlimeRig {
         let freeze = mat.idleFreeze >= 0.5
         let Lamp = freeze ? (reduceMotion ? 0.5 : 1) : L
         let tl = freeze ? tLife : t
+        lifeLB = lv(mat.lifeHeld) ? max(Lamp, mat.heldBreath * (reduceMotion ? 0.5 : 1)) : Lamp   // v2.19 A4: the breathing goes on while held
+        exert *= exp(-dt / 4)
+        do {
+            let tw: Double = !lv(mat.lifeRest) ? 1 : (lifeSt == .rest ? mat.restWrig : (lifeSt == .look ? 0.6 : 0.5))
+            lifeWrg += (tw - lifeWrg) * (1 - exp(-dt / 0.8))   // v2.19 A1: the wriggle drops while resting
+            let gf: Double = lv(mat.lifeGait) && (gaitOn || lifeSt == .arrive) ? 1 : 0
+            goFade += (gf - goFade) * (1 - exp(-dt / 0.25))   // A3: the jellyfish pulse fades while walking; the contraction is the walking
+        }
         // 提案第 23 條 breathing: accumulated phase (the period can change without a jump); at the control values
         // (3.8 s sine) this is exactly the old waveform
         do {
@@ -1180,7 +1242,21 @@ final class SlimeRig {
                 let f = max(0, 1 - (t - brDeepAt) / 20)
                 amp = 1 + 0.5 * f; T *= 1 + 0.2 * f
             }
-            brPhase += (tl - brPrev) / T; brPrev = tl; brAmp = amp
+            brAmpX = 1
+            if lv(mat.lifeBreath) {
+                // v2.19 A6: each breath a little different (smooth noise ±15%); panting (exert) twice as fast and 30% shallower; a sigh
+                // every 30...90 s (1.8× deeper, 1.6× slower), then a 1 s pause before the next
+                if sighNext < 0 { sighNext = t + 30 + Double.random(in: 0..<60) }
+                let ex = exert, cyc = Int(floor(brPhase))
+                T *= (1 + 0.15 * Self.vnoise(77, brPhase * 0.9)) * (1 - 0.5 * ex); brAmpX = 1 - 0.3 * ex
+                if sighCyc < 0 && t > sighNext && ex < 0.2 && lifeSt != .go { sighCyc = cyc + 1 }
+                if cyc == sighCyc { T *= 1.6; brAmpX *= 1.8 }
+                else if sighCyc >= 0 && cyc > sighCyc { sighCyc = -1; pauseUntil = t + 1; sighNext = t + 30 + Double.random(in: 0..<60) }
+            }
+            amp *= brAmpX
+            if t >= pauseUntil { brPhase += (tl - brPrev) / T }
+            brPrev = tl; brAmp = amp
+            do { let c = Int(floor(brPhase)); if c != brCyc { brCyc = c; breathBeat &+= 1 } }   // v2.19 A4: one count per breath
             let ph = brPhase - floor(brPhase)
             // 23b: inhale 40%, exhale 55%, pause 5%
             if mat.breathShape >= 0.5 {
@@ -1197,8 +1273,8 @@ final class SlimeRig {
             let ph = brPhase - floor(brPhase), c = 0.22
             let w = ph < c ? sin(.pi / 2 * ph / c) : 0.5 * (1 + cos(.pi * (ph - c) / (1 - c)))
             let dw = w - brJw
-            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare))
-            if dw > 0 { brLift += dw * mat.jellyLift * R * Lamp * mat.life }
+            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare)) * brAmpX
+            if dw > 0 { brLift += dw * mat.jellyLift * R * Lamp * mat.life * (1 - goFade) }
         }
         brLift *= exp(-dt / 1.0)
         // pseudopods: born, grow, hold, retract, gone. Their clock runs with the idle life (stops while touched) at idlePace
@@ -1207,7 +1283,7 @@ final class SlimeRig {
             for k in pods.indices { pods[k].p += adv / pods[k].D }
             pods.removeAll { $0.p >= 1 }
             podClock += adv
-            if mat.pods > 0 && pods.count < Int(mat.pods.rounded()) && podClock >= podNext {
+            if mat.pods > 0 && !lv(mat.lifeRest) && pods.count < Int(mat.pods.rounded()) && podClock >= podNext {   // v2.19 A2: no random pods, pseudopods only sniff
                 var a = 0.0
                 for _ in 0..<10 {
                     a = Double.random(in: 0..<(2 * .pi))
@@ -1240,6 +1316,17 @@ final class SlimeRig {
                     podE.append((cos(aw), sin(aw), R * 0.32 * e * rm, 0.2, 1.1 * sin(2 * .pi * 2.5 * wt)))
                 }
             }
+            // v2.19 A2, A7 sniffing: a pseudopod out toward that way, its tip swaying a little while it holds (as if smelling), plus a
+            // very wide bulge so the body leans that way; dropped once drawn back in
+            if !sniffs.isEmpty && !clusters.isEmpty {
+                let ga = atan2(clusters[gi].sn, clusters[gi].cs), rm = reduceMotion ? 0.5 : 1.0
+                sniffs.removeAll { sniffEnv($0) <= 0 && t > $0.t0 + 0.1 }
+                for s in sniffs {
+                    let e = sniffEnv(s), ar = s.a - ga, ca = cos(ar), sa = sin(ar)
+                    podE.append((ca, sa, s.L * R * e * rm, 0.2, 0.3 * sin(t * 5.3 + s.ph) * min(1, 2 * e)))
+                    podE.append((ca, sa, R * 0.07 * e * rm, 0.85, 0))
+                }
+            }
             // area: along the reference boundary, the area the pods add (∮ r·Δr + Δr²/2 dθ), taken back all round with the
             // same (r/Rb)² weight (only subtracting each pod's mean left the area 3% to 5% high)
             podShift = 0
@@ -1265,9 +1352,11 @@ final class SlimeRig {
         // wandering home (提案第 20、31 條): pick a spot, walk there with a smoothstep speed profile (6p(1−p): same average
         // speed and the same walk-then-rest rhythm as the constant-speed version), rest a while; stop when touched.
         // Reduce Motion halves the speed again (×0.25 together with L)
-        wanderVX = 0; wanderVY = 0
+        wanderVX = 0; wanderVY = 0; strK = 1
         moodStep(dt)
-        if L > 0.5 && mat.wander > 0 && !introOn && !escOn && t > cowerUntil {
+        if mat.life2 >= 0.5 {
+            lifeStep(dt, idle, engaged)   // v2.19: rest / look / go / arrive + the pulse gait + flinch, shake-off + sniffing (with lifeRest and lifeGait off, v2.18's walk-and-pause)
+        } else if L > 0.5 && mat.wander > 0 && !introOn && !escOn && t > cowerUntil {
             if !wanderMoving && t > wanderNext {
                 wanderSX = homeX; wanderSY = homeY
                 var sp = 1.0
@@ -1364,6 +1453,7 @@ final class SlimeRig {
                     }
                 }
                 // a finger pushing in from outside gets its sound and tap the first time it displaces anything
+                if hit { f.hitT = t }   // v2.19 A4: tells a finger really on the body from one on empty space
                 if hit && !f.pushed { f.pushed = true; onEvent?(.press(gain: 0.5)) }
             }
         }
@@ -1377,9 +1467,10 @@ final class SlimeRig {
             posX = (1 + 0.05 * cp) * (1 - 0.04 * hp) * (1 - 0.06 * cw); posY = (1 - 0.06 * cp) * (1 + 0.07 * hp) * (1 - 0.06 * cw)
             trm = R * 0.016 * min(1, moodStrain + moodScare) * (reduceMotion ? 0.5 : 1)
         }
+        if shkT0 > 0 && t >= shkT0 && t < shkT0 + 0.6 { trm += R * 0.025 * shkAmp * exp(-(t - shkT0) / 0.2) * (reduceMotion ? 0.5 : 1) }   // v2.19 shaking off: the outline trembles too
         let sp = mat.press2 >= 0.5 ? sqrt(max(0.5, 1 + mat.pressArea * pressSum)) : 1
-        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = (1 + bs) * sp * (1 + introSq) * posX, bsy = (1 - bs * 0.85) * sp * (1 - introSq) * posY   // 提案第 23 條: waveform from update()
-        let wr = Lamp * mat.life * mat.wriggle * R * (1 - 0.5 * max(0, moodC)), swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
+        let bs = lifeLB * mat.life * 0.045 * brAmp * brWave * (1 - goFade), bsx = (1 + bs) * sp * (1 + introSq) * posX, bsy = (1 - bs * 0.85) * sp * (1 - introSq) * posY   // 提案第 23 條: waveform from update()
+        let wr = Lamp * mat.life * mat.wriggle * R * (1 - 0.5 * max(0, moodC)) * lifeWrg, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
         // 提案第 20 條 tentacle tail: while wandering, the tentacles' reference positions trail the motion (tips most, u²),
         // scaled by the current speed so the smoothstep profile fades it in and out. Written on the reference shape like the
         // drift; weakening the home pull on the tips instead (the proposal's variant b) was measured to bend the rest pose
@@ -1450,6 +1541,15 @@ final class SlimeRig {
             }
             EX[i] = ex; EY[i] = ey
         }
+        // v2.19 performed scaling of the rest shape: breathing and mood (bsx, bsy) × the flinch (flS) × stretched along the heading while
+        // walking or fleeing (strK, area kept). Memory takes it off (psm)
+        var m00 = bsx * flS, m01 = 0.0, m10 = 0.0, m11 = bsy * flS
+        if strK != 1 {
+            let u = strH - atan2(clusters[gi].sn, clusters[gi].cs), cu = cos(u), su = sin(u), ka = strK - 1, kb = 1 / strK - 1
+            let d00 = 1 + ka * cu * cu + kb * su * su, d01 = (ka - kb) * cu * su, d11 = 1 + ka * su * su + kb * cu * cu
+            m00 = bsx * flS * d00; m01 = bsx * flS * d01; m10 = bsy * flS * d01; m11 = bsy * flS * d11
+        }
+        psm = (m00, m01, m10, m11)
         // 3 shape matching: each cluster's best rigid fit pulls its particles
         for i in 0..<N { GX[i] = 0; GY[i] = 0; GW[i] = 0 }
         clusters[gi].w = mat.wGlobal
@@ -1460,7 +1560,7 @@ final class SlimeRig {
             xc /= n; yc /= n; qcx /= n; qcy /= n
             var a = 0.0, b = 0.0, cc = 0.0, d = 0.0
             for i in idx {
-                let px = X[i] - xc, py = Y[i] - yc, qx = (EX[i] - qcx) * bsx, qy = (EY[i] - qcy) * bsy
+                let px = X[i] - xc, py = Y[i] - yc, ex0 = EX[i] - qcx, ey0 = EY[i] - qcy, qx = m00 * ex0 + m01 * ey0, qy = m10 * ex0 + m11 * ey0
                 a += px * qx; b += px * qy; cc += py * qx; d += py * qy
             }
             let ang = atan2(cc - b, a + d), cs = cos(ang), sn = sin(ang)
@@ -1468,7 +1568,7 @@ final class SlimeRig {
             clusters[c].qcx = qcx; clusters[c].qcy = qcy
             let w = clusters[c].w
             for i in idx {
-                let qx = (EX[i] - qcx) * bsx, qy = (EY[i] - qcy) * bsy
+                let ex0 = EX[i] - qcx, ey0 = EY[i] - qcy, qx = m00 * ex0 + m01 * ey0, qy = m10 * ex0 + m11 * ey0
                 GX[i] += (xc + cs * qx - sn * qy) * w
                 GY[i] += (yc + sn * qx + cs * qy) * w
                 GW[i] += w
@@ -1476,7 +1576,7 @@ final class SlimeRig {
         }
         // area pressure: when squashed or stretched the area drops, push goals outward so sides bulge
         let A = polygonArea()
-        let A0p = mat.press2 >= 0.5 ? A0 * (1 + mat.pressArea * pressSum) : A0   // v2.16 P1: pressed from the front it thins, so it looks bigger
+        let A0p = (mat.press2 >= 0.5 ? A0 * (1 + mat.pressArea * pressSum) : A0) * flS * flS   // v2.16 P1: pressed from the front it thins, so it looks bigger; v2.19 the flinch really shrinks it (else the area pressure pushes it back)
         let ap = max(-0.12, min(0.12, (sqrt(A0p / A) - 1) * mat.areaGain))
         let gcx = clusters[gi].xc, gcy = clusters[gi].yc
         let pf = pressField()
@@ -1679,12 +1779,24 @@ final class SlimeRig {
         let mat = params
         // where each particle sits in rest space right now (rotation only, averaged over its clusters)
         for i in 0..<N { RX[i] = 0; RY[i] = 0; GW[i] = 0 }
+        // v2.19: with the same weights, where the performed scaling alone would put each particle in rest space (SX2, SY2); memory
+        // compares against that, so breathing (it goes on while held), the flinch, the walking stretch and the mood postures are never remembered
+        let usePS = mat.life2 >= 0.5
+        let (p00, p01, p10, p11) = psm
+        if usePS {
+            if SX2.count != N { SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N) }
+            for i in 0..<N { SX2[i] = 0; SY2[i] = 0 }
+        }
         for c in clusters {
             for i in c.idx {
                 let px = X[i] - c.xc, py = Y[i] - c.yc
                 RX[i] += (c.qcx + c.cs * px + c.sn * py) * c.w
                 RY[i] += (c.qcy - c.sn * px + c.cs * py) * c.w
                 GW[i] += c.w
+                if usePS {
+                    let ex = EX[i] - c.qcx, ey = EY[i] - c.qcy
+                    SX2[i] += (c.qcx + p00 * ex + p01 * ey) * c.w; SY2[i] += (c.qcy + p10 * ex + p11 * ey) * c.w
+                }
             }
         }
         // tentMem: a grabbed tentacle is measured in the whole-body frame, more so towards the tip (the root stays on the
@@ -1704,6 +1816,10 @@ final class SlimeRig {
                     let px = X[i] - g.xc, py = Y[i] - g.yc, c = GW[i]
                     RX[i] = RX[i] * (1 - wi) + (g.qcx + g.cs * px + g.sn * py) * c * wi
                     RY[i] = RY[i] * (1 - wi) + (g.qcy - g.sn * px + g.cs * py) * c * wi
+                    if usePS {
+                        let ex = EX[i] - g.qcx, ey = EY[i] - g.qcy
+                        SX2[i] = SX2[i] * (1 - wi) + (g.qcx + p00 * ex + p01 * ey) * c * wi; SY2[i] = SY2[i] * (1 - wi) + (g.qcy + p10 * ex + p11 * ey) * c * wi
+                    }
                 }
             }
         }
@@ -1715,6 +1831,10 @@ final class SlimeRig {
                 let px = X[i] - g.xc, py = Y[i] - g.yc, c = GW[i], w = mat.tentMem * TUB[i]
                 RX[i] = RX[i] * (1 - w) + (g.qcx + g.cs * px + g.sn * py) * c * w
                 RY[i] = RY[i] * (1 - w) + (g.qcy - g.sn * px + g.cs * py) * c * w
+                if usePS {
+                    let ex = EX[i] - g.qcx, ey = EY[i] - g.qcy
+                    SX2[i] = SX2[i] * (1 - w) + (g.qcx + p00 * ex + p01 * ey) * c * w; SY2[i] = SY2[i] * (1 - w) + (g.qcy + p10 * ex + p11 * ey) * c * w
+                }
             }
         }
         let touched = fingers.values.contains { $0.mode == .grab }
@@ -1742,7 +1862,7 @@ final class SlimeRig {
                     // they were remembered as a mark (measured: a 1.5 s hold remembered 67 pt)
                     var rx = RX[i] / GW[i], ry = RY[i] / GW[i]
                     if !pf.isEmpty { let q = pressPush(pf, X[i], Y[i]); rx -= gcs * q.0 + gsn * q.1; ry -= -gsn * q.0 + gcs * q.1 }
-                    let dx = rx - EX[i], dy = ry - EY[i], dl = hypot(dx, dy)
+                    let sx = usePS ? SX2[i] / GW[i] : EX[i], sy = usePS ? SY2[i] / GW[i] : EY[i], dx = rx - sx, dy = ry - sy, dl = hypot(dx, dy)
                     if dl > yl {
                         let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
                         QX[i] += dx * s; QY[i] += dy * s
@@ -2019,11 +2139,200 @@ final class SlimeRig {
         }
     }
 
+    // MARK: - v2.19 活物感: rest / look / go / arrive (A1, A2), the pulse gait (A3), flinch and shake-off (A5), sniffing (A7)
+
+    private func smooth01(_ x: Double) -> Double { x <= 0 ? 0 : (x >= 1 ? 1 : x * x * (3 - 2 * x)) }
+    private func sniffEnv(_ s: Sniff) -> Double {
+        let u = t - s.t0
+        var e: Double = u < s.T1 ? smooth01(u / s.T1) : (u < s.T1 + s.T2 ? 1 : smooth01(1 - (u - s.T1 - s.T2) / s.T3))
+        if s.cut > 0 { e = min(e, s.eCut * max(0, 1 - (t - s.cut) / 0.15)) }
+        return max(0, e)
+    }
+    /// Touched or flinching: the pseudopods out sniffing are drawn in within 0.15 s.
+    private func cutSniffs() {
+        for k in sniffs.indices where !(sniffs[k].cut > 0) { sniffs[k].eCut = sniffEnv(sniffs[k]); sniffs[k].cut = t }
+    }
+    @discardableResult
+    private func startSniff(_ a: Double, _ len: Double, _ T1: Double, _ T2: Double, _ T3: Double) -> Sniff {
+        cutSniffs()
+        let s = Sniff(a: a, L: len, t0: t, T1: T1, T2: T2, T3: T3, ph: Double.random(in: 0..<6.283))
+        sniffs.append(s)
+        return s
+    }
+    /// Rest length: mostly 3...5 s, now and then a long stare; comfortable longer, tense shorter (lifeRest off: v2.18's 0.8...3 s).
+    private func restDur() -> Double {
+        if !lv(params.lifeRest) { return 0.8 + Double.random(in: 0..<2.2) }
+        var d = 2.5 + Double.random(in: 0..<3.5)
+        if Double.random(in: 0..<1) < 0.2 { d += 5 + Double.random(in: 0..<6) }
+        return d * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare))
+    }
+    private func pickDir() -> Double {
+        if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6) }   // too far out: sniff back
+        return Double.random(in: 0..<(2 * .pi))
+    }
+    /// Set off toward `dir` (the way it just sniffed) or, with none, anywhere (up and down at 0.8); far and fast with the `dash` chance.
+    private func goStart(_ dir: Double?) {
+        let far = Double.random(in: 0..<1) < params.dash
+        let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.2 + 0.3 * Double.random(in: 0..<1))
+        var a = dir ?? Double.random(in: 0..<(2 * .pi))
+        let ys = dir == nil ? 0.8 : 1.0
+        if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5) }
+        lifeSt = .go; wanderSX = homeX; wanderSY = homeY; wanderX = homeX + cos(a) * dist; wanderY = homeY + sin(a) * dist * ys; wanderMoving = true
+        if lv(params.lifeGait) {
+            gaitOn = true; gaitTX = wanderX; gaitTY = wanderY; gaitDash = far; gaitPh = -1; gaitPrep = 0; gaitV = 0
+            gaitH = atan2(wanderY - homeY, wanderX - homeX); gaitK = 1; gaitStr = 1; gaitLast = false; gaitOff = 0
+        } else {
+            wanderT = max(0.5, dist / (params.wander * (far ? 2.5 : 1) * R * (reduceMotion ? 0.25 : 1))); wanderP = 0
+        }
+    }
+    /// One stroke lasts P s (a dash 0.62), contracting for the first c s (the speed reaches its peak within 50 ms), then relaxing and
+    /// gliding (speed decays with tau); a stroke covers sd; stretched along the heading up to kA. Reduce Motion: half the rhythm,
+    /// half the stroke (speed ×0.25), half the stretch.
+    private func gaitConst() -> (P: Double, c: Double, tau: Double, sd: Double, kA: Double) {
+        let rm = reduceMotion
+        return ((gaitDash ? 0.62 : 1.1) * (rm ? 2 : 1), (gaitDash ? 0.15 : 0.25) * (rm ? 2 : 1), (gaitDash ? 0.24 : 0.35) * (rm ? 2 : 1),
+                (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))
+    }
+    private func strokeStart(_ K: (P: Double, c: Double, tau: Double, sd: Double, kA: Double)) {
+        let dx = gaitTX - homeX, dy = gaitTY - homeY, rem = hypot(dx, dy)
+        gaitH = atan2(dy, dx) + Double.random(in: -0.21..<0.21)   // each stroke veers a little (±12°): a curved path, speed and heading change together
+        let per = K.c / 2 + K.tau * (1 - exp(-(K.P - K.c) / K.tau))   // how far this speed profile goes per unit of peak speed
+        if rem < K.sd * 1.4 { gaitLast = true; gaitStr = max(0.35, min(1, rem / K.sd)) } else { gaitStr = 1 }   // the last stroke is smaller
+        gaitVP = gaitStr * K.sd / per
+    }
+    private func gaitStep(_ dt: Double) {
+        let K = gaitConst(), rm = reduceMotion ? 0.5 : 1.0
+        var off = 0.0, mv = 0.0
+        if gaitPh < 0 {
+            // gathering for 0.3 s before setting off: draws back a little, squashed along the heading
+            gaitPrep += dt
+            let p = min(1, gaitPrep / 0.3)
+            off = -0.05 * R * sin(.pi * p) * rm; gaitK = 1 - 0.05 * sin(.pi * p) * rm
+            if p >= 1 { gaitPh = 0; gaitK = 1; strokeStart(K) }
+        } else {
+            gaitPh += dt
+            if gaitLast && gaitPh >= K.c + 0.15 { gaitArrive(); return }   // the last stroke stops half-way through its glide; the arrival bump carries its speed on
+            if gaitPh >= K.P { gaitPh -= K.P; strokeStart(K) }
+            let env: Double
+            if gaitPh < K.c { gaitV += (gaitVP - gaitV) * (1 - exp(-dt / 0.05)); env = sin(.pi / 2 * gaitPh / K.c) }
+            else { gaitV *= exp(-dt / K.tau); env = 0.5 * (1 + cos(.pi * (gaitPh - K.c) / (K.P - K.c))) }
+            gaitK = 1 + K.kA * env * gaitStr; mv = gaitV * dt
+        }
+        let d = mv + (off - gaitOff); gaitOff = off
+        moveHome(cos(gaitH) * d, sin(gaitH) * d, dt)
+        strK = gaitK; strH = gaitH
+    }
+    /// Arrived: the speed carries on into a bump o(u) = A·e^(−u/0.3)·sin(2πu/0.6) that starts at the last speed (no sudden kick);
+    /// the stretch eases off, it squashes forward and springs back once.
+    private func gaitArrive() {
+        gaitOn = false; wanderMoving = false
+        lifeSt = .arrive; arrT = t; arrH = gaitH; arrK0 = gaitK; arrA = gaitV / (2 * .pi / 0.6); arrOff = 0; arrK = (gaitDash ? 0.12 : 0.08) * (reduceMotion ? 0.5 : 1)
+        gaitK = 1
+        if gaitDash && lv(params.lifeBreath) { exert = max(exert, 0.6) }   // out of breath after a dash
+    }
+    /// The whole body moves together with its previous positions (a performance, no velocity left behind): it goes forward stroke by
+    /// stroke instead of being dragged along by the home spring.
+    private func moveHome(_ dx: Double, _ dy: Double, _ dt: Double) {
+        if dx == 0 && dy == 0 { return }
+        homeX += dx; homeY += dy; wanderVX = dx / dt; wanderVY = dy / dt
+        for i in 0..<N where !GRAB[i] { X[i] += dx; Y[i] += dy; PX[i] += dx; PY[i] += dy }
+    }
+    /// Let go: a hard pull is shaken off (A5), a long one leaves it panting (A6), and 0.5 s later it sniffs toward where your finger
+    /// left (A7; not while fleeing or on the happy hop).
+    private func lifeRelease(_ f: Finger) {
+        let st = f.stretch
+        if lv(params.lifeFlinch) && st > 1 { shkAt = t + 0.3; shkAmp = min(1, 0.4 + (st - 1) / 1.5) }
+        if lv(params.lifeBreath) && st > 1.5 { exert = max(exert, min(1, 0.3 + (st - 1.5) * 0.35)) }
+        if lv(params.lifeAttend) && !escOn && !introOn && !clusters.isEmpty && hypot(f.fx - clusters[gi].xc, f.fy - clusters[gi].yc) > R * 0.4 {
+            attOn = true; attAt = t + 0.5; attX = f.fx; attY = f.fy
+        }
+        lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<2)
+    }
+    private func lifeStep(_ dt: Double, _ idle: Double, _ engaged: Bool) {
+        // A5 flinch when its time comes (resting before the touch ×1.2, walking ×0.8; comfortable half; each flinch ×0.55, back with 7 s)
+        flH += (1 - flH) * (1 - exp(-dt / 7))
+        if flAt > 0 && t >= flAt {
+            flAt = -9
+            if lv(params.lifeFlinch) {
+                let pre: Double = flPre == .rest ? 1.2 : (flPre == .go ? 0.8 : 1)
+                let a = params.flinchAmp * pre * (moodC > 0.3 ? 0.5 : 1) * flH * (reduceMotion ? 0.5 : 1)
+                flAmp = a; flT0 = t; flH *= 0.55; cutSniffs()
+                if lv(params.lifeBreath) { exert = max(exert, 0.1 + 2 * a) }   // a quick breath in with it
+            }
+        }
+        do {   // 60 ms in, held 50 ms, eased off over half a second
+            let u = t - flT0
+            let e: Double = u < 0 ? 0 : (u < 0.06 ? sin(.pi / 2 * u / 0.06) : (u < 0.11 ? 1 : exp(-(u - 0.11) / 0.18)))
+            flS = 1 - flAmp * e
+        }
+        // shaking off: a few fast turns left and right (6 a second, shrinking with 0.16 s), positions turned with their previous ones
+        if shkAt > 0 && t >= shkAt { shkAt = -9; shkT0 = t }
+        do {
+            let u = t - shkT0
+            let th: Double = u >= 0 && u < 0.6 ? shkAmp * 0.13 * sin(2 * .pi * 6 * u) * exp(-u / 0.16) * (reduceMotion ? 0.5 : 1) : 0
+            let d = th - shkTh
+            shkTh = th
+            if d != 0 && !clusters.isEmpty { rotateFree(by: d, around: clusters[gi].xc, clusters[gi].yc) }
+        }
+        // A7 sniff toward a queued point (this version only sniffs, it does not walk there: it rests after)
+        if attOn && t >= attAt {
+            attOn = false
+            if !engaged && !escOn && !introOn && lv(params.lifeAttend) && !clusters.isEmpty {
+                let dx = attX - clusters[gi].xc, dy = attY - clusters[gi].yc, d = hypot(dx, dy), ang = atan2(dy, dx)
+                startSniff(ang, max(0.3, min(params.podLen * 1.1, d / R - 0.6)), 0.5, 0.7 + Double.random(in: 0..<0.4), 0.6)
+                gaitOn = false; wanderMoving = false
+                lifeSt = .look; lifeLooks = 0; lifeNoGo = true; lastDir = ang; lifeUntil = t + 1.8 + Double.random(in: 0..<0.4)
+            }
+        }
+        // A1 deciding: rest → look (85%) or go; look sniffs once or twice → 65% go the last way sniffed, else rest; arrive → bump → rest
+        let restOn = lv(params.lifeRest), canGo = params.wander > 0
+        let free = idle > 0.5 && !introOn && !escOn && t > cowerUntil && !engaged
+        if lifeUntil < 0 { lifeUntil = t + (restOn ? 1.5 + Double.random(in: 0..<1) : 0.8 + Double.random(in: 0..<1)) }
+        if engaged || escOn || introOn {
+            if gaitOn || lifeSt == .go { gaitOn = false; wanderMoving = false; lifeSt = .rest; lifeUntil = -1 }
+            return
+        }
+        if !free { return }
+        if lifeSt == .rest && t >= lifeUntil {
+            if restOn && (Double.random(in: 0..<1) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1) < 0.45 ? 2 : 1; lifeNoGo = false; lifeUntil = t }
+            else if canGo { goStart(nil) } else { lifeUntil = t + restDur() }
+        }
+        if lifeSt == .look && t >= lifeUntil {
+            if lifeLooks > 0 {
+                lifeLooks -= 1
+                let a = pickDir(), s = startSniff(a, params.podLen * (0.75 + 0.35 * Double.random(in: 0..<1)), 1.2, 0.5 + Double.random(in: 0..<1), 0.8)
+                lastDir = a; lifeUntil = t + s.T1 + s.T2 + s.T3 + 0.3 + Double.random(in: 0..<0.5)
+            } else if !lifeNoGo && canGo && Double.random(in: 0..<1) < 0.65 {
+                goStart(lastDir + Double.random(in: -0.175..<0.175))
+            } else {
+                lifeSt = .rest; lifeUntil = t + restDur()
+            }
+        }
+        if lifeSt == .go && !gaitOn && wanderMoving {   // gait off: v2.18's glide (dragged by the home spring)
+            wanderP = min(1, wanderP + dt / wanderT)
+            let p = wanderP, e = p * p * (3 - 2 * p)
+            let nx = wanderSX + (wanderX - wanderSX) * e, ny = wanderSY + (wanderY - wanderSY) * e
+            wanderVX = (nx - homeX) / dt; wanderVY = (ny - homeY) / dt; homeX = nx; homeY = ny
+            if p >= 1 { wanderMoving = false; lifeSt = .arrive; arrT = t; arrA = 0; arrK = 0; arrK0 = 1; arrOff = 0 }
+        }
+        if gaitOn { gaitStep(dt) }
+        if lifeSt == .arrive {
+            let u = t - arrT
+            if u >= 0 && u < 1.2 {
+                let w = 2 * Double.pi / 0.6, dmp = exp(-u / 0.3), o = arrA * dmp * sin(w * u), d = o - arrOff
+                arrOff = o
+                moveHome(cos(arrH) * d, sin(arrH) * d, dt)
+                strK = 1 + (arrK0 - 1) * exp(-u / 0.12) - arrK * dmp * sin(w * u); strH = arrH
+            }
+            if u > 0.9 || u < 0 { lifeSt = .rest; lifeUntil = t + restDur() }
+        }
+    }
+
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
     private func twitch(_ L: Double) {
         if t < nextTwitch { return }
         nextTwitch = t + 2.2 + Double.random(in: 0..<4.5)
-        if L < 0.5 || params.life <= 0 { return }
+        if L < 0.5 || params.life <= 0 || lv(params.lifeRest) { return }   // v2.19 A1: no causeless twitches
         let amp = R * 0.0012 * params.life * (reduceMotion ? 0.5 : 1)   // per-substep displacement = velocity
         let whole = Double.random(in: 0..<1) < 0.25
         let c = whole ? clusters[gi] : clusters[Int.random(in: 0..<max(1, clusters.count - 1))]
@@ -2076,4 +2385,7 @@ final class SlimeRig {
     }
 
     var isTouched: Bool { fingers.values.contains { $0.mode != .none } }
+
+    /// v2.19 A4: how long the grabbing finger has been held still (s); past 0.8 s each breath comes through as one soft tap.
+    var heldStill: Double { fingers.values.filter { $0.mode == .grab }.map(\.stillT).max() ?? 0 }
 }

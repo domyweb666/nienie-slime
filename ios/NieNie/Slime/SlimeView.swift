@@ -409,14 +409,19 @@ final class SlimeView: UIView {
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }
         let shadowX = (minX + maxX) / 2   // the shadow centres on the whole width (a long pull shifts the centroid aside)
 
-        // floating: a soft shadow under the lowest point, fainter the higher it hangs
-        let sw = (maxX - minX) * 0.5
-        let sy = max(maxY, rig.toScreen(0, rig.cy).y + R * 1.2) + R * 0.35
-        let lift = max(0, min(1, (sy - maxY) / (R * 1.2)))
-        let pz = rig.params.press2 >= 0.5 ? max(0, rig.pressSum) : 0   // v2.16 P6: pressed, the body sinks a little: a wider, darker shadow
-        shadowLayer.opacity = Float((0.10 + 0.08 * (1 - lift) + 0.04 * pz) / 0.18)
-        let rx = sw * (0.7 + 0.3 * (1 - lift)) * (1 + 0.08 * pz), ry = R * 0.11 * 0.8
-        shadowLayer.path = CGPath(ellipseIn: CGRect(x: shadowX - rx, y: sy - ry, width: rx * 2, height: ry * 2), transform: nil)
+        // floating: a soft shadow under the lowest point, fainter the higher it hangs. v2.19 A8: none (it floats and walks every way;
+        // a shadow said up was flying one moment and the floor moved along the next)
+        let noShadow = rig.params.life2 >= 0.5 && rig.params.shadow < 0.5
+        shadowLayer.isHidden = noShadow
+        if !noShadow {
+            let sw = (maxX - minX) * 0.5
+            let sy = max(maxY, rig.toScreen(0, rig.cy).y + R * 1.2) + R * 0.35
+            let lift = max(0, min(1, (sy - maxY) / (R * 1.2)))
+            let pz = rig.params.press2 >= 0.5 ? max(0, rig.pressSum) : 0   // v2.16 P6: pressed, the body sinks a little: a wider, darker shadow
+            shadowLayer.opacity = Float((0.10 + 0.08 * (1 - lift) + 0.04 * pz) / 0.18)
+            let rx = sw * (0.7 + 0.3 * (1 - lift)) * (1 + 0.08 * pz), ry = R * 0.11 * 0.8
+            shadowLayer.path = CGPath(ellipseIn: CGRect(x: shadowX - rx, y: sy - ry, width: rx * 2, height: ry * 2), transform: nil)
+        }
 
         let body = bodyPath(P)
         shadeLayer.path = body
