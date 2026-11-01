@@ -1,4 +1,6 @@
-# sfx｜錄音切片放這裡
+# sfx｜音效檔放這裡
+
+> 2026-11-01 起是 Agent 用 `prototype/sfx-design/design_sfx.py` 設計的音效（史萊姆是虛構的，沒有真的可以錄）。改設計就改那支程式重跑，它會同時寫這裡和 `ios/NieNie/Resources/`、更新兩邊的 `manifest.json`。試聽：`listen.html`。
 
 原型會讀這個資料夾的 `manifest.json`，照裡面列的檔名播。沒列的檔不會播，列了但檔案不存在也不會壞，只是安靜。
 
