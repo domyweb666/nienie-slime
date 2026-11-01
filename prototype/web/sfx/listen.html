@@ -35,6 +35,12 @@ summary{cursor:pointer;color:var(--sub);font-size:14px}
 <body>
 <main>
 <h1>捏捏音效試聽</h1>
+<section>
+  <h2>新舊對照與背景音樂</h2>
+  <div class="when">現在聽的是 <b id="setname"></b>。切換會重新載入頁面。背景音樂是程式作的原創 lofi，循環播放；在 app 裡手指抓著時會降到六成。</div>
+  <div class="grid"><button id="setv3">ASMR 版（新）</button><button id="setv2">v2（舊、刺耳的那組）</button><button id="bgm" aria-pressed="false">播放背景音樂</button></div>
+  <div class="row"><label for="bv">音樂音量</label><input id="bv" type="range" min="0" max="1" step="0.05" value="0.25"><output id="bvo">0.25</output></div>
+</section>
 <p class="note">v2 分層版：按、放手都是好幾層疊起來，力道決定哪幾層響、多大聲、多高、多亮；拉和揉跟著手的動作連續變化。跟 app 用的是同一支播放程式。手機請先關靜音，用手機喇叭聽一次、耳機聽一次。聽到不喜歡的記下來（例如「放手 重 太悶」「拉 越拉越刺耳」）。</p>
 
 <section>
@@ -82,13 +88,20 @@ summary{cursor:pointer;color:var(--sub);font-size:14px}
 <script src="engine.js"></script>
 <script>
 const S = window.SlimeSfx, $ = id => document.getElementById(id);
-const ready = S.load('./');
+// v2.21：?set=v2 聽舊的那組（刺耳的 v2），預設是 ASMR 版（v3）；背景音樂兩組共用
+const SET = new URLSearchParams(location.search).get('set') === 'v2' ? 'v2' : 'v3';
+const ready = S.load(SET === 'v2' ? './v2/' : './'); S.bgmUrl = './bgm-lofi.m4a'; S.mode = 1;
 let state = { rub: 0, stretch: 0, grabbing: false }, last = performance.now();
 function tick(now) { const dt = Math.min(0.1, (now - last) / 1000); last = now; S.frame(dt, state); requestAnimationFrame(tick); }
 async function go() { await ready; S.init(); }
 requestAnimationFrame(tick);
 
 function bindRange(id, fn) { const r = $(id), o = $(id + 'o'); const u = () => { o.textContent = (+r.value).toFixed(2); fn && fn(+r.value); }; r.addEventListener('input', u); u(); }
+$('setname').textContent = SET === 'v2' ? 'v2（舊）' : 'ASMR 版（新）';
+$('setv3').setAttribute('aria-pressed', String(SET === 'v3')); $('setv2').setAttribute('aria-pressed', String(SET === 'v2'));
+$('setv3').onclick = () => { location.search = ''; }; $('setv2').onclick = () => { location.search = '?set=v2'; };
+$('bgm').onclick = async () => { await go(); const on = S.mode !== 0; S.setMode(on ? 0 : 1); $('bgm').setAttribute('aria-pressed', String(on)); $('bgm').textContent = on ? '停止背景音樂' : '播放背景音樂'; };
+bindRange('bv', v => { S.bgmVol = v; S.bgmT = -1; });
 bindRange('pi'); bindRange('ri');
 bindRange('vol', v => S.setVolume(v)); bindRange('pm', v => S.pullMax = v); bindRange('st', v => S.settleAmt = v);
 bindRange('ub', v => { go(); state.rub = v * S.rubMax; });

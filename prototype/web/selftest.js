@@ -31,9 +31,9 @@
   function snap() { const [s, c] = classify(); return { selfX: s + c, fold: s, overlap: c, area: +(area() / A0).toFixed(3), ke: +ke().toFixed(2), qdev: +qdev().toFixed(2) }; }
   function maxMove(ref) { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.hypot(X[i] - ref[0][i], Y[i] - ref[1][i])); return m; }
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
-  // v2.20：舊項目量的是 v2.19 的行為，一律關掉拖著走、凹痕退快、印象（跟關情緒、關活物一樣）；v2.20 在 T35 用 P0 打開。跑完換回來
+  // v2.20：舊項目量的是 v2.19 的行為，一律關掉拖著走、凹痕退快、印象（跟關情緒、關活物一樣）；v2.20 在 T35 用 P0 打開（拉力 slide 0），v2.21 拉力在 T36。跑完換回來
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
-  const P0 = PRESETS.clay, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], drag: 0, dentFade: 10, imp: 0 };
+  const P0 = PRESETS.clay, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], slide: 0, drag: 0, dentFade: 10, imp: 0 };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -499,7 +499,7 @@
   //     e C2 熟 0.5、手指在右邊 2.5R 慢慢往下移 1.5 秒再停：停下 0.5 秒內撲；不熟時手指快甩過去：嚇一下（縮）；
   //     f C4 輕揉 2.5 秒放手：排了討摸，5 秒內再揉呼嚕 0.6 秒內來（第一次 1 秒以上）；g C5 戒 0.8 時被碰縮的量是戒 0 的 1.5 倍以上。全程零對折
   { const clock = saveClock(); Math.random = seeded(20261102); const r35 = {}; let xf = 0;
-    const V20 = { drag: P0.drag, dentFade: P0.dentFade, imp: 1, life2: 1 };
+    const V20 = { slide: 0, drag: P0.drag, dentFade: P0.dentFade, imp: 1, life2: 1 };
     const L3 = o => { resetAligned(1e9, { ...V20, ...o }); impReset(); LIFE.st = 'rest'; LIFE.until = 1e9; };
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
     const cen = () => { let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } return [mx / N, my / N]; };
@@ -546,6 +546,34 @@
     r35.foldFrames = xf; impReset();
     res.T35_v220 = r35; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T36 v2.21 拉力（多米 build 77 錄影：往右下拉，史萊姆也要一併往右下靠；量過果凍拉 2.5R 整團只跟 0.56R）。
+  //     a 果凍抓右下緣往右下拉 2.5R 停：整團跟過去 1.5R 以上、被拉長的量 0.9R 以下（slide 0 不到 0.7R）；b 黏土猛一扯（4 幀）那一下拉得比慢拉長 0.3R 以上；
+  //     c 黏土兩指往兩邊各拉 1.5R：寬過 4.5R、整團移不到 0.2R；d 果凍往右甩 0.4 秒放手：再滑 0.3R 以上。全程零自交、面積回來
+  { const clock = saveClock(); Math.random = seeded(20261103); const r36 = {}; let worst = 0;
+    const PS = { ...PSAVE };
+    const cen = () => { let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } return [mx / N, my / N]; };
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const L4 = (m, o) => { resetAligned(1e9, { ...PS[m], emo: 0, life2: 0, ...o }); };
+    const pullDR = (m, o, frames) => { L4(m, o); let b = -1; for (const i of bnd) if (b < 0 || X[i] + Y[i] > X[b] + Y[b]) b = i;
+      const c0 = cen(), sx = X[b] - 4, sy = Y[b] - 4; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); let maxSt = 0; const d = 2.5 * R / Math.SQRT2;
+      for (let k = 1; k <= frames + 40; k++) { const u = Math.min(1, k / frames); q = [q[0] + (sx + d * u - f.x) * CAM.z, q[1] + (sy + d * u - f.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); maxSt = Math.max(maxSt, f.stretch); if (k % 10 === 0) worst = Math.max(worst, selfX()); }
+      const c1 = cen(), st = f.stretch; ev('pointerup', 1, q[0], q[1]); for (let k = 0; k < 90; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); }
+      return { moveR: +(Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) / R).toFixed(2), stretchR: +st.toFixed(2), maxStretchR: +maxSt.toFixed(2), end: snap() }; };
+    r36.jelly = pullDR('jelly', {}, 30); r36.jellyOff = pullDR('jelly', { slide: 0 }, 30);
+    r36.claySlow = pullDR('clay', {}, 30); r36.clayYank = pullDR('clay', {}, 4);
+    { L4('clay', {}); let l = -1, r = -1; for (const i of bnd) { if (l < 0 || X[i] < X[l]) l = i; if (r < 0 || X[i] > X[r]) r = i; }
+      const c0 = cen(), lx = X[l] + 4, ly = Y[l], rx = X[r] - 4, ry = Y[r]; let a = sc(lx, ly), b = sc(rx, ry); ev('pointerdown', 1, a[0], a[1]); ev('pointerdown', 2, b[0], b[1]); const f1 = fingers.get(1), f2 = fingers.get(2);
+      for (let k = 1; k <= 70; k++) { const u = Math.min(1, k / 40) * 1.5 * R; a = [a[0] + (lx - u - f1.x) * CAM.z, a[1] + (ly - f1.y) * CAM.z]; b = [b[0] + (rx + u - f2.x) * CAM.z, b[1] + (ry - f2.y) * CAM.z]; ev('pointermove', 1, a[0], a[1]); ev('pointermove', 2, b[0], b[1]); steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); }
+      let x0 = 1e9, x1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } const c1 = cen();
+      r36.twoFinger = { widthR: +((x1 - x0) / R).toFixed(2), moveR: +(Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) / R).toFixed(2) };
+      ev('pointerup', 1, a[0], a[1]); ev('pointerup', 2, b[0], b[1]); for (let k = 0; k < 90; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); } }
+    { L4('jelly', {}); const sx = globalC.xc, sy = globalC.yc; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1);
+      for (let k = 1; k <= 24; k++) { q = [q[0] + (sx + 4 * R * k / 60 - f.x) * CAM.z, q[1] + (sy - f.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); }
+      const c1 = cen(); ev('pointerup', 1, q[0], q[1]); for (let k = 0; k < 90; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); } const c2 = cen();
+      r36.fling = { glideR: +((c2[0] - c1[0]) / R).toFixed(2), end: snap() }; }
+    r36.worstSelfX = worst;
+    res.T36_pull = r36; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -576,7 +604,7 @@
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
   const L9 = res.T34_life;
-  const V5 = res.T35_v220;
+  const V5 = res.T35_v220, P6 = res.T36_pull;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -634,6 +662,9 @@
       && V5.c1.come.hitS >= 0 && V5.c1.come.hitS < 6 && V5.c1.backGainR > 0.5 && V5.c1.end.selfX === 0
       && V5.c2.pounceS >= 0 && V5.c2.pounceS < 0.5 && V5.c2.startled
       && V5.c4.firstPurrS > 1 && V5.c4.asked && V5.c4.secondPurrS >= 0 && V5.c4.secondPurrS < 0.6 && V5.c5.flinchRatio > 1.5 && V5.foldFrames === 0,
+    // v2.21 拉力：果凍單指拉 2.5R 整團跟 1.5R 以上、拉長 0.9R 以下（slide 0 不到 0.7R）；猛一扯比慢拉長 0.3R；兩指往兩邊拉寬過 4.5R、整團不動；甩出去再滑 0.3R；零自交、面積回來
+    pullForce: P6.jelly.moveR > 1.5 && P6.jelly.stretchR < 0.9 && P6.jellyOff.moveR < 0.7 && P6.clayYank.maxStretchR > P6.claySlow.maxStretchR + 0.3 && P6.twoFinger.widthR > 4.5 && P6.twoFinger.moveR < 0.2
+      && P6.fling.glideR > 0.3 && P6.worstSelfX === 0 && okArea(P6.jelly.end) && okArea(P6.fling.end),
     lifeV219: L9.idle.restFrac > 0.35 && L9.idle.restFrac < 0.65 && L9.idle.sniffs >= 4 && L9.idle.goes >= 2 && L9.idle.worstSelfX === 0 && L9.idle.areaMin > 0.97 && L9.idle.areaMax < 1.03
       && L9.held.ratio > 0.35 && L9.held.ratioOff < 0.15 && L9.held.qdev1s < L9.held.qdev1sOff + 1
       && Math.abs(L9.flinch.at05 - 1) < 0.015 && L9.flinch.at30 < 0.96 && L9.flinch.fifthOverFirst < 0.3

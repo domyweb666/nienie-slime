@@ -52,7 +52,22 @@
     MAP, ctx: null, master: null, manifest: null, buf: {}, muted: false, volume: 0.9, jitter: 0.08, pullMax: 0.6, rubMax: 0.7, settleAmt: 1,
     active: 0, last: {}, pending: [], st: 0, stS: 0, v: 0, lastStretch: 0, heldFor: 0, base: 'sfx/',
     pullV: null, rubV: null,
+    // v2.21 背景音樂（多米 build 77：背景要放 lofi）：mode 0 音樂和音效、1 只有捏的聲音、2 全部靜音。bgmUrl 由呼叫端給（沒給就沒有音樂）
+    mode: 0, bgmUrl: null, bgmVol: 0.25, bgmDuck: 0.6, bgmG: null, bgmSrc: null, bgmT: -1,
   };
+  // 一首可以無縫循環的 lofi（prototype/sfx-design/design_lofi.py，40 小節、76 BPM）。自己一條 gain 直接接輸出，不經過音效的 master；
+  // 手指抓著時降到六成，讓捏的聲音在前面（0.4 秒慢慢降、1.2 秒慢慢回）。AAC 解碼後尾巴可能多一點空白，循環只取前 40 小節
+  const BGM_LOOP = 40 * 4 * 60 / 76;
+  function startBgm() {
+    const c = S.ctx; if (!c || !S.bgmUrl || S.bgmG) return;
+    S.bgmG = c.createGain(); S.bgmG.gain.value = 0; S.bgmG.connect(c.destination);
+    fetch(S.bgmUrl).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(ab => c.decodeAudioData(ab)).then(b => {
+      const src = c.createBufferSource(); src.buffer = b; src.loop = true;
+      if (b.duration > BGM_LOOP + 0.005) { src.loopStart = 0; src.loopEnd = BGM_LOOP; }
+      src.connect(S.bgmG); src.start(); S.bgmSrc = src; S.bgmT = -1;
+    }).catch(() => {});
+  }
+  function bgmTarget(grabbing) { return S.mode === 0 ? S.bgmVol * (grabbing ? S.bgmDuck : 1) : 0; }
 
   function normManifest(m) {
     const out = {};
@@ -77,6 +92,7 @@
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
     const c = S.ctx = new C();
     S.master = c.createGain(); S.master.gain.value = S.muted ? 0 : S.volume; S.master.connect(c.destination);
+    startBgm();
     for (const k of Object.keys(S.manifest)) for (const layer of Object.keys(S.manifest[k])) {
       const key = k + '.' + layer; S.buf[key] = [];
       for (const f of S.manifest[k][layer]) fetch(S.base + f).then(r => r.arrayBuffer()).then(ab => c.decodeAudioData(ab)).then(b => S.buf[key].push(b)).catch(() => {});
@@ -84,6 +100,7 @@
   };
 
   S.setMuted = function (m) { S.muted = m; if (S.master) S.master.gain.setTargetAtTime(m ? 0 : S.volume, S.ctx.currentTime, 0.02); if (m) S.pending = []; };
+  S.setMode = function (m) { S.mode = m; S.setMuted(m === 2); if (S.bgmG) { S.bgmT = bgmTarget(false); S.bgmG.gain.setTargetAtTime(S.bgmT, S.ctx.currentTime, 0.3); } };
   S.setVolume = function (v) { S.volume = v; if (S.master && !S.muted) S.master.gain.setTargetAtTime(v, S.ctx.currentTime, 0.02); };
 
   function pick(key) { const l = S.buf[key]; return l && l.length ? l[Math.floor(Math.random() * l.length)] : null; }
@@ -155,6 +172,8 @@
     if (grabbing && !S._wasGrab) { S.lastStretch = 0; S.heldFor = 0; }
     if (grabbing) { S.lastStretch = Math.max(S.lastStretch, stretch); S.heldFor += dt; }
     S._wasGrab = grabbing;
+    // 背景音樂的音量（模式、抓著時讓位）
+    if (S.bgmG) { const bt = bgmTarget(grabbing); if (Math.abs(bt - S.bgmT) > 1e-4) { S.bgmG.gain.setTargetAtTime(bt, c.currentTime, bt < S.bgmT ? 0.4 : 1.2); S.bgmT = bt; } }
     // 餘韻排程
     if (S.pending.length) { const now = c.currentTime; S.pending = S.pending.filter(e => { if (e.at <= now) { one(e.key, e.p); return false; } return true; }); }
     if (S.muted) return;

@@ -1,0 +1,100 @@
+{
+  "version": 2,
+  "press": {
+    "body": [
+      "press-body-01.wav",
+      "press-body-02.wav",
+      "press-body-03.wav",
+      "press-body-04.wav",
+      "press-body-05.wav",
+      "press-body-06.wav"
+    ],
+    "wet": [
+      "press-wet-01.wav",
+      "press-wet-02.wav",
+      "press-wet-03.wav",
+      "press-wet-04.wav",
+      "press-wet-05.wav",
+      "press-wet-06.wav"
+    ],
+    "air": [
+      "press-air-01.wav",
+      "press-air-02.wav",
+      "press-air-03.wav",
+      "press-air-04.wav",
+      "press-air-05.wav",
+      "press-air-06.wav"
+    ]
+  },
+  "release": {
+    "air": [
+      "release-air-01.wav",
+      "release-air-02.wav",
+      "release-air-03.wav",
+      "release-air-04.wav",
+      "release-air-05.wav",
+      "release-air-06.wav",
+      "release-air-07.wav",
+      "release-air-08.wav"
+    ],
+    "wet": [
+      "release-wet-01.wav",
+      "release-wet-02.wav",
+      "release-wet-03.wav",
+      "release-wet-04.wav",
+      "release-wet-05.wav",
+      "release-wet-06.wav"
+    ],
+    "body": [
+      "release-body-01.wav",
+      "release-body-02.wav",
+      "release-body-03.wav",
+      "release-body-04.wav",
+      "release-body-05.wav"
+    ]
+  },
+  "pull": {
+    "loop": [
+      "pull-loop-01.wav",
+      "pull-loop-02.wav"
+    ],
+    "strand": [
+      "pull-strand-01.wav",
+      "pull-strand-02.wav",
+      "pull-strand-03.wav",
+      "pull-strand-04.wav",
+      "pull-strand-05.wav",
+      "pull-strand-06.wav",
+      "pull-strand-07.wav",
+      "pull-strand-08.wav",
+      "pull-strand-09.wav",
+      "pull-strand-10.wav"
+    ]
+  },
+  "rub": {
+    "loop": [
+      "rub-loop-01.wav",
+      "rub-loop-02.wav",
+      "rub-loop-03.wav"
+    ]
+  },
+  "settle": {
+    "bubble": [
+      "settle-bubble-01.wav",
+      "settle-bubble-02.wav",
+      "settle-bubble-03.wav",
+      "settle-bubble-04.wav",
+      "settle-bubble-05.wav",
+      "settle-bubble-06.wav",
+      "settle-bubble-07.wav",
+      "settle-bubble-08.wav",
+      "settle-bubble-09.wav",
+      "settle-bubble-10.wav"
+    ],
+    "hiss": [
+      "settle-hiss-01.wav",
+      "settle-hiss-02.wav",
+      "settle-hiss-03.wav"
+    ]
+  }
+}
