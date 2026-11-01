@@ -148,6 +148,7 @@ struct FeelParams: Equatable, Codable {
     var flinchAmp: Double = 0.05      // how much the flinch shrinks it (resting ×1.2, comfortable ×0.5, each flinch ×0.55, back with a 7 s time constant)
     // v2.20 (多米 build 75: dragging only deforms it, nothing moves; a tap's dent takes too long to go; it still does not feel like it
     // reacts to you, wants second-order effects of how you treat it) .uiux/04-手感/互動與拖拉提案-暫定.md
+    var slide: Double = 1.5           // v2.21 D1' pull (多米 build 77 video: pulled down-right, it should go down-right too): stretched about this far (×R), pulling further drags the whole body; two fingers apart still stretch long; 0 = v2.20 (jelly 0.6, mochi 0.9, clay 1.5)
     var drag: Double = 0.35           // D1: while held, home follows this share of the finger's travel (0.25 s lag); release keeps it there, a fling glides on; 0 = v2.19
     var dentFade: Double = 0.6        // D2: seconds a tap's dent takes to go (2.5× after a press of 1 s or more); 10 = v2.19 (fades with recover)
     var imp: Double = 1               // master: an impression of you (trust, wariness) for this run of the app, zeroed after 10 min in the background; C1...C5 only count while this and life2 are 1
@@ -198,12 +199,14 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
                            areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.5,
                            floppy: 0.5, seed: 7)
             p.pressArea = 0.04; p.pressSpread = 0.06; p.pressSink = 0.2; p.pressBounce = 0.3   // v2.16
+            p.slide = 0.6   // v2.21
         case .mochi:
             p = FeelParams(alpha: 0.28, damp: 0.966, yield: 0.14, creep: 0.9, recover: 0.18, grabR: 0.32, maxPull: 1.8,
                            lag: 0.08, wGlobal: 0.10, cSpace: 0.3, cRad: 0.45, upright: 0.004, anchor: 4,
                            areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.5,
                            floppy: 0.55, seed: 7)
             p.pressArea = 0.05; p.pressSpread = 0.08; p.pressSink = 0.45; p.pressBounce = 0.6   // v2.16
+            p.slide = 0.9   // v2.21
         case .clay:
             // clay remembers at once, tentacles too; the mark relaxes slowly: half in about 15 s (v2.14, 多米 build 59: it sprang back
             // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
@@ -222,7 +225,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
-        p.drag = 0; p.dentFade = 10; p.imp = 0   // nothing of v2.20
+        p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0   // nothing of v2.20, v2.21
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
@@ -288,8 +291,9 @@ struct Candidate: Identifiable {
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
-            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
-        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.drag = 0; p.dentFade = 10; p.imp = 0 },
+            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0 },
+        Candidate(id: 220, name: "v2.20 對照（整團只跟三成五）", hint: "單指拉只有三成五跟過去，果凍拉 1.6R 就頂住") { p, _ in p.slide = 0 },
         Candidate(id: 218, name: "v2.18 對照（沒有 v2.19 活物感）", hint: "一直在動、被拖著滑過去、一碰全停、固定節拍呼吸、隨機偽足、有影子") { p, _ in p.life2 = 0 },
         Candidate(id: 216, name: "v2.16 對照（鏡頭釘在中間）", hint: "鏡頭不跟、整隻一定在畫面裡、遊走只在中間一小塊") { p, _ in p.camFollow = 0 },
         Candidate(id: 215, name: "v2.15 對照（月牙凹痕）", hint: "按壓只有那一小塊攤開、凹痕是左上一彎硬邊月牙、0.08 秒到底，放手不分材質一樣淡") { p, _ in p.press2 = 0 },
@@ -336,6 +340,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）", range: 0...0.15, step: 0.01, section: "活物感"),
+        TuneField(key: \.slide, name: "D1' 拉到多長開始整團走（×半徑）", hint: "v2.21 拉力：先被拉長，拉長到這附近再拉就整團被拖著走（果凍 0.6、麻糬 0.9、黏土 1.5）；兩指往兩邊拉不會被拖走、照樣拉很長；0 回 v2.20（整團只跟三成五）", range: 0...3, step: 0.1),
         TuneField(key: \.drag, name: "D1 拖著走", hint: "抓著時身體的原位跟著手指移幾成（v2.20 0.35，約 0.25 秒跟上；放手停在被拖到的地方，甩著放手再滑一小段）；0 是 v2.19（只變形不位移）", range: 0...1, step: 0.05),
         TuneField(key: \.dentFade, name: "D2 凹痕退的時間（秒）", hint: "點一下放手後凹痕多久退完（按越久越慢，按 1 秒以上 2.5 倍）；10 是 v2.19（跟回原形一起退，黏土 15 秒退一半）", range: 0.2...10, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.imp, name: "印象 v2.20", hint: "1：它記得你這一次怎麼對它（熟、戒），關掉 app 或背景 10 分鐘歸零；底下 C1 到 C5 只在這裡是 1、活物 v2.19 也是 1 時有用；0 回 v2.19", range: 0...1, step: 1, section: "活物感"),

@@ -1140,7 +1140,10 @@ final class SlimeRig {
             f.travelFrame = 0
             f.stillT = hypot(f.vxS, f.vyS) < R * 0.5 ? f.stillT + dt : 0   // v2.19 A4: held still long enough, each breath taps softly
 
-            var ex = f.x - f.ax, ey = f.y - f.ay
+            // v2.21 D1' pull: the stretch limit counts from where the body has already followed to (o). Counted from where the finger
+            // landed, jelly stops at 1.6R and the body cannot be pulled along
+            let sl = mat.slide > 0 && f.mode == .grab, ox = sl ? dragOX - dragBX : 0, oy = sl ? dragOY - dragBY : 0
+            var ex = f.x - f.ax - ox, ey = f.y - f.ay - oy
             let el = hypot(ex, ey), lim = mat.maxPull * R
             if f.mode == .grab && el > 0 {
                 let s = lim * tanh(el / lim) / el
@@ -1148,7 +1151,7 @@ final class SlimeRig {
             }
             // the finger keeps 0.35R off the walls: a held patch pressed flat against a wall crossed on release (4 of 6 trials)
             let mw = R * 0.35, wl = worldWalls   // the walls are in world points (the farthest view's edge)
-            let tx = max(wl.l + mw, min(wl.r - mw, f.ax + ex)), ty = max(wl.t + mw, min(wl.b - mw, f.ay + ey))
+            let tx = max(wl.l + mw, min(wl.r - mw, f.ax + ox + ex)), ty = max(wl.t + mw, min(wl.b - mw, f.ay + oy + ey))
             let k = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
             f.fx += (tx - f.fx) * k; f.fy += (ty - f.fy) * k
             if f.mode == .grab {
@@ -2399,18 +2402,37 @@ final class SlimeRig {
         for f in fingers.values where f.mode == .grab { sx += f.fx - f.ax; sy += f.fy - f.ay; n += 1 }
         return n > 0 ? (sx / Double(n), sy / Double(n), n) : (0, 0, 0)
     }
+    /// v2.21 D1' pull (多米 build 77 video: pulled down-right, it should go down-right too; measured: jelly pulled 2.5R, the body
+    /// followed 0.56R): stretched first, and pulled on past about `slide` the whole body is dragged along. Stretch = slide·tanh((1 − follow)
+    /// · travel / slide), the rest moves the body. From the fingers' real travel (not the limited one), averaged: two fingers pulling
+    /// apart average near 0, so it is not dragged and still stretches long. C3: wary needs a longer pull before it gives, trusting goes at once
+    private func slideLen() -> Double {
+        var S = params.slide * R
+        if iv2(params.impC3) { S *= max(0.5, 1 + 0.8 * impWary - 0.4 * impTrust) }
+        return S
+    }
+    private func dragTarget() -> (x: Double, y: Double, n: Int) {
+        guard params.slide > 0 else { let a = dragAvg(), k = dragFollow(); return (a.x * k, a.y * k, a.n) }
+        var sx = 0.0, sy = 0.0, n = 0
+        for f in fingers.values where f.mode == .grab { sx += f.x - f.ax; sy += f.y - f.ay; n += 1 }
+        if n == 0 { return (0, 0, 0) }
+        let dx = sx / Double(n), dy = sy / Double(n), dl = hypot(dx, dy)
+        if dl < 1e-9 { return (0, 0, n) }
+        let S = slideLen(), st: Double = S * tanh((1 - dragFollow()) * dl / S)
+        return (dx - dx / dl * st, dy - dy / dl * st, n)
+    }
     /// A finger joined or left: fold the offset into home, then rebase so the target carries on from 0.
     private func dragRebase() {
         homeX += dragOX; homeY += dragOY; dragOX = 0; dragOY = 0
-        let a = dragAvg(), k = dragFollow()
-        dragBX = a.n > 0 ? -a.x * k : 0; dragBY = a.n > 0 ? -a.y * k : 0; dragSlipT = 0
+        let a = dragTarget()
+        dragBX = a.n > 0 ? -a.x : 0; dragBY = a.n > 0 ? -a.y : 0; dragSlipT = 0
     }
     /// Let go: others still holding → rebase; the last one → the offset joins home (it stays where it was dragged) and a fling glides
     /// on at the offset's speed (at most about 0.4R, 0.25 s time constant).
     private func dragRelease(glide: Bool) {
         if fingers.values.contains(where: { $0.mode == .grab }) { dragRebase(); return }
         var vx = dragVX, vy = dragVY
-        let vl = hypot(vx, vy), vm = R * 1.6
+        let vl = hypot(vx, vy), vm = R * (params.slide > 0 ? 6 : 1.6)   // v2.21: a fling glides on up to about 1.5R (v2.20 0.4R)
         if vl > vm { vx *= vm / vl; vy *= vm / vl }
         if glide && vl > R * 0.3 { dragGX = vx; dragGY = vy }
         homeX += dragOX; homeY += dragOY
@@ -2419,8 +2441,7 @@ final class SlimeRig {
     /// Every frame: the offset eases toward `drag` of the travel (home moves, and the held home spring brings the body along);
     /// sb = how far the body itself is pulled open, used by the mood and the shake-off.
     private func dragStep(_ dt: Double) {
-        let a = dragAvg()
-        if a.n == 0 {
+        if dragAvg().n == 0 {
             if dragGX != 0 || dragGY != 0 {
                 if escOn || gaitOn || introOn { dragGX = 0; dragGY = 0 } else {
                     homeX += dragGX * dt; homeY += dragGY * dt
@@ -2432,10 +2453,11 @@ final class SlimeRig {
             return
         }
         dragGX = 0; dragGY = 0
-        let k = dragFollow(), e = 1 - exp(-dt / 0.25)
-        let nx = dragOX + (a.x * k + dragBX - dragOX) * e, ny = dragOY + (a.y * k + dragBY - dragOY) * e
+        // the body has weight: it catches up in about 0.2 s, so a yank stretches it first
+        let g = dragTarget(), e = 1 - exp(-dt / (params.slide > 0 ? 0.2 : 0.25))
+        let nx = dragOX + (g.x + dragBX - dragOX) * e, ny = dragOY + (g.y + dragBY - dragOY) * e
         dragVX = (nx - dragOX) / dt; dragVY = (ny - dragOY) / dt; dragOX = nx; dragOY = ny
-        for f in fingers.values where f.mode == .grab { f.sb = hypot(f.ex - (dragOX - dragBX), f.ey - (dragOY - dragBY)) / R }
+        for f in fingers.values where f.mode == .grab { f.sb = params.slide > 0 ? f.stretch : hypot(f.ex - (dragOX - dragBX), f.ey - (dragOY - dragBY)) / R }   // v2.21: the stretch already counts from where it followed to
         // C3: very wary, pulled open 1R or more for 1.5 s, the patch slips from the finger and it slinks off a little
         if iv2(params.impC3) && impWary > 0.5 {
             var st = 0.0

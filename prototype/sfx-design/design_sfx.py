@@ -3,6 +3,9 @@
 2026-11-01 多米：史萊姆不是真實存在的，要 Agent 配音。10-31 放棄的是 app 裡即時算的合成音（難聽）；
 這裡在電腦上一段一段做好，app 播的時候才依物理參數調音量、音高、濾波。
 
+v3（2026-11-02，多米 build 77：配音刺耳，要 ASMR 紓壓型）：層與檔名不變，每層換成起音慢、小聲、低通、濕細碎的版本（見下面 v3 那段）。
+`--v2` 把舊的 v2 組寫到 prototype/web/sfx/v2/（只給試聽頁對照）。
+
 v2（2026-11-01 下午，分層版）：一個動作不再是「一類一檔」，拆成幾層，每層獨立隨機挑、獨立浮音高，
 app 依力道決定哪幾層響、各多大聲。對應表在 `.uiux/04-手感/音效參數對應-暫定.md`。
 
@@ -301,13 +304,178 @@ def settle_hiss(rng, k):
     return finish(x, 7000, -12, fin=0.01, fout=0.06)
 
 
-# (類別, 層, 產生函式, 段數)。段數 × 層數 × 浮音高，組合比 v1 的「一類 8 段」多上百倍
-LAYERS = [
+# ---------- v3 ASMR 紓壓版（2026-11-02，多米 build 77：配音刺耳，要 ASMR 紓壓型） ----------
+# 量過 v2：按、放手、細絲從開始到最大聲只有 2 到 12 毫秒（一顆顆的喀），峰值 −1 到 −4 dB，重心擠在 500 到 1800 Hz（手機喇叭最突出的一段），
+# 冒泡是正弦波的「啵」。v3：起音 6 到 40 毫秒（升餘弦，不是直線），峰值壓到 −12 dB 上下，低通多半在 1.6 到 2.6 kHz，
+# 主體改成濕的細碎聲（很多很小的黏液氣泡破掉、手指慢慢壓黏土那種），拿掉卡通的啵，加一點點很短的空間感。層與檔名跟 v2 一樣，播放程式不用改。
+
+def soft_env(n, attack, decay):
+    """升餘弦起音 attack 秒，之後時間常數 decay 秒的指數下降。直線起音在 2 毫秒內一樣會喀一聲。"""
+    t = np.arange(n) / SR
+    a = np.where(t < attack, 0.5 - 0.5 * np.cos(np.pi * np.clip(t / max(attack, 1e-4), 0, 1)), 1.0)
+    return a * np.exp(-np.maximum(0, t - attack) / decay)
+
+
+def grains(n, rng, rate, lo, hi, amp, t0=0.0, t1=None):
+    """細碎的黏響：每秒 rate 顆、每顆 1.5 到 4 毫秒的帶通雜訊，漢寧窗包起來（沒有硬邊）。ASMR 黏土的「細細的濕」靠這個。"""
+    x = np.zeros(n)
+    t1 = n / SR if t1 is None else t1
+    tt = t0
+    while tt < t1:
+        m = int(rng.uniform(0.0015, 0.004) * SR)
+        g = band(rng.standard_normal(m + 64), lo, hi)[64:] * np.hanning(m)
+        place(x, rng.uniform(0.3, 1.0) * amp * g / (np.max(np.abs(g)) or 1), tt)
+        tt += rng.exponential(1 / rate)
+    return x
+
+
+def room(x, rng, mix=0.12, tail=0.09):
+    """很短的空間感：跟一段 tail 秒指數衰減的低通雜訊卷積，混一點點進去，聲音像貼在耳邊、不是乾乾的。"""
+    m = int(tail * 1.6 * SR)
+    ir = lowpass(rng.standard_normal(m), 2500) * np.exp(-np.arange(m) / SR / tail * 3)
+    wet = np.convolve(x, ir)[:len(x)]
+    return x + mix * wet / (np.max(np.abs(wet)) or 1) * (np.max(np.abs(x)) or 1)
+
+
+def finish_a(x, lp, peak_db, fin=0.004, fout=0.05):
+    x = highpass(lowpass(x, lp, 2), 150)
+    return norm(fade(x, fin, fout), peak_db)
+
+
+def press_body_a(rng, k):
+    """軟軟的「嗯」一下：缺基音的悶音，起音 12 毫秒，比 v2 低、長、小聲。"""
+    dur = 0.3
+    n = int(dur * SR)
+    x = phantom(rng.uniform(150, 180), rng.uniform(100, 115), rng.uniform(0.045, 0.06), dur, (0.1, 0.6, 1.0, 0.6, 0.3, 0.12))
+    x *= soft_env(n, 0.012, 1e9)
+    return finish_a(x, 1600, -12, fout=0.08)
+
+
+def press_wet_a(rng, k):
+    """手指慢慢壓進黏土：共鳴從 900 Hz 慢慢滑到 300（空間被壓小），起音 20 毫秒；前 0.15 秒加細碎的濕響。"""
+    dur = 0.32
+    n = int(dur * SR)
+    x = sweep_band(rng.standard_normal(n), rng.uniform(800, 1000), rng.uniform(280, 340), q=2.5) * soft_env(n, 0.02, rng.uniform(0.07, 0.1))
+    x = x / (np.max(np.abs(x)) or 1)
+    x += grains(n, rng, rng.uniform(90, 140), 1100, 2600, 0.18, 0.01, 0.17) * soft_env(n, 0.02, 0.08)
+    return finish_a(room(x, rng), 2600, -12, fout=0.08)
+
+
+def press_air_a(rng, k):
+    """被擠出去的一點空氣：很輕的「呼」，帶通雜訊，起音 30 毫秒（v2 是一顆正弦氣泡）。"""
+    dur = 0.26
+    n = int(dur * SR)
+    x = band(rng.standard_normal(n), rng.uniform(300, 400), rng.uniform(1100, 1400)) * soft_env(n, 0.03, rng.uniform(0.05, 0.08))
+    return finish_a(x, 1800, -18, fin=0.01, fout=0.08)
+
+
+def release_air_a(rng, k):
+    """放手的「噗」：圓圓的、往上滑一點點的軟泡（滑 1.25 倍，v2 滑 2 到 2.6 倍像卡通），起音 6 毫秒、不加飽和，加一點低通雜訊當肉。"""
+    dur = 0.3
+    n = int(dur * SR)
+    size = k % 4
+    f0 = [rng.uniform(180, 210), rng.uniform(210, 250), rng.uniform(250, 290), rng.uniform(290, 330)][size]   # 聽起來的音高（實際能量在 2 倍上下）
+    tau = [0.06, 0.052, 0.045, 0.038][size] * rng.uniform(0.9, 1.1)
+    # 第一版用 f0 本身的正弦泡加 900 Hz 低通雜訊，量過有一段 300 Hz 以上只佔 2%，手機上聽不到：改成泡在兩倍音高、肉用 1.6 到 2.4 倍往上開的共鳴
+    x = bubble(2 * f0, rng.uniform(1.18, 1.3), tau, dur) * soft_env(n, 0.006, 1e9)
+    body = sweep_band(rng.standard_normal(n), 1.6 * f0, 2.4 * f0, q=4) * soft_env(n, 0.008, tau * 0.7)
+    x = 0.6 * x / (np.max(np.abs(x)) or 1) + body / (np.max(np.abs(body)) or 1)
+    return finish_a(room(x, rng, 0.1), 2000, -12, fout=0.08)
+
+
+def release_wet_a(rng, k):
+    """拍回自己：很輕的濕「啪」，300 到 1500 Hz，起音 6 毫秒，後面跟幾顆細碎的濕響。"""
+    dur = 0.2
+    n = int(dur * SR)
+    x = band(rng.standard_normal(n), 300, 1500) * soft_env(n, 0.006, rng.uniform(0.025, 0.035))
+    x = x / (np.max(np.abs(x)) or 1)
+    x += grains(n, rng, 70, 1000, 2400, 0.14, 0.01, 0.1) * soft_env(n, 0.01, 0.06)
+    return finish_a(room(x, rng), 2400, -14, fout=0.06)
+
+
+def release_body_a(rng, k):
+    """重的放手才有的份量：比 press_body_a 再短一點、再小一點。"""
+    dur = 0.24
+    n = int(dur * SR)
+    x = phantom(rng.uniform(150, 170), rng.uniform(105, 115), rng.uniform(0.035, 0.05), dur, (0.08, 0.55, 1.0, 0.6, 0.3, 0.1))
+    x *= soft_env(n, 0.01, 1e9)
+    return finish_a(x, 1500, -14, fout=0.07)
+
+
+def pull_loop_a(rng, k):
+    """被拉開的黏液：3 秒無縫循環，低的濕底（250 到 700 Hz 的共鳴慢慢晃）加稀稀的細碎黏響。app 照舊依拉長調音高、低通、音量。"""
+    loop, xf = 3.0, 0.6
+    dur = loop + xf
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    wob = lambda: (lambda ph, fr: (lambda p: 0.5 + 0.5 * np.sin(2 * np.pi * fr * p * dur + ph)))(rng.uniform(0, 6), rng.uniform(0.4, 0.9))
+    a = sweep_band(rng.standard_normal(n), 260, 480, q=4, curve=wob())
+    b = sweep_band(rng.standard_normal(n), 600, 900, q=5, curve=wob())
+    x = a / np.std(a) + 0.4 * b / np.std(b)
+    x *= 0.7 + 0.3 * np.sin(2 * np.pi * rng.uniform(0.8, 1.4) * t + rng.uniform(0, 6))
+    x *= 0.1
+    x += grains(n, rng, 22, 1000, 2400, 0.12)
+    x = highpass(lowpass(x, 2200), 180)
+    return norm(loopify(x, loop, xf), -14)
+
+
+def pull_strand_a(rng, k):
+    """一根細絲斷掉：很輕的「滋」，3 毫秒升起、12 毫秒退，沒有音高（v2 是上滑的「滴」）。"""
+    dur = 0.06
+    n = int(dur * SR)
+    x = band(rng.standard_normal(n), rng.uniform(900, 1200), rng.uniform(2000, 2400)) * soft_env(n, 0.003, rng.uniform(0.008, 0.014))
+    return finish_a(x, 2800, -18, fin=0.002, fout=0.02)
+
+
+def rub_loop_a(rng, k):
+    """持續揉：3 秒無縫循環，一下一下慢慢的擠壓聲（起音 25 毫秒），間隔 0.15 到 0.3 秒，每下帶一點細碎濕響。"""
+    loop, xf = 3.0, 0.6
+    dur = loop + xf
+    n = int(dur * SR)
+    x = 0.03 * band(rng.standard_normal(n), 200, 600)
+    tt = 0.02
+    while tt < dur - 0.15:
+        m = int(0.16 * SR)
+        sq = sweep_band(rng.standard_normal(m), rng.uniform(650, 850), rng.uniform(230, 300), q=2.5) * soft_env(m, 0.025, rng.uniform(0.04, 0.06))
+        sq = sq / (np.max(np.abs(sq)) or 1)
+        sq += grains(m, rng, 80, 1000, 2400, 0.15, 0.005, 0.08) * soft_env(m, 0.02, 0.05)
+        place(x, rng.uniform(0.35, 0.6) * sq, tt)
+        tt += rng.uniform(0.15, 0.3)
+    x = highpass(lowpass(room(x, rng, 0.1), 2200), 150)
+    return norm(loopify(x, loop, xf), -12)
+
+
+def settle_bubble_a(rng, k):
+    """放手後冒的小泡：低、小、圓（350 到 700 Hz，只滑 1.15 倍，起音 4 毫秒）。"""
+    dur = 0.1
+    n = int(dur * SR)
+    x = bubble(rng.uniform(350, 700), rng.uniform(1.1, 1.2), rng.uniform(0.012, 0.02), dur) * soft_env(n, 0.004, 1e9)
+    return finish_a(x, 2000, -20, fin=0.002, fout=0.03)
+
+
+def settle_hiss_a(rng, k):
+    """壓久了放開，空氣慢慢回填：更小、更低的「嘶」（700 到 2200 Hz，v2 是 2 到 5 kHz）。"""
+    dur = 0.4
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    x = band(rng.standard_normal(n), 700, 2200) * np.sin(np.pi * np.clip(t / dur, 0, 1)) ** 2
+    return finish_a(x, 3000, -24, fin=0.02, fout=0.08)
+
+
+# (類別, 層, 產生函式, 段數)。段數 × 層數 × 浮音高，組合比 v1 的「一類 8 段」多上百倍。LAYERS_V2 是 v2（刺耳的那組，留著對照）
+LAYERS_V2 = [
     ('press', 'body', press_body, 6), ('press', 'wet', press_wet, 6), ('press', 'air', press_air, 6),
     ('release', 'air', release_air, 8), ('release', 'wet', release_wet, 6), ('release', 'body', release_body, 5),
     ('pull', 'loop', pull_loop, 2), ('pull', 'strand', pull_strand, 10),
     ('rub', 'loop', rub_loop, 3),
     ('settle', 'bubble', settle_bubble, 10), ('settle', 'hiss', settle_hiss, 3),
+]
+LAYERS = [
+    ('press', 'body', press_body_a, 6), ('press', 'wet', press_wet_a, 6), ('press', 'air', press_air_a, 6),
+    ('release', 'air', release_air_a, 8), ('release', 'wet', release_wet_a, 6), ('release', 'body', release_body_a, 5),
+    ('pull', 'loop', pull_loop_a, 2), ('pull', 'strand', pull_strand_a, 10),
+    ('rub', 'loop', rub_loop_a, 3),
+    ('settle', 'bubble', settle_bubble_a, 10), ('settle', 'hiss', settle_hiss_a, 3),
 ]
 
 
@@ -318,8 +486,17 @@ def speaker_ratio(y):
     return float(spec[f >= 300].sum() / (spec.sum() or 1))
 
 
+def attack_ms(y):
+    """從開始到包絡最大的毫秒數（1 毫秒平滑）：v2 的按、放手只有 2 到 12 毫秒。"""
+    e = np.convolve(np.abs(y), np.ones(48) / 48, 'same')
+    return float(np.argmax(e) / SR * 1000)
+
+
 def main():
     preview = '--preview' in sys.argv
+    global LAYERS, OUT_DIRS
+    if '--v2' in sys.argv:   # 舊的 v2 組，只寫到網頁的 sfx/v2/（試聽頁切換對照用）
+        LAYERS, OUT_DIRS = LAYERS_V2, [os.path.join(ROOT, 'prototype', 'web', 'sfx', 'v2')]
     manifest = {'version': 2}
     clips = {}
     for li, (kind, layer, fn, count) in enumerate(LAYERS):
@@ -345,7 +522,9 @@ def main():
         for kind, layer, _, _ in LAYERS:
             names = [n for n in clips if n.startswith(f'{kind}-{layer}-')]
             r = [speaker_ratio(clips[n]) for n in names]
-            print(f'  {kind:7s} {layer:6s} 喇叭頻段佔比 {min(r):.2f} 到 {max(r):.2f}', '⚠' if min(r) < 0.6 else '')
+            a = [attack_ms(clips[n]) for n in names]
+            pk = [20 * np.log10(np.max(np.abs(clips[n])) + 1e-9) for n in names]
+            print(f'  {kind:7s} {layer:6s} 喇叭頻段佔比 {min(r):.2f} 到 {max(r):.2f}  起音 {min(a):4.0f} 到 {max(a):4.0f} ms  峰值 {max(pk):5.1f} dB', '⚠' if min(r) < 0.6 else '')
         draw_preview(clips)
 
 
