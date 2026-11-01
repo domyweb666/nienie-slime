@@ -98,7 +98,34 @@ final class SlimeRig {
     private var podE: [(ca: Double, sa: Double, amp: Double, sig: Double, bend: Double)] = []
     private var brJw = 0.0, brLift = 0.0          // jellyfish contraction 0...1, and the lift it gave (points)
     private var GWT: [Double] = []                // grab weight of each particle this substep (grabHold)
-    private var flatOn = false, flatFloor = 0.0, flatQB = 0.0   // press flat: pressing now, table height, remembered bottom below the centroid
+    private var flatOn = false, flatFloor = 0.0, flatQB = 0.0
+    // v2.12 camera (多米: pulled a little bigger and it stopped; the physics followed, the screen edge did not): a big shape
+    // zooms the view out and pans it to fit, down to zoomMin; the walls sit at the edge of the farthest view. screen = (world − cam) × z + V
+    private(set) var camZ = 1.0, camX = 0.0, camY = 0.0
+    var viewV: (x: Double, y: Double) { (W / 2, (90 + H - 120) / 2) }
+    func toWorld(_ sx: Double, _ sy: Double) -> (x: Double, y: Double) {
+        let v = viewV
+        return ((sx - v.x) / camZ + camX, (sy - v.y) / camZ + camY)
+    }
+    func toScreen(_ x: Double, _ y: Double) -> (x: Double, y: Double) {
+        let v = viewV
+        return ((x - camX) * camZ + v.x, (y - camY) * camZ + v.y)
+    }
+    private var worldWalls: (l: Double, r: Double, t: Double, b: Double) {
+        let v = viewV, zm = min(1, max(0.1, params.zoomMin)), ax = (W - 16) / 2 / zm, ay = (H - 210) / 2 / zm
+        return (v.x - ax, v.x + ax, v.y - ay, v.y + ay)
+    }
+    private func updateCam(_ dt: Double) {
+        let v = viewV, pad = R * 0.35
+        var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
+        for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]); y1 = max(y1, Y[i]) }
+        let ax = (W - 16) / 2, ay = (H - 210) / 2, zm = min(1, max(0.1, params.zoomMin))
+        let zt = max(zm, min(1, ax / ((x1 - x0) / 2 + pad), ay / ((y1 - y0) / 2 + pad)))
+        let hx = ax / zt, hy = ay / zt
+        func clampC(_ c: Double, _ lo: Double, _ hi: Double) -> Double { lo > hi ? (lo + hi) / 2 : max(lo, min(hi, c)) }
+        let cxT = clampC(v.x, x1 + pad - hx, x0 - pad + hx), cyT = clampC(v.y, y1 + pad - hy, y0 - pad + hy), k = 1 - exp(-dt / 0.35)
+        camZ += (zt - camZ) * k; camX += (cxT - camX) * k; camY += (cyT - camY) * k
+    }   // press flat: pressing now, table height, remembered bottom below the centroid
     private var builtLimbs = -1.0, builtSize = -1.0
 
     final class Finger {
@@ -122,6 +149,7 @@ final class SlimeRig {
         var over = 0.0                               // seconds past the slip threshold (候選 25)
         var sticking = false, releaseAt = 0.0         // lifted slowly: still holding until releaseAt (候選 26)
         var flatOn = false, h0 = 1.0, bot = 0.0, flat = 1.0   // press flat: began on the upper half; height and bottom then; current squash
+        var sx = 0.0, sy = 0.0, psx = 0.0, psy = 0.0  // screen position (and prediction): the camera moves, so world is recomputed each frame
         var mode: Mode
         var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
         init(x: Double, y: Double, mode: Mode, time: Double) {
@@ -331,6 +359,7 @@ final class SlimeRig {
         A0 = polygonArea()
         builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize
         pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0; flatOn = false
+        camZ = 1; camX = viewV.x; camY = viewV.y
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
@@ -473,12 +502,15 @@ final class SlimeRig {
 
     /// `allowed` is false for touches in the system-gesture bands near the screen edges.
     /// `radius` is UITouch.majorRadius (contact size, points; 0 if unknown).
-    func touchBegan(_ id: ObjectIdentifier, x: Double, y: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
+    /// `x, y` are screen points; the rig turns them into world points through the camera.
+    func touchBegan(_ id: ObjectIdentifier, x sx: Double, y sy: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
         guard N > 0 else { return }
+        let (x, y) = toWorld(sx, sy)
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
         f.radius = radius; f.r0 = radius
+        f.sx = sx; f.sy = sy
         if grab {
             // mem: particle, offset from the finger, follow weight, and the spread direction for the press
             // (unit vector away from the finger × (1 − u²)², so the patch squashes flat under the finger)
@@ -516,9 +548,11 @@ final class SlimeRig {
     /// replaced as real touches arrive). `distance` is the true travelled distance from coalesced touches.
     func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, predictedX: Double?, predictedY: Double?, distance: Double, radius: Double = 0) {
         guard let f = fingers[id] else { return }
-        f.rawX = x; f.rawY = y
+        f.sx = x; f.sy = y
+        (f.rawX, f.rawY) = toWorld(x, y)
         if let predictedX, let predictedY {
-            f.predX = predictedX; f.predY = predictedY; f.hasPrediction = true
+            f.psx = predictedX; f.psy = predictedY
+            (f.predX, f.predY) = toWorld(predictedX, predictedY); f.hasPrediction = true
         } else {
             f.hasPrediction = false
         }
@@ -625,6 +659,13 @@ final class SlimeRig {
         // 候選 26: a stuck finger lets go when its time is up
         for (id, f) in fingers where f.sticking && t >= f.releaseAt { release(id, quiet: false) }
 
+        updateCam(dt)
+        // a finger resting on the screen while the camera backs off: the same screen point maps further out, so the shape keeps
+        // stretching (hold it at the screen edge and it keeps pulling)
+        for f in fingers.values {
+            (f.rawX, f.rawY) = toWorld(f.sx, f.sy)
+            if f.hasPrediction { (f.predX, f.predY) = toWorld(f.psx, f.psy) }
+        }
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
             // chase target: the prediction only on a frame that got a fresh move event, else the real finger,
@@ -647,8 +688,8 @@ final class SlimeRig {
                 ex *= s; ey *= s
             }
             // the finger keeps 0.35R off the walls: a held patch pressed flat against a wall crossed on release (4 of 6 trials)
-            let mw = R * 0.35
-            let tx = max(8 + mw, min(W - 8 - mw, f.ax + ex)), ty = max(90 + mw, min(H - 120 - mw, f.ay + ey))
+            let mw = R * 0.35, wl = worldWalls   // the walls are in world points (the farthest view's edge)
+            let tx = max(wl.l + mw, min(wl.r - mw, f.ax + ex)), ty = max(wl.t + mw, min(wl.b - mw, f.ay + ey))
             let k = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
             f.fx += (tx - f.fx) * k; f.fy += (ty - f.fy) * k
             if f.mode == .grab {
@@ -1086,7 +1127,7 @@ final class SlimeRig {
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
         let hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
         let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hyF - gcy
-        let padT = 90.0, padB = H - 120, padL = 8.0, padR = W - 8
+        let wl = worldWalls, padT = wl.t, padB = wl.b, padL = wl.l, padR = wl.r   // walls: the edge of the farthest view (world)
         for i in 0..<N {
             if !GRAB[i] { X[i] += dx * kh; Y[i] += dy * kh }
             if flatOn && Y[i] > flatFloor { Y[i] = flatFloor; PY[i] = Y[i] }   // the invisible table: no sinking, no bounce, free to slide

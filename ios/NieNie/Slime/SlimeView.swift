@@ -314,25 +314,27 @@ final class SlimeView: UIView {
     }
 
     private func redraw() {
-        let R = rig.R
-        let P = rig.boundaryPoints()
+        // v2.12 camera: everything is drawn in screen points through rig.toScreen; sizes scale with the zoom, the outline
+        // keeps its on-screen width
+        let z = rig.camZ, R = rig.R * z
+        let P = rig.boundaryPoints().map { p -> (x: Double, y: Double) in rig.toScreen(p.x, p.y) }
         guard !P.isEmpty else { return }
-        let lw = max(4, R * 0.034)
+        let lw = max(4, rig.R * 0.034)
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
         var minX = 1e9, maxX = -1e9, maxY = -1e9
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }
-        let c = rig.centroid
+        let shadowX = (minX + maxX) / 2   // the shadow centres on the whole width (a long pull shifts the centroid aside)
 
         // floating: a soft shadow under the lowest point, fainter the higher it hangs
         let sw = (maxX - minX) * 0.5
-        let sy = max(maxY, rig.cy + R * 1.2) + R * 0.35
+        let sy = max(maxY, rig.toScreen(0, rig.cy).y + R * 1.2) + R * 0.35
         let lift = max(0, min(1, (sy - maxY) / (R * 1.2)))
         shadowLayer.opacity = Float((0.10 + 0.08 * (1 - lift)) / 0.18)
         let rx = sw * (0.7 + 0.3 * (1 - lift)), ry = R * 0.11 * 0.8
-        shadowLayer.path = CGPath(ellipseIn: CGRect(x: c.x - rx, y: sy - ry, width: rx * 2, height: ry * 2), transform: nil)
+        shadowLayer.path = CGPath(ellipseIn: CGRect(x: shadowX - rx, y: sy - ry, width: rx * 2, height: ry * 2), transform: nil)
 
         let body = bodyPath(P)
         shadeLayer.path = body
@@ -340,7 +342,7 @@ final class SlimeView: UIView {
         baseLayer.path = bodyPath(P, dx: -R * 0.07, dy: -R * 0.085)
 
         // highlight rides on an upper-left particle and turns with the body
-        let hp = rig.highlight, ang = rig.bodyAngle
+        let hp = rig.toScreen(rig.highlight.x, rig.highlight.y), ang = rig.bodyAngle
         let hl = CGMutablePath()
         let t = CGAffineTransform(translationX: hp.x, y: hp.y).rotated(by: ang - 0.5)
         hl.addEllipse(in: CGRect(x: -R * 0.17, y: -R * 0.085, width: R * 0.34, height: R * 0.17), transform: t)
