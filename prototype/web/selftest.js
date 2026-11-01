@@ -396,6 +396,20 @@
     res.T30_dent = { heldDepth: +dHeld.toFixed(2), after1s: +d1.toFixed(2), after15s: +d15.toFixed(2), dentsAfterPull: DENTS.length, end: snap() };
     log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T31 按壓（v2.16，多米：按壓動畫像兒戲）：黏土按住身體中間 0.8 秒，整團面積要變大 4% 到 15%（press2=0 是 1.00）；按 3 秒跟 1.5 秒比，
+  //     最遠位移不能一直長（黏土記下推開的形狀、再推一次的話會一直攤開）；放手 1 秒凹痕還在。果凍放手要過頭往外彈（p 掉到負的）、1 秒內收乾淨。全程零自交
+  { const clock = saveClock(); Math.random = seeded(20261118); const r31 = {}; let xf = 0;
+    const hold = (over, n) => { resetAligned(1e9, over); nextTwitch = 1e9; const cx = globalC.xc, cy = globalC.yc, a0 = area(), ref = [Float64Array.from(X), Float64Array.from(Y)];
+      ev('pointerdown', 1, cx, cy); const mv = []; let am = 0; for (let k = 1; k <= n; k++) { steps(1); if (classify()[0]) xf++; if (k === 48) am = area() / a0; if (k === 90 || k === 180) mv.push(maxMove(ref)); }
+      return { cx, cy, a0, am, mv }; };
+    { const h = hold({}, 180); r31.clayArea08 = +h.am.toFixed(3); r31.clayMove15 = +h.mv[0].toFixed(1); r31.clayMove3 = +h.mv[1].toFixed(1);
+      ev('pointerup', 1, h.cx, h.cy); steps(60); r31.clayDent1s = DENTS.length ? +DENTS[DENTS.length - 1].d.toFixed(2) : 0; }
+    { const h = hold({ press2: 0 }, 48); r31.offArea08 = +h.am.toFixed(3); ev('pointerup', 1, h.cx, h.cy); steps(30); }
+    { const h = hold({ ...PRESETS.jelly }, 48); ev('pointerup', 1, h.cx, h.cy); let pMin = 1; for (let k = 0; k < 60; k++) { steps(1); if (classify()[0]) xf++; for (const dn of DENTS) pMin = Math.min(pMin, dn.p); }
+      r31.jellyArea08 = +h.am.toFixed(3); r31.jellyOvershoot = +pMin.toFixed(2); r31.jellyDentsAfter1s = DENTS.length; }
+    r31.foldFrames = xf; r31.end = snap();
+    res.T31_press = r31; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -466,6 +480,8 @@
     // 手指停住：形狀不自己長（< 0.3R）、邊界每幀跳動不到 3 點、零交叉
     stillFingerSteady: res.T29_stillFinger.every(r => r.grewR < 0.3 && r.jitterMaxPt < 3 && r.crossFrames === 0),
     // 點一下：按 0.1 秒凹痕深過 0.5、1 秒後還在、15 秒淡了但還看得到（0.15 以上）；拉開的那次凹痕收掉
+    // 按壓：整團變大 4% 到 15%、關掉時不變；按 3 秒的最遠位移不超過 1.5 秒的 1.3 倍；黏土放手 1 秒凹痕還在；果凍過頭彈、1 秒收乾淨；零自交
+    pressReal: res.T31_press.clayArea08 > 1.04 && res.T31_press.clayArea08 < 1.15 && res.T31_press.offArea08 < 1.01 && res.T31_press.clayMove3 < res.T31_press.clayMove15 * 1.3 && res.T31_press.clayDent1s > 0.5 && res.T31_press.jellyOvershoot < -0.1 && res.T31_press.jellyDentsAfter1s === 0 && res.T31_press.foldFrames === 0,
     dentOnTap: res.T30_dent.heldDepth > 0.5 && res.T30_dent.after1s > 0.5 && res.T30_dent.after15s > 0.15 && res.T30_dent.after15s < res.T30_dent.after1s && res.T30_dent.dentsAfterPull === 0,
     // 從中間往右、往上拉 2R，那一側外圈要跟出去 1.5R 以上（v2.13 是 -0.08R）；零自交、面積回來
     pullFromMiddle: ['right', 'up'].every(k => res.T27_pullFromMiddle[k].edgeMovedR > 1.5 && res.T27_pullFromMiddle[k].worstSelfX === 0 && okArea(res.T27_pullFromMiddle[k].end)),
