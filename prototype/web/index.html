@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.8</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.9</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -24,18 +24,18 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .bottom{bottom:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}
 .brand{font-weight:800;font-size:22px;letter-spacing:.04em;display:flex;align-items:baseline;gap:8px;padding:6px 2px}
 .brand span{font-size:12px;font-weight:700;color:var(--ink-soft);letter-spacing:.14em}
-.round{width:46px;height:46px;border-radius:50%;border:2.5px solid var(--chip-line);background:var(--chip);display:grid;place-items:center;flex:none;padding:0;box-shadow:0 3px 0 var(--chip-line);font-size:18px}
+.round{width:46px;height:46px;border-radius:50%;border:2.5px solid var(--chip-line);background:var(--chip);display:grid;place-items:center;flex:none;padding:0;font-size:18px}
 .round[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
-.mats{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--chip);border:2.5px solid var(--chip-line);box-shadow:0 3px 0 var(--chip-line);min-width:0}
+.mats{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--chip);border:2.5px solid var(--chip-line);min-width:0}
 .mats button{border:0;background:transparent;border-radius:999px;padding:8px 11px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--ink)}
 .mats button i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .mats button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 .hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);
   padding:8px 16px;border-radius:999px;background:#fff;border:2.5px solid var(--chip-line);font-size:14px;font-weight:700;
-  box-shadow:0 3px 0 var(--chip-line);transition:opacity .6s;pointer-events:none}
+  transition:opacity .6s;pointer-events:none}
 .hint.off{opacity:0}
 .tune{max-height:calc(100vh - 210px);overflow:auto;position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
-  bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:#fff;border:2.5px solid var(--chip-line);border-radius:22px;box-shadow:0 4px 0 var(--chip-line);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:#fff;border:2.5px solid var(--chip-line);border-radius:22px;
   padding:14px 16px 12px;display:grid;gap:10px;z-index:5}
 .tune.hidden{display:none}
 .tune-head{display:flex;justify-content:space-between;align-items:baseline}
@@ -54,11 +54,11 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.8</span></div>
+  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.9</span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="聲音">🔈</button>
 </div>
 
-<div class="hint" id="hint">捏它、拉它、甩它的觸手。放著不管它也會飄</div>
+<div class="hint" id="hint">捏它、拉它、揉它。放著不管它也會自己動</div>
 
 <div class="bar bottom">
   <div class="mats" role="group" aria-label="手感">
@@ -72,7 +72,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div class="tune hidden" id="tune">
   <div class="tune-head"><b>調整面板</b><span>長按「捏捏」開關</span></div>
   <div id="sliders"></div>
-  <div class="tune-actions" id="cands"><button data-c="6">候選 6 黏滯 0.03</button><button data-c="19">候選 19 凍住</button><button data-c="2">候選 2 特別回彈</button><button data-c="41">41 對照：關橫檔</button><button data-c="21">21 回家慢</button><button data-c="22">22 放手餘韻</button><button data-c="23">23 呼吸</button><button data-c="25">25 滑脫</button><button data-c="26">26 黏連</button><button data-c="27">27 局部鼓</button><button data-c="33">33 家 0.46</button><button data-c="34">34 描邊粗細</button><button data-c="27v">v2.7 對照：蠕動與回彈</button></div>
+  <div class="tune-actions" id="cands"><button data-c="6">候選 6 黏滯 0.03</button><button data-c="19">候選 19 凍住</button><button data-c="2">候選 2 特別回彈</button><button data-c="41">41 對照：關橫檔</button><button data-c="21">21 回家慢</button><button data-c="22">22 放手餘韻</button><button data-c="23">23 呼吸</button><button data-c="25">25 滑脫</button><button data-c="26">26 黏連</button><button data-c="27">27 局部鼓</button><button data-c="33">33 家 0.46</button><button data-c="34">34 描邊粗細</button><button data-c="27v">v2.7 對照（舊外形）</button></div>
   <div class="tune-actions"><button id="b-float" aria-pressed="true">懸空（多米定案）</button><button id="t-copy">複製數值</button><button id="t-close">收起</button></div>
   <textarea id="t-out" readonly rows="3" aria-label="目前的手感數值"></textarea>
 </div>
@@ -100,6 +100,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    - v2.8（多米真機回報 build 46，2026-11-01）：蠕動改成平滑亂數（輪廓 2 到 5 階＋兩個繞著跑的鼓包，morph），幅度約兩倍；
      黏土抓到就記形（dwell 0／0.1、creep 6）、被抓的觸手也記形（tentMem，用整身座標、記住的形狀也套橫檔中軸與彎曲上限），
      放著約 10 秒退（recover 0.3）。面板「v2.7 對照」換回原本的。量法在 selftest.js 的 T17、T18
+   - v2.9（多米第二次真機回報，2026-11-01）：沒有固定觸手（limbs 0），改成會伸縮的偽足（pods，隨機方向、上方也會長，伸 40% 停 20% 縮 40%）；
+     水母呼吸（jelly，3 秒一縮一放，收縮快放鬆慢，收縮時上浮）；按鈕拿掉硬陰影。面板「v2.7 對照（舊外形）」換回海星外形與舊的記形。量法在 T19、T20
    - 音效：真實錄音切片。讀 sfx/manifest.json，分四類（press 按、pull 拉、release 放手、rub 持續揉），
      每類多段隨機挑、音高 ±8%、音量跟動作強度。沒有檔案就安靜。錄法見 .uiux/04-手感/錄音指南.md
    ========================================================= */
@@ -108,9 +110,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.15,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,tentMem:0},
-  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.15,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,tentMem:0},
-  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:6,  recover:.3,  grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.14,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,tentMem:1},
+  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.08,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:0,nearMem:0},
+  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.08,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:0,nearMem:0},
+  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:6,  recover:.3,  grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.08,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:1,nearMem:1},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -129,6 +131,7 @@ const F=[
   ['pressFirst','按壓第一幀比例','按下那一幀先到目標的幾成',0,1,.05],
   ['dwellLo','定型停留起點','抓住幾秒後開始記形（秒）',0,1,.05],
   ['dwellHi','定型停留終點','抓住幾秒後全速記形（秒）',0,2,.05],
+  ['nearMem','手指附近記形','手指附近用整身座標量記形，拉出一塊就留一塊；0：只用局部區塊（拉出去的那塊會被當轉動抵銷）',0,1,.05],
   ['tentMem','觸手記形','觸手跟身體一樣留形、一樣慢慢回；0：v2.7 尖端幾乎不記、一秒多彈回（2026-11-01 真機回報）',0,1,.05],
   ['idleFreeze','碰到時凍住','1：活物感時鐘停住不歸零（候選 19）',0,1,1],
   ['specialEvery','特別回彈','每幾次放手來一次特別 Q 的回彈，0 關（候選 2 是 8）',0,12,1],
@@ -156,14 +159,23 @@ const F=[
   ['life','活物感','沒碰時自己動的幅度',0,1.5,.05],
   ['drift','觸手飄動','沒碰時觸手擺動的幅度（×半徑）',0,.4,.01],
   ['wriggle','蠕動','沒碰時整個身體輪廓慢慢變形的幅度（×半徑）',0,.2,.01],
+  ['pods','偽足數量','沒碰時同一時間最多幾條偽足在伸縮（隨機方向，上方也會長）；0 關（2026-11-01 多米：不是海星，觸手會收回去再從別處長出來）',0,3,1],
+  ['podLen','偽足長度（×半徑）','一條偽足伸到最長多長（每條再隨機 0.7 到 1.2 倍）',0,1.4,.05],
+  ['jelly','水母呼吸','1：規律一縮一放，收縮快、放鬆慢，收縮時往上浮；0：原本的正弦呼吸',0,1,1],
+  ['jellyT','水母呼吸週期（秒）','一縮一放幾秒',1.5,6,.1],
+  ['jellyAmp','水母收縮幅度','收縮時變窄幾成（同時變高八成五）',0,.25,.01],
+  ['jellyLift','水母上浮（×半徑）','每次收縮往上浮多少，放鬆時慢慢沉回',0,.3,.01],
+  ['limbs','固定觸手數','0：沒有固定觸手的一團（2026-11-01 起）；5：原本的海星外形（會重置）',0,5,1],
   ['morph','蠕動不重複','1：輪廓與觸手跟著平滑亂數變形，形狀一直在變不重複；0：v2.7 的固定行進波（2026-11-01 真機回報）',0,1,1],
   ['wander','遊走','沒碰時在畫面裡移動的速度（×半徑／秒）',0,1,.05],
   ['floppy','觸手軟度','越大觸手末端越軟、越會甩',0,.9,.05],
   ['seed','外形亂數種子','換一個數字就換一個形狀（會重置）',1,30,1],
 ];
 // v2.7 對照（2026-11-01 多米真機回報前的值）：蠕動是固定行進波、黏土抓 0.2 秒內純彈性、觸手尖端一秒多彈回、記形 33 秒才退
-const V27={jelly:{morph:0,wriggle:.07,tentMem:0},mochi:{morph:0,wriggle:.07,tentMem:0},
-  clay:{morph:0,wriggle:.06,tentMem:0,dwellLo:.2,dwellHi:.6,creep:3,recover:.03}};
+const OLDSHAPE={limbs:5,pods:0,jelly:0};
+const V27={jelly:{...OLDSHAPE,morph:0,wriggle:.07,tentMem:0},mochi:{...OLDSHAPE,morph:0,wriggle:.07,tentMem:0},
+  clay:{...OLDSHAPE,morph:0,wriggle:.06,tentMem:0,nearMem:0,dwellLo:.2,dwellHi:.6,creep:3,recover:.03}};
+
 let mat={...PRESETS.clay},curMat='clay';  // 多米 2026-10-31 選黏土
 let FLOAT=true;
 
@@ -177,12 +189,15 @@ let clusters=[];     // {idx,w,cs,sn,xc,yc,qcx,qcy}
 let globalC=null;
 let hiIdx=0;         // 亮光跟著哪顆粒子
 let lastC={cSpace:0,cRad:0};
-let lastShape={seed:7,floppy:0};
+let lastShape={seed:7,floppy:0,limbs:0};
 let t=0,last=0,lastTouch=-10,nextTwitch=3,A0=1,relaxUntil=-1;
 let tLife=0,releaseCount=0,nextSpecial=0,specialUntil=-1;   // 候選 19 的活物感時鐘；候選 2 的特別回彈計數
 const WANDER={dx:0,dy:0,sx:0,sy:0,p:0,T:1,vx:0,vy:0,next:3,moving:false};
 const PINCH={a:-1,b:-1,d0:1,next:.6};   // 第 24 條 兩指捏：起始距離與下一個 squish 門檻
-const BR={phase:0,tlPrev:0,amp:1,wave:0,deepAt:-99,grabStart:-1};   // 第 23 條 呼吸：相位累積（週期可變不跳相）、被摸久變深
+const BR={phase:0,tlPrev:0,amp:1,wave:0,deepAt:-99,grabStart:-1,jw:0,lift:0};   // jw：水母收縮量 0..1；lift：收縮推上去的高度（點）
+// 偽足（2026-11-01 多米：觸手會收回去，又從上面長出來；形變自由度很大、沒有固定形狀）：
+// 每條有方向、長度、粗細、彎、壽命；伸 40%、停 20%、縮 40%。時鐘只在沒碰時走（碰到就停在那個樣子，不會一碰就縮掉）
+const POD={list:[],clock:0,next:.5,E:[],shift:0};   // 第 23 條 呼吸：相位累積（週期可變不跳相）、被摸久變深
 let AW,lastHome=.4;   // 候選 27 的面積壓力權重；候選 33 家的高度
 
 /* ---------- 外形：癱軟的不規則團塊＋觸手（多米 10-31：要觸手、不要完整形體） ---------- */
@@ -194,7 +209,8 @@ function defineShape(){
   PH=[r()*6.28,r()*6.28,r()*6.28,(-72+(r()-.5)*30)*Math.PI/180];   // PH[3]：頭頂鼓包的角度
   // 角度：螢幕座標 y 向下，90° 是正下方。大多垂在下方與兩側，頂上一個短凸起當頭的方向感
   // 頂上的「頭」不用細觸手（尖端比粒子間距細會自交），改成團塊的鼓包（見 blobR）
-  const base=[[100,2.1,.17],[55,1.8,.15],[140,1.65,.14],[8,1.5,.14],[198,1.35,.13]];
+  // 2026-11-01 多米：不是海星，沒有固定觸手；limbs 0 時只有團塊，伸出去的是會伸縮的偽足（POD，畫在參考形狀上）
+  const base=[[100,2.1,.17],[55,1.8,.15],[140,1.65,.14],[8,1.5,.14],[198,1.35,.13]].slice(0,Math.round(mat.limbs));
   TENT=base.map(([deg,L,w])=>{const a=(deg+(r()-.5)*22)*Math.PI/180;
     // curl：靜止時就彎（正負隨機）；droop：越橫、越朝上的觸手越往下垂
     const curl=(r()-.5)*.6,droop=.15+.3*Math.max(0,-Math.sin(a));
@@ -202,6 +218,7 @@ function defineShape(){
   for(const t of TENT){const b=blobR(t.a);t.uExit=Math.min(.8,Math.max(0,(b*.95-b*.35)/(t.L-b*.35)))}
 }
 function blobR(a){let d=a-PH[3];d=Math.atan2(Math.sin(d),Math.cos(d));
+  if(!TENT.length)return .98+.07*Math.sin(2*a+PH[0])+.05*Math.sin(3*a+PH[1])+.03*Math.sin(5*a+PH[2]);   // 沒有觸手：一團、沒有頭頂鼓包，大一點補回觸手的量
   return .78+.10*Math.sin(2*a+PH[0])+.07*Math.sin(3*a+PH[1])+.04*Math.sin(5*a+PH[2])+.24*Math.exp(-((d/.38)**2))}   // ×R，最後一項是頭頂鼓包
 // 哪一條觸手、沿觸手的位置 u（0 根 1 尖）、到軸線距離
 function tentHit(x,y){let best=null;
@@ -258,8 +275,8 @@ function setup(){
   buildRungs();
   // 亮光粒子：團塊左上
   let bd=1e9;for(let i=0;i<N;i++){if(TID[i]>=0)continue;const d=Math.hypot(Q0X[i]+R*.28,Q0Y[i]+R*.32);if(d<bd){bd=d;hiIdx=i}}
-  fingers.clear();GRAB.fill(0);lastShape={seed:mat.seed,floppy:mat.floppy};
-  BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;PINCH.a=-1;PINCH.b=-1;
+  fingers.clear();GRAB.fill(0);lastShape={seed:mat.seed,floppy:mat.floppy,limbs:mat.limbs};
+  BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;BR.jw=0;BR.lift=0;POD.list=[];POD.clock=0;POD.next=.5;POD.E=[];POD.shift=0;PINCH.a=-1;PINCH.b=-1;
   {let A=0;const n=bnd.length;for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];A+=X[a]*Y[b]-X[b]*Y[a]}A0=Math.abs(A)/2}
 }
 
@@ -404,9 +421,16 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   let tvx=0,tvy=0;const wv=Math.hypot(WANDER.vx,WANDER.vy);
   if(mat.tail>0&&wv>1e-6&&mat.wander>0){const ga=Math.atan2(globalC.sn,globalC.cs),ca=Math.cos(ga),sa=Math.sin(ga),s=mat.tail*R*Math.min(1.5,wv/(mat.wander*R))/wv;
     tvx=(ca*WANDER.vx+sa*WANDER.vy)*s;tvy=(-sa*WANDER.vx+ca*WANDER.vy)*s}
+  const PE=POD.E,Rb=R*.98;
   for(let i=0;i<N;i++){let ex=QX[i],ey=QY[i];
+    // 偽足：沿方向 a 的高斯把外圈往外推（內部按 (r/Rb)² 少推，整片是平滑映射），整圈扣 POD.shift 讓面積一階不變；bend 讓伸出去的那段往旁邊彎
+    if(PE.length){const r=Math.hypot(ex,ey);if(r>1e-6){const c1=ex/r,s1=ey/r,rn=Math.min(1.6,(r/Rb)**2);let dr=0,dt2=0;
+      for(const q of PE){const da=Math.atan2(s1*q.ca-c1*q.sa,c1*q.ca+s1*q.sa),g=Math.exp(-da*da/(2*q.sig*q.sig));
+        dr+=q.amp*g*rn;dt2+=q.bend*q.amp*g*rn*rn}
+      dr-=POD.shift*rn;
+      ex+=c1*dr-s1*dt2;ey+=s1*dr+c1*dt2}}
     if(wr!==0){const qx=ex*iR,qy=ey*iR;
-      if(mat.morph>=.5){const r=Math.hypot(qx,qy);
+      if(mat.morph>=.5){const r=Math.hypot(qx,qy);   // （偽足推過之後的位置；偽足那段也一起蠕動）
         // 輪廓 2 到 5 階變形（係數在 update() 的 morphCoef 算）：徑向 d、切向 g；中心附近按半徑縮小，整片是平滑的映射
         if(r>1e-6){const c1=qx/r,s1=qy/r,k=wr*Math.min(1,r);let cm=c1,sm=s1,d=0,g=0;
           for(let m=2;m<=5;m++){const c=cm*c1-sm*s1;sm=sm*c1+cm*s1;cm=c;d+=MA[m]*cm+MB[m]*sm;g+=MB[m]*cm-MA[m]*sm}
@@ -515,7 +539,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
         X[q.a]+=ux*delta*wq/sw;Y[q.a]+=uy*delta*wq/sw;X[q.b]+=ux*delta*wq/sw;Y[q.b]+=uy*delta*wq/sw;
         X[g.a]-=ux*delta*wg/sw;Y[g.a]-=uy*delta*wg/sw;X[g.b]-=ux*delta*wg/sw;Y[g.b]-=uy*delta*wg/sw}}}
   // 4 回家（懸空時較強），邊界，地面
-  const hx=HOMEX+Lamp*mat.life*R*.035*Math.sin(tl*2*Math.PI/7.3),hy=HOMEY+(FLOAT?Lamp*mat.life*R*.05*Math.sin(tl*2*Math.PI/4.7):0);
+  const hx=HOMEX+Lamp*mat.life*R*.035*Math.sin(tl*2*Math.PI/7.3),hy=HOMEY-BR.lift+(FLOAT&&mat.jelly<.5?Lamp*mat.life*R*.05*Math.sin(tl*2*Math.PI/4.7):0);   // 水母模式不再另外上下飄，上下只跟呼吸
   const kh=FLOAT?(grabbing?.02*mat.anchor:mat.homeK):.006*(grabbing?mat.anchor:1),dx=hx-cx,dy=hy-cy;   // 候選 21：不抓時的回家彈簧 homeK（0.003 約半秒飄回、不過衝）；抓著時照舊 0.02×anchor
   const padT=90,padB=H-120,padL=8,padR=W-8;
   for(let i=0;i<N;i++){
@@ -544,6 +568,12 @@ function plasticity(dt){
       RX[i]+=(qcx+cs*px+sn*py)*w;RY[i]+=(qcy-sn*px+cs*py)*w;cnt[i]+=w}}
   // tentMem：觸手改用「整身」的座標量現在在哪（根部照舊用區塊、越往尖端越用整身，接點才不會兩套座標打架）。局部區塊會把整條觸手彎過去當成轉動抵銷掉，記不住彎（量過：拉 0.8R 只記 2.7 點）
   // 只有被手指抓到的那條觸手這樣量：沒碰到的觸手在甩，用整身座標量會被當成變形記下來（量過：按住身體 1.5 秒，觸手記歪 52 點）
+  // nearMem：手指附近（高斯半徑約 0.9R）也改用整身座標量。身體被拉出一塊時，局部區塊同樣把它當轉動抵銷（量過：拉 0.9R 只記 7 點）
+  if(mat.nearMem>0){const g=globalC,gs=[];for(const f of fingers.values())if(f.mode==='grab')gs.push(f);
+    if(gs.length){const k2=1/(.8*R*R);
+      for(let i=0;i<N;i++){let wf=0;for(const f of gs){const dx=X[i]-f.fx,dy=Y[i]-f.fy;wf=Math.max(wf,Math.exp(-(dx*dx+dy*dy)*k2))}
+        const wi=mat.nearMem*wf;if(wi<1e-3)continue;const px=X[i]-g.xc,py=Y[i]-g.yc,c=cnt[i];
+        RX[i]=RX[i]*(1-wi)+(g.qcx+g.cs*px+g.sn*py)*c*wi;RY[i]=RY[i]*(1-wi)+(g.qcy-g.sn*px+g.cs*py)*c*wi}}}
   if(mat.tentMem>0){const g=globalC,w=mat.tentMem,TG=new Uint8Array(TENT.length);for(let i=0;i<N;i++)if(GRAB[i]&&TID[i]>=0)TG[TID[i]]=1;
     for(let i=0;i<N;i++){if(TID[i]<0||!TG[TID[i]])continue;const px=X[i]-g.xc,py=Y[i]-g.yc;
       const gx=g.qcx+g.cs*px+g.sn*py,gy=g.qcy-g.sn*px+g.cs*py,c=cnt[i],wi=w*TUB[i];RX[i]=RX[i]*(1-wi)+gx*c*wi;RY[i]=RY[i]*(1-wi)+gy*c*wi}}
@@ -556,7 +586,8 @@ function plasticity(dt){
     let g=0;const lo=mat.dwellLo,hi=Math.max(lo+1e-3,mat.dwellHi);
     for(const f of grabs){const x=Math.max(0,Math.min(1,(t-f.tDown-lo)/(hi-lo)));g=Math.max(g,x*x*(3-2*x))}
     const yl=mat.yield*R,kc=Math.min(1,mat.creep*dt*g);
-    if(kc>0)for(let i=0;i<N;i++){const rx=RX[i]/cnt[i],ry=RY[i]/cnt[i],dx=rx-QX[i],dy=ry-QY[i],dl=Math.hypot(dx,dy);
+    // 跟「表演後的參考形狀」EX 比，不跟 Q 比：偽足碰到時停在半空（不歸零），跟 Q 比會把偽足當成捏出來的痕跡記下來（量過：按住 1.5 秒記 67 點）
+    if(kc>0)for(let i=0;i<N;i++){const rx=RX[i]/cnt[i],ry=RY[i]/cnt[i],dx=rx-EX[i],dy=ry-EY[i],dl=Math.hypot(dx,dy);
       if(dl>yl){const s=(1-yl/dl)*kc*(TID[i]>=0?1-.85*TU[i]*(1-mat.tentMem):1);QX[i]+=dx*s;QY[i]+=dy*s;
         const ex=QX[i]-Q0X[i],ey=QY[i]-Q0Y[i],el=Math.hypot(ex,ey),lim=R*1.1;
         if(el>lim){QX[i]=Q0X[i]+ex*lim/el;QY[i]=Q0Y[i]+ey*lim/el}}}
@@ -572,6 +603,9 @@ function plasticity(dt){
   // 參考形狀重新置中，避免慢慢漂
   let mx=0,my=0;for(let i=0;i<N;i++){mx+=QX[i];my+=QY[i]}mx/=N;my/=N;
   for(let i=0;i<N;i++){QX[i]-=mx;QY[i]-=my}
+  // 黏土體積不變：記住的形狀等比例縮回原形的面積（拉出一塊就從別處收一點；不縮的話拉完放手面積多 2%）
+  {const n=bnd.length;let A=0,B=0;for(let k=0;k<n;k++){const i=bnd[k],j=bnd[(k+1)%n];A+=QX[i]*QY[j]-QX[j]*QY[i];B+=Q0X[i]*Q0Y[j]-Q0X[j]*Q0Y[i]}
+    if(Math.abs(A)>1e-6){const f=Math.sqrt(Math.abs(B/A));if(Math.abs(f-1)>1e-5)for(let i=0;i<N;i++){QX[i]*=f;QY[i]*=f}}}
 }
 // 門檻取「規則」與「原形自己的值」較小的那個：原形本身不一定滿足橫檔與中軸（身體的形狀匹配平常會跟它們互相讓），
 // 不這樣做的話放著不碰參考形狀也會被一直推離原形（量過：靜止 20 秒偏 6 點）。
@@ -629,7 +663,7 @@ function twitch(L){
 }
 function update(dt){
   t+=dt;
-  if(mat.seed!==lastShape.seed||mat.floppy!==lastShape.floppy){setup()}
+  if(mat.seed!==lastShape.seed||mat.floppy!==lastShape.floppy||mat.limbs!==lastShape.limbs){setup()}
   else if(mat.cSpace!==lastC.cSpace||mat.cRad!==lastC.cRad){buildClusters()}
   if(FLOAT&&mat.homeFrac!==lastHome){lastHome=mat.homeFrac;CY=H*mat.homeFrac;HOMEY=CY}   // 候選 33：家的高度
   { // 候選 26：黏連時間到就真的放手
@@ -668,7 +702,7 @@ function update(dt){
   // 候選 19：碰到時活物感「凍住」不歸零。振幅不乘 L，只有時鐘停；L 照舊管搖、抖、遊走
   tLife+=dt*L;const freeze=mat.idleFreeze>=.5,Lamp=freeze?(REDUCED?.5:1):L,tl=freeze?tLife:t;
   { // 第 23 條 呼吸：相位用累積（週期可變不跳相）；對照值（3.8 秒正弦）跟原本一模一樣
-    let T=mat.breathT,amp=1;
+    let T=mat.jelly>=.5?mat.jellyT:mat.breathT,amp=1;   // 水母呼吸用 jellyT
     if(mat.breathDeep>=.5){ // 23c 被摸久了呼吸變深：連續抓超過 10 秒，放手後 20 秒內振幅 ×1.5、週期 ×1.2 再線性衰減
       let grabbing=false;for(const f of fingers.values())if(f.mode==='grab')grabbing=true;
       if(grabbing){if(BR.grabStart<0)BR.grabStart=t}else{if(BR.grabStart>=0&&t-BR.grabStart>10)BR.deepAt=t;BR.grabStart=-1}
@@ -676,6 +710,30 @@ function update(dt){
     BR.phase+=(tl-BR.tlPrev)/T;BR.tlPrev=tl;BR.amp=amp;
     const ph=BR.phase-Math.floor(BR.phase);
     BR.wave=mat.breathShape>=.5?(ph<.4?-Math.cos(Math.PI*ph/.4):ph<.95?Math.cos(Math.PI*(ph-.4)/.55):-1):Math.sin(2*Math.PI*ph)}   // 23b 吸 40%、吐 55%、停 5%
+  // 水母呼吸（2026-11-01 多米：有規律的律動，像水母）：週期 jellyT，前 22% 快縮（sin 緩出）、後 78% 慢放（餘弦）；
+  // 收縮時窄、高，寫進 BR.wave 跟原本的呼吸同一條路（參考形狀縮放）；每次收縮把 lift 往上推、放鬆時 1 秒時間常數沉回
+  if(mat.jelly>=.5){const ph=BR.phase-Math.floor(BR.phase),c=.22,w=ph<c?Math.sin(Math.PI/2*ph/c):.5*(1+Math.cos(Math.PI*(ph-c)/(1-c)));
+    const dw=w-BR.jw;BR.jw=w;BR.wave=-w;BR.amp=mat.jellyAmp/.045;
+    if(dw>0)BR.lift+=dw*mat.jellyLift*R*Lamp*mat.life;BR.lift*=Math.exp(-dt/1.0)}
+  else BR.lift*=Math.exp(-dt/1.0);
+  // 偽足：生、伸、縮、死。adv 跟活物感一起走（碰到就停）
+  {const adv=dt*L,P=POD.list;
+    for(const q of P)q.p+=adv/q.D;
+    for(let i=P.length-1;i>=0;i--)if(P[i].p>=1)P.splice(i,1);
+    POD.clock+=adv;
+    if(mat.pods>0&&P.length<Math.round(mat.pods)&&POD.clock>=POD.next){
+      let a=0;for(let tr=0;tr<10;tr++){a=Math.random()*2*Math.PI;if(P.every(q=>Math.abs(Math.atan2(Math.sin(a-q.a),Math.cos(a-q.a)))>1.1))break}
+      P.push({a,L:mat.podLen*(.7+.5*Math.random()),sig:.22+.1*Math.random(),bend:(Math.random()-.5)*.8,D:4+4*Math.random(),p:0});
+      POD.next=POD.clock+.8+2.2*Math.random()}
+    POD.E=P.map(q=>{const e=q.p<.4?(x=>x*x*(3-2*x))(q.p/.4):q.p<.6?1:(x=>x*x*(3-2*x))((1-q.p)/.4);
+      return{ca:Math.cos(q.a),sa:Math.sin(q.a),amp:q.L*R*e*(REDUCED?.5:1),sig:q.sig,bend:q.bend}});
+    // 面積補償：沿參考形狀的邊界算偽足多出來的面積 ∮ r·Δr dθ，再整圈按同一個權重 (r/Rb)² 往內收同樣的量（只扣各自平均量過：放著 20 秒面積多 4.8%）
+    POD.shift=0;if(POD.E.length){const Rb=R*.98,nb=bnd.length;let num=0,den=0;
+      for(let k=0;k<nb;k++){const i=bnd[k],j=bnd[(k+1)%nb],h0=bnd[(k+nb-1)%nb],x=QX[i],y=QY[i],r=Math.hypot(x,y);if(r<1e-6)continue;
+        const dth=Math.abs(Math.atan2(QX[h0]*QY[j]-QY[h0]*QX[j],QX[h0]*QX[j]+QY[h0]*QY[j]))/2,c1=x/r,s1=y/r,rn=Math.min(1.6,(r/Rb)**2);let dr=0;
+        for(const q of POD.E){const da=Math.atan2(s1*q.ca-c1*q.sa,c1*q.ca+s1*q.sa);dr+=q.amp*Math.exp(-da*da/(2*q.sig*q.sig))*rn}
+        num+=(r*dr+dr*dr/2)*dth;den+=(r+dr)*rn*dth}   // 二階一起算：只算一階，偽足伸長時面積還是多 3%
+      POD.shift=den>0?num/den:0}}
   // 活物：遊走。沒碰時家會慢慢移動，走一段、停一下；碰它就停在原地
   // 第 20 條：走一段用 smoothstep 加減速（速度剖面 6p(1−p)，平均速度與走停節奏不變）；減少動態時速度再減半（第 31 條，連 L 的一半合計 ×0.25）
   WANDER.vx=0;WANDER.vy=0;
