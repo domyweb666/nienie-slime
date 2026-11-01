@@ -658,7 +658,8 @@ final class SlimeRig {
         // v2.20: a rebuild drops the fingers without a release, so the offset must go too or home stays off (measured on the web:
         // later tests leaned with it, a 3 s press moved 61 pt instead of 30)
         dragOX = 0; dragOY = 0; dragVX = 0; dragVY = 0; dragBX = 0; dragBY = 0; dragGX = 0; dragGY = 0; dragSlipT = 0; lureOn = false; lureSn = -1; askOn = false
-        drops = []; mass = 1; massD = 1; lifeDrop = nil; e4On = false   // v2.22
+        drops = []; mass = 1; massD = 1; lifeDrop = nil; e4On = false; e4Wait = -1   // v2.22
+        leanT = -9; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
     }
 
