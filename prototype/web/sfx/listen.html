@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>捏捏音效試聽</title>
+<style>
+:root{--bg:#EAF6FD;--card:#fff;--ink:#2B3A2E;--sub:#5F6F62;--body:#FFD96B;--line:#8B5A20;--on:#F0B64A}
+@media (prefers-color-scheme:dark){:root{--bg:#18201B;--card:#222C25;--ink:#EEF3EC;--sub:#A9B5AB;--body:#E8C25A;--line:#E8C25A;--on:#8B6A2A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"PingFang TC","Noto Sans TC",sans-serif;padding:20px 16px 48px}
+main{max-width:720px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}
+p.note{color:var(--sub);margin:0 0 20px;font-size:14px}
+section{background:var(--card);border-radius:14px;padding:14px 16px 16px;margin-bottom:14px}
+h2{font-size:17px;margin:0}
+.when{color:var(--sub);font-size:13px;margin:2px 0 10px}
+.grid{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-size:15px;border:2px solid var(--line);background:var(--body);color:#3A2A10;border-radius:999px;padding:6px 14px;min-height:40px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--on)}
+button.ghost{background:transparent;color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+label{font-size:14px;color:var(--sub)}
+</style>
+</head>
+<body>
+<main>
+<h1>捏捏音效試聽</h1>
+<p class="note">每顆按鈕是一段音效，app 會在同一類裡隨機挑、音高上下浮 8%。聽到不喜歡的記下編號（例如「放手 03 太悶」），我改設計再重做。手機請先關靜音。</p>
+<div id="list"></div>
+</main>
+<script>
+const KIND = {
+  press: ['按', '手指按到身上那一下'],
+  pull: ['拉', '拉長的過程，每拉長約三分之一個身體響一段'],
+  release: ['放手', '放手那一下，放越快越大聲'],
+  rub: ['揉', '抓著揉的時候循環播，手指越快越大聲']
+};
+let ctx = null; const cache = {}; let loop = null;
+function ac() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx; }
+async function buf(f) { if (!cache[f]) cache[f] = fetch(f).then(r => r.arrayBuffer()).then(a => ac().decodeAudioData(a)); return cache[f]; }
+async function play(f, rate = 1) { const b = await buf(f), s = ac().createBufferSource(); s.buffer = b; s.playbackRate.value = rate; s.connect(ac().destination); s.start(); }
+async function toggleLoop(f, btn) {
+  if (loop) { loop.src.stop(); loop.btn.setAttribute('aria-pressed', 'false'); const same = loop.f === f; loop = null; if (same) return; }
+  const b = await buf(f), s = ac().createBufferSource(); s.buffer = b; s.loop = true; s.connect(ac().destination); s.start();
+  loop = { src: s, btn, f }; btn.setAttribute('aria-pressed', 'true');
+}
+fetch('manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => {
+  const root = document.getElementById('list');
+  for (const k of ['press', 'pull', 'release', 'rub']) {
+    const files = m[k] || []; if (!files.length) continue;
+    const sec = document.createElement('section');
+    sec.innerHTML = `<h2>${KIND[k][0]}（${files.length} 段）</h2><div class="when">${KIND[k][1]}</div><div class="grid"></div>`;
+    const grid = sec.querySelector('.grid');
+    files.forEach((f, i) => {
+      const b = document.createElement('button'); b.textContent = `${KIND[k][0]} ${String(i + 1).padStart(2, '0')}`;
+      if (k === 'rub') { b.setAttribute('aria-pressed', 'false'); b.onclick = () => toggleLoop(f, b); }
+      else b.onclick = () => play(f);
+      grid.appendChild(b);
+    });
+    if (k !== 'rub') {
+      const row = document.createElement('div'); row.className = 'row';
+      const r = document.createElement('button'); r.className = 'ghost'; r.textContent = '隨機連播 5 次（像 app 那樣浮音高）';
+      r.onclick = () => { for (let j = 0; j < 5; j++) setTimeout(() => play(files[Math.floor(Math.random() * files.length)], 1 + (Math.random() * 2 - 1) * 0.08), j * 450); };
+      row.appendChild(r); sec.appendChild(row);
+    } else {
+      const lab = document.createElement('label'); lab.textContent = '揉是循環音，再按一次停'; const row = document.createElement('div'); row.className = 'row'; row.appendChild(lab); sec.appendChild(row);
+    }
+    root.appendChild(sec);
+  }
+});
+</script>
+</body>
+</html>

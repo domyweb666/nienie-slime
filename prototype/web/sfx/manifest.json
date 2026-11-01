@@ -1,6 +1,39 @@
 {
-  "press": [],
-  "pull": [],
-  "release": [],
-  "rub": []
+  "press": [
+    "press-01.wav",
+    "press-02.wav",
+    "press-03.wav",
+    "press-04.wav",
+    "press-05.wav",
+    "press-06.wav",
+    "press-07.wav",
+    "press-08.wav"
+  ],
+  "pull": [
+    "pull-01.wav",
+    "pull-02.wav",
+    "pull-03.wav",
+    "pull-04.wav",
+    "pull-05.wav",
+    "pull-06.wav",
+    "pull-07.wav",
+    "pull-08.wav"
+  ],
+  "release": [
+    "release-01.wav",
+    "release-02.wav",
+    "release-03.wav",
+    "release-04.wav",
+    "release-05.wav",
+    "release-06.wav",
+    "release-07.wav",
+    "release-08.wav",
+    "release-09.wav",
+    "release-10.wav"
+  ],
+  "rub": [
+    "rub-01.wav",
+    "rub-02.wav",
+    "rub-03.wav"
+  ]
 }
