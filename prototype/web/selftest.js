@@ -305,7 +305,7 @@
 
   // T23 一壓就攤平（2026-11-01 多米想看看）：單指按在頂端往內 0.15R、往下壓 1R（1 秒）、停 1 秒放手，
   //     量握著與放手 1 秒的寬高比（原本的倍數）、握著時最低點有沒有穿過桌面（點）、零自交、面積回來
-  { const clock = saveClock(); Math.random = seeded(20261108); resetAligned(1e9); nextTwitch = 1e9;
+  { const clock = saveClock(); Math.random = seeded(20261108); resetAligned(1e9, { pressFlat: 1 }); nextTwitch = 1e9;   // v2.12 起預設關，打開來測機制還在
     const box = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); } return [x0, x1, y0, y1]; };
     const b0 = box(), a0 = (b0[1] - b0[0]) / (b0[3] - b0[2]); let top = -1; for (const i of bnd) if (top < 0 || Y[i] < Y[top]) top = i;
     const sx = X[top], sy = Y[top] + R * 0.15; let worst = 0, below = 0; ev('pointerdown', 1, sx, sy);
@@ -329,6 +329,17 @@
       ev('pointerup', 1, mx - R * 1.6, my - R * 2.6); let after = 0; for (let k = 0; k < 120; k++) { steps(1); const c = selfX(); after = Math.max(after, c); if (c) frames++; }
       log.splice(0); return { worstDuring: during, worstAfter: after, crossFrames: frames, end: snap() }; }
     res.T24_dragAcross = { guard: crossRun(1), noGuard: crossRun(0) };
+    restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T25 按在畫面邊不放（2026-11-01 多米：稍微拉大就拉不動；量過卡在畫面邊，往右 1.1R）：抓身體最右邊、手指拖到畫面右緣停 3 秒，
+  //     量伸出幾個 R、鏡頭縮到多少；放手 12 秒鏡頭要回到 1 倍附近；零自交、面積回來
+  { const clock = saveClock(); Math.random = seeded(20261110); resetAligned(1e9); nextTwitch = 1e9;
+    let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const e0 = X[b], sx = X[b] - R * 0.15, sy = Y[b]; let worst = 0, zMin = 1;
+    ev('pointerdown', 1, sx, sy); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, sx + (W - 12 - sx) * k / 40, sy); steps(1); worst = Math.max(worst, selfX()); }
+    for (let k = 0; k < 180; k++) { steps(1); worst = Math.max(worst, selfX()); zMin = Math.min(zMin, CAM.z); }
+    let e1 = -1e9; for (const i of bnd) e1 = Math.max(e1, X[i]); ev('pointerup', 1, W - 12, sy);
+    for (let k = 0; k < 720; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); }
+    res.T25_edgeHold = { reachR: +((e1 - e0) / R).toFixed(2), zoomMin: +zMin.toFixed(2), zoomAfter12s: +CAM.z.toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
@@ -367,6 +378,8 @@
     // 一壓就攤平：握著寬高比 1.5 倍以上、放手 1 秒還有 1.3 倍、最低點不穿過桌面超過 3 點；邊不能穿邊：拖過身體時交叉幀數比關掉時少、放手後沒有交叉
     pressFlattens: res.T23_pressFlat.heldAspectX > 1.5 && res.T23_pressFlat.after1sAspectX > 1.3 && res.T23_pressFlat.floorPassPt < 3 && res.T23_pressFlat.worstSelfX === 0 && okArea(res.T23_pressFlat.end),
     noCrossing: res.T24_dragAcross.guard.worstAfter === 0 && res.T24_dragAcross.guard.crossFrames <= res.T24_dragAcross.noGuard.crossFrames,
+    // 鏡頭跟著拉遠：按在畫面右緣 3 秒要伸出 2.5R 以上（以前卡在 1.1R），放手 12 秒鏡頭回到 0.95 以上
+    edgeHoldStretches: res.T25_edgeHold.reachR > 2.5 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.zoomAfter12s > 0.95 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
