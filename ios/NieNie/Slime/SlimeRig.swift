@@ -126,13 +126,17 @@ final class SlimeRig {
         // camFill (v2.13, 多米: as far as it is pulled): while grabbed the shape fills at most this much of the view, leaving room for
         // the finger; tight (v2.12) the finger at the screen edge was only pad beyond the shape and the pull stopped near 6R. Only while
         // grabbed: idle pods and breathing change the size all the time and the view would breathe with them
-        let grabbingNow = fingers.values.contains { $0.mode == .grab }
-        let fill = grabbingNow ? min(1, max(0.2, params.camFill)) : 1
+        // the margin comes in with the stretch (v2.14): from 0.5R pulled, full at 1.5R. Full margin from the first touch zoomed the
+        // view the moment a finger landed on a shape near 70% of the view, moving the picture under the fingers (measured: in a
+        // two-finger pinch the fingers' world distance stopped shrinking and a squish went missing)
+        let grabs = fingers.values.filter { $0.mode == .grab }
+        let grabbingNow = !grabs.isEmpty, stMax = grabs.map(\.stretch).max() ?? 0
+        let fillK = max(0, min(1, stMax - 0.5)), fill = 1 - (1 - min(1, max(0.2, params.camFill))) * fillK
         let zt = max(zm, min(1, fill * ax / ((x1 - x0) / 2 + pad), fill * ay / ((y1 - y0) / 2 + pad)))
         let hx = ax / zt, hy = ay / zt
         func clampC(_ c: Double, _ lo: Double, _ hi: Double) -> Double { lo > hi ? (lo + hi) / 2 : max(lo, min(hi, c)) }
         // camCenter: while grabbed, centre on the shape so the margin is ahead of the finger too (centred on home it sits behind, unused)
-        let cc = grabbingNow && params.camCenter >= 0.5, ox = cc ? (x0 + x1) / 2 : v.x, oy = cc ? (y0 + y1) / 2 : v.y
+        let cc = grabbingNow && fillK > 0 && params.camCenter >= 0.5, ox = cc ? (x0 + x1) / 2 : v.x, oy = cc ? (y0 + y1) / 2 : v.y
         let cxT = clampC(ox, x1 + pad - hx, x0 - pad + hx), cyT = clampC(oy, y1 + pad - hy, y0 - pad + hy), k = 1 - exp(-dt / 0.35)
         camZ += (zt - camZ) * k; camX += (cxT - camX) * k; camY += (cyT - camY) * k
     }   // press flat: pressing now, table height, remembered bottom below the centroid
@@ -161,6 +165,7 @@ final class SlimeRig {
         var flatOn = false, h0 = 1.0, bot = 0.0, flat = 1.0   // press flat: began on the upper half; height and bottom then; current squash
         var sx = 0.0, sy = 0.0, psx = 0.0, psy = 0.0  // screen position (and prediction): the camera moves, so world is recomputed each frame
         var mode: Mode
+        var reach = false                            // grabbed from inside out of reach of the boundary: add a strip once it moves (grabReach)
         var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
         init(x: Double, y: Double, mode: Mode, time: Double) {
             ax = x; ay = y; self.x = x; self.y = y; fx = x; fy = y
@@ -492,6 +497,42 @@ final class SlimeRig {
 
     // MARK: - Fingers
 
+    /// A finger grabbed from inside has moved 0.12R or more: from the held patch's centre, find the boundary particle nearest the
+    /// ray in the direction of motion and also grab the strip (grabR wide) from the centre to it, keeping its current offset from
+    /// the finger. The strip carries the boundary out while the far side stays: a stretch. Grabbing everything out to the
+    /// boundary (a bigger radius) only moved the whole body
+    private func reachGrab(_ f: Finger) {
+        let mx = f.rawX - f.ax, my = f.rawY - f.ay, ml = hypot(mx, my)
+        guard ml >= R * 0.12, !f.mem.isEmpty else { return }
+        f.reach = false
+        let ux = mx / ml, uy = my / ml
+        var cx = 0.0, cy = 0.0
+        for m in f.mem { cx += X[m.i]; cy += Y[m.i] }
+        cx /= Double(f.mem.count); cy /= Double(f.mem.count)
+        // pushing toward the body centre (a two-finger pinch, a squeeze inward) adds nothing: only an outward pull carries the boundary.
+        // Measured: in a pinch each finger grabbed a strip toward the other, they fought over it and one squish went missing
+        let rx = cx - clusters[gi].xc, ry = cy - clusters[gi].yc, rl = hypot(rx, ry)
+        if rl > R * 0.3 && (rx * ux + ry * uy) / rl < 0 { return }
+        var bi = -1, bs = 1e9
+        for i in bnd {
+            let dx = X[i] - cx, dy = Y[i] - cy
+            if dx * ux + dy * uy <= 0 { continue }
+            let pr = abs(dx * uy - dy * ux)
+            if pr < bs { bs = pr; bi = i }
+        }
+        guard bi >= 0 else { return }
+        let ex = X[bi] - cx, ey = Y[bi] - cy, l2 = max(1e-9, ex * ex + ey * ey), gr = params.grabR * R
+        for i in 0..<N where !GRAB[i] {
+            let dx = X[i] - cx, dy = Y[i] - cy, tt = max(0, min(1, (dx * ex + dy * ey) / l2))
+            let d = hypot(dx - ex * tt, dy - ey * tt)
+            if d < gr {
+                let u = d / gr
+                f.mem.append((i, X[i] - f.fx, Y[i] - f.fy, exp(-u * u * 2.5) * (1 - u * u), 0, 0))
+                GRAB[i] = true
+            }
+        }
+    }
+
     func insideBody(_ x: Double, _ y: Double) -> Bool {
         var c = false
         let n = bnd.count
@@ -532,6 +573,14 @@ final class SlimeRig {
                     f.mem.append((i, ox, oy, exp(-u * u * 2.5) * (1 - u * u), ox * inv, oy * inv))
                     GRAB[i] = true
                 }
+            }
+            // grabReach (v2.14, 多米 build 59: pulling from the middle did nothing; measured: the right edge went back 0.08R): only the
+            // inner patch was held, and dragged out of the body it is invisible (only the boundary is drawn). Mark it; reachGrab adds
+            // a strip to the boundary in the pull direction once the finger moves
+            if params.grabReach > 0 && insideBody(x, y) {
+                var db = 1e9
+                for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }
+                if db > gr * 0.8 { f.reach = true }
             }
             if f.mem.isEmpty {
                 let order = (0..<N).sorted { hypot(X[$0] - x, Y[$0] - y) < hypot(X[$1] - x, Y[$1] - y) }
@@ -676,6 +725,7 @@ final class SlimeRig {
             (f.rawX, f.rawY) = toWorld(f.sx, f.sy)
             if f.hasPrediction { (f.predX, f.predY) = toWorld(f.psx, f.psy) }
         }
+        for f in fingers.values where f.reach && f.mode == .grab { reachGrab(f) }
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
             // chase target: the prediction only on a frame that got a fresh move event, else the real finger,
@@ -1321,7 +1371,9 @@ final class SlimeRig {
                 }
             }
         } else {
-            let kr = min(1, mat.recover * dt)
+            // crossed: relax at the v2.13 rate (0.3). With recover slowed to 0.05 the knot a 9R pull leaves in the tail stayed for
+            // 12 s after release; relaxing shortens the strand and the knot comes undone
+            let kr = min(1, (mat.ringGuard > 0 && mat.recover < 0.3 && ringCrossed() ? 0.3 : mat.recover) * dt)
             if kr > 0 {
                 for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
             }

@@ -109,6 +109,8 @@ struct FeelParams: Equatable, Codable {
     var camFill: Double = 0.7         // while grabbed the shape fills at most this much of the view, leaving room for the finger; 1 = tight (v2.12)
     var camCenter: Double = 0         // 1: while grabbed the view centres on the shape, so the margin is also ahead of the finger (about 15R,
                                       // but the tail of so thin a strand crosses for ~100 frames while held); 0: centred on home (about 8.5R)
+    // v2.14 (多米 build 59: only the edge could be pulled; nothing happened pulling from the middle)
+    var grabReach: Double = 1         // 1: grabbed from inside out of reach of the boundary, a strip to the boundary is added once the finger moves
     var dens: Double = 12             // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -153,8 +155,9 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
                            areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.25,
                            floppy: 0.55, seed: 7)
         case .clay:
-            // clay remembers at once, tentacles too, and the mark relaxes over about 10 s (多米 2026-11-01)
-            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.3, grabR: 0.32, maxPull: 20,
+            // clay remembers at once, tentacles too; the mark relaxes slowly: half in about 15 s (v2.14, 多米 build 59: it sprang back
+            // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
+            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.05, grabR: 0.32, maxPull: 20,
                            lag: 0.12, wGlobal: 0.08, cSpace: 0.3, cRad: 0.45, upright: 0.002, anchor: 4,
                            areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.05, wander: 0.22,
                            floppy: 0.6, seed: 7)
@@ -232,8 +235,8 @@ struct Candidate: Identifiable {
         Candidate(id: 27, name: "27 局部鼓", hint: "面積壓力集中在手指附近") { p, _ in p.localArea = 1 },
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
-        Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點；黏土拉伸 8R、記形 4R") { p, m in
-            p.zoomMin = 0.45; p.camFill = 1; p.dens = 9; if m == .clay { p.maxPull = 8; p.memMax = 4 } },
+        Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
+            p.zoomMin = 0.45; p.camFill = 1; p.dens = 9; p.grabReach = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
         Candidate(id: 270, name: "v2.7 對照（舊外形）", hint: "海星外形五條觸手、固定行進波蠕動、正弦呼吸、黏土輕捏回彈") { p, m in m.applyV27(&p) },
     ]
 }
@@ -254,6 +257,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
         TuneField(key: \.damp, name: "晃動阻尼", hint: "越小放手晃越久", range: 0.85...0.999, step: 0.001),
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
+        TuneField(key: \.grabReach, name: "從中間抓也拉得動", hint: "1：從身體裡面抓、範圍碰不到外圈時，手指一動往拉的方向補抓一條到外圈；0 是 v2.13（從中間拉沒反應）", range: 0...1, step: 1),
         TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠（軟上限）；黏土 20（v2.13，多米：不要限制），v2.12 是 8", range: 0.6...30, step: 0.1),
         TuneField(key: \.lag, name: "黏滯", hint: "跟手的延遲感（秒）；候選 6 是 0.03", range: 0...0.3, step: 0.01),
         TuneField(key: \.wGlobal, name: "整體性", hint: "越大整團越像一塊", range: 0...1, step: 0.01),
@@ -282,7 +286,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.creep, name: "定型速度", hint: "揉多快記住新形狀", range: 0...6, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.dwellLo, name: "定型停留起點", hint: "抓住幾秒後開始記形（秒）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.dwellHi, name: "定型停留終點", hint: "抓住幾秒後全速記形（秒）", range: 0...2, step: 0.05, section: "按壓與記形"),
-        TuneField(key: \.recover, name: "回原形速度", hint: "放著多快變回原樣；黏土 0.3 約 10 秒退（v2.7 是 0.03）", range: 0...1.5, step: 0.01, section: "按壓與記形"),
+        TuneField(key: \.recover, name: "回原形速度", hint: "放著多快變回原樣；黏土 0.05（v2.14，放手 2 秒退一成、15 秒退一半），v2.8 到 v2.13 是 0.3，v2.7 是 0.03", range: 0...1.5, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.grabK, name: "抓住的力道", hint: "被抓那塊每小步往手指靠幾成（再乘距離權重）；以前 0.55，黏土 1.2 整塊跟手", range: 0.2...2, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住", range: 0.5...4, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.pressFlat, name: "一壓就攤平", hint: "1：從上半部往下壓時下面有看不見的桌面，壓多少扁多少；v2.12 起預設關", range: 0...1, step: 1, section: "按壓與記形"),

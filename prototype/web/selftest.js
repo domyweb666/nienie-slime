@@ -31,7 +31,9 @@
   function snap() { const [s, c] = classify(); return { selfX: s + c, fold: s, overlap: c, area: +(area() / A0).toFixed(3), ke: +ke().toFixed(2), qdev: +qdev().toFixed(2) }; }
   function maxMove(ref) { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.hypot(X[i] - ref[0][i], Y[i] - ref[1][i])); return m; }
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
-  function reset() { mat = { ...PRESETS.clay }; setup(); steps(60); }
+  // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
+  // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
+  function reset() { mat = { ...PRESETS.clay }; setup(); WANDER.moving = false; WANDER.next = t + 5; steps(60); }
   // 固定亂數＋歸零時鐘，T11、T12 用：結果可重現。setup() 不重設時鐘；時鐘動過要還原，不然上一輪 T2 的 relaxUntil 留在未來，下一輪的記形會被當成「揉回原形」
   function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const realRandom = Math.random;
@@ -344,7 +346,8 @@
 
   // T26 鏡頭無限拉遠（v2.13，多米：鏡頭可以無限拉遠，拉多大推多遠）：抓身體最右邊、手指拖到畫面右緣停 8 秒，
   //     量寬幾個 R、鏡頭縮到多少（v2.12 卡在約 5.8R、0.67）、整隻每幀都在畫面裡；按著時的交叉幀數只記錄（拉到 8R 時尾端偶爾摺幾幀，
-  //     每個半徑 12 個點已經少很多），放手那半秒是按著時帶過來的、只記錄；放手 0.5 秒後要零交叉、面積回來、鏡頭回 1 倍附近
+  //     每個半徑 12 個點已經少很多），放手頭 2 秒是按著時帶過來的、只記錄（v2.13 回原形 0.3 時半秒解開，v2.14 放慢到 0.05 要 1.3 秒）；
+  //     放手 2 秒後要零交叉、面積回來、鏡頭跟著拉回來
   { const clock = saveClock(); Math.random = seeded(20261113); resetAligned(1e9); nextTwitch = 1e9;
     const v = viewV(), sxOf = x => (x - CAM.x) * CAM.z + v.x, syOf = y => (y - CAM.y) * CAM.z + v.y;
     let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b];
@@ -355,12 +358,38 @@
       let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); }
       wMax = Math.max(wMax, (x1 - x0) / R); if (sxOf(x0) < 0 || sxOf(x1) > W || syOf(y0) < 0 || syOf(y1) > H) off++; }
     ev('pointerup', 1, W - 12, sy);
-    for (let k = 0; k < 720; k++) { steps(1); if (k < 30) worstEarly = Math.max(worstEarly, selfX()); else if (k % 6 === 0) worstRel = Math.max(worstRel, selfX()); }
-    res.T26_zoomUnlimited = { widthMaxR: +wMax.toFixed(2), zoomMin: +zMin.toFixed(2), offScreenFrames: off, holdCrossFrames: holdX, worstHoldX: worstHold, worstFirstHalfSecX: worstEarly, worstReleaseX: worstRel, zoomAfter12s: +CAM.z.toFixed(2), end: snap() }; log.splice(0);
+    for (let k = 0; k < 720; k++) { steps(1); if (k < 120) worstEarly = Math.max(worstEarly, selfX()); else if (k % 6 === 0) worstRel = Math.max(worstRel, selfX()); }
+    res.T26_zoomUnlimited = { widthMaxR: +wMax.toFixed(2), zoomMin: +zMin.toFixed(2), offScreenFrames: off, holdCrossFrames: holdX, worstHoldX: worstHold, worstFirst2sX: worstEarly, worstReleaseX: worstRel, zoomAfter12s: +CAM.z.toFixed(2), end: snap() }; log.splice(0);
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
+  //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
+  { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
+    for (const [name, ux, uy] of [['right', 1, 0], ['up', 0, -1]]) {
+      resetAligned(1e9); nextTwitch = 1e9; const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); }
+      const cx = globalC.xc, cy = globalC.yc; let worst = 0, q = sc(cx, cy); ev('pointerdown', 1, q[0], q[1]);
+      for (let k = 1; k <= 120; k++) { const a = Math.min(1, k / 60) * 2 * R; q = sc(cx + ux * a, cy + uy * a); ev('pointermove', 1, q[0], q[1]); steps(1); if (k % 3 === 0) worst = Math.max(worst, selfX()); }
+      let x1b = -1e9, y0b = 1e9; for (const i of bnd) { x1b = Math.max(x1b, X[i]); y0b = Math.min(y0b, Y[i]); }
+      ev('pointerup', 1, q[0], q[1]); for (let k = 0; k < 300; k++) { steps(1); if (k % 5 === 0) worst = Math.max(worst, selfX()); }
+      r27[name] = { edgeMovedR: +((ux ? x1b - x1 : y0 - y0b) / R).toFixed(2), worstSelfX: worst, end: snap() };
+    }
+    res.T27_pullFromMiddle = r27; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T28 回彈速度（v2.14，多米 build 59：回彈太快；recover 0.3 時拉 3R 放手 2 秒就退一半）：抓最右邊往右拉 3R、停 2 秒放手，
+  //     量放手 2 秒、15 秒還留著幾成拉出來的寬度
+  { const clock = saveClock(); Math.random = seeded(20261115); resetAligned(1e9); nextTwitch = 1e9;
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const wd = () => { let a = 1e9, b = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); } return (b - a) / R; };
+    const w0 = wd(); let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b];
+    let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]);
+    for (let k = 1; k <= 180; k++) { q = sc(sx + 3 * R * Math.min(1, k / 60), sy); ev('pointermove', 1, q[0], q[1]); steps(1); }
+    const wh = wd(); ev('pointerup', 1, q[0], q[1]); steps(120); const w2 = wd(); steps(780); const w15 = wd();
+    res.T28_relax = { heldR: +wh.toFixed(2), keep2s: +((w2 - w0) / (wh - w0)).toFixed(2), keep15s: +((w15 - w0) / (wh - w0)).toFixed(2), end: snap() };
+    log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
-  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames, T26_firstHalfSecX: res.T26_zoomUnlimited.worstFirstHalfSecX };
+  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames, T26_first2sX: res.T26_zoomUnlimited.worstFirst2sX };
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -386,7 +415,8 @@
     slipLetsGo: res.T14_slip.slipRelease === 1 && res.T14_slip.slipGain >= 0.99 && res.T14_slip.grabbedAfterSlip === 0 && res.T14_slip.popAfterLift === 0,
     stickDelaysPop: res.T15_stick.slow.popFrame >= 6 && res.T15_stick.slow.heldAtLift > 0 && res.T15_stick.slow.fingersLeft === 0 && res.T15_stick.fastImmediate,
     // 捏觸手要留痕、慢慢退；v2.7 對照應該一秒內就幾乎彈回（量法本身還抓得到差別）。過程零自交、面積回來
-    pullKeepsMark: res.T17_pullMark.now.after1s > 3 && res.T17_pullMark.now.after12s < 1.5 && res.T17_pullMark.now.foldFramesAfter === 0 && okArea(res.T17_pullMark.now.end),
+    // v2.14 起回原形放慢到 0.05（多米 build 59：回彈太快）：12 秒還在慢慢退（少於 1 秒時的 75%），不再要求退完
+    pullKeepsMark: res.T17_pullMark.now.after1s > 3 && res.T17_pullMark.now.after12s < res.T17_pullMark.now.after1s * 0.75 && res.T17_pullMark.now.foldFramesAfter === 0 && okArea(res.T17_pullMark.now.end),
     podsGrowAnywhere: res.T19_pods.spawned >= 4 && res.T19_pods.upper > 0 && res.T19_pods.worstSelfX === 0 && res.T19_pods.areaMin > 0.95 && res.T19_pods.areaMax < 1.05 && res.T19_pods.maxOutPt > 0.25 * res.R,
     // 2026-11-01 多米：要能拉很長、攤很扁。往下拉 2.5R 握著要伸出 2R 以上、放手半秒還留 1.5R（之後照 recover 約 10 秒退）；
     // 兩指攤開放手 1 秒寬高比還是原本 1.3 倍以上；都不能自交、面積要回來
@@ -396,9 +426,13 @@
     pressFlattens: res.T23_pressFlat.heldAspectX > 1.5 && res.T23_pressFlat.after1sAspectX > 1.3 && res.T23_pressFlat.floorPassPt < 3 && res.T23_pressFlat.worstSelfX === 0 && okArea(res.T23_pressFlat.end),
     noCrossing: res.T24_dragAcross.guard.worstAfter === 0 && res.T24_dragAcross.guard.crossFrames <= res.T24_dragAcross.noGuard.crossFrames,
     // 鏡頭跟著拉遠：按在畫面右緣 3 秒要伸出 2.5R 以上（以前卡在 1.1R），放手 12 秒鏡頭回到 0.95 以上
-    // 鏡頭無限拉遠：寬過 7R、鏡頭縮過 v2.12 的下限 0.45、整隻一直在畫面裡；放手 0.5 秒後零交叉、面積回來、鏡頭回 0.95 以上
-    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end) && res.T26_zoomUnlimited.zoomAfter12s > 0.95,
-    edgeHoldStretches: res.T25_edgeHold.reachR > 2.5 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.zoomAfter12s > 0.95 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
+    // 鏡頭無限拉遠：寬過 7R、鏡頭縮過 v2.12 的下限 0.45、整隻一直在畫面裡；放手 2 秒後零交叉、面積回來、鏡頭跟著形狀變小拉回來（v2.14 退得慢，12 秒還沒回 1 倍）
+    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end) && res.T26_zoomUnlimited.zoomAfter12s > res.T26_zoomUnlimited.zoomMin + 0.2,
+    // 從中間往右、往上拉 2R，那一側外圈要跟出去 1.5R 以上（v2.13 是 -0.08R）；零自交、面積回來
+    pullFromMiddle: ['right', 'up'].every(k => res.T27_pullFromMiddle[k].edgeMovedR > 1.5 && res.T27_pullFromMiddle[k].worstSelfX === 0 && okArea(res.T27_pullFromMiddle[k].end)),
+    // 回彈：放手 2 秒還留八成以上（v2.13 約五成）
+    relaxSlow: res.T28_relax.keep2s > 0.8 && res.T28_relax.end.selfX === 0,
+    edgeHoldStretches: res.T25_edgeHold.reachR > 2.5 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.zoomAfter12s > res.T25_edgeHold.zoomMin + 0.2 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
