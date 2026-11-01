@@ -100,8 +100,17 @@ final class SlimeController: ObservableObject {
         // 提案第 15 條: sharpness rises when stretched, drops a little when squashing
         haptics.updateContinuous(level: min(1, level) * p.hapMax,
                                  sharpness: p.hapSharp + p.hapSharpStretch * rig.stretchLevel - p.hapSharpSquash * rig.squashLevel)
+        // v2.18 呼嚕: stroked gently while comfortable, two soft taps every half second, the second weaker (a purr is a slow
+        // rumble; the phone can only tap). Strength from the rig's purr level × the panel's purr
+        let pk = rig.purr * p.purr
+        if pk > 0.05 {
+            purrClock += dt
+            if purrClock >= 0.5 { purrClock = 0; purrSecond = 0.09; haptics.transient(intensity: 0.12 + 0.25 * min(1, pk), sharpness: 0.05) }
+            if purrSecond > 0 { purrSecond -= dt; if purrSecond <= 0 { haptics.transient(intensity: 0.07 + 0.15 * min(1, pk), sharpness: 0.05) } }
+        } else { purrClock = 0.5; purrSecond = 0 }
         haptics.flush()
     }
+    private var purrClock = 0.5, purrSecond = 0.0
 
     func report(_ s: SlimeView.FrameStats) { stats = s }
 

@@ -128,6 +128,17 @@ final class SlimeRig {
     private var ivS = 1.0, ivOX = 0.0, ivOY = 0.0
     // v2.17 camera follow (多米: don't pin it to the middle; it moves, sometimes off screen, and the camera follows slowly)
     private var folX = 0.0, folY = 0.0, folVX = 0.0, folVY = 0.0, folChase = false
+    // v2.18 mood (多米: pulled it wants to run, stroked it purrs; no face): comfort −1...1 and arousal 0...1, easing back to the middle
+    // with a 6 s time constant when untouched. Only what the hand is doing now, never how long you have been away.
+    // strain: how hard it is being pulled (past 1.5R, held) 0...1; scare: from pokes; cowerUntil: curled up until; happyT / wagT:
+    // the happy stand-tall and the pseudopod wag; tug: while pulled, home shifts away so the body pulls back
+    private var moodC = 0.0, moodA = 0.0, moodStrain = 0.0, moodStrainMax = 0.0, moodScare = 0.0, cowerUntil = -9.0
+    private var happyT = -9.0, wagT = -9.0, taps: [Double] = [], pullDX = 1.0, pullDY = 0.0, tugX = 0.0, tugY = 0.0
+    // fleeing: home rushes out on an ease-out (fast, the camera lags and it leaves the screen a bit), then it curls up a moment
+    private var escOn = false, escT0 = 0.0, escT = 1.0, escSX = 0.0, escSY = 0.0, escDX = 0.0, escDY = 0.0
+    private var introMini = false
+    /// Purr strength 0...1 (the controller turns it into soft taps).
+    private(set) var purr = 0.0
 
     /// Four hops in place at home: squash to gather before take-off (rest shape wider and lower), stretch in the air, the landing left
     /// to gravity and the floor (it really hits it, so no two wobbles are alike). Distance is drawn: it starts up-right at 0.15×, each
@@ -137,11 +148,80 @@ final class SlimeRig {
         var y1 = -1e9
         for i in bnd { y1 = max(y1, Y[i]) }
         let far = !reduceMotion
+        introMini = false
         introOn = true; introPh = .wait; introK = 0; introN = far ? 4 : 1; introPT = 0; introSq = 0; introFloor = y1
         introU = far ? 0 : 1; introS0 = far ? 0.15 : 1; introOX0 = far ? W * 0.2 : 0; introOY0 = far ? -H * 0.24 : 0
         introPX = homeX; introPY = y1
         ivS = introS0; ivOX = introOX0; ivOY = introOY0
         wanderMoving = false; wanderNext = t + 4
+    }
+    /// v2.18: what kind of grab this was, at release. A pull held past 0.5 s → run the other way; a gentle stroke over 1 s while
+    /// comfortable → happy (stand tall, wag, hop); a quick one (under 0.25 s, not pulled) → a poke: flinch, the third within 1 s darts aside.
+    private func moodRelease(_ f: Finger) {
+        guard params.emo >= 0.5 else { return }
+        if moodStrainMax > 0.15 {
+            flee(-pullDX, -pullDY, W * (0.45 + 0.35 * moodStrainMax) * params.flee); moodStrainMax = 0; return
+        }
+        if t - f.tDown < 0.25 && f.stretch < 0.3 {
+            taps = taps.filter { t - $0 < 1 }; taps.append(t)
+            moodScare = min(1, moodScare + 0.45); moodA = min(1, moodA + 0.3); moodC = max(-1, moodC - 0.1); cowerUntil = max(cowerUntil, t + 0.5)
+            if taps.count >= 3 {
+                var ux = clusters[gi].xc - f.ax, uy = clusters[gi].yc - f.ay
+                let ul = hypot(ux, uy)
+                if ul < R * 0.1 { let a = Double.random(in: 0..<(2 * .pi)); ux = cos(a); uy = sin(a) } else { ux /= ul; uy /= ul }
+                flee(ux, uy, W * 0.28 * params.flee); taps = []; moodC = max(-1, moodC - 0.3); moodA = 1
+            }
+            return
+        }
+        if f.gentleT > 1 && moodC > 0.35 && fingers.isEmpty { happyT = t; wagT = t + 0.1; hop() }
+    }
+    private func flee(_ dx: Double, _ dy: Double, _ dist: Double) {
+        guard dist > 0 else { return }
+        let l = max(1e-9, hypot(dx, dy)), ux = dx / l, uy = dy / l
+        escOn = true; escT0 = t; escT = max(0.6, dist / (R * 2.4)); escSX = homeX; escSY = homeY
+        escDX = homeX + ux * dist; escDY = homeY + uy * dist * 0.8
+        wanderMoving = false; moodScare = min(1, moodScare + 0.5)
+    }
+    /// The happy hop: the intro's hop, once, without travelling (mini: a touch grabs as usual).
+    private func hop() {
+        guard !introOn, N > 0 else { return }
+        var y1 = -1e9
+        for i in bnd { y1 = max(y1, Y[i]) }
+        introMini = true; introOn = true; introPh = .crouch; introK = 0; introN = 1; introPT = 0; introSq = 0; introFloor = y1
+        introU = 1; introS0 = 1; introOX0 = 0; introOY0 = 0; introPX = homeX; introPY = y1
+    }
+    /// Every frame: the mood follows the hand (the most stretched grabbing finger), the purr, home while fleeing.
+    private func moodStep(_ dt: Double) {
+        guard params.emo >= 0.5 else { moodStrain = 0; tugX = 0; tugY = 0; purr = 0; escOn = false; return }
+        var g: Finger?
+        for f in fingers.values where f.mode == .grab { if g == nil || f.stretch > g!.stretch { g = f } }
+        if let g {
+            let st = g.stretch, sp = hypot(g.vxS, g.vyS) / R
+            g.gentleT = st < 0.6 && sp < 2 ? g.gentleT + dt : max(0, g.gentleT - 2 * dt)
+            if g.gentleT > 1 { moodC = min(1, moodC + 0.35 * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5)) }
+            g.strainT = st > 1.5 ? g.strainT + dt : max(0, g.strainT - dt)
+            let sv = max(0, min(1, (g.strainT - 0.5) / 1))
+            moodStrain += (sv - moodStrain) * (1 - exp(-dt / 0.15)); moodStrainMax = max(moodStrainMax, moodStrain)
+            if moodStrain > 0 { moodC = max(-1, moodC - 0.6 * dt * moodStrain); moodA = min(1, moodA + 0.8 * dt * moodStrain) }
+            if !clusters.isEmpty {
+                let px = g.fx - clusters[gi].xc, py = g.fy - clusters[gi].yc, pl = hypot(px, py)
+                if pl > R * 0.2 { pullDX = px / pl; pullDY = py / pl }
+            }
+        } else {
+            moodStrain *= exp(-dt / 0.2)
+            let k = 1 - exp(-dt / 6)
+            moodC -= moodC * k; moodA -= moodA * k
+        }
+        moodScare *= exp(-dt / 0.8)
+        let tg = moodStrain * R * 0.35; tugX = -pullDX * tg; tugY = -pullDY * tg   // tug of war: you can still pull it
+        let pt = g != nil && g!.gentleT > 1 && moodC > 0.2 ? min(1, (moodC - 0.2) / 0.5) : 0
+        purr += (pt - purr) * (1 - exp(-dt / 0.3))
+        if escOn {
+            let p = min(1, (t - escT0) / escT), e = 1 - pow(1 - p, 3)
+            let nx = escSX + (escDX - escSX) * e, ny = escSY + (escDY - escSY) * e
+            wanderVX = (nx - homeX) / dt; wanderVY = (ny - homeY) / dt; homeX = nx; homeY = ny
+            if p >= 1 { escOn = false; cowerUntil = t + 1.2 + Double.random(in: 0..<0.8); wanderNext = max(wanderNext, t + 2 + Double.random(in: 0..<1.5)) }
+        }
     }
     private func endIntro() {
         guard introOn else { return }
@@ -220,7 +300,7 @@ final class SlimeRig {
             mx /= Double(bnd.count); my /= Double(bnd.count)
             let zx = ax / camZ, zy = ay / camZ, dx = mx - (cx - v.x) - folX, dy = my - (cy - v.y) - folY, om = max(0.1, params.followSpeed)
             if !folChase && (abs(dx) > zx * params.followZone || abs(dy) > zy * params.followZone) { folChase = true }
-            if folChase && hypot(dx / zx, dy / zy) < 0.06 { folChase = false }
+            if folChase && hypot(dx / zx, dy / zy) < params.followStop { folChase = false }   // v2.18: stop near, not dead centre (pulled back to centre it looked like it never walked)
             let ex = folChase ? dx : 0, ey = folChase ? dy : 0
             folVX += (om * om * ex - 2 * om * folVX) * dt; folVY += (om * om * ey - 2 * om * folVY) * dt
             folX += folVX * dt; folY += folVY * dt
@@ -249,6 +329,7 @@ final class SlimeRig {
         var speedC = 0.0                             // smoothed travel rate, drives the rub sound
         var radius = 0.0                             // UITouch.majorRadius, points (0 = unknown)
         var r0 = 0.0, prS = 0.0                      // radius baseline at landing, smoothed radius pressure 0...1 (提案第 9 條)
+        var gentleT = 0.0, strainT = 0.0             // v2.18: how long it has been a gentle stroke / a hard pull
         var tickAt = 0.0, tickNext = 0.0             // texture ticks: travel at the last tick, spacing to the next (提案第 13 條)
         var step = 0
         var stretch = 0.0                            // tanh-limited stretch at the last update, in radii
@@ -472,6 +553,8 @@ final class SlimeRig {
         camZ = 1; camX = viewV.x; camY = viewV.y
         folX = viewV.x; folY = viewV.y; folVX = 0; folVY = 0; folChase = false
         introOn = false; introSq = 0; ivS = 1; ivOX = 0; ivOY = 0
+        moodC = 0; moodA = 0; moodStrain = 0; moodStrainMax = 0; moodScare = 0; cowerUntil = -9; happyT = -9; wagT = -9; taps = []
+        tugX = 0; tugY = 0; escOn = false; purr = 0
         dentList.removeAll()
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
@@ -719,10 +802,11 @@ final class SlimeRig {
     /// `x, y` are screen points; the rig turns them into world points through the camera.
     func touchBegan(_ id: ObjectIdentifier, x sx: Double, y sy: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
         guard N > 0 else { return }
-        if introOn { endIntro(); return }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab
+        if introOn { let mini = introMini; endIntro(); if !mini { return } }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab; during a happy hop it grabs as usual
         let (x, y) = toWorld(sx, sy)
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
+        if grab { escOn = false }   // v2.18: caught, it stops running
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
         f.radius = radius; f.r0 = radius
         f.sx = sx; f.sy = sy
@@ -824,6 +908,7 @@ final class SlimeRig {
         for m in f.mem { GRAB[m.i] = false }
         for dn in dentList where dn.finger == id { dn.finger = nil }
         lastTouch = t
+        if f.mode == .grab && !quiet { moodRelease(f) }
         if f.mode == .grab && !quiet {
             // release strength: how fast it was flicked (peak speed over the last ~80 ms) or how far it was
             // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
@@ -1079,6 +1164,10 @@ final class SlimeRig {
         // (3.8 s sine) this is exactly the old waveform
         do {
             var T = mat.jelly >= 0.5 ? mat.jellyT : mat.breathT, amp = 1.0
+            do {   // v2.18: comfortable slow and deep, tense fast and shallow
+                let cp = max(0, moodC), ar = max(moodA, moodScare)
+                T *= (1 + 0.4 * cp) * (1 - 0.4 * ar); amp *= (1 + 0.5 * cp) * (1 - 0.4 * ar)
+            }
             if mat.breathDeep >= 0.5 {
                 // 23c: after a grab held longer than 10 s, the next 20 s breathe 1.5× deeper and 1.2× slower, fading linearly
                 let grabbing = fingers.values.contains { $0.mode == .grab }
@@ -1108,7 +1197,7 @@ final class SlimeRig {
             let ph = brPhase - floor(brPhase), c = 0.22
             let w = ph < c ? sin(.pi / 2 * ph / c) : 0.5 * (1 + cos(.pi * (ph - c) / (1 - c)))
             let dw = w - brJw
-            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045
+            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare))
             if dw > 0 { brLift += dw * mat.jellyLift * R * Lamp * mat.life }
         }
         brLift *= exp(-dt / 1.0)
@@ -1129,9 +1218,27 @@ final class SlimeRig {
                 podNext = podClock + 0.8 + 2.2 * Double.random(in: 0..<1)
             }
             func ease(_ x: Double) -> Double { x * x * (3 - 2 * x) }
+            let cw = t < cowerUntil ? 1 : max(0, 1 - (t - cowerUntil) / 0.6)   // v2.18 curled up: pods drawn in
+            let strain = moodStrain
             podE = pods.map { q in
                 let e = q.p < 0.4 ? ease(q.p / 0.4) : (q.p < 0.6 ? 1 : ease((1 - q.p) / 0.4))
-                return (cos(q.a), sin(q.a), q.L * R * e * (reduceMotion ? 0.5 : 1), q.sig, q.bend)
+                return (cos(q.a), sin(q.a), q.L * R * e * (reduceMotion ? 0.5 : 1) * (1 - cw) * (1 - strain), q.sig, q.bend)
+            }
+            if mat.emo >= 0.5 && !clusters.isEmpty {
+                let ga = atan2(clusters[gi].sn, clusters[gi].cs), rm = reduceMotion ? 0.5 : 1.0
+                // wanting away: two pseudopods on the far side reach out (bending to and fro, clawing), with the strain
+                if strain > 0.02 {
+                    let aw = atan2(-pullDY, -pullDX) - ga
+                    for sd in [-1.0, 1.0] {
+                        podE.append((cos(aw + sd * 0.5), sin(aw + sd * 0.5), R * 0.42 * strain * rm, 0.22, sd * 0.5 * sin(t * 7 + sd)))
+                    }
+                }
+                // happy wag: one pseudopod upper right swings 4 times (1.6 s)
+                let wt = t - wagT
+                if wt > 0 && wt < 1.6 {
+                    let e = sin(.pi * wt / 1.6), aw = -Double.pi / 2 + 0.7
+                    podE.append((cos(aw), sin(aw), R * 0.32 * e * rm, 0.2, 1.1 * sin(2 * .pi * 2.5 * wt)))
+                }
             }
             // area: along the reference boundary, the area the pods add (∮ r·Δr + Δr²/2 dθ), taken back all round with the
             // same (r/Rb)² weight (only subtracting each pod's mean left the area 3% to 5% high)
@@ -1159,7 +1266,8 @@ final class SlimeRig {
         // speed and the same walk-then-rest rhythm as the constant-speed version), rest a while; stop when touched.
         // Reduce Motion halves the speed again (×0.25 together with L)
         wanderVX = 0; wanderVY = 0
-        if L > 0.5 && mat.wander > 0 && !introOn {
+        moodStep(dt)
+        if L > 0.5 && mat.wander > 0 && !introOn && !escOn && t > cowerUntil {
             if !wanderMoving && t > wanderNext {
                 wanderSX = homeX; wanderSY = homeY
                 var sp = 1.0
@@ -1167,10 +1275,10 @@ final class SlimeRig {
                     // v2.17: walk out from where it is; with the `dash` chance far and fast (2.5×: the camera lags, it leaves the screen
                     // a bit). Over three view widths from the start it heads back
                     let far = Double.random(in: 0..<1) < mat.dash
-                    let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.12 + 0.25 * Double.random(in: 0..<1))
+                    let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.2 + 0.3 * Double.random(in: 0..<1))   // v2.18: walks further (多米: it always sits in the middle)
                     var a = Double.random(in: 0..<(2 * .pi))
                     if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5) }
-                    wanderX = homeX + cos(a) * dist; wanderY = homeY + sin(a) * dist * 0.45
+                    wanderX = homeX + cos(a) * dist; wanderY = homeY + sin(a) * dist * 0.8
                     if far { sp = 2.5 }
                 } else {
                     wanderX = cx + (Double.random(in: 0..<1) - 0.5) * W * 0.36
@@ -1188,7 +1296,7 @@ final class SlimeRig {
                 homeX = nx; homeY = ny
                 if p >= 1 {
                     wanderMoving = false
-                    wanderNext = t + 1.5 + Double.random(in: 0..<5)
+                    wanderNext = t + (mat.camFollow >= 0.5 ? 0.8 + Double.random(in: 0..<2.2) : 1.5 + Double.random(in: 0..<5))   // v2.18: shorter rests
                 }
             }
         } else if !fingers.isEmpty {
@@ -1261,9 +1369,17 @@ final class SlimeRig {
         }
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
         // sp: v2.16 P1, pressed the whole body grows (the target area grows with it, so the area pressure does not push back)
+        // v2.18 posture: comfortable it spreads (wider, lower), happy it stands tall (2 s), curled up a size smaller; trembling: a fast
+        // small shake on the rest shape (pulled hard, poked)
+        var posX = 1.0, posY = 1.0, trm = 0.0
+        if mat.emo >= 0.5 {
+            let cp = max(0, moodC), hp = t >= happyT ? max(0, 1 - (t - happyT) / 2) : 0, cw = t < cowerUntil ? 1 : max(0, 1 - (t - cowerUntil) / 0.6)
+            posX = (1 + 0.05 * cp) * (1 - 0.04 * hp) * (1 - 0.06 * cw); posY = (1 - 0.06 * cp) * (1 + 0.07 * hp) * (1 - 0.06 * cw)
+            trm = R * 0.016 * min(1, moodStrain + moodScare) * (reduceMotion ? 0.5 : 1)
+        }
         let sp = mat.press2 >= 0.5 ? sqrt(max(0.5, 1 + mat.pressArea * pressSum)) : 1
-        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = (1 + bs) * sp * (1 + introSq), bsy = (1 - bs * 0.85) * sp * (1 - introSq)   // 提案第 23 條: waveform from update()
-        let wr = Lamp * mat.life * mat.wriggle * R, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
+        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = (1 + bs) * sp * (1 + introSq) * posX, bsy = (1 - bs * 0.85) * sp * (1 - introSq) * posY   // 提案第 23 條: waveform from update()
+        let wr = Lamp * mat.life * mat.wriggle * R * (1 - 0.5 * max(0, moodC)), swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
         // 提案第 20 條 tentacle tail: while wandering, the tentacles' reference positions trail the motion (tips most, u²),
         // scaled by the current speed so the smoothstep profile fades it in and out. Written on the reference shape like the
         // drift; weakening the home pull on the tips instead (the proposal's variant b) was measured to bend the rest pose
@@ -1327,6 +1443,10 @@ final class SlimeRig {
                     ex += -tt.uy * phv; ey += tt.ux * phv
                 }
                 if tvx != 0 || tvy != 0 { ex -= tvx * u2; ey -= tvy * u2 }
+            }
+            if trm > 0 {   // v2.18 trembling (on the rest shape, so it is never remembered)
+                let r = hypot(ex, ey)
+                if r > 1e-6 { let a = trm * sin(t * 41 + Double(i) * 1.7); ex += ex / r * a; ey += ey / r * a }
             }
             EX[i] = ex; EY[i] = ey
         }
@@ -1437,8 +1557,8 @@ final class SlimeRig {
         //    axis links keep advancing (the fold was the axis turning 180° within one link)
         if mat.tentRung > 0 { tentacleRungs(mat) }
         // 4 home (float), bounds
-        let hx = homeX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
-        let hy = homeY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
+        let hx = homeX + tugX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
+        let hy = homeY + tugY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
         let hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
         let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hyF - gcy

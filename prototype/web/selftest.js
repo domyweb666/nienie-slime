@@ -33,13 +33,14 @@
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
-  function reset() { mat = { ...PRESETS.clay }; setup(); WANDER.moving = false; WANDER.next = t + 5; steps(60); }
+  function reset() { mat = { ...PRESETS.clay, emo: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測
+  WANDER.moving = false; WANDER.next = t + 5; steps(60); }
   // 固定亂數＋歸零時鐘，T11、T12 用：結果可重現。setup() 不重設時鐘；時鐘動過要還原，不然上一輪 T2 的 relaxUntil 留在未來，下一輪的記形會被當成「揉回原形」
   function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const realRandom = Math.random;
   const saveClock = () => ({ t, lastTouch, nextTwitch, tLife, relaxUntil, wNext: WANDER.next, wMoving: WANDER.moving });
   function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; Math.random = realRandom; }
-  function resetAligned(wanderNext, over) { mat = { ...PRESETS.clay, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
+  function resetAligned(wanderNext, over) { mat = { ...PRESETS.clay, emo: 0, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
 
   // T1 輕按 0.1 秒：第一幀要動；12 秒後不留痕（2026-11-01 黏土改成約 10 秒退）
   reset();
@@ -412,7 +413,7 @@
 
   // T32 開場與鏡頭跟隨（v2.17，多米：打開時從遠處一跳一跳跑過來；鏡頭不要釘在中間，史萊姆會跑出畫面，鏡頭慢慢跟）：
   //     開場要落地 4 次、落地那幾幀高寬比壓到平常的 0.9 以下、3.2 秒內結束、全程零對折、結束後面積回來；途中碰一下直接到家（0.5 秒內大小回到 1）；
-  //     家往右移 0.6 個畫面寬：身體要有一段跑出畫面、4 秒後鏡頭追到中心附近（0.2 個半畫面內）；抓著時鏡頭不動
+  //     家往右移 0.6 個畫面寬：身體要有一段跑出畫面、4 秒後鏡頭追到 followStop 附近（v2.18 起不拉回正中間）；抓著時鏡頭不動
   { const clock = saveClock(); Math.random = seeded(20261119); const r32 = {}; let xf = 0;
     const asp = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); } return (y1 - y0) / (x1 - x0); };
     resetAligned(1e9); nextTwitch = 1e9; const a0 = asp(); startIntro(); let lands = 0, prev = INTRO.ph, minA = 9, fr = 0;
@@ -426,6 +427,24 @@
     { const cx = (globalC.xc - CAM.x) * CAM.z + v.x, cy = (globalC.yc - CAM.y) * CAM.z + v.y, c0 = CAM.x; ev('pointerdown', 3, cx, cy); steps(60); r32.grabCamMovePt = +Math.abs(CAM.x - c0).toFixed(2); ev('pointerup', 3, cx, cy); steps(60); }
     r32.foldFrames = xf; r32.end = snap();
     res.T32_introFollow = r32; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T33 情緒（v2.18，多米：被拉扯想逃、舒服時呼嚕）：抓右緣往右拉 2.2R 撐 1.5 秒，想逃要滿（strain > 0.8）、舒服掉到負的；放手要開始逃、
+  //     2.5 秒後家往左（拉的反方向）移超過 0.4 個畫面寬。中間輕揉 2.5 秒（半徑 0.25R 的小圈），舒服 > 0.3、呼嚕 > 0.3，放手要開心小跳。
+  //     1 秒內戳 3 下要閃開（2 秒後移超過 0.15 個畫面寬）。全程零對折、逃完面積回來
+  { const clock = saveClock(); Math.random = seeded(20261120); const r33 = {}; let xf = 0; const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    resetAligned(1e9, { emo: 1 }); nextTwitch = 1e9; let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b], h0 = HOMEX;
+    let q = sc(sx, sy), sMax = 0; ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);   // 手指用累加位移（鏡頭拉的時候會動，世界換螢幕會讓手指退回來）
+    for (let k = 1; k <= 120; k++) { const tx = sx + 2.2 * R * Math.min(1, k / 30); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; sMax = Math.max(sMax, MOOD.strain); }
+    r33.strainHeld = +sMax.toFixed(2); r33.moodPulled = +MOOD.c.toFixed(2); ev('pointerup', 1, q[0], q[1]); r33.fleeStarted = ESC.on;
+    for (let k = 0; k < 150; k++) { steps(1); if (classify()[0]) xf++; } r33.fledW = +((h0 - HOMEX) / W).toFixed(2); steps(120); r33.afterFlee = snap();
+    resetAligned(1e9, { emo: 1 }); nextTwitch = 1e9; { const cx = globalC.xc, cy = globalC.yc; let pMax = 0, cMax = 0; q = sc(cx, cy); ev('pointerdown', 1, q[0], q[1]);
+      for (let k = 1; k <= 150; k++) { const a = 2 * Math.PI * 0.5 * k / 60; q = sc(cx + R * 0.25 * Math.sin(a), cy + R * 0.25 * (1 - Math.cos(a))); ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; pMax = Math.max(pMax, PURR); cMax = Math.max(cMax, MOOD.c); }
+      ev('pointerup', 1, q[0], q[1]); r33.purrMax = +pMax.toFixed(2); r33.comfortMax = +cMax.toFixed(2); r33.happyHop = INTRO.on && !!INTRO.mini; for (let k = 0; k < 90; k++) { steps(1); if (classify()[0]) xf++; } }
+    resetAligned(1e9, { emo: 1 }); nextTwitch = 1e9; { const h1x = HOMEX, h1y = HOMEY, cx = globalC.xc + R * 0.2, cy = globalC.yc; q = sc(cx, cy);
+      for (let n = 0; n < 3; n++) { ev('pointerdown', 1, q[0], q[1]); steps(5); ev('pointerup', 1, q[0], q[1]); steps(10); }
+      r33.dartStarted = ESC.on; for (let k = 0; k < 120; k++) { steps(1); if (classify()[0]) xf++; } r33.dartW = +(Math.hypot(HOMEX - h1x, HOMEY - h1y) / W).toFixed(2); }
+    r33.foldFrames = xf; r33.end = snap();
+    res.T33_mood = r33; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
@@ -500,7 +519,9 @@
     // 按壓：整團變大 4% 到 15%、關掉時不變；按 3 秒的最遠位移不超過 1.5 秒的 1.3 倍；黏土放手 1 秒凹痕還在；果凍過頭彈、1 秒收乾淨；零自交
     pressReal: res.T31_press.clayArea08 > 1.04 && res.T31_press.clayArea08 < 1.15 && res.T31_press.offArea08 < 1.01 && res.T31_press.clayMove3 < res.T31_press.clayMove15 * 1.3 && res.T31_press.clayDent1s > 0.5 && res.T31_press.jellyOvershoot < -0.1 && res.T31_press.jellyDentsAfter1s === 0 && res.T31_press.foldFrames === 0,
     // 開場：落地 4 次、落地壓扁到 0.9 以下、3.2 秒內、碰一下直接到家；鏡頭跟隨：會跑出畫面、4 秒後追到中心附近、抓著時鏡頭不動；全程零對折
-    introFollow: res.T32_introFollow.introLands === 4 && res.T32_introFollow.landAspect < 0.9 && res.T32_introFollow.introSec < 3.2 && okArea(res.T32_introFollow.afterIntro) && res.T32_introFollow.skipOff && Math.abs(res.T32_introFollow.skipScale - 1) < 0.01 && res.T32_introFollow.skipFingers === 0 && res.T32_introFollow.followOutPt > 0 && res.T32_introFollow.followEndOff < 0.2 && res.T32_introFollow.grabCamMovePt < 1 && res.T32_introFollow.foldFrames === 0,
+    introFollow: res.T32_introFollow.introLands === 4 && res.T32_introFollow.landAspect < 0.9 && res.T32_introFollow.introSec < 3.2 && okArea(res.T32_introFollow.afterIntro) && res.T32_introFollow.skipOff && Math.abs(res.T32_introFollow.skipScale - 1) < 0.01 && res.T32_introFollow.skipFingers === 0 && res.T32_introFollow.followOutPt > 0 && res.T32_introFollow.followEndOff < PRESETS.clay.followStop + 0.1 && res.T32_introFollow.grabCamMovePt < 1 && res.T32_introFollow.foldFrames === 0,
+    // 情緒：拉扯想逃（strain > 0.8、舒服變負、放手往反方向逃 0.4 畫面寬以上）、輕揉呼嚕（舒服、呼嚕 > 0.3、放手開心小跳）、連戳 3 下閃開；零對折、面積回來
+    moodWorks: res.T33_mood.strainHeld > 0.8 && res.T33_mood.moodPulled < 0 && res.T33_mood.fleeStarted && res.T33_mood.fledW > 0.4 && okArea(res.T33_mood.afterFlee) && res.T33_mood.purrMax > 0.3 && res.T33_mood.comfortMax > 0.3 && res.T33_mood.happyHop && res.T33_mood.dartStarted && res.T33_mood.dartW > 0.15 && res.T33_mood.foldFrames === 0,
     dentOnTap: res.T30_dent.heldDepth > 0.5 && res.T30_dent.after1s > 0.5 && res.T30_dent.after15s > 0.15 && res.T30_dent.after15s < res.T30_dent.after1s && res.T30_dent.dentsAfterPull === 0,
     // 從中間往右、往上拉 2R，那一側外圈要跟出去 1.5R 以上（v2.13 是 -0.08R）；零自交、面積回來
     pullFromMiddle: ['right', 'up'].every(k => res.T27_pullFromMiddle[k].edgeMovedR > 1.5 && res.T27_pullFromMiddle[k].worstSelfX === 0 && okArea(res.T27_pullFromMiddle[k].end)),

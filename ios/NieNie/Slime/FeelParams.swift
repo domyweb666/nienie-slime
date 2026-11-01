@@ -125,7 +125,12 @@ struct FeelParams: Equatable, Codable {
     // sometimes off screen, and the camera follows slowly)
     var intro: Double = 1             // 1: four hops in from far away on a cold start (about 2.8 s), a touch on the way brings it home at once
     var camFollow: Double = 1         // 1: the camera follows once it walks off-centre, it may leave the screen; still while grabbed. 0: v2.16
-    var followZone: Double = 0.5      // how far from the centre (1 = half the view) before the camera starts to follow
+    var followZone: Double = 0.8      // how far off its usual spot (1 = half the view) before the camera follows; v2.18 0.8 (near the edge), v2.17 0.5
+    var followStop: Double = 0.35     // the chase stops this close, it does not pull the slime back to dead centre (v2.18; v2.17 0.06)
+    // v2.18 (多米: it always sits in the middle; pulled it should want to run away, stroked it should purr; no face)
+    var emo: Double = 1               // 1: comfort softens it and purrs, happiness wags a pseudopod and hops, a hard pull makes it flee, pokes make it dart
+    var flee: Double = 1              // how far it runs after a hard pull (1 = half to 0.8 of a view, longer pulls further)
+    var purr: Double = 1              // strength of the purr taps while stroked gently
     var followSpeed: Double = 1.4     // follow spring (rad/s), critically damped; 1.4 catches up in about 2 s
     var dash: Double = 0.25           // chance a wander walks far and fast (2.5× speed); the camera lags and it leaves the screen a bit
     var specks: Double = 1            // 1: faint fixed specks far behind (parallax 0.55) so a moving camera reads as moving
@@ -168,13 +173,13 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         case .jelly:
             p = FeelParams(alpha: 0.34, damp: 0.986, yield: 1.5, creep: 0, recover: 1, grabR: 0.36, maxPull: 1.6,
                            lag: 0.05, wGlobal: 0.12, cSpace: 0.3, cRad: 0.42, upright: 0.004, anchor: 4,
-                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.25,
+                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.5,
                            floppy: 0.5, seed: 7)
             p.pressArea = 0.04; p.pressSpread = 0.06; p.pressSink = 0.2; p.pressBounce = 0.3   // v2.16
         case .mochi:
             p = FeelParams(alpha: 0.28, damp: 0.966, yield: 0.14, creep: 0.9, recover: 0.18, grabR: 0.32, maxPull: 1.8,
                            lag: 0.08, wGlobal: 0.10, cSpace: 0.3, cRad: 0.45, upright: 0.004, anchor: 4,
-                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.25,
+                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.5,
                            floppy: 0.55, seed: 7)
             p.pressArea = 0.05; p.pressSpread = 0.08; p.pressSink = 0.45; p.pressBounce = 0.6   // v2.16
         case .clay:
@@ -182,7 +187,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
             // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
             p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.05, grabR: 0.32, maxPull: 7,
                            lag: 0.12, wGlobal: 0.08, cSpace: 0.3, cRad: 0.45, upright: 0.002, anchor: 4,
-                           areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.05, wander: 0.22,
+                           areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.05, wander: 0.5,
                            floppy: 0.6, seed: 7)
             // free sculpting (多米 2026-11-01: pull it long, spread it flat like dough)
             p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 5; p.grabHold = 0.85   // v2.15: pull 7R, remember 5R (past about 8.5R long it shook; v2.13 20 and 12, v2.12 8 and 4)
@@ -195,7 +200,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
-        p.camFollow = 0   // before v2.17 the view stayed at home and the wander kept to the middle
+        p.camFollow = 0; p.wander = 0.22; p.emo = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
@@ -287,7 +292,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑", range: 0.1...0.5, step: 0.01),
         TuneField(key: \.intro, name: "開場跑過來", hint: "1：冷啟動時從遠處一跳一跳跑過來（約 2.8 秒），途中碰一下就直接到家；0 關（v2.17）", range: 0...1, step: 1),
         TuneField(key: \.camFollow, name: "鏡頭跟著走", hint: "1：史萊姆走離中心就慢慢跟過去，它可以跑出畫面；抓著時鏡頭不動。0 是 v2.16（鏡頭釘在家）", range: 0...1, step: 1),
-        TuneField(key: \.followZone, name: "鏡頭開始追（×半個畫面）", hint: "史萊姆中心離畫面中心多遠鏡頭才開始追", range: 0.1...1, step: 0.05),
+        TuneField(key: \.followZone, name: "鏡頭開始追（×半個畫面）", hint: "史萊姆中心離平常位置多遠鏡頭才開始追；0.8＝快出畫面（v2.18），v2.17 是 0.5", range: 0.1...1, step: 0.05),
+        TuneField(key: \.followStop, name: "鏡頭追到哪停（×半個畫面）", hint: "追到史萊姆離平常位置這麼近就停，不再拉回正中間（v2.18 0.35；v2.17 是 0.06）", range: 0.02...0.8, step: 0.01),
+        TuneField(key: \.emo, name: "情緒", hint: "1：舒服會攤軟呼嚕、開心會搖偽足小跳、被拉扯想逃、連戳會閃開；0 關（v2.18）", range: 0...1, step: 1),
+        TuneField(key: \.flee, name: "逃多遠", hint: "被拉扯放手後衝出去的距離倍數（1＝半個到 0.8 個畫面寬，拉越久越遠）", range: 0...2, step: 0.1),
+        TuneField(key: \.purr, name: "呼嚕", hint: "輕揉時規律輕震的強度倍數；0 關", range: 0...2, step: 0.1),
         TuneField(key: \.followSpeed, name: "鏡頭追的快慢", hint: "彈簧頻率（每秒弧度）；1.4 約 2 秒追上，越大越緊", range: 0.4...5, step: 0.1),
         TuneField(key: \.dash, name: "走遠的機率", hint: "每次遊走有多少機率走遠、走快（2.5 倍速），鏡頭跟不上就會跑出畫面一點", range: 0...1, step: 0.05),
         TuneField(key: \.specks, name: "背景光點", hint: "1：遠處固定的淡光點，鏡頭動的時候看得出來", range: 0...1, step: 1),
