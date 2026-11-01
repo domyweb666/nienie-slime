@@ -31,6 +31,9 @@
   function snap() { const [s, c] = classify(); return { selfX: s + c, fold: s, overlap: c, area: +(area() / A0).toFixed(3), ke: +ke().toFixed(2), qdev: +qdev().toFixed(2) }; }
   function maxMove(ref) { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.hypot(X[i] - ref[0][i], Y[i] - ref[1][i])); return m; }
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
+  // v2.20：舊項目量的是 v2.19 的行為，一律關掉拖著走、凹痕退快、印象（跟關情緒、關活物一樣）；v2.20 在 T35 用 P0 打開。跑完換回來
+  // 三種材質都換（舊項目也用果凍、麻糬的預設）
+  const P0 = PRESETS.clay, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], drag: 0, dentFade: 10, imp: 0 };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -487,6 +490,62 @@
     r34.foldFrames = xf;
     res.T34_life = r34; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T35 v2.20（多米 build 75：拖的時候只有形變沒有位移；點它的凹回復太久；沒有跟人互動的感覺）。舊項目一律關 v2.20（PRESETS.clay 在最上面換成 OFF220），這裡打開。
+  //     a D1 抓右緣往右拉 2R 停 1 秒：重心跟過去 0.55R 到 0.85R（drag 0 不到 0.1R）；被抓那端跟手指的距離跟 drag 0 差不到 0.3R；放手 2 秒往回退不到 0.1R，
+  //       面積不比 drag 0 多 1%（黏土拉 2R 放手 2 秒面積本來就還沒回來，drag 0 量到 1.035）；
+  //     b D2 點一下 0.12 秒：放手 0.6 秒凹痕 < 0.05；按 1 秒：放手 1.5 秒 < 0.05；捏走的形狀跟 dentFade 10 差不到 0.5pt；
+  //     c 印象：輕揉 6 秒熟漲 0.1 以上；扯到想逃戒漲 0.2 以上；不碰 3 分鐘戒剩一半（0.45 到 0.55）；
+  //     d C1 熟 0.8、手指停在右邊 2R：6 秒內偽足或身體碰到手指；戒 0.8、手指停在右邊 0.8R：5 秒後離手指遠 0.5R 以上；
+  //     e C2 熟 0.5、手指在右邊 2.5R 慢慢往下移 1.5 秒再停：停下 0.5 秒內撲；不熟時手指快甩過去：嚇一下（縮）；
+  //     f C4 輕揉 2.5 秒放手：排了討摸，5 秒內再揉呼嚕 0.6 秒內來（第一次 1 秒以上）；g C5 戒 0.8 時被碰縮的量是戒 0 的 1.5 倍以上。全程零對折
+  { const clock = saveClock(); Math.random = seeded(20261102); const r35 = {}; let xf = 0;
+    const V20 = { drag: P0.drag, dentFade: P0.dentFade, imp: 1, life2: 1 };
+    const L3 = o => { resetAligned(1e9, { ...V20, ...o }); impReset(); LIFE.st = 'rest'; LIFE.until = 1e9; };
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const cen = () => { let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } return [mx / N, my / N]; };
+    const edgeTo = (x, y) => { let d = 1e9; for (const i of bnd) d = Math.min(d, Math.hypot(X[i] - x, Y[i] - y)); return d; };
+    const rightPt = () => { let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; return b; };
+    const rub = (id, frames) => { const cx = globalC.xc + R * 0.3, cy = globalC.yc; let q = sc(cx, cy); ev('pointerdown', id, q[0], q[1]); const f = fingers.get(id);
+      let tp = -1; for (let k = 0; k < frames; k++) { const tx = cx + Math.sin(k / 16) * R * 0.25; q = [q[0] + (tx - f.x) * CAM.z, q[1]]; ev('pointermove', id, q[0], q[1]); steps(1); if (classify()[0]) xf++; if (tp < 0 && PURR > 0.2) tp = k / 60; }
+      ev('pointerup', id, q[0], q[1]); return tp; };
+    // a 拖著走
+    const pull = o => { L3(o); const c0 = cen(), b = rightPt(), sx = X[b] - R * 0.15, sy = Y[b]; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);
+      for (let k = 1; k <= 90; k++) { const tx = sx + 2 * R * Math.min(1, k / 30); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; }
+      const c1 = cen(), gap = (f1.fx - X[b]) / R; ev('pointerup', 1, q[0], q[1]); let worst = 0; for (let k = 0; k < 120; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); }
+      const c2 = cen(); return { followR: +((c1[0] - c0[0]) / R).toFixed(2), grabGapR: +gap.toFixed(2), backAfter2sR: +((c1[0] - c2[0]) / R).toFixed(2), worstSelfX: worst, end: snap() }; };
+    { const on = pull({}), off = pull({ drag: 0 }); r35.drag = { on, off }; }
+    // b 凹痕
+    const dent = (o, hold, wait) => { L3({ imp: 0, ...o }); const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 2, cx, cy); steps(hold); ev('pointerup', 2, cx, cy);
+      const dn = DENTS[DENTS.length - 1]; steps(wait); return { d: DENTS.includes(dn) ? +dn.d.toFixed(3) : 0, qdev: qdev() }; };
+    { const tap = dent({}, 7, 36), hold = dent({}, 60, 90), tapOld = dent({ dentFade: 10 }, 7, 36);
+      r35.dent = { tapAt06: tap.d, holdAt15: hold.d, tapOldAt06: tapOld.d, qdevDiffPt: +Math.abs(tap.qdev - tapOld.qdev).toFixed(2) }; }
+    // c 印象怎麼漲、怎麼退
+    { L3({ emo: 1 }); rub(3, 360); const trRub = IMP.tr; L3({ emo: 1 }); const b = rightPt(), sx = X[b] - R * 0.15, sy = Y[b]; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);
+      for (let k = 1; k <= 150; k++) { const tx = sx + 3 * R * Math.min(1, k / 20); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; }
+      ev('pointerup', 1, q[0], q[1]); steps(30); const wPull = IMP.w; impStep(180); r35.imp = { trAfterRub6s: +trRub.toFixed(2), wAfterStrain: +wPull.toFixed(2), wAfter3minRatio: +(IMP.w / wPull).toFixed(2) }; impReset(); }
+    // d C1 手指停在旁邊
+    { L3({}); IMP.tr = 0.8; const b = rightPt(), fx = X[b] + 2 * R, fy = Y[b], q = sc(fx, fy); ev('pointerdown', 5, q[0], q[1]); const f = fingers.get(5); let hit = -1, minE = 1e9;
+      for (let k = 0; k < 360; k++) { steps(1); if (classify()[0]) xf++; minE = Math.min(minE, edgeTo(f.fx, f.fy)); if (hit < 0 && t - f.hitT < 0.02) hit = k / 60; }
+      ev('pointerup', 5, q[0], q[1]); steps(30); const come = { hitS: +hit.toFixed(2), minEdgeR: +(minE / R).toFixed(2) };
+      L3({}); IMP.w = 0.8; const b2 = rightPt(), gx = X[b2] + 0.8 * R, gy = Y[b2], q2 = sc(gx, gy), c0 = cen(); ev('pointerdown', 5, q2[0], q2[1]); for (let k = 0; k < 300; k++) { steps(1); if (classify()[0]) xf++; }
+      const c1 = cen(); ev('pointerup', 5, q2[0], q2[1]); steps(30);
+      r35.c1 = { come, backGainR: +((Math.hypot(gx - c1[0], gy - c1[1]) - Math.hypot(gx - c0[0], gy - c0[1])) / R).toFixed(2), end: snap() }; }
+    // e C2 逗它
+    { L3({}); IMP.tr = 0.5; const b = rightPt(); let q = sc(X[b] + 2.5 * R, Y[b]); ev('pointerdown', 6, q[0], q[1]);
+      for (let k = 0; k < 90; k++) { q = [q[0], q[1] + R * CAM.z * 1.2 / 60]; ev('pointermove', 6, q[0], q[1]); steps(1); if (classify()[0]) xf++; }
+      let pounce = -1; for (let k = 0; k < 120; k++) { steps(1); if (classify()[0]) xf++; if (pounce < 0 && LURE.pounced) pounce = k / 60; } ev('pointerup', 6, q[0], q[1]); steps(30);
+      L3({}); const b2 = rightPt(); q = sc(X[b2] + 1.5 * R, Y[b2]); ev('pointerdown', 7, q[0], q[1]); steps(30); const fl0 = FLN.t0;
+      for (let k = 0; k < 12; k++) { q = [q[0], q[1] + R * CAM.z * 6 / 60]; ev('pointermove', 7, q[0], q[1]); steps(1); } steps(20); const startled = FLN.t0 > fl0; ev('pointerup', 7, q[0], q[1]); steps(30);
+      r35.c2 = { pounceS: +pounce.toFixed(2), startled }; }
+    // f C4 討摸
+    { L3({ emo: 1 }); const first = rub(8, 150); L3({ emo: 1 }); IMP.tr = 0.5; rub(8, 150); const asked = !!LIFE.ask; steps(90); const second = rub(8, 60);
+      r35.c4 = { firstPurrS: +first.toFixed(2), asked, secondPurrS: +second.toFixed(2) }; }
+    // g C5 戒高時縮得大
+    { const fl = w => { L3({}); IMP.w = w; const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(30); ev('pointerup', 1, cx, cy); steps(30); return FLN.last; };
+      const a0 = fl(0), a8 = fl(0.8); r35.c5 = { flinchRatio: +(a8 / a0).toFixed(2) }; }
+    r35.foldFrames = xf; impReset();
+    res.T35_v220 = r35; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -517,6 +576,7 @@
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
   const L9 = res.T34_life;
+  const V5 = res.T35_v220;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -566,6 +626,14 @@
     moodWorks: res.T33_mood.strainHeld > 0.8 && res.T33_mood.moodPulled < 0 && res.T33_mood.fleeStarted && res.T33_mood.fledW > 0.4 && okArea(res.T33_mood.afterFlee) && res.T33_mood.purrMax > 0.3 && res.T33_mood.comfortMax > 0.3 && res.T33_mood.happyHop && res.T33_mood.dartStarted && res.T33_mood.dartW > 0.15 && res.T33_mood.foldFrames === 0,
     // v2.19 活物感：休息 0.35 到 0.65、有探有走；碰著呼吸還在、沒被記進形狀；晚一拍才縮、會習慣；一縮一衝的速度高峰在收縮那段、路線彎、走得到；
     // 碰旁邊空白處會探、不凍住；拉完甩一甩、探手指離開的地方；全程零對折
+    // v2.20：拖著走（跟過去 0.55R 到 0.85R、被抓那端照樣跟手、放手不退、零自交、面積回來）；凹痕 0.6 秒、1.5 秒退完，形狀照舊；印象漲退；
+    // C1 熟的碰到手指、戒的退開；C2 撲、嚇一下；C4 討摸後呼嚕來得快；C5 戒的縮得大；零對折
+    v220: V5.drag.on.followR > 0.55 && V5.drag.on.followR < 0.85 && V5.drag.off.followR < 0.1 && Math.abs(V5.drag.on.grabGapR - V5.drag.off.grabGapR) < 0.3 && V5.drag.on.backAfter2sR < 0.1 && V5.drag.on.worstSelfX === 0 && V5.drag.on.end.area < V5.drag.off.end.area + 0.01
+      && V5.dent.tapAt06 < 0.05 && V5.dent.holdAt15 < 0.05 && V5.dent.tapOldAt06 > 0.4 && V5.dent.qdevDiffPt < 0.5
+      && V5.imp.trAfterRub6s > 0.1 && V5.imp.wAfterStrain > 0.2 && V5.imp.wAfter3minRatio > 0.45 && V5.imp.wAfter3minRatio < 0.55
+      && V5.c1.come.hitS >= 0 && V5.c1.come.hitS < 6 && V5.c1.backGainR > 0.5 && V5.c1.end.selfX === 0
+      && V5.c2.pounceS >= 0 && V5.c2.pounceS < 0.5 && V5.c2.startled
+      && V5.c4.firstPurrS > 1 && V5.c4.asked && V5.c4.secondPurrS >= 0 && V5.c4.secondPurrS < 0.6 && V5.c5.flinchRatio > 1.5 && V5.foldFrames === 0,
     lifeV219: L9.idle.restFrac > 0.35 && L9.idle.restFrac < 0.65 && L9.idle.sniffs >= 4 && L9.idle.goes >= 2 && L9.idle.worstSelfX === 0 && L9.idle.areaMin > 0.97 && L9.idle.areaMax < 1.03
       && L9.held.ratio > 0.35 && L9.held.ratioOff < 0.15 && L9.held.qdev1s < L9.held.qdev1sOff + 1
       && Math.abs(L9.flinch.at05 - 1) < 0.015 && L9.flinch.at30 < 0.96 && L9.flinch.fifthOverFirst < 0.3
@@ -586,6 +654,7 @@
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
   draw();
+  Object.assign(PRESETS, PSAVE); mat = { ...P0 };
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
   console.log(JSON.stringify(res, null, 1));
   return res;
