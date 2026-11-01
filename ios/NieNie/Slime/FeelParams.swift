@@ -164,6 +164,7 @@ struct FeelParams: Equatable, Codable {
     var rubMax: Double = 0.7          // loudest the rub loop gets
     var pitchJitter: Double = 0.08    // random pitch ±
     var sndPullMax: Double = 0.6      // loudest the stretching-strand loop gets (v2 layered sound)
+    var volMusic: Double = 0.25       // v2.21 background lofi volume (the speaker button's first state); ducks to 0.6 while held
     var sndSettle: Double = 1         // after-release tail: bubbles after a pull, a small hiss after a long press; 0 = off
     var sndPressSize: Double = 0.5    // how much contact size (majorRadius) changes the press sound; 0 = off
 }
@@ -442,6 +443,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.rubMax, name: "揉的音量上限", hint: "揉最快時多大聲", range: 0...1, step: 0.05, section: "聲音"),
         TuneField(key: \.pitchJitter, name: "音高抖動", hint: "每次隨機差多少", range: 0...0.3, step: 0.01, section: "聲音"),
         TuneField(key: \.sndPullMax, name: "拉絲音量上限", hint: "拉的時候連續黏絲聲最大多大聲；拉越快越大聲、停住幾乎沒聲", range: 0...1, step: 0.05, section: "聲音"),
+        TuneField(key: \.volMusic, name: "背景音樂音量", hint: "v2.21 lofi 的音量（喇叭按鈕在「音樂和音效」時才有）；手指抓著時降到六成", range: 0...1, step: 0.05, section: "聲音"),
         TuneField(key: \.sndSettle, name: "放手餘韻", hint: "拉過放手冒小氣泡、按久放手一聲小嘶的音量；0 關", range: 0...2, step: 0.1, section: "聲音"),
         TuneField(key: \.sndPressSize, name: "按的音量跟接觸面積", hint: "指尖輕、指腹重的差多少；0 關", range: 0...1, step: 0.05, section: "聲音"),
 

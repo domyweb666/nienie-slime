@@ -11,7 +11,8 @@ final class SlimeController: ObservableObject {
 
     @Published private(set) var material: SlimeMaterial = .clay   // 多米 2026-10-31 選黏土
     @Published private(set) var params: [SlimeMaterial: FeelParams]
-    @Published var muted = false { didSet { sound.muted = muted } }
+    /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
+    @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2; syncAudio() } }
     @Published private(set) var reduceMotion = UIAccessibility.isReduceMotionEnabled
     /// Blind-test slots (3-4 做法五): two saved parameter sets, switched by number only, kept in UserDefaults.
     @Published private(set) var activeSlot: Int?
@@ -155,6 +156,7 @@ final class SlimeController: ObservableObject {
         sound.pullMax = current.sndPullMax
         sound.rubMax = current.rubMax
         sound.settleAmt = current.sndSettle
+        sound.music = soundMode == 0 ? current.volMusic : 0
     }
 
     /// Press loudness from how the finger landed and how big its contact patch is (UITouch.majorRadius):

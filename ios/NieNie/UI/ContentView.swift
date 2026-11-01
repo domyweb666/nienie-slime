@@ -93,15 +93,17 @@ struct ContentView: View {
 
             Spacer()
 
+            // v2.21: three states, music and sounds → sounds only → silent
             Button {
-                controller.muted.toggle()
+                controller.soundMode = (controller.soundMode + 1) % 3
             } label: {
-                Image(systemName: controller.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                Image(systemName: ["music.note", "speaker.wave.2.fill", "speaker.slash.fill"][controller.soundMode])
                     .font(.system(size: 18, weight: .bold))
                     .frame(width: 46, height: 46)
             }
             .buttonStyle(ChipStyle(circle: true))
-            .accessibilityLabel(controller.muted ? "打開聲音" : "關閉聲音")
+            .accessibilityLabel(["音樂和音效", "只有捏的聲音", "全部靜音"][controller.soundMode])
+            .accessibilityHint("點一下換下一種")
         }
     }
 

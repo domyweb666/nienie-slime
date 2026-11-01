@@ -11,6 +11,7 @@ protocol SlimeSoundSource: AnyObject {
     var pullMax: Double { get set }      // loudest the stretching-strand loop gets
     var rubMax: Double { get set }       // loudest the rub loop gets (the rub level passed to frame is already scaled by it)
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
+    var music: Double { get set }        // v2.21 background lofi volume, 0 = off
     /// Finger landed. `intensity` 0...1 (the controller folds in contact size).
     func press(intensity: Double)
     /// Stretched past another step: one strand snaps.
@@ -37,6 +38,12 @@ final class SlimeAudio: SlimeSoundSource {
     var rubMax = 0.7
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
+    /// v2.21 background lofi (多米 build 77: put lofi behind it), `bgm-lofi.m4a` from `prototype/sfx-design/design_lofi.py`: a 126 s loop.
+    /// Streamed by AVAudioPlayer (decoded whole it would be about 44 MB of stereo floats), outside the effects' engine, so "sounds only"
+    /// and the effects' volume do not touch it. Ducks to 0.6 while a finger holds the body (0.4 s down, 1.2 s back), paused in the background.
+    var music = 0.0 { didSet { bgmTarget = -1 } }
+    private var bgm: AVAudioPlayer?
+    private var bgmTarget = -1.0
 
     // ---- the table (keep in step with engine.js) ----
     private struct Play { var gain: Double; var rate: Double; var lowpass: Double; var delay = 0.0; var deco = false }
@@ -115,6 +122,9 @@ final class SlimeAudio: SlimeSoundSource {
         engine.prepare()
         loadBank()
         startEngine()
+        if let url = Bundle.main.url(forResource: "bgm-lofi", withExtension: "m4a"), let p = try? AVAudioPlayer(contentsOf: url) {
+            p.numberOfLoops = -1; p.volume = 0; p.prepareToPlay(); bgm = p
+        }
 
         let nc = NotificationCenter.default
         nc.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
@@ -129,6 +139,7 @@ final class SlimeAudio: SlimeSoundSource {
         }
         nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.startEngine()
+            self?.bgmTarget = -1   // the next frame starts the music again (fading in)
         }
     }
 
@@ -284,6 +295,14 @@ final class SlimeAudio: SlimeSoundSource {
     func frame(dt rawDt: Double, rub: Double, stretch rawStretch: Double, grabbing: Bool) {
         let dt = Self.clamp(rawDt, 0.001, 0.1)
         let stretch = grabbing ? rawStretch : 0
+        if let p = bgm {
+            let target = music * (grabbing ? 0.6 : 1)
+            if abs(target - bgmTarget) > 0.005 {
+                if target > 0 && !p.isPlaying { p.play() }
+                p.setVolume(Float(target), fadeDuration: target < bgmTarget ? 0.4 : 1.2)
+                bgmTarget = target
+            }
+        }
         let vraw = abs(stretch - st) / dt
         st = stretch
         stV += (vraw - stV) * (1 - exp(-dt / 0.06))
@@ -340,6 +359,7 @@ final class SlimeAudio: SlimeSoundSource {
 
     func stopAll() {
         pending.removeAll()
+        bgm?.pause(); bgmTarget = -1
         for v in [pullVoice, rubVoice] where v.playing {
             v.player.stop()
             v.playing = false
