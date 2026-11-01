@@ -146,7 +146,17 @@ struct FeelParams: Equatable, Codable {
     var heldBreath: Double = 0.75     // breathing while held, share of normal (the pinned middle eats some: 0.75 reads as about 0.6)
     var restWrig: Double = 0.3        // wriggle while resting, share of normal (looking 0.6, walking 0.5)
     var flinchAmp: Double = 0.05      // how much the flinch shrinks it (resting ×1.2, comfortable ×0.5, each flinch ×0.55, back with a 7 s time constant)
-    var dens: Double = 12             // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
+    // v2.20 (多米 build 75: dragging only deforms it, nothing moves; a tap's dent takes too long to go; it still does not feel like it
+    // reacts to you, wants second-order effects of how you treat it) .uiux/04-手感/互動與拖拉提案-暫定.md
+    var drag: Double = 0.35           // D1: while held, home follows this share of the finger's travel (0.25 s lag); release keeps it there, a fling glides on; 0 = v2.19
+    var dentFade: Double = 0.6        // D2: seconds a tap's dent takes to go (2.5× after a press of 1 s or more); 10 = v2.19 (fades with recover)
+    var imp: Double = 1               // master: an impression of you (trust, wariness) for this run of the app, zeroed after 10 min in the background; C1...C5 only count while this and life2 are 1
+    var impC1: Double = 1             // C1: a finger resting beside it: trusting, it swims over and touches it (very trusting, nestles and rubs); wary, it backs off and points at you
+    var impC2: Double = 1             // C2: a finger moving nearby: a pseudopod follows it; trusting, it chases and pounces when you stop; a fast swipe startles it when not trusting
+    var impC3: Double = 1             // C3: drag follow by impression: trusting 0.5, wary 0.15; very wary slips free after a while; less while it strains to flee
+    var impC4: Double = 1             // C4: after a purr and release it reaches for where your finger left and edges over; touched within 5 s, the purr comes fast
+    var impC5: Double = 1             // C5: wary, it flinches more and sooner and calms after gentle touches; idle, trusting sniffs toward your last touch, wary away
+    var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
     var volMaster: Double = 0.9       // output volume
@@ -212,6 +222,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
+        p.drag = 0; p.dentFade = 10; p.imp = 0   // nothing of v2.20
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
@@ -278,6 +289,7 @@ struct Candidate: Identifiable {
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.drag = 0; p.dentFade = 10; p.imp = 0 },
         Candidate(id: 218, name: "v2.18 對照（沒有 v2.19 活物感）", hint: "一直在動、被拖著滑過去、一碰全停、固定節拍呼吸、隨機偽足、有影子") { p, _ in p.life2 = 0 },
         Candidate(id: 216, name: "v2.16 對照（鏡頭釘在中間）", hint: "鏡頭不跟、整隻一定在畫面裡、遊走只在中間一小塊") { p, _ in p.camFollow = 0 },
         Candidate(id: 215, name: "v2.15 對照（月牙凹痕）", hint: "按壓只有那一小塊攤開、凹痕是左上一彎硬邊月牙、0.08 秒到底，放手不分材質一樣淡") { p, _ in p.press2 = 0 },
@@ -324,6 +336,14 @@ struct TuneField: Identifiable {
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）", range: 0...0.15, step: 0.01, section: "活物感"),
+        TuneField(key: \.drag, name: "D1 拖著走", hint: "抓著時身體的原位跟著手指移幾成（v2.20 0.35，約 0.25 秒跟上；放手停在被拖到的地方，甩著放手再滑一小段）；0 是 v2.19（只變形不位移）", range: 0...1, step: 0.05),
+        TuneField(key: \.dentFade, name: "D2 凹痕退的時間（秒）", hint: "點一下放手後凹痕多久退完（按越久越慢，按 1 秒以上 2.5 倍）；10 是 v2.19（跟回原形一起退，黏土 15 秒退一半）", range: 0.2...10, step: 0.1, section: "按壓與記形"),
+        TuneField(key: \.imp, name: "印象 v2.20", hint: "1：它記得你這一次怎麼對它（熟、戒），關掉 app 或背景 10 分鐘歸零；底下 C1 到 C5 只在這裡是 1、活物 v2.19 也是 1 時有用；0 回 v2.19", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.impC1, name: "C1 手指放旁邊", hint: "1：手指按在它旁邊不動，熟的時候游過來用偽足碰你的手指（很熟時整團貼過來蹭），碰到時輕震一下；戒的時候退開、偽足指著你；0：v2.19 只探", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.impC2, name: "C2 逗它", hint: "1：手指在旁邊慢慢移，偽足跟著轉；熟的時候追，你停下來它撲過去；不熟時手指動太快它嚇一下；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.impC3, name: "C3 跟手看印象", hint: "1：拖它時熟的跟得多（五成）、戒的跟得少（一成五），戒很高時拖久了會掙脫；用力扯想逃時跟得少；0：一律照 D1", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.impC4, name: "C4 討摸", hint: "1：揉到呼嚕放手後，它往你手指離開的地方伸偽足、挪過去；5 秒內再碰，呼嚕來得快；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.impC5, name: "C5 被粗暴之後", hint: "1：戒高時被碰縮得大、縮得早，溫柔碰幾次慢慢放心；沒碰時熟的往你最後摸的地方探、戒的往反方向；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.press2, name: "按壓真實版", hint: "1：v2.16 按壓（整團壓薄攤開、凹痕跟著身體變形、先快後慢地沉、放手依材質回彈、亮光被擠開、影子變深）；0 是 v2.15 的月牙凹痕", range: 0...1, step: 1),
         TuneField(key: \.pressArea, name: "壓薄攤開：面積", hint: "按到底時整團面積多幾成（從正面按下去前後變薄，看起來變大一圈）", range: 0...0.15, step: 0.01),
         TuneField(key: \.pressSpread, name: "壓薄攤開：手指附近（×半徑）", hint: "手指周圍那圈往外推多少（離手指約 0.3R 推最多）", range: 0...0.3, step: 0.01),

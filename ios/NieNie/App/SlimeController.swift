@@ -47,6 +47,15 @@ final class SlimeController: ObservableObject {
             self?.haptics.stopContinuous()
             self?.sound.stopAll()
         }
+        // v2.20: the impression lives for this run only; 10 min or more in the background and it is a first meeting again
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                                               object: nil, queue: .main) { [weak self] _ in self?.backgroundAt = Date() }
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            guard let self, let at = self.backgroundAt else { return }
+            if Date().timeIntervalSince(at) >= 600 { self.rig.resetImpression() }
+            self.backgroundAt = nil
+        }
     }
 
     var current: FeelParams { params[material] ?? material.defaults }
@@ -82,6 +91,10 @@ final class SlimeController: ObservableObject {
         case .tap:
             sound.press(intensity: 0.5)
             haptics.transient(intensity: 0.45, sharpness: 0.35)
+        case .nudge:
+            // v2.20 C1: it swam over and touched your resting finger: one soft, round tap (lighter than a press)
+            sound.press(intensity: 0.2)
+            haptics.transient(intensity: 0.2, sharpness: 0.15)
         }
     }
 
@@ -116,6 +129,7 @@ final class SlimeController: ObservableObject {
         haptics.flush()
     }
     private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0
+    private var backgroundAt: Date?
 
     func report(_ s: SlimeView.FrameStats) { stats = s }
 
