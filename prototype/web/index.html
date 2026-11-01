@@ -110,9 +110,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.08,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:0,nearMem:0},
-  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.08,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:0,nearMem:0},
-  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:6,  recover:.3,  grabR:.32,maxPull:2.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.08,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:1,nearMem:1},
+  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.08,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:0,nearMem:0,memMax:1.1},
+  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.08,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:0,nearMem:0,memMax:1.1},
+  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:6,  recover:.3,  grabR:.32,maxPull:4.0,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.08,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,podLen:1.1,jelly:1,jellyT:3,jellyAmp:.1,jellyLift:.12,tentMem:1,nearMem:1,memMax:4},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -131,6 +131,7 @@ const F=[
   ['pressFirst','按壓第一幀比例','按下那一幀先到目標的幾成',0,1,.05],
   ['dwellLo','定型停留起點','抓住幾秒後開始記形（秒）',0,1,.05],
   ['dwellHi','定型停留終點','抓住幾秒後全速記形（秒）',0,2,.05],
+  ['memMax','記形上限（×半徑）','記住的形狀最多離原形多遠；黏土 4（可以拉很長、壓很扁），v2.9 以前 1.1',.5,6,.1],
   ['nearMem','手指附近記形','手指附近用整身座標量記形，拉出一塊就留一塊；0：只用局部區塊（拉出去的那塊會被當轉動抵銷）',0,1,.05],
   ['tentMem','觸手記形','觸手跟身體一樣留形、一樣慢慢回；0：v2.7 尖端幾乎不記、一秒多彈回（2026-11-01 真機回報）',0,1,.05],
   ['idleFreeze','碰到時凍住','1：活物感時鐘停住不歸零（候選 19）',0,1,1],
@@ -159,6 +160,7 @@ const F=[
   ['life','活物感','沒碰時自己動的幅度',0,1.5,.05],
   ['drift','觸手飄動','沒碰時觸手擺動的幅度（×半徑）',0,.4,.01],
   ['wriggle','蠕動','沒碰時整個身體輪廓慢慢變形的幅度（×半徑）',0,.2,.01],
+  ['idlePace','自己動的速度','偽足伸縮與蠕動的快慢；1 是 v2.9（多米：太快），0.45 約慢一倍多',.1,1.5,.05],
   ['pods','偽足數量','沒碰時同一時間最多幾條偽足在伸縮（隨機方向，上方也會長）；0 關（2026-11-01 多米：不是海星，觸手會收回去再從別處長出來）',0,3,1],
   ['podLen','偽足長度（×半徑）','一條偽足伸到最長多長（每條再隨機 0.7 到 1.2 倍）',0,1.4,.05],
   ['jelly','水母呼吸','1：規律一縮一放，收縮快、放鬆慢，收縮時往上浮；0：原本的正弦呼吸',0,1,1],
@@ -172,9 +174,9 @@ const F=[
   ['seed','外形亂數種子','換一個數字就換一個形狀（會重置）',1,30,1],
 ];
 // v2.7 對照（2026-11-01 多米真機回報前的值）：蠕動是固定行進波、黏土抓 0.2 秒內純彈性、觸手尖端一秒多彈回、記形 33 秒才退
-const OLDSHAPE={limbs:5,pods:0,jelly:0};
+const OLDSHAPE={limbs:5,pods:0,jelly:0,idlePace:1};
 const V27={jelly:{...OLDSHAPE,morph:0,wriggle:.07,tentMem:0},mochi:{...OLDSHAPE,morph:0,wriggle:.07,tentMem:0},
-  clay:{...OLDSHAPE,morph:0,wriggle:.06,tentMem:0,nearMem:0,dwellLo:.2,dwellHi:.6,creep:3,recover:.03}};
+  clay:{...OLDSHAPE,morph:0,wriggle:.06,tentMem:0,nearMem:0,memMax:1.1,maxPull:2.0,idlePace:1,dwellLo:.2,dwellHi:.6,creep:3,recover:.03}};
 
 let mat={...PRESETS.clay},curMat='clay';  // 多米 2026-10-31 選黏土
 let FLOAT=true;
@@ -500,7 +502,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   // 3b 邊界像一條繩子：相鄰邊界粒子距離夾在 [0.55, 2.4] 倍靜止距離，一顆不能被單獨拽走（防自交）
   {const n=bnd.length;for(let pass=0;pass<2;pass++)for(let k=0;k<n;k++){const i=bnd[k],j=bnd[(k+1)%n];
     const tent=TID[i]>=0||TID[j]>=0;
-    const dx=X[j]-X[i],dy=Y[j]-Y[i],d=Math.hypot(dx,dy)||1e-6,l0=bndL[k],lo=l0*.6,hi=l0*(tent?1.7:2.4);
+    const dx=X[j]-X[i],dy=Y[j]-Y[i],d=Math.hypot(dx,dy)||1e-6,l0=bndL[k],lo=l0*.6,hi=tent?l0*1.7:Math.max(l0,Math.hypot(QX[j]-QX[i],QY[j]-QY[i]))*2.4;   // 上限跟著記住的形狀：拉長記下來之後邊界可以再拉，否則被原本的周長卡住
     let c=0;if(d>hi)c=(d-hi)/d;else if(d<lo)c=(d-lo)/d;if(c===0)continue;
     const wi=GRAB[i]?.15:.5,wj=GRAB[j]?.15:.5,sw=wi+wj;
     X[i]+=dx*c*wi/sw;Y[i]+=dy*c*wi/sw;X[j]-=dx*c*wj/sw;Y[j]-=dy*c*wj/sw}}
@@ -570,7 +572,7 @@ function plasticity(dt){
   // 只有被手指抓到的那條觸手這樣量：沒碰到的觸手在甩，用整身座標量會被當成變形記下來（量過：按住身體 1.5 秒，觸手記歪 52 點）
   // nearMem：手指附近（高斯半徑約 0.9R）也改用整身座標量。身體被拉出一塊時，局部區塊同樣把它當轉動抵銷（量過：拉 0.9R 只記 7 點）
   if(mat.nearMem>0){const g=globalC,gs=[];for(const f of fingers.values())if(f.mode==='grab')gs.push(f);
-    if(gs.length){const k2=1/(.8*R*R);
+    if(gs.length){const k2=1/(2.5*R*R);   // 約 1.1R：拉長的時候整條都記，不只指尖那一塊
       for(let i=0;i<N;i++){let wf=0;for(const f of gs){const dx=X[i]-f.fx,dy=Y[i]-f.fy;wf=Math.max(wf,Math.exp(-(dx*dx+dy*dy)*k2))}
         const wi=mat.nearMem*wf;if(wi<1e-3)continue;const px=X[i]-g.xc,py=Y[i]-g.yc,c=cnt[i];
         RX[i]=RX[i]*(1-wi)+(g.qcx+g.cs*px+g.sn*py)*c*wi;RY[i]=RY[i]*(1-wi)+(g.qcy-g.sn*px+g.cs*py)*c*wi}}}
@@ -589,7 +591,7 @@ function plasticity(dt){
     // 跟「表演後的參考形狀」EX 比，不跟 Q 比：偽足碰到時停在半空（不歸零），跟 Q 比會把偽足當成捏出來的痕跡記下來（量過：按住 1.5 秒記 67 點）
     if(kc>0)for(let i=0;i<N;i++){const rx=RX[i]/cnt[i],ry=RY[i]/cnt[i],dx=rx-EX[i],dy=ry-EY[i],dl=Math.hypot(dx,dy);
       if(dl>yl){const s=(1-yl/dl)*kc*(TID[i]>=0?1-.85*TU[i]*(1-mat.tentMem):1);QX[i]+=dx*s;QY[i]+=dy*s;
-        const ex=QX[i]-Q0X[i],ey=QY[i]-Q0Y[i],el=Math.hypot(ex,ey),lim=R*1.1;
+        const ex=QX[i]-Q0X[i],ey=QY[i]-Q0Y[i],el=Math.hypot(ex,ey),lim=R*mat.memMax;   // memMax：黏土 4R，可以拉很長、壓很扁（多米：自由塑形，像肉餅攤很扁）
         if(el>lim){QX[i]=Q0X[i]+ex*lim/el;QY[i]=Q0Y[i]+ey*lim/el}}}
   }else{
     const kr=Math.min(1,mat.recover*dt);
@@ -717,7 +719,7 @@ function update(dt){
     if(dw>0)BR.lift+=dw*mat.jellyLift*R*Lamp*mat.life;BR.lift*=Math.exp(-dt/1.0)}
   else BR.lift*=Math.exp(-dt/1.0);
   // 偽足：生、伸、縮、死。adv 跟活物感一起走（碰到就停）
-  {const adv=dt*L,P=POD.list;
+  {const adv=dt*L*mat.idlePace,P=POD.list;
     for(const q of P)q.p+=adv/q.D;
     for(let i=P.length-1;i>=0;i--)if(P[i].p>=1)P.splice(i,1);
     POD.clock+=adv;
@@ -745,7 +747,7 @@ function update(dt){
       WANDER.vx=(nx-HOMEX)/dt;WANDER.vy=(ny-HOMEY)/dt;HOMEX=nx;HOMEY=ny;
       if(p>=1){WANDER.moving=false;WANDER.next=t+1.5+Math.random()*5}}
   }else if(fingers.size){WANDER.moving=false;WANDER.next=t+2+Math.random()*3}
-  if(mat.morph>=.5)morphCoef(tl);
+  if(mat.morph>=.5)morphCoef(tl*mat.idlePace);   // idlePace：自己動的快慢（2026-11-01 多米：蠕動別那麼快）
   const sdt=dt/SUB;
   for(let s=0;s<SUB;s++)substep(sdt,L,Lamp,tl);
   plasticity(dt);

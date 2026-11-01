@@ -47,7 +47,7 @@ v2.3（2026-11-01，手感精修提案第一批）加的：按下去那塊往四
 
 ## 第一次上傳 TestFlight 要準備的東西
 
-2026-10-31 到 11-01 上傳的 build（0.1.0 (22)；0.2.0 (29)、(35) 之後幾個）都傳進了另一個 App「茄記」，因為當時 Bundle ID 用了茄記的 `org.domyweb.qieji`。2026-11-01 改成捏捏史萊姆自己的 `org.domyweb.nienieslime`，第 1、2 步要用新 ID 重做一次；之後只要做第 6 步。
+2026-10-31 到 11-01 上傳的 build（0.1.0 (22)；0.2.0 (29)、(35) 之後幾個）都傳進了用茄記 Bundle ID `org.domyweb.qieji` 建的那個 App；那個 App 2026-11-01 已從 App Store Connect 移除，`org.domyweb.qieji` 從此不能再建 App。同一天改成捏捏史萊姆自己的 `org.domyweb.nienieslime`，第 1、2 步要用新 ID 重做一次；之後只要做第 6 步。
 
 簽名的做法（2026-11-01 改）：archive 那步不簽名，export 時才用雲端管理的 Apple Distribution 憑證簽。原本 archive 用自動簽名，每次全新的 CI 機器都會新建一張 Apple Development 憑證，Apple 兩張就滿額（run #33 失敗）。帳號裡 CI 建的那幾張 Development 憑證可以到 developer.apple.com → Certificates 刪掉，留著也沒影響。
 
