@@ -12,24 +12,22 @@ extension Font {
     }
 }
 
-/// Chunky cartoon chip: white fill, thick ink outline, solid drop.
+/// Chunky cartoon chip: white fill, thick ink outline.
 struct ChipStyle: ButtonStyle {
     var circle = false
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
         return configuration.label
             .foregroundStyle(Palette.ink)
-            // the drop goes on the shape only: on the whole view it copies the glyphs 3 pt down (疊影, 2026-11-01 真機)
+            // no hard drop under the outline: 多米 2026-11-01 saw it as two rings stacked; pressing scales down a little instead
             .background(Group {
                 if circle {
                     Circle().fill(Palette.chip).overlay(Circle().stroke(Palette.ink, lineWidth: 2.5))
-                        .shadow(color: Palette.ink, radius: 0, x: 0, y: pressed ? 1 : 3)
                 } else {
                     Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5))
-                        .shadow(color: Palette.ink, radius: 0, x: 0, y: pressed ? 1 : 3)
                 }
             })
-            .offset(y: pressed ? 2 : 0)
+            .scaleEffect(pressed ? 0.94 : 1)
     }
 }
 
@@ -50,7 +48,7 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 topBar
-                Text("捏它、拉它、甩它的觸手。放著不管它也會飄")
+                Text("捏它、拉它、揉它。放著不管它也會自己動")
                     .font(.rounded(14))
                     .foregroundStyle(Palette.ink)
                     .padding(.horizontal, 16).padding(.vertical, 8)
@@ -130,8 +128,7 @@ struct ContentView: View {
                 }
             }
             .padding(3)
-            .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5))
-                .shadow(color: Palette.ink, radius: 0, x: 0, y: 3))
+            .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("史萊姆手感")
 

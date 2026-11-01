@@ -90,6 +90,14 @@ final class SlimeRig {
     private var morphA = [Double](repeating: 0, count: 6), morphB = [Double](repeating: 0, count: 6)
     private var bumpAng = [0.0, 0.0], bumpAmp = [0.0, 0.0]
     private var rest0: [[(w: Double, s: Double)]] = []   // the original shape's own rung widths and axis advances (restFix thresholds)
+    // v2.9 pseudopods (多米 2026-11-01: limbs retract and grow again elsewhere, the top too; no fixed shape): direction, length,
+    // width, bend, lifetime; grow 40%, hold 20%, retract 40%. Their clock runs only while untouched (touched, they hold still)
+    private struct Pod { var a, L, sig, bend, D: Double; var p = 0.0 }
+    private var pods: [Pod] = [], podClock = 0.0, podNext = 0.5, podShift = 0.0
+    private var podE: [(ca: Double, sa: Double, amp: Double, sig: Double, bend: Double)] = []
+    private var brJw = 0.0, brLift = 0.0          // jellyfish contraction 0...1, and the lift it gave (points)
+    private var GWT: [Double] = []                // grab weight of each particle this substep (grabHold)
+    private var builtLimbs = -1.0, builtSize = -1.0
 
     final class Finger {
         enum Mode { case grab, push, none }
@@ -141,7 +149,9 @@ final class SlimeRig {
         var r = LCG(seed: Int(params.seed.rounded()) * 7 + 3)
         ph = [r.next() * 6.28, r.next() * 6.28, r.next() * 6.28, (-72 + (r.next() - 0.5) * 30) * .pi / 180]
         // screen coords, y down: 90° is straight down. Most hang below or sideways.
-        let base: [(Double, Double, Double)] = [(100, 2.1, 0.17), (55, 1.8, 0.15), (140, 1.65, 0.14), (8, 1.5, 0.14), (198, 1.35, 0.13)]
+        // v2.9: limbs 0 by default, no fixed tentacles (多米: not a starfish); what reaches out are the pseudopods
+        let base: [(Double, Double, Double)] = Array([(100, 2.1, 0.17), (55, 1.8, 0.15), (140, 1.65, 0.14), (8, 1.5, 0.14), (198, 1.35, 0.13)]
+            .prefix(max(0, min(5, Int(params.limbs.rounded())))))
         tent = base.map { item -> Tentacle in
             let (deg, L, w) = item
             let a = (deg + (r.next() - 0.5) * 22) * .pi / 180
@@ -158,6 +168,8 @@ final class SlimeRig {
 
     /// Blob radius in units of R, with the head bump on top.
     private func blobR(_ a: Double) -> Double {
+        // no tentacles: one lump, no head bump, a little bigger to keep the tentacles' mass
+        if tent.isEmpty { return 0.98 + 0.07 * sin(2 * a + ph[0]) + 0.05 * sin(3 * a + ph[1]) + 0.03 * sin(5 * a + ph[2]) }
         var d = a - ph[3]
         d = atan2(sin(d), cos(d))
         return 0.78 + 0.10 * sin(2 * a + ph[0]) + 0.07 * sin(3 * a + ph[1]) + 0.04 * sin(5 * a + ph[2]) + 0.24 * exp(-pow(d / 0.38, 2))
@@ -199,7 +211,7 @@ final class SlimeRig {
 
     func setup(width: Double, height: Double) {
         W = width; H = height
-        R = max(60, min(W * 0.26, H * 0.14, 160))
+        R = max(60, min(W * params.bodySize, H * 0.14, 160))   // bodySize: 0.26 before v2.9; smaller leaves room to pull and spread
         cx = W / 2
         defineShape()
 
@@ -258,7 +270,7 @@ final class SlimeRig {
 
         X = [Double](repeating: 0, count: N); Y = X; PX = X; PY = X
         Q0X = X; Q0Y = X; QX = X; QY = X; EX = X; EY = X
-        GX = X; GY = X; GW = X; RX = X; RY = X
+        GX = X; GY = X; GW = X; RX = X; RY = X; GWT = X
         TU = X; TUB = X; KF = X
         TID = [Int](repeating: -1, count: N); BIDX = [Int](repeating: -1, count: N)
         GRAB = [Bool](repeating: false, count: N)
@@ -310,7 +322,8 @@ final class SlimeRig {
         }
         fingers.removeAll()
         A0 = polygonArea()
-        builtSeed = params.seed; builtFloppy = params.floppy
+        builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize
+        pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
@@ -522,7 +535,8 @@ final class SlimeRig {
             // release strength: how fast it was flicked (peak speed over the last ~80 ms) or how far it was
             // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
             let sv = min(1, f.peak / R / 6)
-            let ss = pow(min(1, f.stretch / max(0.01, params.maxPull)), 1.5)
+            // a full pull counts at 2R at most: clay's limit went to 8 for free sculpting, and the pop would have shrunk with it
+            let ss = pow(min(1, f.stretch / max(0.01, min(params.maxPull, 2))), 1.5)
             var s = max(sv, ss)
             // 偶發特別回彈 (提案第 2 條): every `specialEvery` releases (±2) one comes back extra bouncy for 0.35 s
             var special = false
@@ -587,7 +601,7 @@ final class SlimeRig {
     func update(_ dt: Double) {
         guard N > 0 else { return }
         t += dt
-        if params.seed != builtSeed || params.floppy != builtFloppy {
+        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize {
             setup(width: W, height: H)
         } else if params.cSpace != builtSpace || params.cRad != builtRad {
             buildClusters()
@@ -704,7 +718,7 @@ final class SlimeRig {
         // 提案第 23 條 breathing: accumulated phase (the period can change without a jump); at the control values
         // (3.8 s sine) this is exactly the old waveform
         do {
-            var T = mat.breathT, amp = 1.0
+            var T = mat.jelly >= 0.5 ? mat.jellyT : mat.breathT, amp = 1.0
             if mat.breathDeep >= 0.5 {
                 // 23c: after a grab held longer than 10 s, the next 20 s breathe 1.5× deeper and 1.2× slower, fading linearly
                 let grabbing = fingers.values.contains { $0.mode == .grab }
@@ -724,6 +738,60 @@ final class SlimeRig {
                 brWave = ph < 0.4 ? -cos(.pi * ph / 0.4) : (ph < 0.95 ? cos(.pi * (ph - 0.4) / 0.55) : -1)
             } else {
                 brWave = sin(2 * .pi * ph)
+            }
+        }
+
+        // jellyfish pulse (多米 2026-11-01: a regular rhythm, like a jellyfish): the first 22% of the period contracts fast
+        // (sine ease-out), the rest relaxes slowly (cosine); contracted is narrower and taller, through the same reference
+        // scaling as the breathing. Each contraction pushes `brLift` up; it sinks back with a 1 s time constant
+        if mat.jelly >= 0.5 {
+            let ph = brPhase - floor(brPhase), c = 0.22
+            let w = ph < c ? sin(.pi / 2 * ph / c) : 0.5 * (1 + cos(.pi * (ph - c) / (1 - c)))
+            let dw = w - brJw
+            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045
+            if dw > 0 { brLift += dw * mat.jellyLift * R * Lamp * mat.life }
+        }
+        brLift *= exp(-dt / 1.0)
+        // pseudopods: born, grow, hold, retract, gone. Their clock runs with the idle life (stops while touched) at idlePace
+        do {
+            let adv = dt * L * mat.idlePace
+            for k in pods.indices { pods[k].p += adv / pods[k].D }
+            pods.removeAll { $0.p >= 1 }
+            podClock += adv
+            if mat.pods > 0 && pods.count < Int(mat.pods.rounded()) && podClock >= podNext {
+                var a = 0.0
+                for _ in 0..<10 {
+                    a = Double.random(in: 0..<(2 * .pi))
+                    if pods.allSatisfy({ abs(atan2(sin(a - $0.a), cos(a - $0.a))) > 1.1 }) { break }
+                }
+                pods.append(Pod(a: a, L: mat.podLen * (0.7 + 0.5 * Double.random(in: 0..<1)), sig: 0.22 + 0.1 * Double.random(in: 0..<1),
+                                bend: (Double.random(in: 0..<1) - 0.5) * 0.8, D: 4 + 4 * Double.random(in: 0..<1)))
+                podNext = podClock + 0.8 + 2.2 * Double.random(in: 0..<1)
+            }
+            func ease(_ x: Double) -> Double { x * x * (3 - 2 * x) }
+            podE = pods.map { q in
+                let e = q.p < 0.4 ? ease(q.p / 0.4) : (q.p < 0.6 ? 1 : ease((1 - q.p) / 0.4))
+                return (cos(q.a), sin(q.a), q.L * R * e * (reduceMotion ? 0.5 : 1), q.sig, q.bend)
+            }
+            // area: along the reference boundary, the area the pods add (∮ r·Δr + Δr²/2 dθ), taken back all round with the
+            // same (r/Rb)² weight (only subtracting each pod's mean left the area 3% to 5% high)
+            podShift = 0
+            if !podE.isEmpty {
+                let Rb = R * 0.98, nb = bnd.count
+                var num = 0.0, den = 0.0
+                for k in 0..<nb {
+                    let i = bnd[k], j = bnd[(k + 1) % nb], h0 = bnd[(k + nb - 1) % nb], x = QX[i], y = QY[i], r = hypot(x, y)
+                    if r < 1e-6 { continue }
+                    let dth = abs(atan2(QX[h0] * QY[j] - QY[h0] * QX[j], QX[h0] * QX[j] + QY[h0] * QY[j])) / 2
+                    let c1 = x / r, s1 = y / r, rn = min(1.6, (r / Rb) * (r / Rb))
+                    var dr = 0.0
+                    for q in podE {
+                        let da = atan2(s1 * q.ca - c1 * q.sa, c1 * q.ca + s1 * q.sa)
+                        dr += q.amp * exp(-da * da / (2 * q.sig * q.sig)) * rn
+                    }
+                    num += (r * dr + dr * dr / 2) * dth; den += (r + dr) * rn * dth
+                }
+                podShift = den > 0 ? num / den : 0
             }
         }
 
@@ -756,7 +824,7 @@ final class SlimeRig {
             wanderNext = t + 2 + Double.random(in: 0..<3)
         }
 
-        if mat.morph >= 0.5 { morphCoef(tl) }
+        if mat.morph >= 0.5 { morphCoef(tl * mat.idlePace) }   // idlePace (多米 2026-11-01: the wriggle was too fast)
         let n = max(1, Int((dt * 240).rounded()))
         let sdt = dt / Double(n)
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
@@ -784,7 +852,8 @@ final class SlimeRig {
             PX[i] = X[i]; PY[i] = Y[i]
             X[i] += vx; Y[i] += vy
         }
-        // 2 fingers
+        // 2 fingers (GWT: how much each particle is held this substep, for grabHold in shape matching)
+        for i in 0..<N { GWT[i] = 0 }
         for f in fingers.values {
             if f.mode == .grab {
                 // the patch follows the finger and, while pressed, spreads away from it (squashes flat)
@@ -792,6 +861,7 @@ final class SlimeRig {
                     let k = 0.55 * m.w
                     X[m.i] += (f.fx + m.ox + m.dx * f.press - X[m.i]) * k
                     Y[m.i] += (f.fy + m.oy + m.dy * f.press - Y[m.i]) * k
+                    if m.w > GWT[m.i] { GWT[m.i] = m.w }
                 }
             } else if f.mode == .push {
                 let rf = R * 0.22
@@ -823,8 +893,24 @@ final class SlimeRig {
             tvx = (ca * wanderVX + sa * wanderVY) * s
             tvy = (-sa * wanderVX + ca * wanderVY) * s
         }
+        let Rb = R * 0.98
         for i in 0..<N {
             var ex = QX[i], ey = QY[i]
+            // pseudopods: a Gaussian along direction a pushes the outer ring out (the inside less, by (r/Rb)², so the whole
+            // field is a smooth map), minus podShift all round so the area stays; bend swings the outer part sideways
+            if !podE.isEmpty {
+                let r = hypot(ex, ey)
+                if r > 1e-6 {
+                    let c1 = ex / r, s1 = ey / r, rn = min(1.6, (r / Rb) * (r / Rb))
+                    var dr = 0.0, dtn = 0.0
+                    for q in podE {
+                        let da = atan2(s1 * q.ca - c1 * q.sa, c1 * q.ca + s1 * q.sa), g = exp(-da * da / (2 * q.sig * q.sig))
+                        dr += q.amp * g * rn; dtn += q.bend * q.amp * g * rn * rn
+                    }
+                    dr -= podShift * rn
+                    ex += c1 * dr - s1 * dtn; ey += s1 * dr + c1 * dtn
+                }
+            }
             if wr != 0 {
                 let qx = ex * iR, qy = ey * iR
                 if mat.morph >= 0.5 {
@@ -915,7 +1001,7 @@ final class SlimeRig {
             var gx = GX[i] / GW[i], gy = GY[i] / GW[i]
             let api = local ? ap * AW[i] : ap
             gx = gcx + (gx - gcx) * (1 + api); gy = gcy + (gy - gcy) * (1 + api)
-            let ka = alpha * KF[i]
+            let ka = alpha * KF[i] * (1 - mat.grabHold * GWT[i])   // grabHold: the held patch listens to the finger more than to the shape
             X[i] += (gx - X[i]) * ka; Y[i] += (gy - Y[i]) * ka
         }
         // upright: turn back head-up. Kinematic (position and previous position together), so no overshoot.
@@ -933,7 +1019,10 @@ final class SlimeRig {
                 let i = bnd[k], j = bnd[(k + 1) % nb]
                 let tentacle = TID[i] >= 0 || TID[j] >= 0
                 let dx = X[j] - X[i], dy = Y[j] - Y[i]
-                let d = max(1e-6, hypot(dx, dy)), l0 = bndL[k], lo = l0 * 0.6, hi = l0 * (tentacle ? 1.7 : 2.4)
+                // the upper bound follows the remembered shape: once a long pull is remembered the ring may stretch again,
+                // otherwise it stays capped by the original perimeter
+                let d = max(1e-6, hypot(dx, dy)), l0 = bndL[k], lo = l0 * 0.6
+                let hi = tentacle ? l0 * 1.7 : max(l0, hypot(QX[j] - QX[i], QY[j] - QY[i])) * 2.4
                 var c = 0.0
                 if d > hi { c = (d - hi) / d } else if d < lo { c = (d - lo) / d }
                 if c == 0 { continue }
@@ -951,7 +1040,7 @@ final class SlimeRig {
         if mat.tentRung > 0 { tentacleRungs(mat) }
         // 4 home (float), bounds
         let hx = homeX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
-        let hy = homeY + Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7)
+        let hy = homeY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
         let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hy - gcy
         let padT = 90.0, padB = H - 120, padL = 8.0, padR = W - 8
@@ -1080,6 +1169,22 @@ final class SlimeRig {
         // clusters like the body, so the junction does not get two frames). The clusters read a bent tentacle as a rotation
         // and cancel it (measured: a 0.8R pull remembered 2.7 pt). Only the grabbed tentacle: an untouched one swinging
         // would be remembered as bent (measured: holding the body 1.5 s bent the tentacles 52 pt)
+        // nearMem: near the fingers (Gaussian, about 1.1R) the body is measured in the whole-body frame too. A pulled-out lump
+        // reads as a rotation to the clusters and is cancelled (measured: a 0.9R pull remembered 7 pt)
+        if mat.nearMem > 0 {
+            let g = clusters[gi], gs = fingers.values.filter { $0.mode == .grab }, k2 = 1 / (2.5 * R * R)
+            if !gs.isEmpty {
+                for i in 0..<N {
+                    var wf = 0.0
+                    for f in gs { let dx = X[i] - f.fx, dy = Y[i] - f.fy; wf = max(wf, exp(-(dx * dx + dy * dy) * k2)) }
+                    let wi = mat.nearMem * wf
+                    if wi < 1e-3 { continue }
+                    let px = X[i] - g.xc, py = Y[i] - g.yc, c = GW[i]
+                    RX[i] = RX[i] * (1 - wi) + (g.qcx + g.cs * px + g.sn * py) * c * wi
+                    RY[i] = RY[i] * (1 - wi) + (g.qcy - g.sn * px + g.cs * py) * c * wi
+                }
+            }
+        }
         if mat.tentMem > 0 && !tent.isEmpty {
             var tg = [Bool](repeating: false, count: tent.count)
             for i in 0..<N where GRAB[i] && TID[i] >= 0 { tg[TID[i]] = true }
@@ -1108,11 +1213,13 @@ final class SlimeRig {
             let yl = mat.yield * R, kc = min(1, mat.creep * dt * g)
             if kc > 0 {
                 for i in 0..<N {
-                    let rx = RX[i] / GW[i], ry = RY[i] / GW[i], dx = rx - QX[i], dy = ry - QY[i], dl = hypot(dx, dy)
+                    // compared with the performed reference EX, not Q: touched pseudopods hold still in mid-air, and against Q
+                    // they were remembered as a mark (measured: a 1.5 s hold remembered 67 pt)
+                    let rx = RX[i] / GW[i], ry = RY[i] / GW[i], dx = rx - EX[i], dy = ry - EY[i], dl = hypot(dx, dy)
                     if dl > yl {
                         let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
                         QX[i] += dx * s; QY[i] += dy * s
-                        let ex = QX[i] - Q0X[i], ey = QY[i] - Q0Y[i], el = hypot(ex, ey), lim = R * 1.1
+                        let ex = QX[i] - Q0X[i], ey = QY[i] - Q0Y[i], el = hypot(ex, ey), lim = R * mat.memMax   // clay 4R: pull long, spread flat
                         if el > lim { QX[i] = Q0X[i] + ex * lim / el; QY[i] = Q0Y[i] + ey * lim / el }
                     }
                 }
@@ -1138,6 +1245,18 @@ final class SlimeRig {
         for i in 0..<N { mx += QX[i]; my += QY[i] }
         mx /= Double(N); my /= Double(N)
         for i in 0..<N { QX[i] -= mx; QY[i] -= my }
+        // clay keeps its volume: the remembered shape scales back to the original area (a pulled-out lump takes a little from
+        // everywhere else; without it the area was 2% high after a pull)
+        var A = 0.0, B = 0.0
+        let n = bnd.count
+        for k in 0..<n {
+            let i = bnd[k], j = bnd[(k + 1) % n]
+            A += QX[i] * QY[j] - QX[j] * QY[i]; B += Q0X[i] * Q0Y[j] - Q0X[j] * Q0Y[i]
+        }
+        if abs(A) > 1e-6 {
+            let f = (abs(B / A)).squareRoot()
+            if abs(f - 1) > 1e-5 { for i in 0..<N { QX[i] *= f; QY[i] *= f } }
+        }
     }
 
     /// The remembered tentacles must not fold either (tentMem): rungs and medial axis on the rest shape, a cap on the
@@ -1318,7 +1437,7 @@ final class SlimeRig {
     /// How close the most-stretched grabbing finger is to the stretch limit, 0...1 (sharpness bonus, 提案第 15 條).
     var stretchLevel: Double {
         var m = 0.0
-        for f in fingers.values where f.mode == .grab { m = max(m, f.stretch / max(0.01, params.maxPull)) }
+        for f in fingers.values where f.mode == .grab { m = max(m, f.stretch / max(0.01, min(params.maxPull, 2))) }   // same 2R cap as the pop
         return min(1, m)
     }
 

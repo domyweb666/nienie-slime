@@ -116,8 +116,7 @@ struct TunePanel: View {
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 14)
         .background(RoundedRectangle(cornerRadius: 22).fill(.white)
-            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5))
-            .shadow(color: Palette.ink, radius: 0, x: 0, y: 4))   // on the shape only, or every glyph gets a ghost 4 pt down
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
         .frame(maxWidth: 460)
     }
 

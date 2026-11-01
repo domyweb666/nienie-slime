@@ -75,7 +75,7 @@ final class SlimeView: UIView {
         applyColors()
 
         isAccessibilityElement = true
-        accessibilityLabel = "史萊姆，可以捏、拉、甩它的觸手"
+        accessibilityLabel = "史萊姆，可以捏、拉、揉，拉出來的形狀會留一陣子"
         accessibilityTraits = .allowsDirectInteraction
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "捏一下") { [weak self] _ in

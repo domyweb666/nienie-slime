@@ -82,6 +82,20 @@ struct FeelParams: Equatable, Codable {
     // 2026-11-01 多米真機回報 (build 46): idle wriggle looked like one shape swaying; clay sprang straight back and kept no mark
     var morph: Double = 1             // 1: idle outline follows smooth noise (modes 2–5 plus two roaming bumps), never repeats; 0 = v2.7 travelling waves
     var tentMem: Double = 0           // tentacles remember like the body and relax at `recover`; 0 = v2.7 (tips barely remember, spring back in ~1 s)
+    // v2.9 (多米 second device report, build 48): not a starfish. No fixed tentacles; pseudopods grow, hold and retract anywhere
+    // (the top too); a regular jellyfish pulse; free sculpting, pulled long and spread flat like dough
+    var limbs: Double = 0             // fixed tentacles (5 = the old starfish shape; changing it rebuilds the body)
+    var pods: Double = 2              // pseudopods growing at once while untouched; 0 = off
+    var podLen: Double = 1.1          // pseudopod length at full extension, in radii (each one 0.7 to 1.2× of it)
+    var idlePace: Double = 0.45       // pace of the idle morph and the pseudopods (1 = v2.9 web, which 多米 found too fast)
+    var bodySize: Double = 0.22       // body radius as a fraction of the screen width (0.26 before; changing it rebuilds the body)
+    var jelly: Double = 1             // 1: jellyfish pulse (fast contraction, slow relax, a lift on each contraction); 0: the plain breathing
+    var jellyT: Double = 3            // jellyfish pulse period, seconds
+    var jellyAmp: Double = 0.1        // how much narrower at full contraction (taller by 0.85 of it)
+    var jellyLift: Double = 0.12      // lift per contraction, in radii; sinks back with a 1 s time constant
+    var nearMem: Double = 0           // near the fingers the body remembers in the whole-body frame (clay 1: a pulled-out lump stays)
+    var memMax: Double = 1.1          // how far the remembered shape may move from the original, in radii (clay 4)
+    var grabHold: Double = 0          // how much less the grabbed patch listens to shape matching (clay 0.85: it follows the finger)
     // sound
     var volMaster: Double = 0.9       // output volume
     var rubMax: Double = 0.7          // loudest the rub loop gets
@@ -116,30 +130,33 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         case .jelly:
             p = FeelParams(alpha: 0.34, damp: 0.986, yield: 1.5, creep: 0, recover: 1, grabR: 0.36, maxPull: 1.6,
                            lag: 0.05, wGlobal: 0.12, cSpace: 0.3, cRad: 0.42, upright: 0.004, anchor: 4,
-                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.15, wander: 0.25,
+                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.08, wander: 0.25,
                            floppy: 0.5, seed: 7)
         case .mochi:
             p = FeelParams(alpha: 0.28, damp: 0.966, yield: 0.14, creep: 0.9, recover: 0.18, grabR: 0.32, maxPull: 1.8,
                            lag: 0.08, wGlobal: 0.10, cSpace: 0.3, cRad: 0.45, upright: 0.004, anchor: 4,
-                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.15, wander: 0.25,
+                           areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.08, wander: 0.25,
                            floppy: 0.55, seed: 7)
         case .clay:
             // clay remembers at once, tentacles too, and the mark relaxes over about 10 s (多米 2026-11-01)
-            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.3, grabR: 0.32, maxPull: 2.0,
+            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.3, grabR: 0.32, maxPull: 8.0,
                            lag: 0.12, wGlobal: 0.08, cSpace: 0.3, cRad: 0.45, upright: 0.002, anchor: 4,
-                           areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.14, wander: 0.22,
+                           areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.08, wander: 0.22,
                            floppy: 0.6, seed: 7)
-            p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1
+            // free sculpting (多米 2026-11-01: pull it long, spread it flat like dough)
+            p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 4; p.grabHold = 0.85
         }
         return p
     }
 
-    /// v2.7 control (before the build 46 device report): travelling-wave wriggle; clay elastic for 0.2 s, tips spring back, 33 s to forget
+    /// v2.7 control (before the build 46 device report): the starfish shape with five tentacles, travelling-wave wriggle,
+    /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
+        p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
-        case .clay: p.wriggle = 0.06; p.dwellLo = 0.2; p.dwellHi = 0.6; p.creep = 3; p.recover = 0.03
+        case .clay: p.wriggle = 0.06; p.dwellLo = 0.2; p.dwellHi = 0.6; p.creep = 3; p.recover = 0.03; p.maxPull = 2.0
         }
     }
 
@@ -199,7 +216,7 @@ struct Candidate: Identifiable {
         Candidate(id: 27, name: "27 局部鼓", hint: "面積壓力集中在手指附近") { p, _ in p.localArea = 1 },
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
-        Candidate(id: 270, name: "v2.7 對照：蠕動與回彈", hint: "回報前的樣子：固定行進波蠕動、黏土輕捏回彈、觸手一秒彈回") { p, m in m.applyV27(&p) },
+        Candidate(id: 270, name: "v2.7 對照（舊外形）", hint: "海星外形五條觸手、固定行進波蠕動、正弦呼吸、黏土輕捏回彈") { p, m in m.applyV27(&p) },
     ]
 }
 
@@ -219,7 +236,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
         TuneField(key: \.damp, name: "晃動阻尼", hint: "越小放手晃越久", range: 0.85...0.999, step: 0.001),
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
-        TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠", range: 0.6...2.6, step: 0.05),
+        TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠（軟上限）；黏土 8 幾乎跟手", range: 0.6...10, step: 0.1),
         TuneField(key: \.lag, name: "黏滯", hint: "跟手的延遲感（秒）；候選 6 是 0.03", range: 0...0.3, step: 0.01),
         TuneField(key: \.wGlobal, name: "整體性", hint: "越大整團越像一塊", range: 0...1, step: 0.01),
         TuneField(key: \.cSpace, name: "區塊間距（×半徑）", hint: "越小區塊越多越軟", range: 0.15...0.7, step: 0.05),
@@ -248,11 +265,21 @@ struct TuneField: Identifiable {
         TuneField(key: \.dwellLo, name: "定型停留起點", hint: "抓住幾秒後開始記形（秒）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.dwellHi, name: "定型停留終點", hint: "抓住幾秒後全速記形（秒）", range: 0...2, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.recover, name: "回原形速度", hint: "放著多快變回原樣；黏土 0.3 約 10 秒退（v2.7 是 0.03）", range: 0...1.5, step: 0.01, section: "按壓與記形"),
+        TuneField(key: \.grabHold, name: "抓住跟手", hint: "被抓那塊不聽彈性、跟手指走的程度；黏土 0.85，0 是以前（落後手指約 1 個半徑）", range: 0...1, step: 0.05, section: "按壓與記形"),
+        TuneField(key: \.nearMem, name: "手指附近記形", hint: "手指附近用整身座標記形，拉出一塊就留一塊；0 只用局部區塊", range: 0...1, step: 0.05, section: "按壓與記形"),
+        TuneField(key: \.memMax, name: "記形上限（×半徑）", hint: "記住的形狀最多離原形多遠；黏土 4（拉得長、攤得扁），以前 1.1", range: 0.5...6, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.tentMem, name: "觸手記形", hint: "1：觸手跟身體一樣留形、一樣慢慢回；0：v2.7 尖端一秒多彈回", range: 0...1, step: 0.05, section: "按壓與記形"),
 
         TuneField(key: \.life, name: "活物感", hint: "沒碰時自己動的幅度", range: 0...1.5, step: 0.05, section: "活物感"),
         TuneField(key: \.drift, name: "觸手飄動", hint: "沒碰時觸手擺動的幅度（×半徑）", range: 0...0.4, step: 0.01, section: "活物感"),
         TuneField(key: \.wriggle, name: "蠕動", hint: "沒碰時整個身體輪廓慢慢變形的幅度（×半徑）", range: 0...0.3, step: 0.01, section: "活物感"),
+        TuneField(key: \.idlePace, name: "自己動的速度", hint: "偽足伸縮與蠕動的快慢；1 是 v2.9 網頁版（多米：太快）", range: 0.1...1.5, step: 0.05, section: "活物感"),
+        TuneField(key: \.pods, name: "偽足數量", hint: "沒碰時同一時間最多幾條在伸縮，隨機方向、上方也會長；0 關", range: 0...3, step: 1, section: "活物感"),
+        TuneField(key: \.podLen, name: "偽足長度（×半徑）", hint: "伸到最長多長（每條再隨機 0.7 到 1.2 倍）", range: 0...1.4, step: 0.05, section: "活物感"),
+        TuneField(key: \.jelly, name: "水母呼吸", hint: "1：規律一縮一放，收縮快放鬆慢、收縮時上浮；0：原本的呼吸", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.jellyT, name: "水母呼吸週期（秒）", hint: "一縮一放幾秒", range: 1.5...6, step: 0.1, section: "活物感"),
+        TuneField(key: \.jellyAmp, name: "水母收縮幅度", hint: "收縮時變窄幾成（同時變高八成五）", range: 0...0.25, step: 0.01, section: "活物感"),
+        TuneField(key: \.jellyLift, name: "水母上浮（×半徑）", hint: "每次收縮往上浮多少，放鬆時慢慢沉回", range: 0...0.3, step: 0.01, section: "活物感"),
         TuneField(key: \.morph, name: "蠕動不重複", hint: "1：輪廓與觸手跟著平滑亂數變，形狀一直在換；0：v2.7 固定行進波", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.wander, name: "遊走", hint: "沒碰時在畫面裡移動的速度（×半徑／秒）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.tail, name: "遊走拖尾（×半徑）", hint: "遊走時觸手往移動反方向拖的量，照速度自己淡入淡出；0 關（第 20 條）", range: 0...0.4, step: 0.02, section: "活物感"),
@@ -288,6 +315,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.pitchJitter, name: "音高抖動", hint: "每次隨機差多少", range: 0...0.3, step: 0.01, section: "聲音"),
 
         TuneField(key: \.seed, name: "外形亂數種子", hint: "換一個數字就換一個形狀（會重置）", range: 1...30, step: 1, section: "外形"),
+        TuneField(key: \.bodySize, name: "身體大小", hint: "半徑是畫面寬的幾成（會重置）；以前 0.26，0.22 留空間拉長、攤平", range: 0.15...0.3, step: 0.01, section: "外形"),
+        TuneField(key: \.limbs, name: "固定觸手數", hint: "0：沒有固定觸手的一團；5：以前的海星外形（會重置）", range: 0...5, step: 1, section: "外形"),
         TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
         TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),
     ]
