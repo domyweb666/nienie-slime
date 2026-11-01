@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>捏捏音效試聽</title>
 <style>
-:root{--bg:#EAF6FD;--card:#fff;--ink:#2B3A2E;--sub:#5F6F62;--body:#FFD96B;--line:#8B5A20;--on:#F0B64A}
-@media (prefers-color-scheme:dark){:root{--bg:#18201B;--card:#222C25;--ink:#EEF3EC;--sub:#A9B5AB;--body:#E8C25A;--line:#E8C25A;--on:#8B6A2A}}
+:root{--bg:#EAF6FD;--card:#fff;--ink:#2B3A2E;--sub:#5F6F62;--body:#FFD96B;--line:#8B5A20;--on:#F0B64A;--track:#D9E6DC}
+@media (prefers-color-scheme:dark){:root{--bg:#18201B;--card:#222C25;--ink:#EEF3EC;--sub:#A9B5AB;--body:#E8C25A;--line:#E8C25A;--on:#8B6A2A;--track:#33403A}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"PingFang TC","Noto Sans TC",sans-serif;padding:20px 16px 48px}
 main{max-width:720px;margin:0 auto}
@@ -14,59 +14,144 @@ h1{font-size:22px;margin:0 0 4px}
 p.note{color:var(--sub);margin:0 0 20px;font-size:14px}
 section{background:var(--card);border-radius:14px;padding:14px 16px 16px;margin-bottom:14px}
 h2{font-size:17px;margin:0}
+h3{font-size:14px;margin:12px 0 6px;color:var(--sub);font-weight:600}
 .when{color:var(--sub);font-size:13px;margin:2px 0 10px}
 .grid{display:flex;flex-wrap:wrap;gap:8px}
-button{font:inherit;font-size:15px;border:2px solid var(--line);background:var(--body);color:#3A2A10;border-radius:999px;padding:6px 14px;min-height:40px;cursor:pointer}
+button{font:inherit;font-size:15px;border:2px solid var(--line);background:var(--body);color:#3A2A10;border-radius:999px;padding:6px 14px;min-height:40px;cursor:pointer;touch-action:manipulation}
+button.small{font-size:13px;min-height:34px;padding:3px 10px}
 button[aria-pressed="true"]{background:var(--on)}
 button.ghost{background:transparent;color:var(--ink)}
-.row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
-label{font-size:14px;color:var(--sub)}
+.row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+label{font-size:14px;color:var(--sub);min-width:4.5em}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--line);height:32px}
+output{font-variant-numeric:tabular-nums;font-size:14px;min-width:3.5em;text-align:right}
+.pad{position:relative;height:120px;border-radius:12px;background:var(--track);margin-top:10px;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad .dot{position:absolute;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--body);border:3px solid var(--line)}
+.pad .hint{position:absolute;inset:auto 10px 6px;font-size:12px;color:var(--sub);text-align:center}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--sub);font-size:14px}
 </style>
 </head>
 <body>
 <main>
 <h1>捏捏音效試聽</h1>
-<p class="note">每顆按鈕是一段音效，app 會在同一類裡隨機挑、音高上下浮 8%。聽到不喜歡的記下編號（例如「放手 03 太悶」），我改設計再重做。手機請先關靜音。</p>
-<div id="list"></div>
+<p class="note">v2 分層版：按、放手都是好幾層疊起來，力道決定哪幾層響、多大聲、多高、多亮；拉和揉跟著手的動作連續變化。跟 app 用的是同一支播放程式。手機請先關靜音，用手機喇叭聽一次、耳機聽一次。聽到不喜歡的記下來（例如「放手 重 太悶」「拉 越拉越刺耳」）。</p>
+
+<section>
+  <h2>按</h2>
+  <div class="when">手指按到身上那一下。力道在 app 裡來自按的方式（抓、推、兩指捏）和手指接觸面積。</div>
+  <div class="row"><label for="pi">力道</label><input id="pi" type="range" min="0" max="1" step="0.05" value="0.7"><output id="pio">0.70</output></div>
+  <div class="grid" style="margin-top:8px">
+    <button data-press="0.25">輕</button><button data-press="0.55">中</button><button data-press="0.9">重</button>
+    <button class="ghost" id="pnow">用滑桿的力道</button>
+    <button class="ghost" id="prand">隨機連按 6 下</button>
+  </div>
+</section>
+
+<section>
+  <h2>放手</h2>
+  <div class="when">放開那一下。力道 = 拉多遠和甩多快取大。越用力「啵」越大顆、越低，還會疊上彈回的份量。拉過再放會冒幾顆小氣泡；按久了沒拉放開會有一聲很小的嘶。</div>
+  <div class="row"><label for="ri">力道</label><input id="ri" type="range" min="0" max="1" step="0.05" value="0.7"><output id="rio">0.70</output></div>
+  <div class="grid" style="margin-top:8px">
+    <button data-rel="0.15">輕</button><button data-rel="0.5">中</button><button data-rel="1">重</button>
+    <button class="ghost" id="rpull">拉 2R 再放（有氣泡餘韻）</button>
+    <button class="ghost" id="rhold">按 1 秒不拉再放（有嘶）</button>
+  </div>
+</section>
+
+<section>
+  <h2>拉</h2>
+  <div class="when">按住下面的黃球往右拖：拖越遠＝拉越長，聲音越細越高越亮；拖越快越大聲，停住幾乎沒聲音。拉長的路上會有細絲一根根斷掉。放開＝放手。</div>
+  <div class="pad" id="pad"><div class="dot" id="dot" style="left:30px"></div><div class="hint" id="padhint">拉伸 0.0R</div></div>
+</section>
+
+<section>
+  <h2>揉</h2>
+  <div class="when">抓著揉的時候循環播，手指越快越大聲、越亮。拉得很遠的時候會自動讓位給拉絲聲。</div>
+  <div class="row"><label for="ub">揉的速度</label><input id="ub" type="range" min="0" max="1" step="0.01" value="0"><output id="ubo">0.00</output></div>
+</section>
+
+<section>
+  <h2>整體</h2>
+  <div class="row"><label for="vol">主音量</label><input id="vol" type="range" min="0" max="1" step="0.05" value="0.9"><output id="volo">0.90</output></div>
+  <div class="row"><label for="pm">拉絲音量</label><input id="pm" type="range" min="0" max="1" step="0.05" value="0.6"><output id="pmo">0.60</output></div>
+  <div class="row"><label for="st">餘韻</label><input id="st" type="range" min="0" max="2" step="0.1" value="1"><output id="sto">1.00</output></div>
+  <details><summary>單獨聽每一層的每一段</summary><div id="raw"></div></details>
+</section>
 </main>
+<script src="engine.js"></script>
 <script>
-const KIND = {
-  press: ['按', '手指按到身上那一下'],
-  pull: ['拉', '拉長的過程，每拉長約三分之一個身體響一段'],
-  release: ['放手', '放手那一下，放越快越大聲'],
-  rub: ['揉', '抓著揉的時候循環播，手指越快越大聲']
-};
-let ctx = null; const cache = {}; let loop = null;
-function ac() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx; }
-async function buf(f) { if (!cache[f]) cache[f] = fetch(f).then(r => r.arrayBuffer()).then(a => ac().decodeAudioData(a)); return cache[f]; }
-async function play(f, rate = 1) { const b = await buf(f), s = ac().createBufferSource(); s.buffer = b; s.playbackRate.value = rate; s.connect(ac().destination); s.start(); }
-async function toggleLoop(f, btn) {
-  if (loop) { loop.src.stop(); loop.btn.setAttribute('aria-pressed', 'false'); const same = loop.f === f; loop = null; if (same) return; }
-  const b = await buf(f), s = ac().createBufferSource(); s.buffer = b; s.loop = true; s.connect(ac().destination); s.start();
-  loop = { src: s, btn, f }; btn.setAttribute('aria-pressed', 'true');
+const S = window.SlimeSfx, $ = id => document.getElementById(id);
+const ready = S.load('./');
+let state = { rub: 0, stretch: 0, grabbing: false }, last = performance.now();
+function tick(now) { const dt = Math.min(0.1, (now - last) / 1000); last = now; S.frame(dt, state); requestAnimationFrame(tick); }
+async function go() { await ready; S.init(); }
+requestAnimationFrame(tick);
+
+function bindRange(id, fn) { const r = $(id), o = $(id + 'o'); const u = () => { o.textContent = (+r.value).toFixed(2); fn && fn(+r.value); }; r.addEventListener('input', u); u(); }
+bindRange('pi'); bindRange('ri');
+bindRange('vol', v => S.setVolume(v)); bindRange('pm', v => S.pullMax = v); bindRange('st', v => S.settleAmt = v);
+bindRange('ub', v => { go(); state.rub = v * S.rubMax; });
+
+// 模擬一次「抓住」：按、拉到多少、抓多久，再放手（餘韻要靠 frame 看到抓的過程）
+function fakeGrab(stretch, holdS, then) {
+  state.grabbing = true; state.stretch = 0;
+  const t0 = performance.now();
+  const iv = setInterval(() => {
+    const p = Math.min(1, (performance.now() - t0) / 1000 / holdS);
+    state.stretch = stretch * p;
+    if (p >= 1) { clearInterval(iv); then(); state.grabbing = false; state.stretch = 0; }
+  }, 16);
 }
-fetch('manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => {
-  const root = document.getElementById('list');
-  for (const k of ['press', 'pull', 'release', 'rub']) {
-    const files = m[k] || []; if (!files.length) continue;
-    const sec = document.createElement('section');
-    sec.innerHTML = `<h2>${KIND[k][0]}（${files.length} 段）</h2><div class="when">${KIND[k][1]}</div><div class="grid"></div>`;
-    const grid = sec.querySelector('.grid');
+
+document.querySelectorAll('[data-press]').forEach(b => b.onclick = async () => { await go(); S.press(+b.dataset.press); });
+$('pnow').onclick = async () => { await go(); S.press(+$('pi').value); };
+$('prand').onclick = async () => { await go(); for (let j = 0; j < 6; j++) setTimeout(() => S.press(0.3 + Math.random() * 0.65), j * 380); };
+const rel = s => 0.35 + 0.65 * s;
+document.querySelectorAll('[data-rel]').forEach(b => b.onclick = async () => { await go(); S.lastStretch = 0; S.heldFor = 0; S.release(rel(+b.dataset.rel)); });
+$('rpull').onclick = async () => { await go(); S.press(0.7); fakeGrab(2, 0.6, () => S.release(rel(+$('ri').value))); };
+$('rhold').onclick = async () => { await go(); S.press(0.7); fakeGrab(0, 1.0, () => S.release(rel(Math.min(0.4, +$('ri').value)))); };
+
+// 拉的觸控板：左邊是抓住的點，往右 1 個身體寬 = 1R，最遠 6R
+const pad = $('pad'), dot = $('dot'), hint = $('padhint');
+let dragging = false, x0 = 0;
+function padPos(e) { const r = pad.getBoundingClientRect(); return Math.max(30, Math.min(r.width - 30, e.clientX - r.left)); }
+pad.addEventListener('pointerdown', async e => {
+  await go(); dragging = true; pad.setPointerCapture(e.pointerId); x0 = 30; S.press(0.7);
+  state.grabbing = true; state.stretch = 0; dot.style.left = padPos(e) + 'px';
+});
+pad.addEventListener('pointermove', e => {
+  if (!dragging) return; const x = padPos(e), w = pad.getBoundingClientRect().width - 60;
+  dot.style.left = x + 'px'; state.stretch = (x - x0) / w * 6; hint.textContent = '拉伸 ' + state.stretch.toFixed(1) + 'R';
+});
+function padUp() {
+  if (!dragging) return; dragging = false;
+  const s = Math.min(1, state.stretch / 2) ** 1.5;
+  S.release(rel(s)); state.grabbing = false; state.stretch = 0; dot.style.left = '30px'; hint.textContent = '拉伸 0.0R';
+}
+pad.addEventListener('pointerup', padUp); pad.addEventListener('pointercancel', padUp);
+
+// 原始素材
+const NAME = { press: '按', release: '放手', pull: '拉', rub: '揉', settle: '餘韻' };
+const LAYER = { body: '份量', wet: '濕聲', air: '氣泡／啵', loop: '循環', strand: '細絲', bubble: '小氣泡', hiss: '嘶', all: '全部' };
+let rawLoop = null;
+ready.then(() => {
+  const root = $('raw'), m = S.manifest || {};
+  for (const k of Object.keys(m)) for (const layer of Object.keys(m[k])) {
+    const files = m[k][layer]; if (!files.length) continue;
+    const h = document.createElement('h3'); h.textContent = `${NAME[k] || k}｜${LAYER[layer] || layer}（${files.length} 段）`; root.appendChild(h);
+    const g = document.createElement('div'); g.className = 'grid'; root.appendChild(g);
     files.forEach((f, i) => {
-      const b = document.createElement('button'); b.textContent = `${KIND[k][0]} ${String(i + 1).padStart(2, '0')}`;
-      if (k === 'rub') { b.setAttribute('aria-pressed', 'false'); b.onclick = () => toggleLoop(f, b); }
-      else b.onclick = () => play(f);
-      grid.appendChild(b);
+      const b = document.createElement('button'); b.className = 'small'; b.textContent = String(i + 1).padStart(2, '0');
+      b.onclick = async () => {
+        await go(); const c = S.ctx, buf = await fetch(f).then(r => r.arrayBuffer()).then(a => c.decodeAudioData(a));
+        if (rawLoop) { rawLoop.src.stop(); rawLoop.b.setAttribute('aria-pressed', 'false'); const same = rawLoop.b === b; rawLoop = null; if (same) return; }
+        const s = c.createBufferSource(); s.buffer = buf; s.connect(S.master);
+        if (layer === 'loop') { s.loop = true; rawLoop = { src: s, b }; b.setAttribute('aria-pressed', 'true'); }
+        s.start();
+      };
+      g.appendChild(b);
     });
-    if (k !== 'rub') {
-      const row = document.createElement('div'); row.className = 'row';
-      const r = document.createElement('button'); r.className = 'ghost'; r.textContent = '隨機連播 5 次（像 app 那樣浮音高）';
-      r.onclick = () => { for (let j = 0; j < 5; j++) setTimeout(() => play(files[Math.floor(Math.random() * files.length)], 1 + (Math.random() * 2 - 1) * 0.08), j * 450); };
-      row.appendChild(r); sec.appendChild(row);
-    } else {
-      const lab = document.createElement('label'); lab.textContent = '揉是循環音，再按一次停'; const row = document.createElement('div'); row.className = 'row'; row.appendChild(lab); sec.appendChild(row);
-    }
-    root.appendChild(sec);
   }
 });
 </script>

@@ -1,29 +1,30 @@
 # sfx｜音效檔放這裡
 
-> 2026-11-01 起是 Agent 用 `prototype/sfx-design/design_sfx.py` 設計的音效（史萊姆是虛構的，沒有真的可以錄）。改設計就改那支程式重跑，它會同時寫這裡和 `ios/NieNie/Resources/`、更新兩邊的 `manifest.json`。試聽：`listen.html`。
+> 2026-11-01 起是 Agent 用 `prototype/sfx-design/design_sfx.py` 設計的音效（史萊姆是虛構的，沒有真的可以錄）。改設計就改那支程式重跑，它會同時寫這裡和 `ios/NieNie/Resources/`、更新兩邊的 `manifest.json`、清掉不在 manifest 裡的舊檔。試聽：`listen.html`。
 
-原型會讀這個資料夾的 `manifest.json`，照裡面列的檔名播。沒列的檔不會播，列了但檔案不存在也不會壞，只是安靜。
+## v2 分層版
 
-四類：
+聲音不是「觸發一段音檔」，是物理參數決定每一層多大聲、多高、多亮。播放程式是 `engine.js`（網頁原型和試聽頁共用），Swift 版 `ios/NieNie/Feedback/SlimeAudio.swift` 照同一張表。表在 `.uiux/04-手感/音效參數對應-暫定.md`。
 
-| 類別 | 什麼時候響 | 音量跟什麼走 |
+| 類別 | 層 | 什麼時候響 |
 |---|---|---|
-| `press` | 手指按到身上那一下 | 固定 |
-| `pull` | 拉長的過程，每拉長約三分之一個身體響一段 | 拉越長越大聲、音高略降 |
-| `release` | 放手那一下 | 放手越快越大聲、音高略升 |
-| `rub` | 抓著揉的時候，循環播 | 手指越快越大聲，停手就淡出 |
+| `press` | `body` `wet` `air` | 按到身上；力道越大越多層、越低、越亮 |
+| `release` | `air` `wet` `body` | 放手；越用力「啵」越大顆越低，加彈回的份量 |
+| `pull` | `loop` `strand` | 拉著的時候連續播；拉越長越高越亮、拉越快越大聲，路上細絲一根根斷 |
+| `rub` | `loop` | 抓著揉；手指越快越大聲越亮，拉遠了讓位給拉絲 |
+| `settle` | `bubble` `hiss` | 放手後的餘韻：拉過冒小氣泡，按久了放開一聲小嘶 |
 
-每類放 8 到 12 段，程式隨機挑、音高上下浮 8%，這樣不會每次一模一樣。
-
-`manifest.json` 長這樣，檔名自己取，副檔名 `.m4a` 直接用（iPhone 語音備忘錄的格式，Safari 和 Chrome 都能解）：
+`manifest.json` 長這樣：
 
 ```json
 {
-  "press":   ["press-01.m4a", "press-02.m4a"],
-  "pull":    ["pull-01.m4a"],
-  "release": ["release-01.m4a"],
-  "rub":     ["rub-01.m4a"]
+  "version": 2,
+  "press":   {"body": ["press-body-01.wav"], "wet": ["press-wet-01.wav"], "air": ["press-air-01.wav"]},
+  "release": {"air": [...], "wet": [...], "body": [...]},
+  "pull":    {"loop": [...], "strand": [...]},
+  "rub":     {"loop": [...]},
+  "settle":  {"bubble": [...], "hiss": [...]}
 }
 ```
 
-怎麼錄見 `.uiux/04-手感/錄音指南.md`。
+舊的平坦格式 `{"press": ["press-01.m4a"], ...}` 兩邊播放程式都還吃（一類整包當一層），想換回真錄音照 `.uiux/04-手感/錄音指南.md` 錄完直接用。沒列的檔不會播，列了但檔案不存在也不會壞，只是安靜。
