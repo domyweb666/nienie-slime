@@ -333,34 +333,68 @@
     res.T24_dragAcross = { guard: crossRun(1), noGuard: crossRun(0) };
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
-  // T25 按在畫面邊不放（2026-11-01 多米：稍微拉大就拉不動；量過卡在畫面邊，往右 1.1R）：抓身體最右邊、手指拖到畫面右緣停 3 秒，
-  //     量伸出幾個 R、鏡頭縮到多少；放手 12 秒鏡頭要回到 1 倍附近；零自交、面積回來
+  // T25 按在畫面邊停住（v2.15 改）：v2.12 起停著的手指會跟著鏡頭在世界裡往外跑、形狀一直長，那就是多米 build 61 回報的抽搐來源。
+  //     現在抓身體最右邊拖到畫面右緣停 3 秒：伸出去要有（鏡頭有退），停著的 3 秒形狀不能自己再長；放手後鏡頭跟著拉回來、零自交
   { const clock = saveClock(); Math.random = seeded(20261110); resetAligned(1e9); nextTwitch = 1e9;
+    const wd = () => { let a = 1e9, b = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); } return (b - a) / R; };
     let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const e0 = X[b], sx = X[b] - R * 0.15, sy = Y[b]; let worst = 0, zMin = 1;
     ev('pointerdown', 1, sx, sy); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, sx + (W - 12 - sx) * k / 40, sy); steps(1); worst = Math.max(worst, selfX()); }
-    for (let k = 0; k < 180; k++) { steps(1); worst = Math.max(worst, selfX()); zMin = Math.min(zMin, CAM.z); }
-    let e1 = -1e9; for (const i of bnd) e1 = Math.max(e1, X[i]); ev('pointerup', 1, W - 12, sy);
+    steps(30); const w1 = wd();
+    for (let k = 0; k < 150; k++) { steps(1); worst = Math.max(worst, selfX()); zMin = Math.min(zMin, CAM.z); }
+    const w2 = wd(); let e1 = -1e9; for (const i of bnd) e1 = Math.max(e1, X[i]); ev('pointerup', 1, W - 12, sy);
     for (let k = 0; k < 720; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); }
-    res.T25_edgeHold = { reachR: +((e1 - e0) / R).toFixed(2), zoomMin: +zMin.toFixed(2), zoomAfter12s: +CAM.z.toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
+    res.T25_edgeHold = { reachR: +((e1 - e0) / R).toFixed(2), grewWhileStillR: +(w2 - w1).toFixed(2), zoomMin: +zMin.toFixed(2), zoomAfter12s: +CAM.z.toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
-  // T26 鏡頭無限拉遠（v2.13，多米：鏡頭可以無限拉遠，拉多大推多遠）：抓身體最右邊、手指拖到畫面右緣停 8 秒，
-  //     量寬幾個 R、鏡頭縮到多少（v2.12 卡在約 5.8R、0.67）、整隻每幀都在畫面裡；按著時的交叉幀數只記錄（拉到 8R 時尾端偶爾摺幾幀，
-  //     每個半徑 12 個點已經少很多），放手頭 2 秒是按著時帶過來的、只記錄（v2.13 回原形 0.3 時半秒解開，v2.14 放慢到 0.05 要 1.3 秒）；
-  //     放手 2 秒後要零交叉、面積回來、鏡頭跟著拉回來
+  // T26 鏡頭無限拉遠（v2.13 起；v2.15 改成重複抓）：手指停著不再自己拉長，要拉更長就放手、抓住最右端再拉，拉 6 次。
+  //     手指從那一端拖到畫面右緣（手指出不了螢幕），每次停 1 秒帶一點手抖（±0.6 點）。量最長幾個 R、鏡頭縮到多少、整隻每幀都在畫面裡、按著時邊界每幀最大跳動（螢幕點），
+  //     放手後零交叉。黏土拉伸 7R、記形 5R：超過約 8.5R 會抖（v2.15 量過拉到 9.5R 跳 13 到 22 點、交叉）
   { const clock = saveClock(); Math.random = seeded(20261113); resetAligned(1e9); nextTwitch = 1e9;
-    const v = viewV(), sxOf = x => (x - CAM.x) * CAM.z + v.x, syOf = y => (y - CAM.y) * CAM.z + v.y;
-    let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b];
-    let holdX = 0, worstHold = 0, worstEarly = 0, worstRel = 0, zMin = 1, off = 0, wMax = 0;
-    ev('pointerdown', 1, sx, sy); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, sx + (W - 12 - sx) * k / 40, sy); steps(1); }
-    for (let k = 0; k < 480; k++) { steps(1); zMin = Math.min(zMin, CAM.z);
-      if (k % 3 === 0) { const c = selfX(); if (c) holdX++; worstHold = Math.max(worstHold, c); }
-      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); }
-      wMax = Math.max(wMax, (x1 - x0) / R); if (sxOf(x0) < 0 || sxOf(x1) > W || syOf(y0) < 0 || syOf(y1) > H) off++; }
-    ev('pointerup', 1, W - 12, sy);
-    for (let k = 0; k < 720; k++) { steps(1); if (k < 120) worstEarly = Math.max(worstEarly, selfX()); else if (k % 6 === 0) worstRel = Math.max(worstRel, selfX()); }
-    res.T26_zoomUnlimited = { widthMaxR: +wMax.toFixed(2), zoomMin: +zMin.toFixed(2), offScreenFrames: off, holdCrossFrames: holdX, worstHoldX: worstHold, worstFirst2sX: worstEarly, worstReleaseX: worstRel, zoomAfter12s: +CAM.z.toFixed(2), end: snap() }; log.splice(0);
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    let wMax = 0, zMin = 1, off = 0, holdX = 0, worstRel = 0, jMax = 0;
+    for (let r = 0; r < 6; r++) {
+      let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const wx = X[b] - R * 0.15, wy = Y[b];
+      let [qx, qy] = sc(wx, wy); ev('pointerdown', 1, qx, qy); const f = [...fingers.values()][0];
+      const q0 = qx; for (let k = 1; k <= 45; k++) { qx = q0 + (W - 12 - q0) * k / 45; ev('pointermove', 1, qx, qy); steps(1); }
+      let prev = null, prev2 = null;
+      for (let k = 0; k < 60; k++) { ev('pointermove', 1, qx + (Math.random() - 0.5) * 1.2, qy + (Math.random() - 0.5) * 1.2); steps(1);
+        const cur = bnd.map(i => sc(X[i], Y[i]));
+        if (prev2) for (let m = 0; m < cur.length; m++) jMax = Math.max(jMax, Math.hypot(cur[m][0] - 2 * prev[m][0] + prev2[m][0], cur[m][1] - 2 * prev[m][1] + prev2[m][1]));
+        prev2 = prev; prev = cur; if (k % 3 === 0 && selfX()) holdX++;
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); }
+        wMax = Math.max(wMax, (x1 - x0) / R); zMin = Math.min(zMin, CAM.z);
+        const a = sc(x0, y0), c = sc(x1, y1); if (a[0] < 0 || c[0] > W || a[1] < 0 || c[1] > H) off++; }
+      ev('pointerup', 1, qx, qy); for (let k = 0; k < 60; k++) { steps(1); if (k % 6 === 0) worstRel = Math.max(worstRel, selfX()); }
+    }
+    for (let k = 0; k < 600; k++) { steps(1); if (k % 10 === 0) worstRel = Math.max(worstRel, selfX()); }
+    res.T26_zoomUnlimited = { widthMaxR: +wMax.toFixed(2), zoomMin: +zMin.toFixed(2), offScreenFrames: off, holdCrossFrames: holdX, jitterMaxPt: +jMax.toFixed(2), worstReleaseX: worstRel, end: snap() }; log.splice(0);
     restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T29 手指停住不抖（v2.15，多米 build 61：拉到某個程度會抽搐）：抓最右邊往右拉 1、2、3R 各停 2 秒帶手抖，形狀不能自己長、邊界每幀最大跳動
+  { const clock = saveClock(); const r29 = [];
+    for (const d of [1, 2, 3]) { Math.random = seeded(20261116 + d); resetAligned(1e9); nextTwitch = 1e9;
+      const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+      const wd = () => { let a = 1e9, b = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); } return (b - a) / R; };
+      let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const wx = X[b] - R * 0.15, wy = Y[b];
+      let [qx, qy] = sc(wx, wy); ev('pointerdown', 1, qx, qy); const f = [...fingers.values()][0];
+      for (let k = 1; k <= 60; k++) { qx += (wx + d * R * k / 60 - f.x) * CAM.z; ev('pointermove', 1, qx, qy); steps(1); }
+      steps(30); const w1 = wd(); let prev = null, prev2 = null, jMax = 0, xf = 0;
+      for (let k = 0; k < 120; k++) { ev('pointermove', 1, qx + (Math.random() - 0.5) * 1.2, qy + (Math.random() - 0.5) * 1.2); steps(1);
+        const cur = bnd.map(i => sc(X[i], Y[i]));
+        if (prev2) for (let m = 0; m < cur.length; m++) jMax = Math.max(jMax, Math.hypot(cur[m][0] - 2 * prev[m][0] + prev2[m][0], cur[m][1] - 2 * prev[m][1] + prev2[m][1]));
+        prev2 = prev; prev = cur; if (selfX()) xf++; }
+      r29.push({ pullR: d, widthR: +wd().toFixed(2), grewR: +(wd() - w1).toFixed(2), jitterMaxPt: +jMax.toFixed(2), crossFrames: xf }); ev('pointerup', 1, qx, qy); steps(30); }
+    res.T29_stillFinger = r29; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T30 點一下留凹痕（v2.15，多米 build 61：單純點一下也要有效果，也許是出現凹陷）：點身體中間 0.1 秒，凹痕要出現；放手 15 秒還看得到、淡了一些；
+  //     按住拉開 1R 的那次凹痕要收掉
+  { const clock = saveClock(); Math.random = seeded(20261117); resetAligned(1e9); nextTwitch = 1e9;
+    const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(6); const dHeld = DENTS.length ? DENTS[DENTS.length - 1].d : 0; ev('pointerup', 1, cx, cy);
+    steps(60); const d1 = DENTS.length ? DENTS[0].d : 0; steps(840); const d15 = DENTS.length ? DENTS[0].d : 0;
+    resetAligned(1e9); nextTwitch = 1e9; ev('pointerdown', 1, cx, cy); for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx + R * k / 30, cy); steps(1); } steps(30);
+    ev('pointerup', 1, cx + R, cy); steps(60);
+    res.T30_dent = { heldDepth: +dHeld.toFixed(2), after1s: +d1.toFixed(2), after15s: +d15.toFixed(2), dentsAfterPull: DENTS.length, end: snap() };
+    log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
@@ -368,8 +402,9 @@
     for (const [name, ux, uy] of [['right', 1, 0], ['up', 0, -1]]) {
       resetAligned(1e9); nextTwitch = 1e9; const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
       let x0 = 1e9, x1 = -1e9, y0 = 1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); }
-      const cx = globalC.xc, cy = globalC.yc; let worst = 0, q = sc(cx, cy); ev('pointerdown', 1, q[0], q[1]);
-      for (let k = 1; k <= 120; k++) { const a = Math.min(1, k / 60) * 2 * R; q = sc(cx + ux * a, cy + uy * a); ev('pointermove', 1, q[0], q[1]); steps(1); if (k % 3 === 0) worst = Math.max(worst, selfX()); }
+      const cx = globalC.xc, cy = globalC.yc; let worst = 0, q = sc(cx, cy); ev('pointerdown', 1, q[0], q[1]); const f27 = [...fingers.values()][0];
+      // v2.15 起手指在世界裡只跟著螢幕位移 ÷ 鏡頭倍率走：每幀照「世界目標 − 手指現在的世界位置」補螢幕位移
+      for (let k = 1; k <= 120; k++) { const a = Math.min(1, k / 60) * 2 * R; q = [q[0] + (cx + ux * a - f27.x) * CAM.z, q[1] + (cy + uy * a - f27.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (k % 3 === 0) worst = Math.max(worst, selfX()); }
       let x1b = -1e9, y0b = 1e9; for (const i of bnd) { x1b = Math.max(x1b, X[i]); y0b = Math.min(y0b, Y[i]); }
       ev('pointerup', 1, q[0], q[1]); for (let k = 0; k < 300; k++) { steps(1); if (k % 5 === 0) worst = Math.max(worst, selfX()); }
       r27[name] = { edgeMovedR: +((ux ? x1b - x1 : y0 - y0b) / R).toFixed(2), worstSelfX: worst, end: snap() };
@@ -389,7 +424,7 @@
     log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
-  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames, T26_first2sX: res.T26_zoomUnlimited.worstFirst2sX };
+  res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -426,13 +461,18 @@
     pressFlattens: res.T23_pressFlat.heldAspectX > 1.5 && res.T23_pressFlat.after1sAspectX > 1.3 && res.T23_pressFlat.floorPassPt < 3 && res.T23_pressFlat.worstSelfX === 0 && okArea(res.T23_pressFlat.end),
     noCrossing: res.T24_dragAcross.guard.worstAfter === 0 && res.T24_dragAcross.guard.crossFrames <= res.T24_dragAcross.noGuard.crossFrames,
     // 鏡頭跟著拉遠：按在畫面右緣 3 秒要伸出 2.5R 以上（以前卡在 1.1R），放手 12 秒鏡頭回到 0.95 以上
-    // 鏡頭無限拉遠：寬過 7R、鏡頭縮過 v2.12 的下限 0.45、整隻一直在畫面裡；放手 2 秒後零交叉、面積回來、鏡頭跟著形狀變小拉回來（v2.14 退得慢，12 秒還沒回 1 倍）
-    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end) && res.T26_zoomUnlimited.zoomAfter12s > res.T26_zoomUnlimited.zoomMin + 0.2,
+    // 鏡頭無限拉遠（重複抓）：寬過 7R、鏡頭縮過 0.45、整隻一直在畫面裡、按著時邊界每幀跳動不到 3 點、放手後零交叉、面積回來
+    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.jitterMaxPt < 3 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end),
+    // 手指停住：形狀不自己長（< 0.3R）、邊界每幀跳動不到 3 點、零交叉
+    stillFingerSteady: res.T29_stillFinger.every(r => r.grewR < 0.3 && r.jitterMaxPt < 3 && r.crossFrames === 0),
+    // 點一下：按 0.1 秒凹痕深過 0.5、1 秒後還在、15 秒淡了但還看得到（0.15 以上）；拉開的那次凹痕收掉
+    dentOnTap: res.T30_dent.heldDepth > 0.5 && res.T30_dent.after1s > 0.5 && res.T30_dent.after15s > 0.15 && res.T30_dent.after15s < res.T30_dent.after1s && res.T30_dent.dentsAfterPull === 0,
     // 從中間往右、往上拉 2R，那一側外圈要跟出去 1.5R 以上（v2.13 是 -0.08R）；零自交、面積回來
     pullFromMiddle: ['right', 'up'].every(k => res.T27_pullFromMiddle[k].edgeMovedR > 1.5 && res.T27_pullFromMiddle[k].worstSelfX === 0 && okArea(res.T27_pullFromMiddle[k].end)),
     // 回彈：放手 2 秒還留八成以上（v2.13 約五成）
     relaxSlow: res.T28_relax.keep2s > 0.8 && res.T28_relax.end.selfX === 0,
-    edgeHoldStretches: res.T25_edgeHold.reachR > 2.5 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.zoomAfter12s > res.T25_edgeHold.zoomMin + 0.2 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
+    // 按在畫面邊：手指能走多遠就伸多遠（手機寬約 1.2R 以上）、鏡頭有退，停著的 3 秒不能自己長超過 0.3R（v2.14 會一直長）
+    edgeHoldStretches: res.T25_edgeHold.reachR > 1.2 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.grewWhileStillR < 0.3 && res.T25_edgeHold.zoomAfter12s > res.T25_edgeHold.zoomMin + 0.1 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,

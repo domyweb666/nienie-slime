@@ -131,12 +131,17 @@ final class SlimeRig {
         // two-finger pinch the fingers' world distance stopped shrinking and a squish went missing)
         let grabs = fingers.values.filter { $0.mode == .grab }
         let grabbingNow = !grabs.isEmpty, stMax = grabs.map(\.stretch).max() ?? 0
-        let fillK = max(0, min(1, stMax - 0.5)), fill = 1 - (1 - min(1, max(0.2, params.camFill))) * fillK
+        // once the shape is big enough to zoom (v2.15), keep a margin even untouched (camFill + 0.1) and centre on the shape: otherwise
+        // after a release the pulled end sits on the screen edge and grabbing it again leaves nowhere to pull (measured the device
+        // way, pull to the edge, let go, grab again: 5 pulls reached 5.2R). Before, the resting finger dragged out by the view did it,
+        // which was the twitch
+        let cf = min(1, max(0.2, params.camFill)), big = camZ < 0.95 && cf < 1, idleFill = big ? min(1, cf + 0.1) : 1
+        let fillK = max(0, min(1, stMax - 0.5)), fill = min(idleFill, 1 - (1 - cf) * fillK)
         let zt = max(zm, min(1, fill * ax / ((x1 - x0) / 2 + pad), fill * ay / ((y1 - y0) / 2 + pad)))
         let hx = ax / zt, hy = ay / zt
         func clampC(_ c: Double, _ lo: Double, _ hi: Double) -> Double { lo > hi ? (lo + hi) / 2 : max(lo, min(hi, c)) }
-        // camCenter: while grabbed, centre on the shape so the margin is ahead of the finger too (centred on home it sits behind, unused)
-        let cc = grabbingNow && fillK > 0 && params.camCenter >= 0.5, ox = cc ? (x0 + x1) / 2 : v.x, oy = cc ? (y0 + y1) / 2 : v.y
+        // camCenter: centre on the shape when it is big or pulled, so the margin is ahead of the finger too (centred on home it sits behind)
+        let cc = (big || grabbingNow && fillK > 0) && params.camCenter >= 0.5, ox = cc ? (x0 + x1) / 2 : v.x, oy = cc ? (y0 + y1) / 2 : v.y
         let cxT = clampC(ox, x1 + pad - hx, x0 - pad + hx), cyT = clampC(oy, y1 + pad - hy, y0 - pad + hy), k = 1 - exp(-dt / 0.35)
         camZ += (zt - camZ) * k; camX += (cxT - camX) * k; camY += (cyT - camY) * k
     }   // press flat: pressing now, table height, remembered bottom below the centroid
@@ -375,6 +380,7 @@ final class SlimeRig {
         builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize; builtDens = params.dens
         pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0; flatOn = false
         camZ = 1; camX = viewV.x; camY = viewV.y
+        dentList.removeAll()
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
@@ -494,6 +500,13 @@ final class SlimeRig {
     var centroid: (x: Double, y: Double) { (clusters.isEmpty ? cx : clusters[gi].xc, clusters.isEmpty ? cy : clusters[gi].yc) }
     var bodyAngle: Double { clusters.isEmpty ? 0 : atan2(clusters[gi].sn, clusters[gi].cs) }
     var highlight: (x: Double, y: Double) { N > 0 ? (X[hiIdx], Y[hiIdx]) : (cx, cy) }
+    /// Dents (v2.15, 多米 build 61: just tapping should do something, maybe a dent). Only the boundary is drawn, so a press in the
+    /// middle was invisible. Each dent rides a particle; held it sinks in 0.08 s, a finger dragged 0.4R or more is a pull and the
+    /// dent goes; released it fades at the relax rate (clay: half in about 15 s). World position and depth 0...1
+    var dents: [(x: Double, y: Double, d: Double)] { dentList.compactMap { $0.i < N ? (X[$0.i], Y[$0.i], $0.d) : nil } }
+    private final class Dent { let i: Int; var d = 0.0; var finger: ObjectIdentifier?; var pull = false
+        init(i: Int, finger: ObjectIdentifier) { self.i = i; self.finger = finger } }
+    private var dentList: [Dent] = []
 
     // MARK: - Fingers
 
@@ -599,6 +612,12 @@ final class SlimeRig {
                 if y < clusters[gi].yc { f.flatOn = true; f.h0 = max(R * 0.5, y1 - y0); f.bot = y1; f.flat = 1 }
             }
         }
+        if grab && params.dent > 0 {
+            var bi = 0, bd = 1e9
+            for i in 0..<N { let d = hypot(X[i] - x, Y[i] - y); if d < bd { bd = d; bi = i } }
+            dentList.append(Dent(i: bi, finger: id))
+            if dentList.count > 6 { dentList.removeFirst() }
+        }
         fingers[id] = f
     }
 
@@ -607,11 +626,15 @@ final class SlimeRig {
     /// replaced as real touches arrive). `distance` is the true travelled distance from coalesced touches.
     func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, predictedX: Double?, predictedY: Double?, distance: Double, radius: Double = 0) {
         guard let f = fingers[id] else { return }
+        // in the world the finger only follows its real movement: screen travel ÷ the current zoom (v2.15). From v2.12 the screen point was
+        // mapped back every frame, so as the view backed off a resting finger ran outward in the world, the shape stretched, the view
+        // backed off more and it never settled (measured: pull 3R and hold, it grew to 12R by itself, past 10R it shook and crossed;
+        // 多米 build 61: past some point it twitches)
+        f.rawX += (x - f.sx) / camZ; f.rawY += (y - f.sy) / camZ
         f.sx = x; f.sy = y
-        (f.rawX, f.rawY) = toWorld(x, y)
         if let predictedX, let predictedY {
             f.psx = predictedX; f.psy = predictedY
-            (f.predX, f.predY) = toWorld(predictedX, predictedY); f.hasPrediction = true
+            f.predX = f.rawX + (predictedX - x) / camZ; f.predY = f.rawY + (predictedY - y) / camZ; f.hasPrediction = true
         } else {
             f.hasPrediction = false
         }
@@ -637,6 +660,7 @@ final class SlimeRig {
     private func release(_ id: ObjectIdentifier, quiet: Bool) {
         guard let f = fingers.removeValue(forKey: id) else { return }
         for m in f.mem { GRAB[m.i] = false }
+        for dn in dentList where dn.finger == id { dn.finger = nil }
         lastTouch = t
         if f.mode == .grab && !quiet {
             // release strength: how fast it was flicked (peak speed over the last ~80 ms) or how far it was
@@ -719,13 +743,18 @@ final class SlimeRig {
         for (id, f) in fingers where f.sticking && t >= f.releaseAt { release(id, quiet: false) }
 
         updateCam(dt)
-        // a finger resting on the screen while the camera backs off: the same screen point maps further out, so the shape keeps
-        // stretching (hold it at the screen edge and it keeps pulling)
-        for f in fingers.values {
-            (f.rawX, f.rawY) = toWorld(f.sx, f.sy)
-            if f.hasPrediction { (f.predX, f.predY) = toWorld(f.psx, f.psy) }
-        }
         for f in fingers.values where f.reach && f.mode == .grab { reachGrab(f) }
+        for dn in dentList {
+            if let id = dn.finger, let f = fingers[id] {
+                if hypot(f.rawX - f.ax, f.rawY - f.ay) > R * 0.4 { dn.pull = true }
+                let tg = dn.pull ? 0.0 : 1.0
+                dn.d += (tg - dn.d) * (1 - exp(-dt / (tg > 0 ? 0.08 : 0.12)))
+            } else {
+                dn.finger = nil
+                dn.d *= exp(-(dn.pull ? 8 : t < relaxUntil ? 6 : max(mat.recover, 0.02)) * dt)
+            }
+        }
+        dentList.removeAll { $0.finger == nil && $0.d < 0.02 }
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
             // chase target: the prediction only on a frame that got a fresh move event, else the real finger,

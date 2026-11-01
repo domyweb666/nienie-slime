@@ -41,6 +41,8 @@ final class SlimeView: UIView {
     private let litGroup = CALayer()             // masked to the body
     private let litMask = CAShapeLayer()
     private let baseLayer = CAShapeLayer()       // same body shifted up-left, in the base colour
+    private let dentShadeLayer = CAShapeLayer()  // dents: an ellipse in the shade colour...
+    private let dentLitLayer = CAShapeLayer()    // ...covered by the base colour shifted down-right, leaving a crescent upper-left
     private let highlightLayer = CAShapeLayer()
     private let outlineLayer = CAShapeLayer()
 
@@ -65,6 +67,8 @@ final class SlimeView: UIView {
         litGroup.mask = litMask
         layer.addSublayer(litGroup)
         litGroup.addSublayer(baseLayer)
+        litGroup.addSublayer(dentShadeLayer)
+        litGroup.addSublayer(dentLitLayer)
         litGroup.addSublayer(highlightLayer)
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
@@ -103,6 +107,8 @@ final class SlimeView: UIView {
         }
         shadeLayer.fillColor = colors.shade.cgColor
         baseLayer.fillColor = colors.base.cgColor
+        dentShadeLayer.fillColor = colors.shade.cgColor
+        dentLitLayer.fillColor = colors.base.cgColor
         highlightLayer.fillColor = colors.light.cgColor
         outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
         outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
@@ -138,7 +144,7 @@ final class SlimeView: UIView {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
-            for l in [shadowLayer, shadeLayer, litGroup, litMask, baseLayer, highlightLayer, outlineLayer, flashLayer] as [CALayer] {
+            for l in [shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer] as [CALayer] {
                 l.frame = bounds
             }
             redraw()
@@ -340,6 +346,18 @@ final class SlimeView: UIView {
         shadeLayer.path = body
         litMask.path = body
         baseLayer.path = bodyPath(P, dx: -R * 0.07, dy: -R * 0.085)
+
+        // dents (v2.15): the light comes from the upper left, so inside a dent the upper-left wall is in shade
+        let ds = CGMutablePath(), dl = CGMutablePath()
+        for dn in rig.dents {
+            let r = R * rig.params.dentSize * dn.d
+            if r < 0.5 { continue }
+            let c = rig.toScreen(dn.x, dn.y)
+            ds.addEllipse(in: CGRect(x: c.x - r, y: c.y - r * 0.8, width: r * 2, height: r * 1.6))
+            dl.addEllipse(in: CGRect(x: c.x + r * 0.22 - r * 0.82, y: c.y + r * 0.26 - r * 0.64, width: r * 1.64, height: r * 1.28))
+        }
+        dentShadeLayer.path = ds
+        dentLitLayer.path = dl
 
         // highlight rides on an upper-left particle and turns with the body
         let hp = rig.toScreen(rig.highlight.x, rig.highlight.y), ang = rig.bodyAngle

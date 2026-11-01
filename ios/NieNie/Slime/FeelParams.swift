@@ -107,10 +107,13 @@ struct FeelParams: Equatable, Codable {
     var zoomMin: Double = 0           // the view zooms out to fit a big shape, down to this; 0 = no limit and no walls (v2.13, 多米), 1 = off, v2.12 was 0.45
     // v2.13 (多米: zoom out without limit, as far as the slime is pulled)
     var camFill: Double = 0.7         // while grabbed the shape fills at most this much of the view, leaving room for the finger; 1 = tight (v2.12)
-    var camCenter: Double = 0         // 1: while grabbed the view centres on the shape, so the margin is also ahead of the finger (about 15R,
-                                      // but the tail of so thin a strand crosses for ~100 frames while held); 0: centred on home (about 8.5R)
+    var camCenter: Double = 1         // 1: once big or pulled the view centres on the shape, so there is room ahead of the finger to pull again
+                                      // (v2.15 default; in v2.13 it ran to 15R because the resting finger was dragged out by the view); 0: on home
     // v2.14 (多米 build 59: only the edge could be pulled; nothing happened pulling from the middle)
     var grabReach: Double = 1         // 1: grabbed from inside out of reach of the boundary, a strip to the boundary is added once the finger moves
+    // v2.15 (多米 build 61: a tap should leave something, maybe a dent)
+    var dent: Double = 1              // 1: a press leaves a dent (a crescent of shade upper-left), fading at the relax rate
+    var dentSize: Double = 0.3        // dent radius, in radii
     var dens: Double = 12             // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -157,12 +160,12 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         case .clay:
             // clay remembers at once, tentacles too; the mark relaxes slowly: half in about 15 s (v2.14, 多米 build 59: it sprang back
             // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
-            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.05, grabR: 0.32, maxPull: 20,
+            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.05, grabR: 0.32, maxPull: 7,
                            lag: 0.12, wGlobal: 0.08, cSpace: 0.3, cRad: 0.45, upright: 0.002, anchor: 4,
                            areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.05, wander: 0.22,
                            floppy: 0.6, seed: 7)
             // free sculpting (多米 2026-11-01: pull it long, spread it flat like dough)
-            p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 12; p.grabHold = 0.85   // v2.13: pull 20R, remember 12R (v2.12: 8 and 4)
+            p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 5; p.grabHold = 0.85   // v2.15: pull 7R, remember 5R (past about 8.5R long it shook; v2.13 20 and 12, v2.12 8 and 4)
             p.grabK = 1.2; p.nearR = 3   // pressFlat off since v2.12 (多米: take it out)
         }
         return p
@@ -236,7 +239,7 @@ struct Candidate: Identifiable {
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
-            p.zoomMin = 0.45; p.camFill = 1; p.dens = 9; p.grabReach = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
         Candidate(id: 270, name: "v2.7 對照（舊外形）", hint: "海星外形五條觸手、固定行進波蠕動、正弦呼吸、黏土輕捏回彈") { p, m in m.applyV27(&p) },
     ]
 }
@@ -257,8 +260,10 @@ struct TuneField: Identifiable {
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
         TuneField(key: \.damp, name: "晃動阻尼", hint: "越小放手晃越久", range: 0.85...0.999, step: 0.001),
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
+        TuneField(key: \.dent, name: "點一下留凹痕", hint: "1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）", range: 0...1, step: 1),
+        TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑", range: 0.1...0.5, step: 0.01),
         TuneField(key: \.grabReach, name: "從中間抓也拉得動", hint: "1：從身體裡面抓、範圍碰不到外圈時，手指一動往拉的方向補抓一條到外圈；0 是 v2.13（從中間拉沒反應）", range: 0...1, step: 1),
-        TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠（軟上限）；黏土 20（v2.13，多米：不要限制），v2.12 是 8", range: 0.6...30, step: 0.1),
+        TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠（軟上限）；黏土 7（v2.15，超過約 8.5R 會抖），v2.13 是 20，v2.12 是 8", range: 0.6...30, step: 0.1),
         TuneField(key: \.lag, name: "黏滯", hint: "跟手的延遲感（秒）；候選 6 是 0.03", range: 0...0.3, step: 0.01),
         TuneField(key: \.wGlobal, name: "整體性", hint: "越大整團越像一塊", range: 0...1, step: 0.01),
         TuneField(key: \.cSpace, name: "區塊間距（×半徑）", hint: "越小區塊越多越軟", range: 0.15...0.7, step: 0.05),
@@ -292,13 +297,13 @@ struct TuneField: Identifiable {
         TuneField(key: \.pressFlat, name: "一壓就攤平", hint: "1：從上半部往下壓時下面有看不見的桌面，壓多少扁多少；v2.12 起預設關", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.zoomMin, name: "鏡頭最遠", hint: "形狀變大時畫面自動縮小，最小縮到幾倍；0 不限制、也沒有牆（多米：鏡頭無限拉遠），1 關，v2.12 是 0.45", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.camFill, name: "鏡頭留邊", hint: "抓著時形狀最多佔畫面幾成就開始退；1 貼邊（v2.12），越小留越多邊給手指繼續拉；沒碰時都貼邊", range: 0.3...1, step: 0.05, section: "按壓與記形"),
-        TuneField(key: \.camCenter, name: "抓著時鏡頭對準形狀", hint: "1：抓著時鏡頭對準形狀中心，按在邊上能拉到約 15R，但細到尾端會交叉；0 對準家（約 8.5R）", range: 0...1, step: 1, section: "按壓與記形"),
+        TuneField(key: \.camCenter, name: "鏡頭對準形狀", hint: "1：形狀大到要縮鏡頭、或抓著拉開時，鏡頭對準形狀中心，兩邊都留邊，再抓那一端還有地方拉（v2.15 預設）；0 對準家", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.dens, name: "點的密度", hint: "每個半徑幾個點；12（v2.13），以前 9：拉到 8R 時外圈太疏、尾端交叉。越密越吃效能，改了會重建身體", range: 6...14, step: 1, section: "按壓與記形"),
         TuneField(key: \.flatMin, name: "最扁", hint: "壓到最扁是原本高度的幾成", range: 0.15...0.8, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.ringGuard, name: "邊不能穿邊", hint: "1：邊界的點不能穿過另一段邊界（多米：交叉時像快壞掉）；0 關", range: 0...1, step: 1),
         TuneField(key: \.grabHold, name: "抓住跟手", hint: "被抓那塊不聽彈性、跟手指走的程度；黏土 0.85，0 是以前（落後手指約 1 個半徑）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.nearMem, name: "手指附近記形", hint: "手指附近用整身座標記形，拉出一塊就留一塊；0 只用局部區塊", range: 0...1, step: 0.05, section: "按壓與記形"),
-        TuneField(key: \.memMax, name: "記形上限（×半徑）", hint: "記住的形狀最多離原形多遠；黏土 12（v2.13），v2.12 是 4，以前 1.1", range: 0.5...20, step: 0.1, section: "按壓與記形"),
+        TuneField(key: \.memMax, name: "記形上限（×半徑）", hint: "記住的形狀最多離原形多遠；黏土 5（v2.15，超過約 8.5R 會抖），v2.13 是 12，v2.12 是 4，以前 1.1", range: 0.5...20, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.tentMem, name: "觸手記形", hint: "1：觸手跟身體一樣留形、一樣慢慢回；0：v2.7 尖端一秒多彈回", range: 0...1, step: 0.05, section: "按壓與記形"),
 
         TuneField(key: \.life, name: "活物感", hint: "沒碰時自己動的幅度", range: 0...1.5, step: 0.05, section: "活物感"),
