@@ -44,6 +44,16 @@ summary{cursor:pointer;color:var(--sub);font-size:14px}
 <p class="note">v2 分層版：按、放手都是好幾層疊起來，力道決定哪幾層響、多大聲、多高、多亮；拉和揉跟著手的動作連續變化。跟 app 用的是同一支播放程式。手機請先關靜音，用手機喇叭聽一次、耳機聽一次。聽到不喜歡的記下來（例如「放手 重 太悶」「拉 越拉越刺耳」）。</p>
 
 <section>
+  <h2>它的聲音（v2.22）</h2>
+  <div class="when">沒有字的小聲音。app 裡熟的時候音高高一點，戒的時候低一點；下面的「音高」滑桿可以模擬。</div>
+  <div class="grid" id="voices">
+    <button data-v="poke">被戳「噗」</button><button data-v="mmm">被摸「嗯～」</button><button data-v="protest">被扯「嗯嗯」</button><button data-v="happy">開心「噗咿」</button>
+    <button data-v="ask">討摸「嗯？」</button><button data-v="giggle">搔癢咯咯笑</button><button data-v="gulp">吞黏液「咕嚕」</button><button data-v="hello">打招呼</button>
+  </div>
+  <div class="row"><label for="vr">音高</label><input id="vr" type="range" min="0.9" max="1.1" step="0.01" value="1"><output id="vro">1.00</output></div>
+</section>
+
+<section>
   <h2>按</h2>
   <div class="when">手指按到身上那一下。力道在 app 裡來自按的方式（抓、推、兩指捏）和手指接觸面積。</div>
   <div class="row"><label for="pi">力道</label><input id="pi" type="range" min="0" max="1" step="0.05" value="0.7"><output id="pio">0.70</output></div>
@@ -102,6 +112,8 @@ $('setv3').setAttribute('aria-pressed', String(SET === 'v3')); $('setv2').setAtt
 $('setv3').onclick = () => { location.search = ''; }; $('setv2').onclick = () => { location.search = '?set=v2'; };
 $('bgm').onclick = async () => { await go(); const on = S.mode !== 0; S.setMode(on ? 0 : 1); $('bgm').setAttribute('aria-pressed', String(on)); $('bgm').textContent = on ? '停止背景音樂' : '播放背景音樂'; };
 bindRange('bv', v => { S.bgmVol = v; S.bgmT = -1; });
+bindRange('vr');
+for (const b of document.querySelectorAll('#voices button')) b.onclick = async () => { await go(); S.voice(b.dataset.v, 0.9, +$('vr').value); };
 bindRange('pi'); bindRange('ri');
 bindRange('vol', v => S.setVolume(v)); bindRange('pm', v => S.pullMax = v); bindRange('st', v => S.settleAmt = v);
 bindRange('ub', v => { go(); state.rub = v * S.rubMax; });
