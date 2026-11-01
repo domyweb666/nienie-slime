@@ -111,22 +111,32 @@ final class SlimeRig {
         let v = viewV
         return ((x - camX) * camZ + v.x, (y - camY) * camZ + v.y)
     }
+    // zoomMin 0 (v2.13, 多米: zoom out without limit): no floor on the zoom, the walls are at infinity (no walls)
+    private var camMin: Double { params.zoomMin > 0 ? min(1, params.zoomMin) : 1e-4 }
     private var worldWalls: (l: Double, r: Double, t: Double, b: Double) {
-        let v = viewV, zm = min(1, max(0.1, params.zoomMin)), ax = (W - 16) / 2 / zm, ay = (H - 210) / 2 / zm
+        if !(params.zoomMin > 0) { return (-.infinity, .infinity, -.infinity, .infinity) }
+        let v = viewV, zm = camMin, ax = (W - 16) / 2 / zm, ay = (H - 210) / 2 / zm
         return (v.x - ax, v.x + ax, v.y - ay, v.y + ay)
     }
     private func updateCam(_ dt: Double) {
         let v = viewV, pad = R * 0.35
         var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
         for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]); y1 = max(y1, Y[i]) }
-        let ax = (W - 16) / 2, ay = (H - 210) / 2, zm = min(1, max(0.1, params.zoomMin))
-        let zt = max(zm, min(1, ax / ((x1 - x0) / 2 + pad), ay / ((y1 - y0) / 2 + pad)))
+        let ax = (W - 16) / 2, ay = (H - 210) / 2, zm = camMin
+        // camFill (v2.13, 多米: as far as it is pulled): while grabbed the shape fills at most this much of the view, leaving room for
+        // the finger; tight (v2.12) the finger at the screen edge was only pad beyond the shape and the pull stopped near 6R. Only while
+        // grabbed: idle pods and breathing change the size all the time and the view would breathe with them
+        let grabbingNow = fingers.values.contains { $0.mode == .grab }
+        let fill = grabbingNow ? min(1, max(0.2, params.camFill)) : 1
+        let zt = max(zm, min(1, fill * ax / ((x1 - x0) / 2 + pad), fill * ay / ((y1 - y0) / 2 + pad)))
         let hx = ax / zt, hy = ay / zt
         func clampC(_ c: Double, _ lo: Double, _ hi: Double) -> Double { lo > hi ? (lo + hi) / 2 : max(lo, min(hi, c)) }
-        let cxT = clampC(v.x, x1 + pad - hx, x0 - pad + hx), cyT = clampC(v.y, y1 + pad - hy, y0 - pad + hy), k = 1 - exp(-dt / 0.35)
+        // camCenter: while grabbed, centre on the shape so the margin is ahead of the finger too (centred on home it sits behind, unused)
+        let cc = grabbingNow && params.camCenter >= 0.5, ox = cc ? (x0 + x1) / 2 : v.x, oy = cc ? (y0 + y1) / 2 : v.y
+        let cxT = clampC(ox, x1 + pad - hx, x0 - pad + hx), cyT = clampC(oy, y1 + pad - hy, y0 - pad + hy), k = 1 - exp(-dt / 0.35)
         camZ += (zt - camZ) * k; camX += (cxT - camX) * k; camY += (cyT - camY) * k
     }   // press flat: pressing now, table height, remembered bottom below the centroid
-    private var builtLimbs = -1.0, builtSize = -1.0
+    private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
 
     final class Finger {
         enum Mode { case grab, push, none }
@@ -257,7 +267,7 @@ final class SlimeRig {
         }
         cy = H * params.homeFrac; builtHome = params.homeFrac   // 候選 33: 0.40H, or 0.46H for the one-hand test
         homeX = cx; homeY = cy
-        h = R / 9
+        h = R / max(4, params.dens)   // dens (v2.13): particles per radius; a long pull spreads the boundary out
         var cum = [0.0]
         cum.reserveCapacity(fine + 1)
         for i in 1...fine {
@@ -357,7 +367,7 @@ final class SlimeRig {
         }
         fingers.removeAll()
         A0 = polygonArea()
-        builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize
+        builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize; builtDens = params.dens
         pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0; flatOn = false
         camZ = 1; camX = viewV.x; camY = viewV.y
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
@@ -649,7 +659,7 @@ final class SlimeRig {
     func update(_ dt: Double) {
         guard N > 0 else { return }
         t += dt
-        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize {
+        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens {
             setup(width: W, height: H)
         } else if params.cSpace != builtSpace || params.cRad != builtRad {
             buildClusters()
