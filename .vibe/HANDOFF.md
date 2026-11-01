@@ -37,7 +37,7 @@
 
 - 多米沒有 Mac。編譯走 GitHub Actions（`macos-26`、latest-stable Xcode、XcodeGen），裝機走 TestFlight 內部測試
 - GitHub Secrets 四個：`APPLE_TEAM_ID`、`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_PRIVATE_KEY`（Admin 團隊金鑰）。不要動
-- Bundle ID `org.domyweb.qieji`，MARKETING_VERSION 0.2.0，build 號＝run number，最低 iOS 17，SWIFT_VERSION 5.0
+- Bundle ID `org.domyweb.nienieslime`（2026-11-01 改；舊的 `org.domyweb.qieji` 那個 App 已移除，該 ID 不能再用。新 App 的 SKU 是 nienie，Apple ID 6829347310，第一個 build 是 0.2.0 (50)），MARKETING_VERSION 0.2.0，build 號＝run number，最低 iOS 17，SWIFT_VERSION 5.0
 - 史萊姆本體 UIKit（UIView＋CAShapeLayer，為了 coalesced／predicted touches），按鈕與面板 SwiftUI；隱藏面板長按「捏捏」標題 1.2 秒
 - 網頁原型在 `https://domyweb666.github.io/nienie-slime/prototype/web/index.html`，只能看形狀與手勢，沒有觸覺
 
