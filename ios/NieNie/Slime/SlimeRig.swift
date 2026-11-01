@@ -109,7 +109,74 @@ final class SlimeRig {
     }
     func toScreen(_ x: Double, _ y: Double) -> (x: Double, y: Double) {
         let v = viewV
-        return ((x - camX) * camZ + v.x, (y - camY) * camZ + v.y)
+        // v2.17 intro: far away is drawn smaller and up-right, pivoting on the floor point under home
+        let wx = ivS == 1 && ivOX == 0 && ivOY == 0 ? x : introPX + ivOX + ivS * (x - introPX)
+        let wy = ivS == 1 && ivOX == 0 && ivOY == 0 ? y : introPY + ivOY + ivS * (y - introPY)
+        return ((wx - camX) * camZ + v.x, (wy - camY) * camZ + v.y)
+    }
+    /// On-screen scale of the body: the camera zoom times the intro's distance scale.
+    var drawZ: Double { camZ * ivS }
+
+    // v2.17 intro (多米: when it opens it comes bouncing over from far away, hop by hop): wait → crouch → air → land, n hops; gravity and
+    // the floor only during the intro; distance is a drawing scale (pivot: the floor point under home); iv* is that scale and shift
+    // (eased back to 1 in 0.25 s at the end or on a touch)
+    private enum IntroPhase { case wait, crouch, air, land }
+    private(set) var introOn = false
+    private var introPh = IntroPhase.wait, introK = 0, introN = 4, introPT = 0.0, introSq = 0.0, introFloor = 0.0, introTair = 0.4
+    private var introU = 0.0, introS0 = 0.15, introOX0 = 0.0, introOY0 = 0.0, introPX = 0.0, introPY = 0.0
+    private let introG = 26.0, introHops = [0.55, 0.6, 0.65, 0.85]
+    private var ivS = 1.0, ivOX = 0.0, ivOY = 0.0
+    // v2.17 camera follow (多米: don't pin it to the middle; it moves, sometimes off screen, and the camera follows slowly)
+    private var folX = 0.0, folY = 0.0, folVX = 0.0, folVY = 0.0, folChase = false
+
+    /// Four hops in place at home: squash to gather before take-off (rest shape wider and lower), stretch in the air, the landing left
+    /// to gravity and the floor (it really hits it, so no two wobbles are alike). Distance is drawn: it starts up-right at 0.15×, each
+    /// hop comes closer and bigger, the last lands at home. Reduce Motion: no travel, one small hop at home.
+    func startIntro() {
+        guard params.intro >= 0.5, N > 0 else { return }
+        var y1 = -1e9
+        for i in bnd { y1 = max(y1, Y[i]) }
+        let far = !reduceMotion
+        introOn = true; introPh = .wait; introK = 0; introN = far ? 4 : 1; introPT = 0; introSq = 0; introFloor = y1
+        introU = far ? 0 : 1; introS0 = far ? 0.15 : 1; introOX0 = far ? W * 0.2 : 0; introOY0 = far ? -H * 0.24 : 0
+        introPX = homeX; introPY = y1
+        ivS = introS0; ivOX = introOX0; ivOY = introOY0
+        wanderMoving = false; wanderNext = t + 4
+    }
+    private func endIntro() {
+        guard introOn else { return }
+        introOn = false; introSq = 0; lastTouch = t - 0.8   // life fades in from the start; iv eases back to 1
+    }
+    private func introStep(_ dt: Double, _ h: Double) {
+        introPT += dt
+        var y1 = -1e9
+        for i in bnd { y1 = max(y1, Y[i]) }
+        let hh = R * (introN > 1 ? introHops[min(introK, 3)] : 0.3), v0 = sqrt(2 * R * introG * hh), tair = 2 * v0 / (R * introG)
+        switch introPh {
+        case .wait:   // a little wobble far away, as if it just saw you
+            introSq = 0.05 * sin(min(1, introPT / 0.25) * .pi)
+            if introPT >= 0.25 { introPh = .crouch; introPT = 0 }
+        case .crouch:
+            introSq = 0.14 * sin(min(1, introPT / 0.07) * .pi / 2)
+            if introPT >= 0.07 {   // take-off: an upward velocity for the whole body (Verlet velocity = this substep minus the last)
+                for i in 0..<N { PY[i] = Y[i] + v0 * h }
+                introPh = .air; introPT = 0; introTair = tair
+            }
+        case .air:
+            let q = min(1, introPT / introTair)
+            introSq = -0.07 * sin(.pi * q)
+            if introN > 1 { introU = min(1, (Double(introK) + q) / Double(introN)) }
+            if introPT > introTair * 0.5 && y1 >= introFloor - 0.5 {
+                introPh = .land; introPT = 0; introSq = 0
+                if introN > 1 { introU = min(1, Double(introK + 1) / Double(introN)) }
+                onEvent?(.press(gain: 0.15 + 0.45 * ivS))
+            }
+        case .land:
+            if introPT >= (introK + 1 >= introN ? 0.3 : 0.08) {
+                introK += 1; introPT = 0
+                if introK >= introN { endIntro() } else { introPh = .crouch }
+            }
+        }
     }
     // zoomMin 0 (v2.13, 多米: zoom out without limit): no floor on the zoom, the walls are at infinity (no walls)
     private var camMin: Double { params.zoomMin > 0 ? min(1, params.zoomMin) : 1e-4 }
@@ -141,9 +208,32 @@ final class SlimeRig {
         let hx = ax / zt, hy = ay / zt
         func clampC(_ c: Double, _ lo: Double, _ hi: Double) -> Double { lo > hi ? (lo + hi) / 2 : max(lo, min(hi, c)) }
         // camCenter: centre on the shape when it is big or pulled, so the margin is ahead of the finger too (centred on home it sits behind)
-        let cc = (big || grabbingNow && fillK > 0) && params.camCenter >= 0.5, ox = cc ? (x0 + x1) / 2 : v.x, oy = cc ? (y0 + y1) / 2 : v.y
-        let cxT = clampC(ox, x1 + pad - hx, x0 - pad + hx), cyT = clampC(oy, y1 + pad - hy, y0 - pad + hy), k = 1 - exp(-dt / 0.35)
-        camZ += (zt - camZ) * k; camX += (cxT - camX) * k; camY += (cyT - camY) * k
+        // v2.17 follow: untouched and not big, the view is no longer pinned at home nor forced to frame the whole body. Once the centre
+        // is followZone (1 = half the view) off, chase it until close, on a critically damped spring (followSpeed 1.4: about 2 s, eased
+        // start and stop). Still while grabbed: the picture must not slide under a finger
+        let follow = params.camFollow >= 0.5 && !big && !grabbingNow && !introOn
+        // the target puts the slime back where it normally sits on screen (home cx, cy against the view centre), not dead centre;
+        // the centre is the boundary mean (the centroid is still 0 on the first frame and the view thought it had run far)
+        if follow, !bnd.isEmpty {
+            var mx = 0.0, my = 0.0
+            for i in bnd { mx += X[i]; my += Y[i] }
+            mx /= Double(bnd.count); my /= Double(bnd.count)
+            let zx = ax / camZ, zy = ay / camZ, dx = mx - (cx - v.x) - folX, dy = my - (cy - v.y) - folY, om = max(0.1, params.followSpeed)
+            if !folChase && (abs(dx) > zx * params.followZone || abs(dy) > zy * params.followZone) { folChase = true }
+            if folChase && hypot(dx / zx, dy / zy) < 0.06 { folChase = false }
+            let ex = folChase ? dx : 0, ey = folChase ? dy : 0
+            folVX += (om * om * ex - 2 * om * folVX) * dt; folVY += (om * om * ey - 2 * om * folVY) * dt
+            folX += folVX * dt; folY += folVY * dt
+        } else {
+            folX = camX; folY = camY; folVX = 0; folVY = 0; folChase = false
+        }
+        let fo = params.camFollow >= 0.5
+        let cc = (big || grabbingNow && fillK > 0) && params.camCenter >= 0.5
+        let ox = cc ? (x0 + x1) / 2 : fo ? folX : v.x, oy = cc ? (y0 + y1) / 2 : fo ? folY : v.y
+        let fit = !fo || big || fillK > 0   // following, frame the whole body only when big or pulled (else grabbing a half-out body slides the view)
+        let cxT = fit ? clampC(ox, x1 + pad - hx, x0 - pad + hx) : ox, cyT = fit ? clampC(oy, y1 + pad - hy, y0 - pad + hy) : oy
+        let k = follow ? 1 : 1 - exp(-dt / 0.35), kz = 1 - exp(-dt / 0.35)
+        camZ += (zt - camZ) * kz; camX += (cxT - camX) * k; camY += (cyT - camY) * k
     }   // press flat: pressing now, table height, remembered bottom below the centroid
     private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
 
@@ -380,6 +470,8 @@ final class SlimeRig {
         builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize; builtDens = params.dens
         pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0; flatOn = false
         camZ = 1; camX = viewV.x; camY = viewV.y
+        folX = viewV.x; folY = viewV.y; folVX = 0; folVY = 0; folChase = false
+        introOn = false; introSq = 0; ivS = 1; ivOX = 0; ivOY = 0
         dentList.removeAll()
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
@@ -627,6 +719,7 @@ final class SlimeRig {
     /// `x, y` are screen points; the rig turns them into world points through the camera.
     func touchBegan(_ id: ObjectIdentifier, x sx: Double, y sy: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
         guard N > 0 else { return }
+        if introOn { endIntro(); return }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab
         let (x, y) = toWorld(sx, sy)
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         let grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
@@ -1066,12 +1159,24 @@ final class SlimeRig {
         // speed and the same walk-then-rest rhythm as the constant-speed version), rest a while; stop when touched.
         // Reduce Motion halves the speed again (×0.25 together with L)
         wanderVX = 0; wanderVY = 0
-        if L > 0.5 && mat.wander > 0 {
+        if L > 0.5 && mat.wander > 0 && !introOn {
             if !wanderMoving && t > wanderNext {
                 wanderSX = homeX; wanderSY = homeY
-                wanderX = cx + (Double.random(in: 0..<1) - 0.5) * W * 0.36
-                wanderY = cy + (Double.random(in: 0..<1) - 0.5) * H * 0.16
-                wanderT = max(0.5, hypot(wanderX - homeX, wanderY - homeY) / (mat.wander * R * (reduceMotion ? 0.5 : 1)))
+                var sp = 1.0
+                if mat.camFollow >= 0.5 {
+                    // v2.17: walk out from where it is; with the `dash` chance far and fast (2.5×: the camera lags, it leaves the screen
+                    // a bit). Over three view widths from the start it heads back
+                    let far = Double.random(in: 0..<1) < mat.dash
+                    let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.12 + 0.25 * Double.random(in: 0..<1))
+                    var a = Double.random(in: 0..<(2 * .pi))
+                    if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5) }
+                    wanderX = homeX + cos(a) * dist; wanderY = homeY + sin(a) * dist * 0.45
+                    if far { sp = 2.5 }
+                } else {
+                    wanderX = cx + (Double.random(in: 0..<1) - 0.5) * W * 0.36
+                    wanderY = cy + (Double.random(in: 0..<1) - 0.5) * H * 0.16
+                }
+                wanderT = max(0.5, hypot(wanderX - homeX, wanderY - homeY) / (mat.wander * sp * R * (reduceMotion ? 0.5 : 1)))
                 wanderP = 0
                 wanderMoving = true
             }
@@ -1094,6 +1199,13 @@ final class SlimeRig {
         if mat.morph >= 0.5 { morphCoef(tl * mat.idlePace) }   // idlePace (多米 2026-11-01: the wriggle was too fast)
         let n = max(1, Int((dt * 240).rounded()))
         let sdt = dt / Double(n)
+        if introOn { introStep(dt, sdt) }
+        do {
+            let u = introU, ts = introOn ? introS0 + (1 - introS0) * pow(u, 1.5) : 1, fo = pow(1 - u, 1.2)
+            let tx = introOn ? introOX0 * fo : 0, ty = introOn ? introOY0 * fo : 0, k = introOn ? 1 : 1 - exp(-dt / 0.08)
+            ivS += (ts - ivS) * k; ivOX += (tx - ivOX) * k; ivOY += (ty - ivOY) * k
+            if !introOn && abs(ivS - 1) < 1e-3 { ivS = 1; ivOX = 0; ivOY = 0 }
+        }
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         plasticity(dt)
         twitch(L)
@@ -1112,12 +1224,14 @@ final class SlimeRig {
             if since < mat.afterglow { damp = max(damp, 0.975 - (0.975 - mat.damp) * since / mat.afterglow) }
         }
         damp = min(0.995, damp)
+        if introOn && introPh == .air { damp = 1 }   // v2.17 intro: no damping in the air (clay's 0.94 takes 6% a substep, it would not lift off)
         let alpha = mat.alpha * (special ? 1.25 : 1)
+        let G = introOn ? R * introG * dt * dt : 0   // v2.17 intro: gravity only while hopping in
         // 1 Verlet
         for i in 0..<N {
             let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
             PX[i] = X[i]; PY[i] = Y[i]
-            X[i] += vx; Y[i] += vy
+            X[i] += vx; Y[i] += vy + G
         }
         // 2 fingers (GWT: how much each particle is held this substep, for grabHold in shape matching)
         for i in 0..<N { GWT[i] = 0 }
@@ -1148,7 +1262,7 @@ final class SlimeRig {
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
         // sp: v2.16 P1, pressed the whole body grows (the target area grows with it, so the area pressure does not push back)
         let sp = mat.press2 >= 0.5 ? sqrt(max(0.5, 1 + mat.pressArea * pressSum)) : 1
-        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = (1 + bs) * sp, bsy = (1 - bs * 0.85) * sp   // 提案第 23 條: waveform from update()
+        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = (1 + bs) * sp * (1 + introSq), bsy = (1 - bs * 0.85) * sp * (1 - introSq)   // 提案第 23 條: waveform from update()
         let wr = Lamp * mat.life * mat.wriggle * R, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
         // 提案第 20 條 tentacle tail: while wandering, the tentacles' reference positions trail the motion (tips most, u²),
         // scaled by the current speed so the smoothstep profile fades it in and out. Written on the reference shape like the
@@ -1330,7 +1444,8 @@ final class SlimeRig {
         let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hyF - gcy
         let wl = worldWalls, padT = wl.t, padB = wl.b, padL = wl.l, padR = wl.r   // walls: the edge of the farthest view (world)
         for i in 0..<N {
-            if !GRAB[i] { X[i] += dx * kh; Y[i] += dy * kh }
+            if !GRAB[i] { X[i] += dx * kh; if !introOn { Y[i] += dy * kh } }   // hopping in, up and down is gravity and the floor's
+            if introOn && Y[i] > introFloor { Y[i] = introFloor; PX[i] += (X[i] - PX[i]) * 0.45 }   // intro floor: it really lands, squashes, wobbles
             if flatOn && Y[i] > flatFloor { Y[i] = flatFloor; PY[i] = Y[i] }   // the invisible table: no sinking, no bounce, free to slide
             if Y[i] < padT { Y[i] = padT }
             if Y[i] > padB { Y[i] = padB }

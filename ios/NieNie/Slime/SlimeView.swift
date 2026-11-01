@@ -36,6 +36,7 @@ final class SlimeView: UIView {
     private var laidOutSize: CGSize = .zero
 
     private let skyLayer = CAGradientLayer()
+    private let speckLayers = [CAShapeLayer(), CAShapeLayer()]   // v2.17: far-away specks, two strengths
     private let shadowLayer = CAShapeLayer()
     private let shadeLayer = CAShapeLayer()      // whole body in the shade colour
     private let litGroup = CALayer()             // masked to the body
@@ -64,6 +65,11 @@ final class SlimeView: UIView {
         skyLayer.startPoint = CGPoint(x: 0.5, y: 0)
         skyLayer.endPoint = CGPoint(x: 0.5, y: 1)
         layer.addSublayer(skyLayer)
+        for (n, l) in speckLayers.enumerated() {
+            l.fillColor = UIColor.white.cgColor
+            l.opacity = n == 0 ? 0.4 : 0.7
+            layer.addSublayer(l)
+        }
         shadowLayer.fillColor = UIColor(red: 60 / 255, green: 90 / 255, blue: 40 / 255, alpha: 0.18).cgColor
         layer.addSublayer(shadowLayer)
         layer.addSublayer(shadeLayer)
@@ -151,12 +157,14 @@ final class SlimeView: UIView {
         guard size.width > 0, size.height > 0 else { return }
         // ignore small height changes (keyboard, panels), rebuild on real size changes
         if abs(size.width - laidOutSize.width) > 2 || abs(size.height - laidOutSize.height) > 160 || laidOutSize == .zero {
+            let first = laidOutSize == .zero
             laidOutSize = size
             rig.setup(width: Double(size.width), height: Double(size.height))
+            if first { rig.startIntro() }   // v2.17: the hop-in plays on a cold start only, not on a rotation or coming back from the background
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
-            for l in [shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer] as [CALayer] {
+            for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer] as [CALayer]) + (speckLayers as [CALayer]) {
                 l.frame = bounds
             }
             redraw()
@@ -358,16 +366,44 @@ final class SlimeView: UIView {
         return img.cgImage
     }
 
+    /// v2.17: a layer of faint fixed specks far behind (parallax 0.55, they move slower than the slime). Without them a following
+    /// camera looks like the slime walking back by itself. One speck or none per 120-point cell, hashed from the cell.
+    private func drawSpecks() {
+        guard rig.params.specks >= 0.5 else { for l in speckLayers { l.path = nil }; return }
+        let v = rig.viewV, par = 0.55, zf = 1 + (rig.camZ - 1) * par, cell = 120.0, bx = rig.camX * par, by = rig.camY * par
+        let W = Double(bounds.width), H = Double(bounds.height)
+        func hs(_ a: Int, _ b: Int, _ c: Int) -> Double {
+            var n = UInt32(truncatingIfNeeded: a &* 374761393 &+ b &* 668265263 &+ c &* 2147483647)
+            n = (n ^ (n >> 13)) &* 1274126177
+            return Double(n ^ (n >> 16)) / 4294967296
+        }
+        let x0 = Int(floor((bx - v.x / zf) / cell)) - 1, x1 = Int(ceil((bx + (W - v.x) / zf) / cell)) + 1
+        let y0 = Int(floor((by - v.y / zf) / cell)) - 1, y1 = Int(ceil((by + (H - v.y) / zf) / cell)) + 1
+        let paths = [CGMutablePath(), CGMutablePath()]
+        if x1 >= x0 && y1 >= y0 && (x1 - x0) * (y1 - y0) < 4000 {
+            for i in x0...x1 {
+                for j in y0...y1 where hs(i, j, 1) <= 0.45 {
+                    let sx = (Double(i) * cell + hs(i, j, 2) * cell - bx) * zf + v.x, sy = (Double(j) * cell + hs(i, j, 3) * cell - by) * zf + v.y
+                    let r = (1.4 + 2 * hs(i, j, 4)) * zf
+                    paths[hs(i, j, 5) < 0.5 ? 0 : 1].addEllipse(in: CGRect(x: sx - r, y: sy - r, width: r * 2, height: r * 2))
+                }
+            }
+        }
+        speckLayers[0].path = paths[0]; speckLayers[1].path = paths[1]
+    }
+
     private func redraw() {
         // v2.12 camera: everything is drawn in screen points through rig.toScreen; sizes scale with the zoom, the outline
         // keeps its on-screen width
-        let z = rig.camZ, R = rig.R * z
+        let z = rig.drawZ, R = rig.R * z
         let P = rig.boundaryPoints().map { p -> (x: Double, y: Double) in rig.toScreen(p.x, p.y) }
         guard !P.isEmpty else { return }
         let lw = max(4, rig.R * 0.034)
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+
+        drawSpecks()
 
         var minX = 1e9, maxX = -1e9, maxY = -1e9
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }

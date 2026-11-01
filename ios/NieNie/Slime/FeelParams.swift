@@ -121,6 +121,14 @@ struct FeelParams: Equatable, Codable {
     var pressSpread: Double = 0.10    // around the finger the body is pushed out this much (in radii, most at 0.3R from the finger)
     var pressSink: Double = 0.8       // 60% in the first 40 ms, the rest takes this long (s)
     var pressBounce: Double = 1       // release damping: 1 no rebound (clay), lower rebounds more (jelly 0.3)
+    // v2.17 (多米: when the app opens it comes hopping over from far away; the camera should not pin it to the middle: it moves,
+    // sometimes off screen, and the camera follows slowly)
+    var intro: Double = 1             // 1: four hops in from far away on a cold start (about 2.8 s), a touch on the way brings it home at once
+    var camFollow: Double = 1         // 1: the camera follows once it walks off-centre, it may leave the screen; still while grabbed. 0: v2.16
+    var followZone: Double = 0.5      // how far from the centre (1 = half the view) before the camera starts to follow
+    var followSpeed: Double = 1.4     // follow spring (rad/s), critically damped; 1.4 catches up in about 2 s
+    var dash: Double = 0.25           // chance a wander walks far and fast (2.5× speed); the camera lags and it leaves the screen a bit
+    var specks: Double = 1            // 1: faint fixed specks far behind (parallax 0.55) so a moving camera reads as moving
     var dens: Double = 12             // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -187,6 +195,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
+        p.camFollow = 0   // before v2.17 the view stayed at home and the wander kept to the middle
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
@@ -251,7 +260,8 @@ struct Candidate: Identifiable {
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
-            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+        Candidate(id: 216, name: "v2.16 對照（鏡頭釘在中間）", hint: "鏡頭不跟、整隻一定在畫面裡、遊走只在中間一小塊") { p, _ in p.camFollow = 0 },
         Candidate(id: 215, name: "v2.15 對照（月牙凹痕）", hint: "按壓只有那一小塊攤開、凹痕是左上一彎硬邊月牙、0.08 秒到底，放手不分材質一樣淡") { p, _ in p.press2 = 0 },
         Candidate(id: 270, name: "v2.7 對照（舊外形）", hint: "海星外形五條觸手、固定行進波蠕動、正弦呼吸、黏土輕捏回彈") { p, m in m.applyV27(&p) },
     ]
@@ -275,6 +285,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
         TuneField(key: \.dent, name: "點一下留凹痕", hint: "1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）", range: 0...1, step: 1),
         TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑", range: 0.1...0.5, step: 0.01),
+        TuneField(key: \.intro, name: "開場跑過來", hint: "1：冷啟動時從遠處一跳一跳跑過來（約 2.8 秒），途中碰一下就直接到家；0 關（v2.17）", range: 0...1, step: 1),
+        TuneField(key: \.camFollow, name: "鏡頭跟著走", hint: "1：史萊姆走離中心就慢慢跟過去，它可以跑出畫面；抓著時鏡頭不動。0 是 v2.16（鏡頭釘在家）", range: 0...1, step: 1),
+        TuneField(key: \.followZone, name: "鏡頭開始追（×半個畫面）", hint: "史萊姆中心離畫面中心多遠鏡頭才開始追", range: 0.1...1, step: 0.05),
+        TuneField(key: \.followSpeed, name: "鏡頭追的快慢", hint: "彈簧頻率（每秒弧度）；1.4 約 2 秒追上，越大越緊", range: 0.4...5, step: 0.1),
+        TuneField(key: \.dash, name: "走遠的機率", hint: "每次遊走有多少機率走遠、走快（2.5 倍速），鏡頭跟不上就會跑出畫面一點", range: 0...1, step: 0.05),
+        TuneField(key: \.specks, name: "背景光點", hint: "1：遠處固定的淡光點，鏡頭動的時候看得出來", range: 0...1, step: 1),
         TuneField(key: \.press2, name: "按壓真實版", hint: "1：v2.16 按壓（整團壓薄攤開、凹痕跟著身體變形、先快後慢地沉、放手依材質回彈、亮光被擠開、影子變深）；0 是 v2.15 的月牙凹痕", range: 0...1, step: 1),
         TuneField(key: \.pressArea, name: "壓薄攤開：面積", hint: "按到底時整團面積多幾成（從正面按下去前後變薄，看起來變大一圈）", range: 0...0.15, step: 0.01),
         TuneField(key: \.pressSpread, name: "壓薄攤開：手指附近（×半徑）", hint: "手指周圍那圈往外推多少（離手指約 0.3R 推最多）", range: 0...0.3, step: 0.01),
