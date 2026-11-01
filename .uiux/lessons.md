@@ -61,4 +61,5 @@
 | 2026-11-02 | 音效 | 多米說配音刺耳。量了才知道高頻其實很少（3 kHz 以上幾乎 0%），刺耳來自起音只有 2 到 12 毫秒、峰值頂到 −1 到 −4 dB、能量擠在手機喇叭最突出的 500 到 1800 Hz。ASMR 版第一次做的「噗」為了圓潤用低頻，量到有一段 300 Hz 以上只剩 2%，手機上會聽不到 | 「刺耳」先量起音、峰值、重心，不要直覺砍高頻；改得更軟的同時每段都要再量一次 300 Hz 以上的佔比 |
 | 2026-11-02 | VibeRails | v2.22 整組 selftest 時 T28（放手 2 秒還留八成）掉到 0.76，單獨跑是 0.89。一段一段試，才找到是開心小跳跳到一半被 setup() 打斷：setup 只把 INTRO.on 關掉，壓扁量 INTRO.sq 留著 −0.053，之後每個測試的參考形狀都被橫向撐開。這是 v2.17 就有的洞，app 裡在小跳時換材質也會中 | setup() 要把所有「表演中」的量歸零（不只開關）；單獨跑對、整組跑錯，用「跑一段可疑的動作、接著跑那個測試」逐段找，比猜快 |
 | 2026-11-02 | VibeRails | v2.22 的搔癢計時器存的是「下次幾秒」（絕對時間），selftest 每輪把時鐘倒回 0，第二輪起就一直等不到下次，咯咯笑和扭動都沒了 | 存絕對時間的計時器（gigNext、nextTwitch 這類）在 setup() 一起歸零；selftest 至少連跑兩輪，第二輪抓得到這種 |
+| 2026-11-02 | VibeRails | 推 main 的流程（cherry-pick -n 之後 `git checkout HEAD -- ios`）擋得住改過的 iOS 檔，擋不住「新增」的：v2.22 新增 32 個 voice wav 跟著進了 main，比對又只看 prototype、.uiux、CLAUDE.md，沒抓到。同一次我還拿 main 上的 hash 當 `log A..HEAD` 的起點，列出整串舊 commit（沒造成損害，但很危險） | cherry-pick 之後再加一步 `git diff --cached --name-only --diff-filter=A -- ios \| xargs -r git rm -q --cached`，commit 完確認 `git diff --stat HEAD~1 HEAD -- ios` 是空的；要挑的 commit 直接寫 hash，不用範圍 |
 
