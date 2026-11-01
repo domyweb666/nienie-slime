@@ -92,6 +92,10 @@ final class SlimeController: ObservableObject {
         case .tap:
             sound.press(intensity: 0.5)
             haptics.transient(intensity: 0.45, sharpness: 0.35)
+        case .voice(let kind, let gain, let rate):
+            sound.voice(kind, gain: gain, rate: rate)
+        case .drip(let gain):
+            sound.drip(gain: gain)
         case .nudge:
             // v2.20 C1: it swam over and touched your resting finger: one soft, round tap (lighter than a press)
             sound.press(intensity: 0.2)

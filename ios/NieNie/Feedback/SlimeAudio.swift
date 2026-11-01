@@ -22,6 +22,10 @@ protocol SlimeSoundSource: AnyObject {
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool)
     /// App going to the background: loops off, nothing pending.
     func stopAll()
+    /// v2.22 E1: one of its small sounds (`voice.<kind>` in the manifest); `rate` is the pitch from the impression.
+    func voice(_ kind: String, gain: Double, rate: Double)
+    /// v2.22: a drop of slime comes off (one small bubble).
+    func drip(gain: Double)
     /// 候選 17: one release "pop" file, for Core Haptics to register (nil until there is one).
     var releaseSampleURL: URL? { get }
 }
@@ -265,6 +269,14 @@ final class SlimeAudio: SlimeSoundSource {
     func press(intensity: Double) {
         pending.removeAll()   // touching again cuts the last release's tail
         layered("press", Self.clamp(intensity, 0, 1), pressLayers)
+    }
+
+    func voice(_ kind: String, gain: Double, rate: Double) {
+        one("voice.\(kind)", Play(gain: Self.clamp(gain, 0, 1), rate: rate, lowpass: 4000))
+    }
+
+    func drip(gain: Double) {
+        one("settle.bubble", Play(gain: Self.clamp(gain, 0, 1) * 0.6, rate: Self.rnd(0.8, 1.1), lowpass: 3000, deco: true))
     }
 
     func strand(gain: Double) {

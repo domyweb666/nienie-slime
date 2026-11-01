@@ -96,5 +96,55 @@
       "settle-hiss-02.wav",
       "settle-hiss-03.wav"
     ]
+  },
+  "voice": {
+    "poke": [
+      "voice-poke-01.wav",
+      "voice-poke-02.wav",
+      "voice-poke-03.wav",
+      "voice-poke-04.wav",
+      "voice-poke-05.wav"
+    ],
+    "mmm": [
+      "voice-mmm-01.wav",
+      "voice-mmm-02.wav",
+      "voice-mmm-03.wav",
+      "voice-mmm-04.wav"
+    ],
+    "protest": [
+      "voice-protest-01.wav",
+      "voice-protest-02.wav",
+      "voice-protest-03.wav",
+      "voice-protest-04.wav"
+    ],
+    "happy": [
+      "voice-happy-01.wav",
+      "voice-happy-02.wav",
+      "voice-happy-03.wav",
+      "voice-happy-04.wav"
+    ],
+    "ask": [
+      "voice-ask-01.wav",
+      "voice-ask-02.wav",
+      "voice-ask-03.wav",
+      "voice-ask-04.wav"
+    ],
+    "giggle": [
+      "voice-giggle-01.wav",
+      "voice-giggle-02.wav",
+      "voice-giggle-03.wav",
+      "voice-giggle-04.wav"
+    ],
+    "gulp": [
+      "voice-gulp-01.wav",
+      "voice-gulp-02.wav",
+      "voice-gulp-03.wav",
+      "voice-gulp-04.wav"
+    ],
+    "hello": [
+      "voice-hello-01.wav",
+      "voice-hello-02.wav",
+      "voice-hello-03.wav"
+    ]
   }
 }

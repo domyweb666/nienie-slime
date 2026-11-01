@@ -37,7 +37,7 @@ SR = 48000  # iOS 端的音訊引擎是 48k，直接對上不用轉
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT_DIRS = [os.path.join(ROOT, 'prototype', 'web', 'sfx'), os.path.join(ROOT, 'ios', 'NieNie', 'Resources')]
-OURS = re.compile(r'^(press|pull|release|rub|settle)-.*\.wav$')
+OURS = re.compile(r'^(press|pull|release|rub|settle|voice)-.*\.wav$')
 
 
 # ---------- 積木 ----------
@@ -462,6 +462,137 @@ def settle_hiss_a(rng, k):
     return finish_a(x, 3000, -24, fin=0.02, fout=0.08)
 
 
+# ---------- v2.22 它的聲音（E1，多米 build 77：還是沒有互動的感覺；拉力互動聲音黏液提案第二節） ----------
+# 沒有字的小聲音，像小動物在喉嚨裡哼：聲帶脈衝（諧波 −12 dB/八度）加一點氣聲，過兩三個共振峰（嘴巴的形狀），音高照每種情緒畫一條線。
+# 基音 330 到 600 Hz（小動物，而且手機喇叭放得出來），低通 2.4 kHz、起音 15 到 30 毫秒、峰值 −16 dB 上下：跟 v3 音效一樣是貼耳的輕聲。
+# app 依印象調音高（熟的高一點、長一點，戒的低、短），所以每種只做 4 到 6 段。
+
+VOWEL = {   # 共振峰（Hz、相對大小），小動物的嘴比較小，全部往上推一點
+    'm': [(320, 1.0), (1150, 0.25)],                 # 閉嘴哼
+    'u': [(380, 1.0), (950, 0.5), (2300, 0.08)],
+    'o': [(520, 1.0), (980, 0.6), (2500, 0.08)],
+    'i': [(330, 1.0), (2100, 0.35), (2900, 0.1)],
+}
+
+
+def glottal(f0_curve, breath=0.08, jitter=0.006, rng=None):
+    """聲帶：照音高曲線產生 30 個諧波（每八度 −12 dB），加一點點音高抖動和氣聲。f0_curve 是每個樣本的 Hz。"""
+    n = len(f0_curve)
+    f = f0_curve * (1 + jitter * lowpass(rng.standard_normal(n), 12))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    x = np.zeros(n)
+    for h in range(1, 31):
+        amp = 1.0 / h ** 2
+        mask = (h * f) < 4000
+        x += amp * np.sin(h * ph) * mask
+    x += breath * band(rng.standard_normal(n), 800, 3500)
+    return x
+
+
+def mouth(x, vowel, vowel2=None):
+    """過共振峰；有 vowel2 就從 vowel 慢慢滑到 vowel2（嘴型在變）。"""
+    a = sum(g * band(x, max(80, fc * 0.85), fc * 1.15) for fc, g in VOWEL[vowel])
+    if vowel2 is None:
+        return a
+    b = sum(g * band(x, max(80, fc * 0.85), fc * 1.15) for fc, g in VOWEL[vowel2])
+    w = np.linspace(0, 1, len(x))
+    return a * (1 - w) + b * w
+
+
+def contour(dur, pts):
+    """音高曲線：pts 是 [(時間比例 0..1, Hz)]，中間用平滑插值。"""
+    n = int(dur * SR)
+    t = np.linspace(0, 1, n)
+    ts, fs = zip(*pts)
+    return np.interp(t, ts, fs)
+
+
+def hum(rng, dur, pts, vowel, vowel2=None, attack=0.02, decay_tail=0.08, vib=0.0, breath=0.08):
+    n = int(dur * SR)
+    f0 = contour(dur, pts)
+    if vib:
+        f0 = f0 * (1 + vib * np.sin(2 * np.pi * rng.uniform(4.5, 6) * np.arange(n) / SR))
+    x = mouth(glottal(f0, breath, rng=rng), vowel, vowel2)
+    t = np.arange(n) / SR
+    env = np.where(t < attack, 0.5 - 0.5 * np.cos(np.pi * t / attack), 1.0)
+    env *= np.where(t > dur - decay_tail, np.clip((dur - t) / decay_tail, 0, 1) ** 1.5, 1.0)
+    return x * env
+
+
+def voice_poke(rng, k):
+    """被戳一下：「噗」，0.12 秒，音高很快往下掉，前面一點點軟的氣音。"""
+    f = rng.uniform(500, 580)
+    x = hum(rng, 0.13, [(0, f), (0.3, f * 0.92), (1, f * 0.75)], 'u', attack=0.012, decay_tail=0.06, breath=0.12)
+    puff = lowpass(rng.standard_normal(len(x)), 1500) * soft_env(len(x), 0.004, 0.015)
+    x = x / (np.max(np.abs(x)) or 1) + 0.25 * puff / (np.max(np.abs(puff)) or 1)
+    return finish_a(x, 2400, -16, fin=0.004, fout=0.04)
+
+
+def voice_mmm(rng, k):
+    """被摸得舒服：「嗯～」，0.6 秒閉嘴哼，音高先微微上去再慢慢下來，有一點點顫音。"""
+    f = rng.uniform(340, 400)
+    x = hum(rng, rng.uniform(0.55, 0.7), [(0, f * 0.95), (0.25, f * 1.06), (1, f * 0.9)], 'm', attack=0.03, decay_tail=0.2, vib=0.012, breath=0.06)
+    return finish_a(x, 2000, -16, fin=0.01, fout=0.1)
+
+
+def voice_protest(rng, k):
+    """被用力扯：「嗯嗯」，兩下短而有點緊的哼（諧波多一點），第二下高一點。"""
+    f = rng.uniform(420, 480)
+    a = hum(rng, 0.15, [(0, f), (1, f * 0.88)], 'u', attack=0.012, decay_tail=0.05, breath=0.1)
+    b = hum(rng, 0.17, [(0, f * 1.08), (1, f * 0.9)], 'u', attack=0.012, decay_tail=0.07, breath=0.1)
+    x = np.zeros(int(0.42 * SR))
+    place(x, a, 0)
+    place(x, b, rng.uniform(0.19, 0.23))
+    return finish_a(sat(x / (np.max(np.abs(x)) or 1), 1.4), 2400, -16, fout=0.05)
+
+
+def voice_happy(rng, k):
+    """揉完放手、開心：「噗咿」，嘴型從 u 滑到 i，音高往上揚。"""
+    f = rng.uniform(390, 440)
+    x = hum(rng, rng.uniform(0.32, 0.4), [(0, f), (0.35, f * 1.05), (1, f * 1.38)], 'u', 'i', attack=0.015, decay_tail=0.1)
+    return finish_a(x, 2400, -16, fout=0.08)
+
+
+def voice_ask(rng, k):
+    """伸偽足討摸、探你：「嗯？」，短短的閉嘴哼，尾巴往上問。"""
+    f = rng.uniform(360, 410)
+    x = hum(rng, rng.uniform(0.22, 0.28), [(0, f), (0.5, f * 1.02), (1, f * 1.32)], 'm', 'u', attack=0.02, decay_tail=0.06)
+    return finish_a(x, 2200, -16, fout=0.06)
+
+
+def voice_giggle(rng, k):
+    """被搔癢：咯咯咯，4 到 6 下很短的「i」，一下比一下低一點，間隔 85 到 110 毫秒。"""
+    m = int(rng.integers(4, 7))
+    f = rng.uniform(540, 600)
+    x = np.zeros(int((0.12 + m * 0.11) * SR))
+    tt = 0.0
+    for j in range(m):
+        g = hum(rng, 0.06, [(0, f * (1 - 0.03 * j)), (1, f * (0.9 - 0.03 * j))], 'i', attack=0.008, decay_tail=0.03, breath=0.14)
+        place(x, (1 - 0.08 * j) * g, tt)
+        tt += rng.uniform(0.085, 0.11)
+    return finish_a(x, 2200, -17, fout=0.05)
+
+
+def voice_gulp(rng, k):
+    """把黏液吸回去：「咕嚕」，低一點的哼（缺基音，手機也聽得到）加嘴型 o → u，後面一顆軟泡。"""
+    f = rng.uniform(300, 340)
+    x = hum(rng, 0.26, [(0, f), (0.4, f * 0.82), (1, f * 0.7)], 'o', 'u', attack=0.015, decay_tail=0.08)
+    x = x / (np.max(np.abs(x)) or 1)
+    place(x, 0.4 * bubble(rng.uniform(420, 560), 1.2, 0.02, 0.08) * soft_env(int(0.08 * SR), 0.004, 1e9), rng.uniform(0.15, 0.2))
+    return finish_a(x, 2000, -15, fout=0.06)
+
+
+def voice_hello(rng, k):
+    """游到前面跟你打招呼：「嗯～嗯」，上去再下來的兩個音，像在叫你。"""
+    f = rng.uniform(380, 430)
+    a = hum(rng, 0.26, [(0, f), (1, f * 1.2)], 'm', 'u', attack=0.02, decay_tail=0.05)
+    b = hum(rng, 0.3, [(0, f * 1.15), (1, f * 0.95)], 'u', attack=0.015, decay_tail=0.12, vib=0.01)
+    x = np.zeros(int(0.62 * SR))
+    place(x, a, 0)
+    place(x, b, 0.27)
+    return finish_a(x, 2300, -16, fout=0.1)
+
+
 # (類別, 層, 產生函式, 段數)。段數 × 層數 × 浮音高，組合比 v1 的「一類 8 段」多上百倍。LAYERS_V2 是 v2（刺耳的那組，留著對照）
 LAYERS_V2 = [
     ('press', 'body', press_body, 6), ('press', 'wet', press_wet, 6), ('press', 'air', press_air, 6),
@@ -476,6 +607,8 @@ LAYERS = [
     ('pull', 'loop', pull_loop_a, 2), ('pull', 'strand', pull_strand_a, 10),
     ('rub', 'loop', rub_loop_a, 3),
     ('settle', 'bubble', settle_bubble_a, 10), ('settle', 'hiss', settle_hiss_a, 3),
+    ('voice', 'poke', voice_poke, 5), ('voice', 'mmm', voice_mmm, 4), ('voice', 'protest', voice_protest, 4), ('voice', 'happy', voice_happy, 4),
+    ('voice', 'ask', voice_ask, 4), ('voice', 'giggle', voice_giggle, 4), ('voice', 'gulp', voice_gulp, 4), ('voice', 'hello', voice_hello, 3),
 ]
 
 

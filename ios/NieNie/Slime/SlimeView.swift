@@ -49,6 +49,14 @@ final class SlimeView: UIView {
     private let dentUnit: CGFloat = 40           // the pit image is drawn for this radius (points)
     private let highlightLayer = CAShapeLayer()
     private let outlineLayer = CAShapeLayer()
+    // v2.22 drops, drawn in front of the body the same way: shade, the base colour shifted up-left inside, a highlight, an outline
+    private let dropShadeLayer = CAShapeLayer()
+    private let dropLitGroup = CALayer()
+    private let dropMask = CAShapeLayer()
+    private let dropBaseLayer = CAShapeLayer()
+    private let dropHiLayer = CAShapeLayer()
+    private let dropLineLayer = CAShapeLayer()
+    private var tintKey = -1   // v2.22 E3: the impression tint last applied (rounded), −1 = plain colours
 
     /// Touches starting this close to the top/bottom edge are left to the system gestures.
     private let edgeBand: CGFloat = 32
@@ -89,6 +97,13 @@ final class SlimeView: UIView {
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
+        layer.addSublayer(dropShadeLayer)
+        dropLitGroup.mask = dropMask
+        layer.addSublayer(dropLitGroup)
+        dropLitGroup.addSublayer(dropBaseLayer)
+        layer.addSublayer(dropHiLayer)
+        dropLineLayer.fillColor = nil
+        layer.addSublayer(dropLineLayer)
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
         layer.addSublayer(flashLayer)
@@ -130,7 +145,21 @@ final class SlimeView: UIView {
         highlightLayer.fillColor = colors.light.cgColor
         outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
         outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
+        dropShadeLayer.fillColor = colors.shade.cgColor
+        dropBaseLayer.fillColor = colors.base.cgColor
+        dropHiLayer.fillColor = colors.light.cgColor
+        dropLineLayer.strokeColor = colors.line.cgColor
+        tintKey = -1
         CATransaction.commit()
+    }
+
+    /// v2.22 E3: trusting leans warm, wary leans pale, inside the same two flat colours (the style stays).
+    private func tinted(_ c: UIColor, _ tr: Double, _ w: Double) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        c.getRed(&r, green: &g, blue: &b, alpha: &a)
+        var rr = min(255, Double(r) * 255 + 22 * tr), gg = min(255, Double(g) * 255 + 4 * tr), bb = max(0, Double(b) * 255 - 18 * tr)
+        rr += (255 - rr) * 0.22 * w; gg += (255 - gg) * 0.22 * w; bb += (255 - bb) * 0.22 * w
+        return UIColor(red: CGFloat(rr / 255), green: CGFloat(gg / 255), blue: CGFloat(bb / 255), alpha: a)
     }
 
     // MARK: - Lifecycle
@@ -164,7 +193,8 @@ final class SlimeView: UIView {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
-            for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer] as [CALayer]) + (speckLayers as [CALayer]) {
+            for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
+                       dropShadeLayer, dropLitGroup, dropMask, dropBaseLayer, dropHiLayer, dropLineLayer] as [CALayer]) + (speckLayers as [CALayer]) {
                 l.frame = bounds
             }
             redraw()
@@ -497,6 +527,28 @@ final class SlimeView: UIView {
             outlineLayer.lineWidth = lw
             outlineLayer.path = body
         }
+
+        // v2.22 E3: the body colour leans with the impression (only re-set when it moved by a visible step)
+        let tk = rig.showsImpression ? Int((rig.impShownTrust * 40).rounded()) * 100 + Int((rig.impShownWary * 40).rounded()) : -1
+        if tk != tintKey {
+            tintKey = tk
+            let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
+            let sh = tinted(colors.shade, tr, w).cgColor, ba = tinted(colors.base, tr, w).cgColor
+            shadeLayer.fillColor = sh; baseLayer.fillColor = ba; dropShadeLayer.fillColor = sh; dropBaseLayer.fillColor = ba
+        }
+        // v2.22 drops: an ellipse stretched along its speed; the base colour shifted up-left inside it, a small highlight, the outline
+        let dv = rig.dropViews
+        let dsh = CGMutablePath(), dba = CGMutablePath(), dhi = CGMutablePath()
+        for d in dv {
+            let c = rig.toScreen(d.x, d.y), r = d.r * z, sp = hypot(d.vx, d.vy), st = 1 + min(0.5, sp / (rig.R * 3)), a = atan2(d.vy, d.vx)
+            let rect = CGRect(x: -r * st, y: -r / st, width: 2 * r * st, height: 2 * r / st), rot = CGAffineTransform(rotationAngle: a)
+            dsh.addEllipse(in: rect, transform: rot.concatenating(CGAffineTransform(translationX: c.x, y: c.y)))
+            dba.addEllipse(in: rect, transform: rot.concatenating(CGAffineTransform(translationX: c.x - r * 0.18, y: c.y - r * 0.22)))
+            dhi.addEllipse(in: CGRect(x: -r * 0.28, y: -r * 0.13, width: r * 0.56, height: r * 0.26),
+                           transform: CGAffineTransform(rotationAngle: -0.5).concatenating(CGAffineTransform(translationX: c.x - r * 0.38, y: c.y - r * 0.42)))
+        }
+        dropShadeLayer.path = dsh; dropMask.path = dsh; dropBaseLayer.path = dba; dropHiLayer.path = dhi
+        dropLineLayer.path = dsh; dropLineLayer.lineWidth = max(2.5, rig.R * 0.024)
 
         CATransaction.commit()
     }

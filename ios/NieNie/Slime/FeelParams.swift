@@ -157,6 +157,12 @@ struct FeelParams: Equatable, Codable {
     var impC3: Double = 1             // C3: drag follow by impression: trusting 0.5, wary 0.15; very wary slips free after a while; less while it strains to flee
     var impC4: Double = 1             // C4: after a purr and release it reaches for where your finger left and edges over; touched within 5 s, the purr comes fast
     var impC5: Double = 1             // C5: wary, it flinches more and sooner and calms after gentle touches; idle, trusting sniffs toward your last touch, wary away
+    // v2.22 (多米 build 77: still no feeling it reacts to you; go on with the drops). All five only count while life2 is 1
+    var e1: Double = 1                // E1: it makes small sounds: poked, stroked, pulled, happy, begging, tickled, gulping a drop, saying hello; higher when trusting
+    var e2: Double = 1                // E2: every action answered: a tap → it leans toward your finger; held still → it pushes once, then nuzzles; tickled → it squirms, too long → slips free; wary and dragged → it claws away
+    var e3: Double = 1                // E3: the impression shows: trust 3–4× faster; trusting rounder, taller, warmer, slower breath; wary flatter, paler
+    var e4: Double = 1                // E4: trusting and left alone 10–20 s, it swims to the front, waves a pseudopod, hums, goes back (3 times a run at most)
+    var drops: Double = 1             // drops: long pulls, yanks, flings, pinches, slow lifts drop bits (body at most 15% smaller); they float, it swims over and takes them back; you can drag them; trusting it pushes one to you; hold one and it comes to snatch it
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -226,7 +232,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
-        p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0   // nothing of v2.20, v2.21
+        p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0   // nothing of v2.20 to v2.22
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
@@ -293,7 +299,8 @@ struct Candidate: Identifiable {
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
-        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0 },
+        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 221, name: "v2.21 對照（不出聲、沒有黏液）", hint: "沒有 E1 到 E4、沒有黏液") { p, _ in p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
         Candidate(id: 220, name: "v2.20 對照（整團只跟三成五）", hint: "單指拉只有三成五跟過去，果凍拉 1.6R 就頂住") { p, _ in p.slide = 0 },
         Candidate(id: 218, name: "v2.18 對照（沒有 v2.19 活物感）", hint: "一直在動、被拖著滑過去、一碰全停、固定節拍呼吸、隨機偽足、有影子") { p, _ in p.life2 = 0 },
         Candidate(id: 216, name: "v2.16 對照（鏡頭釘在中間）", hint: "鏡頭不跟、整隻一定在畫面裡、遊走只在中間一小塊") { p, _ in p.camFollow = 0 },
@@ -338,6 +345,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.lifeBreath, name: "A6 呼吸像生理", hint: "1：每一下快慢不同、30 到 90 秒一次大口呼吸、跑完會喘；0：v2.18 固定節拍", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.lifeAttend, name: "A7 探你碰的地方", hint: "1：放手後往你手指離開的地方探一下；碰它旁邊的空白處，它轉過去探（不走過去）；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.shadow, name: "A8 影子", hint: "1：畫影子（v2.18）；0：不畫（v2.19）。活物總開關 0 時一律畫", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.e1, name: "E1 它會出聲", hint: "v2.22：被戳「噗」、被揉「嗯～」、被扯「嗯嗯」、開心「噗咿」、討摸「嗯？」、搔癢咯咯笑、吞黏液「咕嚕」、打招呼；熟的高一點、戒的低一點；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.e2, name: "E2 動作都有它的回應", hint: "1：點它，它朝你的手指傾一下；按著不動 0.35 秒，它往你的手指推一下（輕頂）；手指放著不動它慢慢蹭你；搔癢它扭來扭去，撥太久會掙脫；戒的時候被拖會扒著反方向；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.e3, name: "E3 看得出印象", hint: "1：熟得快三到四倍；熟的圓一點、挺一點、顏色偏暖、呼吸慢；戒的扁一點、顏色淡一點；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.e4, name: "E4 來找你", hint: "1：熟的時候你 10 到 20 秒沒碰它，它游到畫面前面揮一下偽足、哼一聲，再回去休息；一次打開最多 3 次；0 關（碰到不做清單的「主動找你」，等多米決定）", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.drops, name: "黏液", hint: "1：拉很長、猛扯、甩、兩指擠、按久慢慢抬手會掉黏液（身體最多小一成五）；黏液飄著，它會游過去吸回來；你可以拖黏液，丟到它身上就吸；熟的時候它會推給你；你抓著一滴它會來搶；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）", range: 0...0.15, step: 0.01, section: "活物感"),
