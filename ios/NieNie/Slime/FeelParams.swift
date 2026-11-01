@@ -114,6 +114,13 @@ struct FeelParams: Equatable, Codable {
     // v2.15 (多米 build 61: a tap should leave something, maybe a dent)
     var dent: Double = 1              // 1: a press leaves a dent (a crescent of shade upper-left), fading at the relax rate
     var dentSize: Double = 0.3        // dent radius, in radii
+    // v2.16 (多米: the press looked like a toy). Defaults are clay; jelly and mochi set theirs in `defaults`
+    var press2: Double = 1            // 1: the whole body thins and spreads, the dent bends with the body, fast then slow sinking,
+                                      // a material rebound on release, the highlight squeezed aside, a deeper shadow; 0: v2.15 crescent
+    var pressArea: Double = 0.06      // fully pressed, the body's area grows this much (pressed from the front it gets thinner, so wider)
+    var pressSpread: Double = 0.10    // around the finger the body is pushed out this much (in radii, most at 0.3R from the finger)
+    var pressSink: Double = 0.8       // 60% in the first 40 ms, the rest takes this long (s)
+    var pressBounce: Double = 1       // release damping: 1 no rebound (clay), lower rebounds more (jelly 0.3)
     var dens: Double = 12             // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -155,11 +162,13 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
                            lag: 0.05, wGlobal: 0.12, cSpace: 0.3, cRad: 0.42, upright: 0.004, anchor: 4,
                            areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.25,
                            floppy: 0.5, seed: 7)
+            p.pressArea = 0.04; p.pressSpread = 0.06; p.pressSink = 0.2; p.pressBounce = 0.3   // v2.16
         case .mochi:
             p = FeelParams(alpha: 0.28, damp: 0.966, yield: 0.14, creep: 0.9, recover: 0.18, grabR: 0.32, maxPull: 1.8,
                            lag: 0.08, wGlobal: 0.10, cSpace: 0.3, cRad: 0.45, upright: 0.004, anchor: 4,
                            areaGain: 0.6, gripRot: 3, life: 1, drift: 0.16, wriggle: 0.05, wander: 0.25,
                            floppy: 0.55, seed: 7)
+            p.pressArea = 0.05; p.pressSpread = 0.08; p.pressSink = 0.45; p.pressBounce = 0.6   // v2.16
         case .clay:
             // clay remembers at once, tentacles too; the mark relaxes slowly: half in about 15 s (v2.14, 多米 build 59: it sprang back
             // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
@@ -243,6 +252,7 @@ struct Candidate: Identifiable {
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+        Candidate(id: 215, name: "v2.15 對照（月牙凹痕）", hint: "按壓只有那一小塊攤開、凹痕是左上一彎硬邊月牙、0.08 秒到底，放手不分材質一樣淡") { p, _ in p.press2 = 0 },
         Candidate(id: 270, name: "v2.7 對照（舊外形）", hint: "海星外形五條觸手、固定行進波蠕動、正弦呼吸、黏土輕捏回彈") { p, m in m.applyV27(&p) },
     ]
 }
@@ -265,6 +275,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
         TuneField(key: \.dent, name: "點一下留凹痕", hint: "1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）", range: 0...1, step: 1),
         TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑", range: 0.1...0.5, step: 0.01),
+        TuneField(key: \.press2, name: "按壓真實版", hint: "1：v2.16 按壓（整團壓薄攤開、凹痕跟著身體變形、先快後慢地沉、放手依材質回彈、亮光被擠開、影子變深）；0 是 v2.15 的月牙凹痕", range: 0...1, step: 1),
+        TuneField(key: \.pressArea, name: "壓薄攤開：面積", hint: "按到底時整團面積多幾成（從正面按下去前後變薄，看起來變大一圈）", range: 0...0.15, step: 0.01),
+        TuneField(key: \.pressSpread, name: "壓薄攤開：手指附近（×半徑）", hint: "手指周圍那圈往外推多少（離手指約 0.3R 推最多）", range: 0...0.3, step: 0.01),
+        TuneField(key: \.pressSink, name: "下沉時間（秒）", hint: "40 毫秒先到六成，剩下的多久沉到底；黏土 0.8、果凍 0.2", range: 0.05...2, step: 0.05),
+        TuneField(key: \.pressBounce, name: "放手回彈阻尼", hint: "1 不彈（黏土）；越小放手彈越多下（果凍 0.3）", range: 0.1...1, step: 0.05),
         TuneField(key: \.grabReach, name: "從中間抓也拉得動", hint: "1：從身體裡面抓、範圍碰不到外圈時，手指一動往拉的方向補抓一條到外圈；0 是 v2.13（從中間拉沒反應）", range: 0...1, step: 1),
         TuneField(key: \.maxPull, name: "拉伸上限（×半徑）", hint: "最多拉多遠（軟上限）；黏土 7（v2.15，超過約 8.5R 會抖），v2.13 是 20，v2.12 是 8", range: 0.6...30, step: 0.1),
         TuneField(key: \.lag, name: "黏滯", hint: "跟手的延遲感（秒）；候選 6 是 0.03", range: 0...0.3, step: 0.01),

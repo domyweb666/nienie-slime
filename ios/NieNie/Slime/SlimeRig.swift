@@ -503,10 +503,68 @@ final class SlimeRig {
     /// Dents (v2.15, 多米 build 61: just tapping should do something, maybe a dent). Only the boundary is drawn, so a press in the
     /// middle was invisible. Each dent rides a particle; held it sinks in 0.08 s, a finger dragged 0.4R or more is a pull and the
     /// dent goes; released it fades at the relax rate (clay: half in about 15 s). World position and depth 0...1
-    var dents: [(x: Double, y: Double, d: Double)] { dentList.compactMap { $0.i < N ? (X[$0.i], Y[$0.i], $0.d) : nil } }
+    var dents: [DentView] {
+        dentList.compactMap { dn -> DentView? in
+            guard dn.i < N else { return nil }
+            let m = dentFrame(dn)
+            return DentView(x: X[dn.i], y: Y[dn.i], d: dn.d, p: dn.p, w: dn.w, a: m.0, b: m.1, c: m.2, dd: m.3)
+        }
+    }
+    /// A dent for drawing: world position, visible depth d, physical press p (can dip below 0 on a jelly rebound), how long
+    /// it was held (w 0...1: wider and shallower), and how the skin around it is stretched (a b c dd, CGAffineTransform order,
+    /// rotation removed so the light stays upper-left).
+    struct DentView { let x, y, d, p, w, a, b, c, dd: Double }
+    /// v2.16: p is the physical press (the body spreads, area, highlight, shadow), d the visible depth. nb: neighbours and their
+    /// offsets at the press, to fit how the skin is stretched
     private final class Dent { let i: Int; var d = 0.0; var finger: ObjectIdentifier?; var pull = false
+        var p = 0.0, v = 0.0, p0 = 0.0, tau = 0.0, w = 0.0
+        var nb: [(i: Int, ox: Double, oy: Double)] = []
         init(i: Int, finger: ObjectIdentifier) { self.i = i; self.finger = finger } }
     private var dentList: [Dent] = []
+    /// v2.16: all dents' physical press added up (area, shadow), clamped to -0.6...1.5
+    private(set) var pressSum = 0.0
+
+    /// Least-squares fit of the neighbours' offsets now against at the press, then the stretch part only (polar decomposition
+    /// A = R·S): the body turning must not turn the dent's dark side away from the upper-left light.
+    private func dentFrame(_ dn: Dent) -> (Double, Double, Double, Double) {
+        let x0 = X[dn.i], y0 = Y[dn.i]
+        var m00 = 0.0, m01 = 0.0, m10 = 0.0, m11 = 0.0, s00 = 0.0, s01 = 0.0, s11 = 0.0
+        for q in dn.nb where q.i < N {
+            let cx = X[q.i] - x0, cy = Y[q.i] - y0
+            m00 += cx * q.ox; m01 += cx * q.oy; m10 += cy * q.ox; m11 += cy * q.oy
+            s00 += q.ox * q.ox; s01 += q.ox * q.oy; s11 += q.oy * q.oy
+        }
+        let det = s00 * s11 - s01 * s01
+        if dn.nb.count < 3 || abs(det) < 1e-9 { return (1, 0, 0, 1) }
+        let i00 = s11 / det, i01 = -s01 / det, i11 = s00 / det
+        let a = m00 * i00 + m01 * i01, c = m00 * i01 + m01 * i11, b = m10 * i00 + m11 * i01, d = m10 * i01 + m11 * i11
+        let da = a * d - b * c
+        if !(da > 0.15 && da < 6) { return (1, 0, 0, 1) }
+        let th = atan2(b - c, a + d), co = cos(th), si = sin(th)
+        return (co * a + si * b, -si * a + co * b, co * c + si * d, -si * c + co * d)
+    }
+
+    /// v2.16 P1: around each dent the goals are pushed outward, most (pressSpread·R·p) at σ = 0.3R from the finger and soon gone
+    /// further out (σ 0.6R reached the whole ring from a press in the middle: +20% area, the body's growth is sp's job).
+    private func pressField() -> [(x: Double, y: Double, a: Double, k: Double, s: Double)] {
+        guard params.press2 >= 0.5 && params.pressSpread > 0 else { return [] }
+        let sg = R * 0.3
+        var pf: [(x: Double, y: Double, a: Double, k: Double, s: Double)] = []
+        for dn in dentList where abs(dn.p) >= 0.005 && dn.i < N {
+            pf.append((x: X[dn.i], y: Y[dn.i], a: params.pressSpread * R * dn.p, k: 1 / (2 * sg * sg), s: sg))
+        }
+        return pf
+    }
+    private func pressPush(_ pf: [(x: Double, y: Double, a: Double, k: Double, s: Double)], _ x: Double, _ y: Double) -> (Double, Double) {
+        var ox = 0.0, oy = 0.0
+        for q in pf {
+            let dx = x - q.x, dy = y - q.y, d2 = dx * dx + dy * dy
+            if d2 < 1e-6 { continue }
+            let m = q.a * exp(0.5 - d2 * q.k) / q.s
+            ox += dx * m; oy += dy * m
+        }
+        return (ox, oy)
+    }
 
     // MARK: - Fingers
 
@@ -615,8 +673,19 @@ final class SlimeRig {
         if grab && params.dent > 0 {
             var bi = 0, bd = 1e9
             for i in 0..<N { let d = hypot(X[i] - x, Y[i] - y); if d < bd { bd = d; bi = i } }
-            dentList.append(Dent(i: bi, finger: id))
-            if dentList.count > 6 { dentList.removeFirst() }
+            // v2.16: pressing near an old dent reuses it (pressing one spot keeps deepening it, not two dents side by side that
+            // read as eyes); remember the neighbours' offsets so the drawing bends with the body
+            if params.press2 >= 0.5, let old = dentList.first(where: { $0.finger == nil && hypot(X[$0.i] - x, Y[$0.i] - y) < R * params.dentSize * 0.9 }) {
+                old.finger = id; old.pull = false; old.tau = 0; old.p0 = max(0, old.p)
+            } else {
+                let dn = Dent(i: bi, finger: id), rr = R * params.dentSize * 1.3
+                for i in 0..<N where i != bi {
+                    let ox = X[i] - X[bi], oy = Y[i] - Y[bi]
+                    if ox * ox + oy * oy < rr * rr { dn.nb.append((i, ox, oy)) }
+                }
+                dentList.append(dn)
+                if dentList.count > (params.press2 >= 0.5 ? 4 : 6) { dentList.removeFirst() }
+            }
         }
         fingers[id] = f
     }
@@ -718,6 +787,7 @@ final class SlimeRig {
     func relax() {
         guard N > 0 else { return }
         relaxUntil = t + 0.5
+        for dn in dentList { dn.p = 0; dn.v = 0; dn.p0 = 0 }
     }
 
     /// VoiceOver "拉長": tug the top upward.
@@ -744,7 +814,44 @@ final class SlimeRig {
 
         updateCam(dt)
         for f in fingers.values where f.reach && f.mode == .grab { reachGrab(f) }
-        for dn in dentList {
+        pressSum = 0
+        if mat.press2 >= 0.5 {
+            // v2.16 (多米: the press looked like a toy): 60% in 40 ms, the rest by the material (pressSink); held longer it gets
+            // wider and shallower (w). Released, p springs back by pressBounce (jelly overshoots outward once); clay does not
+            // bounce and lets go fast (the shape is already remembered); d fades at the relax rate on clay, with p elsewhere
+            for dn in dentList {
+                if let id = dn.finger, let f = fingers[id] {
+                    let moved = hypot(f.rawX - f.ax, f.rawY - f.ay)
+                    if moved > R * 0.4 { dn.pull = true }
+                    if dn.pull {
+                        let k2 = 1 - exp(-dt / 0.12)
+                        dn.d -= dn.d * k2; dn.p -= dn.p * k2; dn.v = 0
+                    } else {
+                        // past 0.15R it is a drag, not a press: no more sinking and the push fades (T28: grabbing the edge and
+                        // pulling out with the push still on dropped the kept share to 0.80; without the push 0.83)
+                        let drag = moved >= R * 0.15
+                        if !drag { dn.tau += dt }
+                        let c = 0.6 * (1 - exp(-dn.tau / 0.013)) + 0.4 * (1 - exp(-dn.tau / max(0.02, mat.pressSink)))
+                        dn.p = drag ? dn.p * exp(-dt / 0.12) : max(dn.p0, c); dn.d = max(dn.d, c); dn.v = 0; dn.w = 1 - exp(-dn.tau / 1.5)
+                    }
+                } else {
+                    dn.finger = nil
+                    let b = mat.pressBounce
+                    if b >= 0.95 {
+                        dn.p *= exp(-dt / 0.25); dn.v = 0
+                    } else {
+                        let om = 2 * Double.pi * 5
+                        dn.v += (-om * om * dn.p - 2 * b * om * dn.v) * dt; dn.p += dn.v * dt
+                    }
+                    dn.d *= exp(-(dn.pull ? 8 : t < relaxUntil ? 6 : max(mat.recover, 0.02)) * dt)
+                    if b < 0.95 { dn.d = min(dn.d, max(0, dn.p)) }
+                }
+            }
+            dentList.removeAll { $0.finger == nil && $0.d < 0.02 && abs($0.p) < 0.01 && abs($0.v) < 0.05 }
+            for dn in dentList { pressSum += dn.p }
+            pressSum = max(-0.6, min(1.5, pressSum))
+        }
+        for dn in dentList where mat.press2 < 0.5 {
             if let id = dn.finger, let f = fingers[id] {
                 if hypot(f.rawX - f.ax, f.rawY - f.ay) > R * 0.4 { dn.pull = true }
                 let tg = dn.pull ? 0.0 : 1.0
@@ -754,7 +861,7 @@ final class SlimeRig {
                 dn.d *= exp(-(dn.pull ? 8 : t < relaxUntil ? 6 : max(mat.recover, 0.02)) * dt)
             }
         }
-        dentList.removeAll { $0.finger == nil && $0.d < 0.02 }
+        if mat.press2 < 0.5 { dentList.removeAll { $0.finger == nil && $0.d < 0.02 } }
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
             // chase target: the prediction only on a frame that got a fresh move event, else the real finger,
@@ -1039,7 +1146,9 @@ final class SlimeRig {
             }
         }
         // idle life on the reference shape: breathing, travelling-wave wriggle, tentacle drift
-        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = 1 + bs, bsy = 1 - bs * 0.85   // 提案第 23 條: waveform from update()
+        // sp: v2.16 P1, pressed the whole body grows (the target area grows with it, so the area pressure does not push back)
+        let sp = mat.press2 >= 0.5 ? sqrt(max(0.5, 1 + mat.pressArea * pressSum)) : 1
+        let bs = Lamp * mat.life * 0.045 * brAmp * brWave, bsx = (1 + bs) * sp, bsy = (1 - bs * 0.85) * sp   // 提案第 23 條: waveform from update()
         let wr = Lamp * mat.life * mat.wriggle * R, swA = Lamp * mat.life * mat.drift * R, iR = 1 / R
         // 提案第 20 條 tentacle tail: while wandering, the tentacles' reference positions trail the motion (tips most, u²),
         // scaled by the current speed so the smoothstep profile fades it in and out. Written on the reference shape like the
@@ -1133,8 +1242,10 @@ final class SlimeRig {
         }
         // area pressure: when squashed or stretched the area drops, push goals outward so sides bulge
         let A = polygonArea()
-        let ap = max(-0.12, min(0.12, (sqrt(A0 / A) - 1) * mat.areaGain))
+        let A0p = mat.press2 >= 0.5 ? A0 * (1 + mat.pressArea * pressSum) : A0   // v2.16 P1: pressed from the front it thins, so it looks bigger
+        let ap = max(-0.12, min(0.12, (sqrt(A0p / A) - 1) * mat.areaGain))
         let gcx = clusters[gi].xc, gcy = clusters[gi].yc
+        let pf = pressField()
         // 候選 27 局部面積壓力: weight the area pressure towards the fingers (exp(−(d/1.2R)²), mean kept at 1 so the
         // total area correction is unchanged)
         var local = false
@@ -1161,6 +1272,7 @@ final class SlimeRig {
             var gx = GX[i] / GW[i], gy = GY[i] / GW[i]
             let api = local ? ap * AW[i] : ap
             gx = gcx + (gx - gcx) * (1 + api); gy = gcy + (gy - gcy) * (1 + api)
+            if !pf.isEmpty { let q = pressPush(pf, gx, gy); gx += q.0; gy += q.1 }
             let ka = alpha * KF[i] * (1 - mat.grabHold * GWT[i])   // grabHold: the held patch listens to the finger more than to the shape
             X[i] += (gx - X[i]) * ka; Y[i] += (gy - Y[i]) * ka
         }
@@ -1386,11 +1498,16 @@ final class SlimeRig {
                 g = max(g, x * x * (3 - 2 * x))
             }
             let yl = mat.yield * R, kc = min(1, mat.creep * dt * g)
+            // v2.16: the press push is a performance, taken off before remembering (turned into rest space). Kept, clay remembered
+            // the pushed shape and the next step pushed again on top: the longer the hold the wider (measured: 1.5 s moved 48 pt, was 24)
+            let pf = pressField(), gcs = clusters[gi].cs, gsn = clusters[gi].sn
             if kc > 0 {
                 for i in 0..<N {
                     // compared with the performed reference EX, not Q: touched pseudopods hold still in mid-air, and against Q
                     // they were remembered as a mark (measured: a 1.5 s hold remembered 67 pt)
-                    let rx = RX[i] / GW[i], ry = RY[i] / GW[i], dx = rx - EX[i], dy = ry - EY[i], dl = hypot(dx, dy)
+                    var rx = RX[i] / GW[i], ry = RY[i] / GW[i]
+                    if !pf.isEmpty { let q = pressPush(pf, X[i], Y[i]); rx -= gcs * q.0 + gsn * q.1; ry -= -gsn * q.0 + gcs * q.1 }
+                    let dx = rx - EX[i], dy = ry - EY[i], dl = hypot(dx, dy)
                     if dl > yl {
                         let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
                         QX[i] += dx * s; QY[i] += dy * s

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.15</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.16</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -54,7 +54,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.15</span></div>
+  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.16</span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="聲音">🔈</button>
 </div>
 
@@ -112,6 +112,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    - v2.13（多米 2026-11-01：鏡頭無限拉遠、拉多大推多遠）：鏡頭沒有下限、沒有牆；黏土拉伸 20R、記形 12R；點加密到每個半徑 12 個（拉到 8R 時外圈太疏、尾端交叉）；抓著時鏡頭留邊，形狀佔畫面七成就開始退（camFill 0.7）。面板「v2.12 對照」換回去。量法在 T26
    - v2.14（多米真機 build 59，2026-11-01）：黏土回原形 0.05（回彈太快）；從身體裡面抓也拉得動（grabReach：手指一動往拉的方向補抓一條到外圈）。量法在 T27、T28
    - v2.15（多米真機 build 61，2026-11-01）：手指在世界裡只跟著真正的移動走（鏡頭退時停著的手指不再被往外帶，抽搐的源頭）；黏土拉伸 7R、記形 5R（超過約 8.5R 會抖）；點一下留凹痕（dent）。量法在 T29、T30
+   - v2.16（多米 2026-11-01：按壓動畫像兒戲）：整團被壓薄攤開（面積＋手指附近往外推）、凹痕用周圍粒子擬合跟著身體變形並改成柔邊漸層、40 毫秒到六成再照材質沉、放手照材質回彈、亮光被擠開、影子變深；面板 press2=0 回 v2.15。量法在 T31
    - 音效（v2 分層，2026-11-01）：sfx/engine.js 讀 sfx/manifest.json。按、放手各拆 body／wet／air 三層，依力道決定哪幾層響、多大聲、多高、多亮；
      拉是連續的黏絲 loop（拉越長越高越亮、拉越快越大聲）加細絲斷裂；揉是 loop（拉遠了讓位給拉絲）；放手後有餘韻（小氣泡或嘶）。
      對應表在 .uiux/04-手感/音效參數對應-暫定.md，Swift 的 SlimeAudio 照同一張表。沒有檔案就安靜
@@ -121,9 +122,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,bodySize:.22,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.7,camCenter:1,grabReach:1,dent:1,dentSize:.3,dens:12},
-  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,bodySize:.22,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.7,camCenter:1,grabReach:1,dent:1,dentSize:.3,dens:12},
-  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,bodySize:.22,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.7,camCenter:1,grabReach:1,dent:1,dentSize:.3,dens:12},
+  jelly:{alpha:.34,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,bodySize:.22,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.7,camCenter:1,grabReach:1,dent:1,dentSize:.3,press2:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12},
+  mochi:{alpha:.28,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.25,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,bodySize:.22,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.7,camCenter:1,grabReach:1,dent:1,dentSize:.3,press2:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12},
+  clay: {alpha:.40,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.22,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:.85,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:0,homeFrac:.4,inkVar:0,morph:1,limbs:0,pods:2,idlePace:.45,bodySize:.22,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.7,camCenter:1,grabReach:1,dent:1,dentSize:.3,press2:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -135,6 +136,11 @@ const F=[
   ['grabR','抓取範圍（×半徑）','一指抓到多大一塊',.2,.8,.01],
   ['dent','點一下留凹痕','1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）',0,1,1],
   ['dentSize','凹痕大小（×半徑）','凹痕最大半徑',.1,.5,.01],
+  ['press2','按壓真實版','1：v2.16 按壓（整團壓薄攤開、凹痕跟著身體變形、先快後慢地沉、放手依材質回彈、亮光被擠開、影子變深）；0 是 v2.15 的月牙凹痕',0,1,1],
+  ['pressArea','壓薄攤開：面積','按到底時整團面積多幾成（從正面按下去前後變薄，看起來變大一圈）',0,.15,.01],
+  ['pressSpread','壓薄攤開：手指附近（×半徑）','手指周圍那圈往外推多少（離手指約 0.3R 推最多）',0,.3,.01],
+  ['pressSink','下沉時間（秒）','40 毫秒先到六成，剩下的多久沉到底；黏土 0.8、果凍 0.2',.05,2,.05],
+  ['pressBounce','放手回彈阻尼','1 不彈（黏土）；越小放手彈越多下（果凍 0.3）',.1,1,.05],
   ['grabReach','從中間抓也拉得動','1：從身體裡面抓、範圍碰不到外圈時，放大到碰到外圈；0 是 v2.13（從中間拉沒反應）',0,1,1],
   ['maxPull','拉伸上限（×半徑）','最多拉多遠（軟上限）；黏土 20（v2.13，多米：不要限制），v2.12 是 8',.6,30,.1],
   ['lag','黏滯','跟手的延遲感（秒）',0,.3,.01],
@@ -258,7 +264,7 @@ function updateCam(dt){const v=viewV(),pad=R*.35;let x0=1e9,x1=-1e9,y0=1e9,y1=-1
 let AW,lastHome=.4;   // 候選 27 的面積壓力權重；候選 33 家的高度
 // 凹痕（v2.15，多米 build 61：單純點一下也要有效果，也許是出現凹陷）：只畫外圈的話，點在身體中間按下去的那塊看不到。
 // 每個凹痕綁一顆粒子跟著身體走；按著時 0.08 秒凹到底，手指拉開 0.4R 以上就算是拉、凹痕很快收掉；放手後跟回原形同速慢慢淡（黏土 15 秒淡一半）
-const DENTS=[];
+const DENTS=[];let PRESS_SUM=0;   // v2.16：所有凹痕的物理按壓量加總（面積、影子、亮光用）
 
 /* ---------- 外形：癱軟的不規則團塊＋觸手（多米 10-31：要觸手、不要完整形體） ---------- */
 let TENT=[],PH=[];   // 觸手定義、團塊的亂數相位
@@ -422,7 +428,11 @@ function down(e){
   if(grab&&mat.pressFlat>0){let y0=1e9,y1=-1e9;for(const i of bnd){y0=Math.min(y0,Y[i]);y1=Math.max(y1,Y[i])}
     if(p.y<globalC.yc){f.flatOn=true;f.h0=Math.max(R*.5,y1-y0);f.bot=y1;f.flat=1}}
   if(grab&&mat.dent>0){let bi=-1,bd=1e9;for(let i=0;i<N;i++){const d=Math.hypot(X[i]-p.x,Y[i]-p.y);if(d<bd){bd=d;bi=i}}
-    DENTS.push({i:bi,d:0,f:e.pointerId});if(DENTS.length>6)DENTS.shift()}
+    // v2.16：按在舊凹痕附近就沿用那個（一直按同一處是越按越深，不會排出兩個像眼睛的凹痕）；記下周圍粒子的相對位置，畫的時候跟著身體一起被拉歪
+    let dn=null;if(mat.press2>=.5)for(const o of DENTS)if(o.f===null&&Math.hypot(X[o.i]-p.x,Y[o.i]-p.y)<R*mat.dentSize*.9){dn=o;break}
+    if(dn){dn.f=e.pointerId;dn.pull=false;dn.tau=0;dn.p0=Math.max(0,dn.p)}
+    else{const nb=[],rr=R*mat.dentSize*1.3;for(let i=0;i<N;i++){const ox=X[i]-X[bi],oy=Y[i]-Y[bi];if(i!==bi&&ox*ox+oy*oy<rr*rr)nb.push([i,ox,oy])}
+      DENTS.push({i:bi,d:0,f:e.pointerId,p:0,v:0,p0:0,tau:0,w:0,nb});if(DENTS.length>(mat.press2>=.5?4:6))DENTS.shift()}}
   fingers.set(e.pointerId,f);try{cv.setPointerCapture(e.pointerId)}catch(_){}
   $('hint').classList.add('off');
 }
@@ -482,7 +492,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
     }
   }
   // 活物：呼吸。寫在「參考形狀」上（所有區塊一致），不是寫在目標上，否則小區塊會跟著滑開拉不回來
-  const bs=Lamp*mat.life*.045*BR.amp*BR.wave,bsx=1+bs,bsy=1-bs*.85;   // 第 23 條：波形、週期、振幅在 update() 算（BR）
+  const sp=mat.press2>=.5?Math.sqrt(Math.max(.5,1+mat.pressArea*PRESS_SUM)):1,bs=Lamp*mat.life*.045*BR.amp*BR.wave,bsx=(1+bs)*sp,bsy=(1-bs*.85)*sp;   // sp：v2.16 P1 按下去整團變大（目標面積也跟著放大，面積壓力才不會推回去）   // 第 23 條：波形、週期、振幅在 update() 算（BR）
   // 活物：蠕動。幾個慢速行進波掃過參考形狀，輪廓每一刻都在變（多米：平常就要在蠕動）
   const wr=Lamp*mat.life*mat.wriggle*R,swA=Lamp*mat.life*mat.drift*R,iR=1/R;
   // 第 20 條 觸手拖尾：遊走時觸手的參考位置往移動的反方向拖，尖端最多（u²），量跟速度走（smoothstep 讓它自己淡入淡出）。
@@ -544,8 +554,12 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   }
   // 面積壓力：被壓扁、被拉長時面積掉，就把目標整體往外推，旁邊自然鼓出來
   let A=0;{const n=bnd.length;for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];A+=X[a]*Y[b]-X[b]*Y[a]}A=Math.abs(A)/2}
-  const ap=Math.max(-.12,Math.min(.12,(Math.sqrt(A0/A)-1)*mat.areaGain));
+  const A0p=mat.press2>=.5?A0*(1+mat.pressArea*PRESS_SUM):A0;   // v2.16 P1：按下去前後變薄，從正面看面積變大
+  const ap=Math.max(-.12,Math.min(.12,(Math.sqrt(A0p/A)-1)*mat.areaGain));
   const cx=globalC.xc,cy=globalC.yc;
+  // v2.16 P1：手指周圍往外推（離手指 σ=0.3R 推最多 pressSpread·R·p，往外很快淡掉），推的是目標，所以是被壓開、不是被瞬移。
+  // σ 用 0.6R 量過按在中間整圈都被推到，面積多兩成（要的是六趴，整團變大交給 sp）
+  const PF=pressField();
   // 候選 27 局部面積壓力：把面積壓力往手指附近集中（權重 exp(−(d/1.2R)²)，平均仍是 1，總面積修正量不變）
   let local=false;if(mat.localArea>0&&ap!==0&&fingers.size){const gs=[];for(const f of fingers.values())if(f.mode==='grab')gs.push(f);
     if(gs.length){local=true;let sum=0;const r2=1/(1.44*R*R);for(let i=0;i<N;i++){let g=0;for(const f of gs){const dx=X[i]-f.fx,dy=Y[i]-f.fy;g=Math.max(g,Math.exp(-(dx*dx+dy*dy)*r2))}AW[i]=g;sum+=g}
@@ -553,6 +567,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   for(let i=0;i<N;i++){
     let gx=GX[i]/GW[i],gy=GY[i]/GW[i];const api=local?ap*AW[i]:ap;
     gx=cx+(gx-cx)*(1+api);gy=cy+(gy-cy)*(1+api);
+    if(PF){const q=pressPush(PF,gx,gy);gx+=q[0];gy+=q[1]}
     const ka=alpha*KF[i]*(1-mat.grabHold*GWT[i]);X[i]+=(gx-X[i])*ka;Y[i]+=(gy-Y[i])*ka;   // grabHold：被抓住的地方少聽彈性、多聽手指
   }
   // 回正：轉回頭朝上。純運動學（位置與前一幀一起轉，不留速度），所以不會過衝、不會翻身；抓著時加強
@@ -667,6 +682,8 @@ function ringGuard(){const nb=bnd.length,dm=h*.45,far=dm*4;
       const nx=-ey/l*side,ny=ex/l*side,push=dm-cur,wp=GRAB[p]?.3:1,wa=GRAB[a]?.3:1,wb=GRAB[b]?.3:1,ws=wp+(wa*(1-u)+wb*u);
       X[p]+=nx*push*wp/ws;Y[p]+=ny*push*wp/ws;
       X[a]-=nx*push*wa*(1-u)/ws;Y[a]-=ny*push*wa*(1-u)/ws;X[b]-=nx*push*wb*u/ws;Y[b]-=ny*push*wb*u/ws}}}
+function pressField(){let PF=null;if(mat.press2>=.5&&mat.pressSpread>0)for(const dn of DENTS){if(Math.abs(dn.p)<.005)continue;const sg=R*.3;(PF||(PF=[])).push([X[dn.i],Y[dn.i],mat.pressSpread*R*dn.p,1/(2*sg*sg),sg])}return PF}
+function pressPush(PF,x,y){let ox=0,oy=0;for(const q of PF){const dx=x-q[0],dy=y-q[1],d2=dx*dx+dy*dy;if(d2<1e-6)continue;const m=q[2]*Math.exp(.5-d2*q[3])/q[4];ox+=dx*m;oy+=dy*m}return[ox,oy]}
 function plasticity(dt){
   // 每顆粒子在「參考座標」裡現在的位置（只用旋轉反推，平均各區塊）
   RX.fill(0);RY.fill(0);
@@ -695,7 +712,10 @@ function plasticity(dt){
     for(const f of grabs){const x=Math.max(0,Math.min(1,(t-f.tDown-lo)/(hi-lo)));g=Math.max(g,x*x*(3-2*x))}
     const yl=mat.yield*R,kc=Math.min(1,mat.creep*dt*g);
     // 跟「表演後的參考形狀」EX 比，不跟 Q 比：偽足碰到時停在半空（不歸零），跟 Q 比會把偽足當成捏出來的痕跡記下來（量過：按住 1.5 秒記 67 點）
-    if(kc>0)for(let i=0;i<N;i++){const rx=RX[i]/cnt[i],ry=RY[i]/cnt[i],dx=rx-EX[i],dy=ry-EY[i],dl=Math.hypot(dx,dy);
+    // v2.16：按壓往外推的那一份是表演，記形時扣掉（轉回參考座標）。不扣的話黏土記下被推開的形狀、下一步又在上面再推一次，按越久攤越開（量過按 1.5 秒移 48 點，原本 24）
+    const PF=pressField(),gc=globalC;
+    if(kc>0)for(let i=0;i<N;i++){let rx=RX[i]/cnt[i],ry=RY[i]/cnt[i];if(PF){const q=pressPush(PF,X[i],Y[i]);rx-=gc.cs*q[0]+gc.sn*q[1];ry-=-gc.sn*q[0]+gc.cs*q[1]}
+      const dx=rx-EX[i],dy=ry-EY[i],dl=Math.hypot(dx,dy);
       if(dl>yl){const s=(1-yl/dl)*kc*(TID[i]>=0?1-.85*TU[i]*(1-mat.tentMem):1);QX[i]+=dx*s;QY[i]+=dy*s;
         const ex=QX[i]-Q0X[i],ey=QY[i]-Q0Y[i],el=Math.hypot(ex,ey),lim=R*mat.memMax;   // memMax：黏土 4R，可以拉很長、壓很扁（多米：自由塑形，像肉餅攤很扁）
         if(el>lim){QX[i]=Q0X[i]+ex*lim/el;QY[i]=Q0Y[i]+ey*lim/el}}}
@@ -757,7 +777,7 @@ function restFix(){
       const d0x=m0x-(Q0X[p.a]+Q0X[p.b])*.5,d0y=m0y-(Q0Y[p.a]+Q0Y[p.b])*.5,dx=mx-(QX[p.a]+QX[p.b])*.5,dy=my-(QY[p.a]+QY[p.b])*.5;
       const an=Math.atan2(d0x*dy-d0y*dx,d0x*dx+d0y*dy),c=Math.cos(an),sn=Math.sin(an);
       for(let i=0;i<N;i++){if(TID[i]!==k||TU[i]<=ut)continue;const ox=Q0X[i]-m0x,oy=Q0Y[i]-m0y;QX[i]=mx+c*ox-sn*oy;QY[i]=my+sn*ox+c*oy}}}}
-function relax(){relaxUntil=t+.5}   // 「揉回原形」按鈕：半秒內記憶淡回 Q0，換種子才重建
+function relax(){relaxUntil=t+.5;for(const dn of DENTS){dn.p=0;dn.v=0;dn.p0=0}}   // 「揉回原形」按鈕：半秒內記憶淡回 Q0，換種子才重建
 function twitch(L){
   // 偶爾抖一下：隨機一個區塊得到一個小衝量；偶爾整團輕晃
   if(t<nextTwitch)return;
@@ -779,10 +799,27 @@ function update(dt){
     const due=[];for(const f of fingers.values())if(f.sticking&&t>=f.releaseAt)due.push(f);for(const f of due)releaseFinger(f,false)}
   updateCam(dt);
   for(const f of fingers.values())if(f.reach&&f.mode==='grab')reachGrab(f);
+  PRESS_SUM=0;
   for(let k=DENTS.length-1;k>=0;k--){const dn=DENTS[k],f=dn.f!==null?fingers.get(dn.f):null;
+    if(mat.press2>=.5){
+      // v2.16 按壓（多米：按壓動畫像兒戲）：40 毫秒先到六成，剩下的照材質慢慢沉（pressSink）；按越久越寬越淺（w）。
+      // p 是物理的按壓量（整團攤開、面積、亮光、影子），d 是看得到的凹痕深度。放手：p 照 pressBounce 的彈簧回去（果凍會過頭往外彈一下），
+      // 黏土不彈、很快放掉（形狀已經被記住）；d 在黏土照回原形速度慢慢淡，其他材質跟著 p 一起沒
+      if(f){const pulled=Math.hypot(f.x-f.ax,f.y-f.ay)>R*.4;if(pulled)dn.pull=true;
+        if(dn.pull){const k2=1-Math.exp(-dt/.12);dn.d-=dn.d*k2;dn.p-=dn.p*k2;dn.v=0}
+        else{const drag=Math.hypot(f.x-f.ax,f.y-f.ay)>=R*.15;if(!drag)dn.tau+=dt;const c=.6*(1-Math.exp(-dn.tau/.013))+.4*(1-Math.exp(-dn.tau/Math.max(.02,mat.pressSink)));   // 手指拖超過 0.15R 就是拖不是按：不再往下沉，推開的那份也淡掉（T28：抓邊緣往外拉時推力還在，回彈比例掉到 0.80，關掉推力 0.83）
+          dn.p=drag?dn.p*Math.exp(-dt/.12):Math.max(dn.p0,c);dn.d=Math.max(dn.d,c);dn.v=0;dn.w=1-Math.exp(-dn.tau/1.5)}}
+      else{const b=mat.pressBounce;
+        if(b>=.95){dn.p*=Math.exp(-dt/.25);dn.v=0}
+        else{const om=2*Math.PI*5;dn.v+=(-om*om*dn.p-2*b*om*dn.v)*dt;dn.p+=dn.v*dt}
+        dn.d*=Math.exp(-(dn.pull?8:t<relaxUntil?6:Math.max(mat.recover,.02))*dt);
+        if(b<.95)dn.d=Math.min(dn.d,Math.max(0,dn.p))}
+      if(!f&&dn.d<.02&&Math.abs(dn.p)<.01&&Math.abs(dn.v)<.05){DENTS.splice(k,1);continue}
+      PRESS_SUM+=dn.p;continue}
     if(f){const pulled=Math.hypot(f.x-f.ax,f.y-f.ay)>R*.4;if(pulled)dn.pull=true;const tg=dn.pull?0:1;dn.d+=(tg-dn.d)*(1-Math.exp(-dt/(tg?.08:.12)))}
     else dn.d*=Math.exp(-(dn.pull?8:t<relaxUntil?6:Math.max(mat.recover,.02))*dt);
     if(dn.d<.02&&!f)DENTS.splice(k,1)}
+  PRESS_SUM=Math.max(-.6,Math.min(1.5,PRESS_SUM));
   // 手指黏滯：有效位置 = 起點 + tanh 軟上限的位移，再慢慢跟
   for(const f of fingers.values()){
     let ex=f.x-f.ax,ey=f.y-f.ay;const el=Math.hypot(ex,ey),lim=mat.maxPull*R;
@@ -906,6 +943,25 @@ function inkBand(P,lw){const n=P.length,w=inkWidths(lw),S=3,outer=[],inner=[];
       outer.push([bx-ty*hw,by+tx*hw]);inner.push([bx+ty*hw,by-tx*hw])}}
   ctx.beginPath();ctx.moveTo(outer[0][0],outer[0][1]);for(let k=1;k<outer.length;k++)ctx.lineTo(outer[k][0],outer[k][1]);ctx.closePath();
   ctx.moveTo(inner[inner.length-1][0],inner[inner.length-1][1]);for(let k=inner.length-2;k>=0;k--)ctx.lineTo(inner[k][0],inner[k][1]);ctx.closePath()}
+// v2.16 P2 凹痕：拿掉蓋章式的月牙（多米：像兒戲；兩個月牙看起來像眉毛眼睛）。凹痕用周圍粒子的實際位置擬合一個仿射（被拉歪就跟著歪），
+// 坑裡左上那面背光：兩圓漸層從右下（亮）到左上邊緣（暗），邊緣柔掉；坑外右下一彎淡亮邊，是被壓下去翻起來的肩。按越久越寬越淺
+function hexA(h,a){const n=h.replace('#','');const v=n.length===3?n.split('').map(c=>parseInt(c+c,16)):[0,2,4].map(k=>parseInt(n.slice(k,k+2),16));return`rgba(${v[0]},${v[1]},${v[2]},${Math.max(0,Math.min(1,a)).toFixed(3)})`}
+function dentFrame(dn){const x0=X[dn.i],y0=Y[dn.i];let m00=0,m01=0,m10=0,m11=0,s00=0,s01=0,s11=0;
+  for(const [k,ox,oy] of dn.nb){if(k>=N)continue;const cx=X[k]-x0,cy=Y[k]-y0;m00+=cx*ox;m01+=cx*oy;m10+=cy*ox;m11+=cy*oy;s00+=ox*ox;s01+=ox*oy;s11+=oy*oy}
+  const det=s00*s11-s01*s01;if(dn.nb.length<3||Math.abs(det)<1e-9)return[1,0,0,1];
+  const i00=s11/det,i01=-s01/det,i11=s00/det;let a=m00*i00+m01*i01,c=m00*i01+m01*i11,b=m10*i00+m11*i01,d=m10*i01+m11*i11;
+  const da=a*d-b*c;if(!(da>.15&&da<6))return[1,0,0,1];
+  // 只留拉伸、去掉轉動（極分解 A＝R·S）：身體轉了，光還是從畫面左上來，坑的暗面不能跟著轉
+  const th=Math.atan2(b-c,a+d),co=Math.cos(th),si=Math.sin(th);return[co*a+si*b,-si*a+co*b,co*c+si*d,-si*c+co*d]}
+function drawDents(col){const sh=col('--shade'),hi=col('--hi');
+  for(const dn of DENTS){if(dn.d<.02||dn.i>=N)continue;const r=R*mat.dentSize*(.65+.35*dn.w),a=dn.d*(1-.35*dn.w),[ma,mb,mc,md]=dentFrame(dn);
+    ctx.save();ctx.transform(ma,mb,mc,md,X[dn.i],Y[dn.i]);
+    const g=ctx.createRadialGradient(r*.42,r*.5,r*.3,0,0,r);
+    g.addColorStop(0,hexA(sh,0));g.addColorStop(.5,hexA(sh,.3*a));g.addColorStop(.86,hexA(sh,.9*a));g.addColorStop(1,hexA(sh,0));
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(r*.55,r*.65,r*1.05,0,Math.PI*2);ctx.clip();
+    const g2=ctx.createRadialGradient(0,0,r*.92,0,0,r*1.28);g2.addColorStop(0,hexA(hi,0));g2.addColorStop(.35,hexA(hi,.45*a));g2.addColorStop(1,hexA(hi,0));
+    ctx.fillStyle=g2;ctx.beginPath();ctx.arc(0,0,r*1.28,0,Math.PI*2);ctx.arc(0,0,r*.92,0,Math.PI*2,true);ctx.fill();ctx.restore()}}
 function draw(){
   const css=getComputedStyle(document.documentElement),col=n=>css.getPropertyValue(n).trim();
   ctx.clearRect(0,0,W,H);
@@ -921,8 +977,9 @@ function draw(){
   // 影子
   const sw=(maxX-minX)*.5,sy=FLOAT?Math.max(maxY,CY+R*1.2)+R*.35:GROUND+10;
   const lift=FLOAT?Math.max(0,Math.min(1,(sy-maxY)/(R*1.2))):0;
-  ctx.fillStyle=`rgba(60,90,40,${FLOAT?.10+.08*(1-lift):.16})`;
-  ctx.beginPath();ctx.ellipse((minX+maxX)/2,sy,sw*(FLOAT?.7+.3*(1-lift):1.05),   // 影子跟整體寬度置中（拉長時跟重心會偏一邊）
+  const pz=mat.press2>=.5?Math.max(0,PRESS_SUM):0;   // v2.16 P6：按住時身體被往下壓一點，影子寬一點、深一點
+  ctx.fillStyle=`rgba(60,90,40,${(FLOAT?.10+.08*(1-lift):.16)+.04*pz})`;
+  ctx.beginPath();ctx.ellipse((minX+maxX)/2,sy,sw*(FLOAT?.7+.3*(1-lift):1.05)*(1+.08*pz),   // 影子跟整體寬度置中（拉長時跟重心會偏一邊）
     R*.11*(FLOAT?.8:1),0,0,Math.PI*2);ctx.fill();
   ctx.save();
   if(!FLOAT){ctx.beginPath();ctx.rect(0,0,W,GROUND+2);ctx.clip()}
@@ -930,14 +987,22 @@ function draw(){
   bodyPath(P);ctx.fillStyle=col('--shade');ctx.fill();
   ctx.save();bodyPath(P);ctx.clip();bodyPath(P,-R*.07,-R*.085);ctx.fillStyle=col('--body');ctx.fill();
   // 凹痕：陰影色的橢圓，再用底色往右下偏蓋掉，留左上一彎陰影（光從左上來，凹下去的地方左上那面背光）
-  for(const dn of DENTS){const r=R*mat.dentSize*dn.d;if(r<.5)continue;const x=X[dn.i],y=Y[dn.i];
+  if(mat.press2>=.5)drawDents(col);
+  else for(const dn of DENTS){const r=R*mat.dentSize*dn.d;if(r<.5)continue;const x=X[dn.i],y=Y[dn.i];
     ctx.fillStyle=col('--shade');ctx.beginPath();ctx.ellipse(x,y,r,r*.8,0,0,Math.PI*2);ctx.fill();
     ctx.fillStyle=col('--body');ctx.beginPath();ctx.ellipse(x+r*.22,y+r*.26,r*.82,r*.64,0,0,Math.PI*2);ctx.fill()}
   // 亮光：綁在左上粒子，跟著整體旋轉
-  const hx=X[hiIdx],hy=Y[hiIdx],ang=Math.atan2(globalC.sn,globalC.cs);
-  ctx.fillStyle=col('--hi');
-  ctx.beginPath();ctx.ellipse(hx,hy,R*.17,R*.085,ang-.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(hx+Math.cos(ang-.2)*R*.26,hy+Math.sin(ang-.2)*R*.26,R*.035,0,Math.PI*2);ctx.fill();
+  let hx=X[hiIdx],hy=Y[hiIdx];const ang=Math.atan2(globalC.sn,globalC.cs);
+  // v2.16 P5：手指按在亮光附近（0.45R 內），亮光往遠離手指的方向被擠開、沿那個方向壓扁
+  let sq=0,ux=1,uy=0;if(mat.press2>=.5){let ox=0,oy=0;
+    for(const dn of DENTS){if(dn.p<=0)continue;const dx=hx-X[dn.i],dy=hy-Y[dn.i],d=Math.hypot(dx,dy),rad=R*.45;if(d>=rad)continue;
+      const a=(1-d/rad)*Math.min(1,dn.p),vx=d>1e-6?dx/d:1,vy=d>1e-6?dy/d:0;ox+=vx*a*R*.16;oy+=vy*a*R*.16;if(a>sq){sq=a;ux=vx;uy=vy}}
+    hx+=ox;hy+=oy}
+  ctx.fillStyle=col('--hi');ctx.save();ctx.translate(hx,hy);
+  if(sq>0){const s=1-.4*sq,k=s-1,s2=1+.25*sq,k2=s2-1;   // 沿 u 壓成 s 倍、垂直方向撐開 s2 倍
+    ctx.transform(1+k*ux*ux+k2*uy*uy,(k-k2)*ux*uy,(k-k2)*ux*uy,1+k*uy*uy+k2*ux*ux,0,0)}
+  ctx.beginPath();ctx.ellipse(0,0,R*.17,R*.085,ang-.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(Math.cos(ang-.2)*R*.26,Math.sin(ang-.2)*R*.26,R*.035,0,Math.PI*2);ctx.fill();ctx.restore();
   ctx.restore();
   // 描邊
   if(mat.inkVar>0){ctx.fillStyle=col('--line');inkBand(P,Math.max(4,R*.034)/CAM.z);ctx.fill()}   // 候選 34：描邊粗細隨壓縮

@@ -41,8 +41,11 @@ final class SlimeView: UIView {
     private let litGroup = CALayer()             // masked to the body
     private let litMask = CAShapeLayer()
     private let baseLayer = CAShapeLayer()       // same body shifted up-left, in the base colour
-    private let dentShadeLayer = CAShapeLayer()  // dents: an ellipse in the shade colour...
+    private let dentShadeLayer = CAShapeLayer()  // v2.15 dents (press2 0): an ellipse in the shade colour...
     private let dentLitLayer = CAShapeLayer()    // ...covered by the base colour shifted down-right, leaving a crescent upper-left
+    private var dentLayers: [CALayer] = []       // v2.16 dents: a soft pit image each, stretched with the skin
+    private var dentImage: CGImage?
+    private let dentUnit: CGFloat = 40           // the pit image is drawn for this radius (points)
     private let highlightLayer = CAShapeLayer()
     private let outlineLayer = CAShapeLayer()
 
@@ -69,6 +72,13 @@ final class SlimeView: UIView {
         litGroup.addSublayer(baseLayer)
         litGroup.addSublayer(dentShadeLayer)
         litGroup.addSublayer(dentLitLayer)
+        for _ in 0..<4 {
+            let l = CALayer()
+            l.bounds = CGRect(x: 0, y: 0, width: dentUnit * 2.6, height: dentUnit * 2.6)
+            l.isHidden = true
+            litGroup.addSublayer(l)
+            dentLayers.append(l)
+        }
         litGroup.addSublayer(highlightLayer)
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
@@ -109,6 +119,8 @@ final class SlimeView: UIView {
         baseLayer.fillColor = colors.base.cgColor
         dentShadeLayer.fillColor = colors.shade.cgColor
         dentLitLayer.fillColor = colors.base.cgColor
+        dentImage = makeDentImage()
+        for l in dentLayers { l.contents = dentImage }
         highlightLayer.fillColor = colors.light.cgColor
         outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
         outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
@@ -319,6 +331,33 @@ final class SlimeView: UIView {
         return path
     }
 
+    /// v2.16 P2 (多米: the press looked like a toy; two crescents read as brows and eyes): the light comes from the upper left,
+    /// so inside the pit the upper-left wall is dark. A two-circle gradient from the lower right (light) to the upper-left rim
+    /// (dark), soft at the edge; outside it on the lower right a faint lit lip, the skin pushed up around the press.
+    /// Same stops as the prototype's drawDents.
+    private func makeDentImage() -> CGImage? {
+        let u = dentUnit, size = CGSize(width: u * 2.6, height: u * 2.6)
+        let fmt = UIGraphicsImageRendererFormat()
+        fmt.scale = 3
+        let img = UIGraphicsImageRenderer(size: size, format: fmt).image { ctx in
+            let g = ctx.cgContext, c = CGPoint(x: size.width / 2, y: size.height / 2), sp = CGColorSpaceCreateDeviceRGB()
+            let sh = colors.shade, hi = colors.light
+            if let grad = CGGradient(colorsSpace: sp, colors: [sh.withAlphaComponent(0).cgColor, sh.withAlphaComponent(0.3).cgColor,
+                                                                sh.withAlphaComponent(0.9).cgColor, sh.withAlphaComponent(0).cgColor] as CFArray,
+                                     locations: [0, 0.5, 0.86, 1]) {
+                g.drawRadialGradient(grad, startCenter: CGPoint(x: c.x + u * 0.42, y: c.y + u * 0.5), startRadius: u * 0.3,
+                                     endCenter: c, endRadius: u, options: [])
+            }
+            g.addEllipse(in: CGRect(x: c.x + u * 0.55 - u * 1.05, y: c.y + u * 0.65 - u * 1.05, width: u * 2.1, height: u * 2.1))
+            g.clip()
+            if let grad = CGGradient(colorsSpace: sp, colors: [hi.withAlphaComponent(0).cgColor, hi.withAlphaComponent(0.45).cgColor,
+                                                                hi.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 0.35, 1]) {
+                g.drawRadialGradient(grad, startCenter: c, startRadius: u * 0.92, endCenter: c, endRadius: u * 1.28, options: [])
+            }
+        }
+        return img.cgImage
+    }
+
     private func redraw() {
         // v2.12 camera: everything is drawn in screen points through rig.toScreen; sizes scale with the zoom, the outline
         // keeps its on-screen width
@@ -338,8 +377,9 @@ final class SlimeView: UIView {
         let sw = (maxX - minX) * 0.5
         let sy = max(maxY, rig.toScreen(0, rig.cy).y + R * 1.2) + R * 0.35
         let lift = max(0, min(1, (sy - maxY) / (R * 1.2)))
-        shadowLayer.opacity = Float((0.10 + 0.08 * (1 - lift)) / 0.18)
-        let rx = sw * (0.7 + 0.3 * (1 - lift)), ry = R * 0.11 * 0.8
+        let pz = rig.params.press2 >= 0.5 ? max(0, rig.pressSum) : 0   // v2.16 P6: pressed, the body sinks a little: a wider, darker shadow
+        shadowLayer.opacity = Float((0.10 + 0.08 * (1 - lift) + 0.04 * pz) / 0.18)
+        let rx = sw * (0.7 + 0.3 * (1 - lift)) * (1 + 0.08 * pz), ry = R * 0.11 * 0.8
         shadowLayer.path = CGPath(ellipseIn: CGRect(x: shadowX - rx, y: sy - ry, width: rx * 2, height: ry * 2), transform: nil)
 
         let body = bodyPath(P)
@@ -349,7 +389,22 @@ final class SlimeView: UIView {
 
         // dents (v2.15): the light comes from the upper left, so inside a dent the upper-left wall is in shade
         let ds = CGMutablePath(), dl = CGMutablePath()
-        for dn in rig.dents {
+        let dents = rig.dents, press2 = rig.params.press2 >= 0.5
+        var used = 0
+        if press2 {
+            // v2.16 P2: the pit image stretched with the skin around it; held longer it gets wider and shallower
+            for dn in dents where dn.d >= 0.02 && used < dentLayers.count {
+                let l = dentLayers[used]; used += 1
+                let r = R * rig.params.dentSize * (0.65 + 0.35 * dn.w), k = r / Double(dentUnit)
+                l.isHidden = false
+                let c = rig.toScreen(dn.x, dn.y)
+                l.position = CGPoint(x: c.x, y: c.y)
+                l.setAffineTransform(CGAffineTransform(a: dn.a * k, b: dn.b * k, c: dn.c * k, d: dn.dd * k, tx: 0, ty: 0))
+                l.opacity = Float(dn.d * (1 - 0.35 * dn.w))
+            }
+        }
+        for l in dentLayers[used...] { l.isHidden = true }
+        for dn in dents where !press2 {
             let r = R * rig.params.dentSize * dn.d
             if r < 0.5 { continue }
             let c = rig.toScreen(dn.x, dn.y)
@@ -360,11 +415,31 @@ final class SlimeView: UIView {
         dentLitLayer.path = dl
 
         // highlight rides on an upper-left particle and turns with the body
-        let hp = rig.toScreen(rig.highlight.x, rig.highlight.y), ang = rig.bodyAngle
+        var hp = rig.toScreen(rig.highlight.x, rig.highlight.y)
+        let ang = rig.bodyAngle
+        // v2.16 P5: a finger pressing within 0.45R of the highlight squeezes it aside and flattens it along that direction
+        var sq = 0.0, ux = 1.0, uy = 0.0
+        if press2 {
+            var ox = 0.0, oy = 0.0
+            for dn in dents where dn.p > 0 {
+                let c = rig.toScreen(dn.x, dn.y), dx = hp.x - c.x, dy = hp.y - c.y, d = hypot(dx, dy), rad = R * 0.45
+                if d >= rad { continue }
+                let a = (1 - d / rad) * min(1, dn.p), vx = d > 1e-6 ? dx / d : 1, vy = d > 1e-6 ? dy / d : 0
+                ox += vx * a * R * 0.16; oy += vy * a * R * 0.16
+                if a > sq { sq = a; ux = vx; uy = vy }
+            }
+            hp.x += ox; hp.y += oy
+        }
+        var S = CGAffineTransform.identity
+        if sq > 0 {   // squash to s along u, widen to s2 across
+            let k = -0.4 * sq, k2 = 0.25 * sq
+            S = CGAffineTransform(a: 1 + k * ux * ux + k2 * uy * uy, b: (k - k2) * ux * uy, c: (k - k2) * ux * uy, d: 1 + k * uy * uy + k2 * ux * ux, tx: 0, ty: 0)
+        }
+        let at = CGAffineTransform(translationX: hp.x, y: hp.y)
         let hl = CGMutablePath()
-        let t = CGAffineTransform(translationX: hp.x, y: hp.y).rotated(by: ang - 0.5)
+        let t = CGAffineTransform(rotationAngle: ang - 0.5).concatenating(S).concatenating(at)
         hl.addEllipse(in: CGRect(x: -R * 0.17, y: -R * 0.085, width: R * 0.34, height: R * 0.17), transform: t)
-        let dot = CGAffineTransform(translationX: hp.x + cos(ang - 0.2) * R * 0.26, y: hp.y + sin(ang - 0.2) * R * 0.26)
+        let dot = CGAffineTransform(translationX: cos(ang - 0.2) * R * 0.26, y: sin(ang - 0.2) * R * 0.26).concatenating(S).concatenating(at)
         hl.addEllipse(in: CGRect(x: -R * 0.035, y: -R * 0.035, width: R * 0.07, height: R * 0.07), transform: dot)
         highlightLayer.path = hl
 
