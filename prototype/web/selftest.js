@@ -275,6 +275,31 @@
       contractShare: +(share.reduce((s, x) => s + x, 0) / Math.max(1, share.length)).toFixed(2), liftPt: +(Math.max(...cyt) - Math.min(...cyt)).toFixed(1) };
     restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T21 拉很長（2026-11-01 多米：拖拉時沒辦法拖很長，要能自由塑形）：抓身體最下面往下拉 2.5R（1 秒）、停 0.5 秒放手，
+  //     量握著、放手後 0.5 秒與 3 秒最下面比原本多出幾個 R，過程與之後零自交、面積回來。往右拉在手機寬度會先撞到畫面邊，所以往下
+  { const clock = saveClock(); Math.random = seeded(20261106); resetAligned(1e9); nextTwitch = 1e9;
+    const reach = () => { let b = -1e9; for (const i of bnd) b = Math.max(b, Y[i]); return b; };
+    let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] > Y[bi]) bi = i;
+    const r0 = reach(), sx = X[bi], sy = Y[bi] - R * 0.15; let worst = 0; ev('pointerdown', 1, sx, sy);
+    for (let k = 1; k <= 60; k++) { ev('pointermove', 1, sx, sy + R * 2.5 * k / 60); steps(1); worst = Math.max(worst, selfX()); }
+    for (let k = 0; k < 30; k++) { steps(1); worst = Math.max(worst, selfX()); }
+    const held = reach() - r0; ev('pointerup', 1, sx, sy + R * 2.5); steps(30); const a05 = reach() - r0; steps(150); const a3 = reach() - r0;
+    for (let k = 0; k < 60; k++) { steps(1); worst = Math.max(worst, selfX()); }
+    res.T21_longPull = { heldR: +(held / R).toFixed(2), after05sR: +(a05 / R).toFixed(2), after3sR: +(a3 / R).toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
+    restoreClock(clock); mat = { ...PRESETS.clay }; }
+
+  // T22 攤平（肉餅）：兩指抓左右兩邊各往外拉 0.9R（1 秒）、停 1 秒放手，量放手後 1 秒的寬高比（原本的倍數），零自交、面積回來。
+  //     懸空的身體往下壓沒東西頂著，只會把頂端推進身體裡，所以用兩指攤開量
+  { const clock = saveClock(); Math.random = seeded(20261107); resetAligned(1e9); nextTwitch = 1e9;
+    const aspect = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); } return (x1 - x0) / (y1 - y0); };
+    const a0 = aspect(), [lx, ly] = edgeX(-1), [rx, ry] = edgeX(1); let worst = 0; ev('pointerdown', 1, lx, ly); ev('pointerdown', 2, rx, ry);
+    for (let k = 1; k <= 60; k++) { ev('pointermove', 1, lx - R * 0.9 * k / 60, ly); ev('pointermove', 2, rx + R * 0.9 * k / 60, ry); steps(1); worst = Math.max(worst, selfX()); }
+    for (let k = 0; k < 60; k++) { steps(1); worst = Math.max(worst, selfX()); }
+    const held = aspect() / a0; ev('pointerup', 1, lx - R * 0.9, ly); ev('pointerup', 2, rx + R * 0.9, ry); steps(60); const a1 = aspect() / a0;
+    for (let k = 0; k < 120; k++) { steps(1); worst = Math.max(worst, selfX()); }
+    res.T22_flatten = { heldAspectX: +held.toFixed(2), after1sAspectX: +a1.toFixed(2), worstSelfX: worst, end: snap() }; log.splice(0);
+    restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames };
   res.PASS = {
@@ -304,6 +329,10 @@
     // 捏觸手要留痕、慢慢退；v2.7 對照應該一秒內就幾乎彈回（量法本身還抓得到差別）。過程零自交、面積回來
     pullKeepsMark: res.T17_pullMark.now.after1s > 3 && res.T17_pullMark.now.after12s < 1.5 && res.T17_pullMark.now.foldFramesAfter === 0 && okArea(res.T17_pullMark.now.end),
     podsGrowAnywhere: res.T19_pods.spawned >= 4 && res.T19_pods.upper > 0 && res.T19_pods.worstSelfX === 0 && res.T19_pods.areaMin > 0.95 && res.T19_pods.areaMax < 1.05 && res.T19_pods.maxOutPt > 0.4 * res.R,
+    // 2026-11-01 多米：要能拉很長、攤很扁。往下拉 2.5R 握著要伸出 2R 以上、放手半秒還留 1.5R（之後照 recover 約 10 秒退）；
+    // 兩指攤開放手 1 秒寬高比還是原本 1.3 倍以上；都不能自交、面積要回來
+    sculptLong: res.T21_longPull.heldR > 2 && res.T21_longPull.after05sR > 1.5 && res.T21_longPull.worstSelfX === 0 && okArea(res.T21_longPull.end),
+    sculptFlat: res.T22_flatten.after1sAspectX > 1.3 && res.T22_flatten.worstSelfX === 0 && okArea(res.T22_flatten.end),
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,

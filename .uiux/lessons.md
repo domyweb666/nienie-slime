@@ -14,8 +14,10 @@
 | 2026-10-31 | VibeRails | 粒子互不穿透若跨群作用（不同觸手、觸手對身體），被手指拉過去的部分會卡住永遠解不開 | 互不穿透只在「不該變形的群內」用；跨群允許交疊，交給形狀匹配拉回原排列 |
 | 2026-10-31 | feel | Agent 用程式模擬手指的自測可以抓「壞掉」（自交、爆炸、面積漂移），但抓不到「好不好捏」 | 程式自測只當回歸測試（不壞），手感判斷一律真機＋新的手 |
 | 2026-10-31 | feel／CI | TestFlight 第一次上傳跑了 7 次 run 才過：Issuer ID 貼成 7 字元、App Store Connect 沒建 App、API 金鑰是 Developer 角色（export 回 Cloud signing permission error）、Bundle ID 建成別的名字、workflow 檔只在非預設分支（手動觸發 422）。每個錯都要等一到兩分鐘 archive 才看得到 | 簽名前先用金鑰直接打 ASC API：檢查三個值的格式、列出金鑰看得到的 App、對照 project.yml 的 Bundle ID，有錯在 10 秒內報出來；workflow_dispatch 的檔要在預設分支上才能手動觸發；Secrets 名稱以使用者實際取的為準，改 workflow 配合比請他重設快 |
+| 2026-11-01 | CI | Bundle ID 用了 `org.domyweb.qieji`，那是多米另一個 App「茄記」的。workflow 只檢查「金鑰看得到這個 Bundle ID 的 App」，沒看 App 名字，所以好幾個 build 傳進茄記的 TestFlight 都沒被擋，多米自己發現才改成 `org.domyweb.nienieslime` | verify 步驟要對照 App Store Connect 的 App 名稱與 `CFBundleDisplayName`，名字對不上就報錯（已加）；第一次設 Bundle ID 時先問多米「這個 ID 是給哪個 App 的」，帳號裡有別的 App 就不要從清單裡挑一個湊合 |
 | 2026-10-31 | feel | v2 重寫演算法、再移植 Swift，參數表上的「接觸點先凹」「偶發特別回彈」都沒搬過去；「黏滯延遲」表上 0.06、程式 0.12。兩版推上 main、多米摸過、Swift 編譯過，一路沒人拿參數表逐列對過程式 | 每次換演算法或移植，拿參數表逐列對程式，列出「表有程式沒有」「表與程式數值不同」兩張清單寫進手感測試紀錄；對不上的先補或改表，再推 |
 | 2026-11-01 | feel／CI | 觸發 TestFlight 上傳（workflow_dispatch）之後又推了一個 docs commit 到同一分支，workflow 的 concurrency 設 cancel-in-progress，上傳 run #26 被新 push 的編譯 run 取消，要重新觸發 | 要上傳 TestFlight 時，先把該推的全部推完、等編譯過，再觸發 dispatch；觸發後到上傳完成之前不推同一分支 |
+| 2026-11-01 | VibeRails | 改 Bundle ID 的會話用 `git commit -a` 提交兩份文件，把另一個會話正在改、還沒 commit 的 `prototype/web/index.html`、`selftest.js`（v2.9 之後的 idlePace、memMax）一起包進 commit 3b33a21「docs: old qieji app removed…」並推上 swiftui-port。內容沒壞，訊息標錯；沒有 force push 改寫 | 同一個資料夾可能有別的會話在改：commit 一律 `git add <要的檔>` 再 commit，不用 `-a`／`add -A`；commit 前先看 `git status`，有不是自己改的檔就別碰 |
 | 2026-11-01 | feel／VibeRails | 之前的程式自測只在動作「終點」量自交，抓不到過程：抓觸手根部往尖端推（壓縮）時，大約一半的次數中途對折幾幀，v2.2 就有，Agent 一直寫「零自交」 | 自測要逐幀量，而且分「對折」（同一群自己交叉，壞）與「交疊」（觸手疊在身體前面，設計允許）；一次跑 12 次看比例，單次零不算零 |
 | 2026-11-01 | VibeRails | 想用「邊界對邊界互不穿透距離 0.6h 改 1.2h」擋對折，12 次對照沒變好（6 比 5），有幾次終點還多了自交；粒子式互不穿透只知道距離不知道方向，兩顆已經交換邊之後再推開是推往錯的方向 | 粒子式約束擋不住線段交叉；要擋對折得用方向（邊界法線）或讓觸手軸向不可壓縮。改硬規則前先 12 次統計對照，沒有變好就還原 |
 | 2026-11-01 | CI | TestFlight 第三次上傳（run #33）在 archive 失敗：Apple 回「reached the maximum number of certificates」。每次 CI 是全新機器，自動簽名每跑一次就新建一張 Apple Development 憑證，兩次就滿額 | archive 不簽名（CODE_SIGNING_ALLOWED=NO），export 時才用雲端管理的 Apple Distribution 簽；run #35 實證可行。CI 上任何「每次新建」的東西都要想它有沒有額度 |
@@ -31,3 +33,6 @@
 | 2026-11-01 | feel | 多米說「觸手」，我一直當成身上固定的五條腳，只讓它們擺、彎、留痕；他要的是沒有固定形狀、會伸出又縮回、換地方長的一團。連改兩版都在錯的模型上加東西 | 使用者用一個詞描述外形時，先用自己的話把「它會怎麼動、會不會消失、會不會換位置」講回去給他確認，再動手 |
 | 2026-11-01 | VibeRails | 記形跟 Q（記住的形狀）比，偽足這種「碰到時停在半空」的表演位移會被當成捏出來的痕跡記下來 | 記形一律跟表演後的參考形狀（EX）比；新增任何碰到時不歸零的表演位移都要檢查這點 |
 | 2026-11-01 | VibeRails | 偽足推出去的面積只扣一階平均，伸長時二階項讓面積多 3% 到 5%；記住的形狀也沒守面積，拉完放手多 2% | 大幅度的形變要沿邊界算實際面積再補償；黏土記住的形狀要維持原形面積 |
+| 2026-11-01 | VibeRails | 同一天兩次把註解插在 JS 一行的中間（`…;   // 註解 GROUND=…;CX=…`），後半行被吃掉，整個身體變 NaN；第二次吃掉的是放手啵的計算 | 網頁原型很多一行多句；加註解一律放在行尾最後，改完 grep 自己加的註解看下一句是不是還在同一行 |
+| 2026-11-01 | VibeRails | 把拉伸上限 maxPull 從 2 放寬到 8，放手啵與觸覺強度是用「拉了幾成上限」算的，跟著小到聽不到 | 改一個「上限」參數前，先 grep 所有拿它當分母的地方 |
+| 2026-11-01 | feel | 「拖不長」量出四個原因，其中最大的是手機畫面寬：身體半徑 0.26W，往兩邊拉不到一個半徑就撞邊 | 量拉伸距離時先算畫面還剩多少空間；自測的拉法要選畫面放得下的方向 |
