@@ -63,3 +63,5 @@
 | 2026-11-02 | VibeRails | v2.22 的搔癢計時器存的是「下次幾秒」（絕對時間），selftest 每輪把時鐘倒回 0，第二輪起就一直等不到下次，咯咯笑和扭動都沒了 | 存絕對時間的計時器（gigNext、nextTwitch 這類）在 setup() 一起歸零；selftest 至少連跑兩輪，第二輪抓得到這種 |
 | 2026-11-02 | VibeRails | 推 main 的流程（cherry-pick -n 之後 `git checkout HEAD -- ios`）擋得住改過的 iOS 檔，擋不住「新增」的：v2.22 新增 32 個 voice wav 跟著進了 main，比對又只看 prototype、.uiux、CLAUDE.md，沒抓到。同一次我還拿 main 上的 hash 當 `log A..HEAD` 的起點，列出整串舊 commit（沒造成損害，但很危險） | cherry-pick 之後再加一步 `git diff --cached --name-only --diff-filter=A -- ios \| xargs -r git rm -q --cached`，commit 完確認 `git diff --stat HEAD~1 HEAD -- ios` 是空的；要挑的 commit 直接寫 hash，不用範圍 |
 
+| 2026-11-02 | feel | 多米連續三版說「沒有互動的感覺」，我每版都在加它對手指的肢體反應（游過來、蹭、討摸、搔癢、出聲）。第三次才想到：它沒有眼睛，人看不出它在看你，肢體動作就讀不成「對你做的」 | 同一個回報出現第二次，先停下來找缺的那一層（這次是注視），不要在同一層繼續加料；多米自己提的解法（加表情）常常就是那一層 |
+| 2026-11-02 | feel | v2.23 第一版黏液在猛扯途中就掉，拉出去的那條比那滴跑得快，追過去把它疊在身體上；改成從手指旁邊掉也一樣，因為拉長的那條本來就比手指長 | 從身體甩出東西，要在「前端停下來」那一刻、從最突出的外圈點、帶著前端自己的速度出去；畫面上確認那滴真的在身體外面，數字（掉了幾滴）對不代表看得到 |
