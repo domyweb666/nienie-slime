@@ -17,6 +17,10 @@
   const origPlay = sfxPlay;
   sfxPlay = (k, g, r) => { log.push([k, +(+g).toFixed(3), +(+(r || 1)).toFixed(3)]); };
   const DT = 1 / 60;
+  // 音效引擎不准碰測試的亂數（2026-11-03）：音效檔載完之後引擎每幀抽 Math.random，把各項用固定種子產生的手抖序列錯開；載完的時間點落在第一輪中途，
+  // 第一輪跟之後幾輪抽到的手抖不一樣（v2.16 到 v2.23 每版第一輪 T26 都是 3.25、之後 1.3 左右，就是這個）。跑 selftest 時音效那一幀改用真的亂數，跑完換回
+  const realRandom0 = Math.random, sfxFrame0 = SFX && SFX.frame;
+  if (SFX) SFX.frame = (...a) => { const r = Math.random; Math.random = realRandom0; try { return sfxFrame0.apply(SFX, a); } finally { Math.random = r; } };
   function ev(type, id, x, y) { cv.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch', isPrimary: id === 1 })); }
   function steps(n) { for (let i = 0; i < n; i++) update(DT); }
   function segInt(ax, ay, bx, by, cx, cy, dx, dy) { const d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx); if (Math.abs(d) < 1e-12) return false; const u = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d, v = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d; return u > 0 && u < 1 && v > 0 && v < 1; }
@@ -354,6 +358,7 @@
   // T26 鏡頭無限拉遠（v2.13 起；v2.15 改成重複抓）：手指停著不再自己拉長，要拉更長就放手、抓住最右端再拉，拉 6 次。
   //     手指從那一端拖到畫面右緣（手指出不了螢幕），每次停 1 秒帶一點手抖（±0.6 點）。量最長幾個 R、鏡頭縮到多少、整隻每幀都在畫面裡、按著時邊界每幀最大跳動（螢幕點），
   //     放手後零交叉。黏土拉伸 7R、記形 5R：超過約 8.5R 會抖（v2.15 量過拉到 9.5R 跳 13 到 22 點、交叉）
+  //     跳動門檻 5 點（原本 3）：2026-11-03 同一套物理換 8 組手抖（種子），量到 1.18 到 4.21 點，3 點卡在正常範圍中間；真的抖是 13 點以上
   { const clock = saveClock(); Math.random = seeded(20261113); resetAligned(1e9); nextTwitch = 1e9;
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
     let wMax = 0, zMin = 1, off = 0, holdX = 0, worstRel = 0, jMax = 0;
@@ -727,7 +732,7 @@
     noCrossing: res.T24_dragAcross.guard.worstAfter === 0 && res.T24_dragAcross.guard.crossFrames <= res.T24_dragAcross.noGuard.crossFrames,
     // 鏡頭跟著拉遠：按在畫面右緣 3 秒要伸出 2.5R 以上（以前卡在 1.1R），放手 12 秒鏡頭回到 0.95 以上
     // 鏡頭無限拉遠（重複抓）：寬過 7R、鏡頭縮過 0.45、整隻一直在畫面裡、按著時邊界每幀跳動不到 3 點、放手後零交叉、面積回來
-    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.jitterMaxPt < 3 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end),
+    zoomUnlimited: res.T26_zoomUnlimited.widthMaxR > 7 && res.T26_zoomUnlimited.zoomMin < 0.45 && res.T26_zoomUnlimited.offScreenFrames === 0 && res.T26_zoomUnlimited.jitterMaxPt < 5 && res.T26_zoomUnlimited.worstReleaseX === 0 && res.T26_zoomUnlimited.end.selfX === 0 && okArea(res.T26_zoomUnlimited.end),
     // 手指停住：形狀不自己長（< 0.3R）、邊界每幀跳動不到 3 點、零交叉
     stillFingerSteady: res.T29_stillFinger.every(r => r.grewR < 0.3 && r.jitterMaxPt < 3 && r.crossFrames === 0),
     // 點一下：按 0.1 秒凹痕深過 0.5、1 秒後還在、15 秒淡了但還看得到（0.15 以上）；拉開的那次凹痕收掉
@@ -784,6 +789,7 @@
 
   draw();
   Object.assign(PRESETS, PSAVE); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
+  if (SFX) SFX.frame = sfxFrame0;
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
   console.log(JSON.stringify(res, null, 1));
   return res;
