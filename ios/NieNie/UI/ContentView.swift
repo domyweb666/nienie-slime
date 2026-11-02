@@ -40,6 +40,8 @@ struct ContentView: View {
         _showHint = State(initialValue: UserDefaults.standard.integer(forKey: "launchCount") < 3)
     }
     @State private var showTune = false
+    @State private var hintText = "捏它、拉它、揉它。放著不管它也會自己動"
+    @State private var hintGen = 0
 
     var body: some View {
         ZStack {
@@ -48,7 +50,7 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 topBar
-                Text("捏它、拉它、揉它。放著不管它也會自己動")
+                Text(hintText)
                     .font(.rounded(14))
                     .foregroundStyle(Palette.ink)
                     .padding(.horizontal, 16).padding(.vertical, 8)
@@ -109,30 +111,34 @@ struct ContentView: View {
 
     private var bottomBar: some View {
         HStack(spacing: 8) {
+            // v2.23 收集 (多米 11-02: all of them there from the start): four slimes; the material moved to the panel
             HStack(spacing: 2) {
-                ForEach(SlimeMaterial.allCases) { m in
-                    let on = controller.material == m
+                ForEach(SlimeKind.allCases) { k in
+                    let on = controller.slime == k
                     Button {
-                        controller.select(m)
+                        guard !on else { return }
+                        controller.select(k)
+                        showSlimeHint(k)
                     } label: {
                         HStack(spacing: 5) {
-                            Circle().fill(Color(uiColor: m.colors.base))
+                            Circle().fill(Color(uiColor: k.colors.base))
                                 .overlay(Circle().stroke(on ? .white : Palette.ink, lineWidth: 2))
                                 .frame(width: 12, height: 12)
-                            Text(m.name).font(.rounded(14))
+                            Text(k.name).font(.rounded(14))
                         }
-                        .padding(.horizontal, 11).padding(.vertical, 8)
+                        .padding(.horizontal, 9).padding(.vertical, 8)
                         .foregroundStyle(on ? .white : Palette.ink)
                         .background(Capsule().fill(on ? Palette.ink : .clear))
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(on ? .isSelected : [])
+                    .accessibilityHint(k.desc)
                 }
             }
             .padding(3)
             .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("史萊姆手感")
+            .accessibilityLabel("選史萊姆")
 
             Button {
                 controller.resetShape()
@@ -145,6 +151,18 @@ struct ContentView: View {
             .accessibilityLabel("揉回原形")
 
             Spacer(minLength: 0)
+        }
+    }
+
+    /// Its name and personality for 2.6 s.
+    private func showSlimeHint(_ k: SlimeKind) {
+        hintText = "\(k.name)：\(k.desc)"
+        hintGen += 1
+        let gen = hintGen
+        withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showHint = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+            guard gen == hintGen else { return }
+            withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.6)) { showHint = false }
         }
     }
 }

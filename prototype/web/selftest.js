@@ -33,7 +33,8 @@
   const res = { W, H, R: +R.toFixed(1), N, nb: bnd.length, preset: 'clay' };
   // v2.20：舊項目量的是 v2.19 的行為，一律關掉拖著走、凹痕退快、印象（跟關情緒、關活物一樣）；v2.20 在 T35 用 P0 打開（拉力 slide 0），v2.21 拉力在 T36。跑完換回來
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
-  const P0 = PRESETS.clay, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0 };
+  // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
+  const P1 = PRESETS.clay, OFF23 = { dropsV: 0, eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, ...OFF23 };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -609,6 +610,55 @@
     r37.worstSelfX = worst;
     res.T37_v222 = r37; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T38 v2.23（多米 build 86：黏液不自然、形狀不自然、太容易掉、太多；還是沒有互動感；加表情看看，只要眼睛；睡著、節奏、游過來、收集一起做）。
+  //   a 黏液：黏土單指慢拉 2.5R（2 秒）不掉；兩指往兩邊慢慢拉 1.8R 不掉（v2.22 會掉）；猛扯（0.12 秒拉 2.6R 再停）掉 1 滴、有拉絲（neck 8 幀以上）、斷開 0.6 秒後離身體 0.25R 以上（黏土最近，量過 0.34），同一抓再扯、放手都不再掉
+  //   b 眼睛：手指按在右邊 2.2R 的空白處 1 秒，眼睛往右看（gx 0.5 以上）；放著 10 秒眨 2 次以上；搔癢出現 > <；揉到呼嚕出現 ∩
+  //   c 睡著：不碰 40 到 45 秒睡著、∪；點身體當下醒、縮得比平常大（0.06 以上）、「嗯？」
+  //   d 節奏：空白處點 3 下（間隔 0.4 秒）→ 回 3 下、間隔 0.35 到 0.45、第一下在最後一點後 0.9 到 1.6 秒；接著點一樣的 → 回完開心（「噗咿」）；只點一下不回
+  //   e 游過來：從家右邊 2R 以外開始，4.5 秒內到家 0.6R 內、打招呼，鏡頭不動（5 點內）；f 收集：四隻輪流換，材質、種子、顏色對，放 3 秒零自交、面積 0.97 到 1.03；換回來印象還在。全程零自交
+  { const clock = saveClock(); Math.random = seeded(20261105); const r38 = {}; let worst = 0;
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const L6 = o => { resetAligned(1e9, { ...P1, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; log.splice(0); };
+    const voices = () => log.filter(x => String(x[0]).startsWith('voice.')).map(x => x[0].slice(6));
+    const pull = (dur, dist) => { L6({}); const x0 = globalC.xc + R * 0.8, y0 = globalC.yc; let q = sc(x0, y0); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); let neck = 0;
+      for (let k = 0; k < dur + 40; k++) { const tx = x0 + dist * R * Math.min(1, k / dur); q = [q[0] + (tx - f.x) * CAM.z, q[1] + (y0 - f.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (DROPS.some(d => d.neck > 0 && d.neck < 1)) neck++; if (k % 10 === 0) worst = Math.max(worst, selfX()); }
+      const n = DROPS.length, d = DROPS[0]; let sep = -1;
+      if (d) { steps(Math.max(0, Math.round((0.6 - (t - d.snapT)) * 60))); let m = 1e9; for (const i of bnd) m = Math.min(m, Math.hypot(X[i] - d.x, Y[i] - d.y)); sep = m / R; }
+      const x1 = f.x; for (let k = 0; k < 30; k++) { const tx = x1 + R * 1.5 * Math.sin(Math.min(1, k / 6) * Math.PI / 2); q = [q[0] + (tx - f.x) * CAM.z, q[1]]; ev('pointermove', 1, q[0], q[1]); steps(1); }
+      const n2 = DROPS.length; ev('pointerup', 1, q[0], q[1]); steps(30); return { n, neck, sepR: +sep.toFixed(2), n2, after: DROPS.length }; };
+    const apart = () => { L6({}); let l = -1, r = -1; for (const i of bnd) { if (l < 0 || X[i] < X[l]) l = i; if (r < 0 || X[i] > X[r]) r = i; }
+      const lx = X[l] + 4, ly = Y[l], rx = X[r] - 4, ry = Y[r]; let a = sc(lx, ly), b = sc(rx, ry); ev('pointerdown', 1, a[0], a[1]); ev('pointerdown', 2, b[0], b[1]); const f1 = fingers.get(1), f2 = fingers.get(2);
+      for (let k = 1; k <= 50; k++) { const u = Math.min(1, k / 40) * 1.8 * R; a = [a[0] + (lx - u - f1.x) * CAM.z, a[1] + (ly - f1.y) * CAM.z]; b = [b[0] + (rx + u - f2.x) * CAM.z, b[1] + (ry - f2.y) * CAM.z]; ev('pointermove', 1, a[0], a[1]); ev('pointermove', 2, b[0], b[1]); steps(1); }
+      const n = DROPS.length; ev('pointerup', 1, a[0], a[1]); ev('pointerup', 2, b[0], b[1]); steps(30); return n; };
+    r38.drops = { slow: pull(120, 2.5), yank: pull(7, 2.6), apart: apart() };
+    { L6({}); const q = sc(globalC.xc + R * 2.2, globalC.yc); ev('pointerdown', 2, q[0], q[1]); steps(60); const gx = +EYE.gx.toFixed(2); ev('pointerup', 2, q[0], q[1]); steps(30);
+      let bl = 0, lastB = EYE.blinkT; for (let k = 0; k < 600; k++) { steps(1); if (EYE.blinkT !== lastB) { bl++; lastB = EYE.blinkT; } }
+      L6({}); const sx = globalC.xc, sy = globalC.yc; let p = sc(sx, sy); ev('pointerdown', 1, p[0], p[1]); const f = fingers.get(1); let sq = 0;
+      for (let k = 0; k < 240; k++) { const tx = sx + Math.sign(Math.sin(k * Math.PI / 5)) * R * 0.15; p = [p[0] + (tx - f.x) * CAM.z, p[1]]; ev('pointermove', 1, p[0], p[1]); steps(1); if (EYE.mode === 'squeeze') sq++; }
+      ev('pointerup', 1, p[0], p[1]); steps(60);
+      L6({}); const rx = globalC.xc + R * 0.3, ry = globalC.yc; p = sc(rx, ry); ev('pointerdown', 2, p[0], p[1]); const g = fingers.get(2); let hp = 0;
+      for (let k = 0; k < 300; k++) { const tx = rx + Math.sin(k / 16) * R * 0.25; p = [p[0] + (tx - g.x) * CAM.z, p[1]]; ev('pointermove', 2, p[0], p[1]); steps(1); if (EYE.mode === 'happy') hp++; }
+      ev('pointerup', 2, p[0], p[1]); steps(30); r38.eyes = { lookGx: gx, blinks10s: bl, tickleSqueeze: sq, purrHappy: hp }; }
+    { L6({}); lastTouch = t; let at = -1; const t0 = t; for (let k = 0; k < 60 * 50 && at < 0; k++) { steps(1); if (SLP.on) at = t - t0; if (k % 60 === 0) worst = Math.max(worst, selfX()); }
+      steps(150); const eye = EYE.mode, kk = SLP.k; log.splice(0);
+      const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 3, q[0], q[1]); const woke = !SLP.on; steps(30); const fl = FLN.amp; ev('pointerup', 3, q[0], q[1]); steps(60);
+      r38.sleep = { at: +at.toFixed(1), eye, k: +kk.toFixed(2), woke, flinch: +fl.toFixed(3), voices: voices() }; }
+    const tapsAt = (ivs, id) => { const q = sc(globalC.xc, globalC.yc + R * 1.8), tp = []; for (let i = 0; i <= ivs.length; i++) { if (i) steps(Math.round(ivs[i - 1] * 60) - 3); ev('pointerdown', id, q[0], q[1]); tp.push(t); steps(3); ev('pointerup', id, q[0], q[1]); } return tp; };
+    const listen = n => { const b = []; let last = ECHO.beatT; for (let k = 0; k < n; k++) { steps(1); if (ECHO.beatT !== last) { b.push(ECHO.beatT); last = ECHO.beatT; } if (k % 20 === 0) worst = Math.max(worst, selfX()); } return b; };
+    { L6({}); const tp = tapsAt([0.4, 0.4], 4), b = listen(240); log.splice(0); tapsAt([0.42, 0.38], 4); const b2 = listen(240), joy = voices().includes('happy');
+      L6({}); tapsAt([], 4); const b3 = listen(180);
+      r38.echo = { beats: b.length, iv: b.slice(1).map((x, i) => +(x - b[i]).toFixed(2)), firstAfter: b.length ? +(b[0] - tp[tp.length - 1]).toFixed(2) : -1, again: b2.length, joy, single: b3.length }; }
+    { L6({}); LIFE.until = -1; const cam0 = CAM.x, home = [CX, CY]; startIntro(); let mx = 0; for (let i = 0; i < N; i++) mx += X[i]; mx /= N; let arr = -1, hello = -1; const t0 = t;
+      for (let k = 0; k < 600; k++) { steps(1); if (k % 10 === 0) worst = Math.max(worst, selfX()); if (hello < 0 && voices().includes('hello')) hello = t - t0; if (arr < 0 && Math.hypot(globalC.xc - home[0], globalC.yc - home[1]) < R * 0.6) arr = t - t0; if (hello > 0 && t - t0 > hello + 1) break; }
+      r38.swim = { startOffR: +((mx - home[0]) / R).toFixed(2), arriveS: +arr.toFixed(2), helloS: +hello.toFixed(2), camMoved: +Math.abs(CAM.x - cam0).toFixed(1), end: snap() }; }
+    { L6({}); const s0 = SLIME, o = []; IMP.tr = 0.7; IMP.w = 0.1; chooseSlime((s0 + 1) % SLIMES.length, false, false);
+      for (let i = 0; i < SLIMES.length; i++) { chooseSlime(i, false, false); mat.emo = 0; WANDER.moving = false; LIFE.until = 1e9; let aMin = 9, aMax = 0, x = 0;
+        for (let k = 0; k < 180; k++) { steps(1); const a = area() / A0; aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); if (k % 10 === 0) x = Math.max(x, selfX()); }
+        o.push({ id: SLIMES[i].id, mat: curMat === SLIMES[i].mat, seed: mat.seed === SLIMES[i].seed, color: getComputedStyle(document.documentElement).getPropertyValue('--body').trim().toUpperCase() === SLIMES[i].c[0], aMin: +aMin.toFixed(3), aMax: +aMax.toFixed(3), selfX: x }); }
+      chooseSlime(s0, false, false); r38.collect = { slimes: o, impBack: +IMP.tr.toFixed(2) }; }
+    r38.worstSelfX = worst;
+    res.T38_v223 = r38; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -639,7 +689,7 @@
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
   const L9 = res.T34_life;
-  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222;
+  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -706,6 +756,13 @@
       && V7.e3.trOn > 0.5 && V7.e3.trOff < 0.3 && V7.e4.count === 1 && V7.e4.helloAt > 0 && V7.e4.distR < 0.6
       && V7.drops.spawned >= 1 && V7.drops.massAfter < 1 && V7.drops.allEatenS >= 0 && V7.drops.massEnd > 0.995 && V7.drops.offSpawned === 0 && V7.drops.gulps >= 1
       && V7.dragIn.held === 'held' && V7.dragIn.left === 0 && V7.dragIn.mass > 0.995 && V7.snatch.gotAt > 0 && V7.snatch.left === 0 && V7.worstSelfX === 0,
+    // v2.23：慢拉、兩指慢慢拉開不掉黏液，猛扯掉一滴、有拉絲、會離開；眼睛看手指、會眨、搔癢 > <、呼嚕 ∩；40 秒睡著、碰到嚇醒；照節奏回、你接著回它會開心、點一下不回；游過來到家打招呼、鏡頭不動；四隻都正常、印象分開記
+    v223: X8.drops.slow.n === 0 && X8.drops.apart === 0 && X8.drops.yank.n === 1 && X8.drops.yank.neck >= 8 && X8.drops.yank.sepR > 0.25 && X8.drops.yank.n2 === 1 && X8.drops.yank.after === 1
+      && X8.eyes.lookGx > 0.5 && X8.eyes.blinks10s >= 2 && X8.eyes.tickleSqueeze > 10 && X8.eyes.purrHappy > 10
+      && X8.sleep.at >= 39.9 && X8.sleep.at < 45 && X8.sleep.eye === 'sleep' && X8.sleep.woke && X8.sleep.flinch > 0.06 && X8.sleep.voices.includes('ask')
+      && X8.echo.beats === 3 && X8.echo.iv.every(x => x > 0.35 && x < 0.45) && X8.echo.firstAfter > 0.9 && X8.echo.firstAfter < 1.6 && X8.echo.again === 3 && X8.echo.joy && X8.echo.single === 0
+      && X8.swim.startOffR > 2 && X8.swim.arriveS > 0 && X8.swim.arriveS < 4.5 && X8.swim.helloS > 0 && X8.swim.camMoved < 5 && X8.swim.end.selfX === 0
+      && X8.collect.slimes.every(q => q.mat && q.seed && q.color && q.aMin > 0.97 && q.aMax < 1.03 && q.selfX === 0) && X8.collect.impBack === 0.7 && X8.worstSelfX === 0,
     lifeV219: L9.idle.restFrac > 0.35 && L9.idle.restFrac < 0.65 && L9.idle.sniffs >= 4 && L9.idle.goes >= 2 && L9.idle.worstSelfX === 0 && L9.idle.areaMin > 0.97 && L9.idle.areaMax < 1.03
       && L9.held.ratio > 0.35 && L9.held.ratioOff < 0.15 && L9.held.qdev1s < L9.held.qdev1sOff + 1
       && Math.abs(L9.flinch.at05 - 1) < 0.015 && L9.flinch.at30 < 0.96 && L9.flinch.fifthOverFirst < 0.3
@@ -726,7 +783,7 @@
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
   draw();
-  Object.assign(PRESETS, PSAVE); mat = { ...P0 };
+  Object.assign(PRESETS, PSAVE); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
   console.log(JSON.stringify(res, null, 1));
   return res;

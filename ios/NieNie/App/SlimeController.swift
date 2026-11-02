@@ -10,6 +10,9 @@ final class SlimeController: ObservableObject {
     let sound: SlimeSoundSource = SlimeAudio()
 
     @Published private(set) var material: SlimeMaterial = .clay   // 多米 2026-10-31 選黏土
+    /// v2.23 收集: the slime on screen (its material is the default material; the panel can swap the material for a blind test)
+    @Published private(set) var slime: SlimeKind = .honey
+    private var impressions: [SlimeKind: (trust: Double, wary: Double)] = [:]   // each slime's impression, this run only
     @Published private(set) var params: [SlimeMaterial: FeelParams]
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2; syncAudio() } }
@@ -30,7 +33,11 @@ final class SlimeController: ObservableObject {
         var p: [SlimeMaterial: FeelParams] = [:]
         for m in SlimeMaterial.allCases { p[m] = m.defaults }
         params = p
-        rig = SlimeRig(params: SlimeMaterial.clay.defaults)
+        let saved = SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey
+        slime = saved; material = saved.material
+        var start = saved.material.defaults
+        saved.apply(&start)
+        rig = SlimeRig(params: start)
         rig.reduceMotion = reduceMotion
         rig.onEvent = { [weak self] e in self?.handle(e) }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
@@ -54,12 +61,17 @@ final class SlimeController: ObservableObject {
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             guard let self, let at = self.backgroundAt else { return }
-            if Date().timeIntervalSince(at) >= 600 { self.rig.resetImpression() }
+            if Date().timeIntervalSince(at) >= 600 { self.rig.resetImpression(); self.impressions = [:] }
             self.backgroundAt = nil
         }
     }
 
-    var current: FeelParams { params[material] ?? material.defaults }
+    /// The material's numbers with the chosen slime's shape seed and personality on top.
+    var current: FeelParams {
+        var p = params[material] ?? material.defaults
+        slime.apply(&p)
+        return p
+    }
 
     // MARK: - Events → sound + haptics (same event, same frame)
 
@@ -96,6 +108,9 @@ final class SlimeController: ObservableObject {
             sound.voice(kind, gain: gain, rate: rate)
         case .drip(let gain):
             sound.drip(gain: gain)
+        case .beat:
+            // v2.23 C6: one beat of its answer to your rhythm, a soft round tap
+            haptics.transient(intensity: 0.3, sharpness: 0.2)
         case .nudge:
             // v2.20 C1: it swam over and touched your resting finger: one soft, round tap (lighter than a press)
             sound.press(intensity: 0.2)
@@ -173,7 +188,22 @@ final class SlimeController: ObservableObject {
 
     // MARK: - Buttons
 
-    func select(_ m: SlimeMaterial) {
+    /// v2.23 收集: another slime swims in (its own colours, shape, personality; its impression from earlier this run comes back).
+    func select(_ k: SlimeKind) {
+        guard k != slime else { return }
+        impressions[slime] = (rig.impTrust, rig.impWary)
+        slime = k; material = k.material
+        UserDefaults.standard.set(k.rawValue, forKey: "slime")
+        pushParams()
+        activeSlot = nil
+        rig.resetShape()
+        if let imp = impressions[k] { rig.setImpression(trust: imp.trust, wary: imp.wary) } else { rig.resetImpression() }
+        rig.startIntro()
+        sound.press(intensity: 0.5)
+    }
+
+    /// Panel only: the same slime on another material (blind tests).
+    func selectMaterial(_ m: SlimeMaterial) {
         material = m
         pushParams()
         activeSlot = nil
@@ -243,7 +273,7 @@ final class SlimeController: ObservableObject {
     var exportText: String {
         let p = current
         let pairs = TuneField.all.map { f in "\"\(f.name)\":\(Self.fmt(p[keyPath: f.key]))" }
-        return "{\"手感\":\"\(material.name)\"," + pairs.joined(separator: ",") + "}"
+        return "{\"史萊姆\":\"\(slime.name)\",\"手感\":\"\(material.name)\"," + pairs.joined(separator: ",") + "}"
     }
 
     private static func fmt(_ v: Double) -> String {

@@ -57,6 +57,10 @@ final class SlimeView: UIView {
     private let dropHiLayer = CAShapeLayer()
     private let dropLineLayer = CAShapeLayer()
     private var tintKey = -1   // v2.22 E3: the impression tint last applied (rounded), −1 = plain colours
+    private let strandLayer = CAShapeLayer()     // v2.23 the strand a drop pulls out, behind the body (its root covered)
+    private let eyeFillLayer = CAShapeLayer()    // v2.23 eyes, inside the body: open eyes...
+    private let eyeLightLayer = CAShapeLayer()   // ...their white glints...
+    private let eyeLineLayer = CAShapeLayer()    // ...and the ∩ ∪ > < and shut ones as strokes
 
     /// Touches starting this close to the top/bottom edge are left to the system gestures.
     private let edgeBand: CGFloat = 32
@@ -80,6 +84,8 @@ final class SlimeView: UIView {
         }
         shadowLayer.fillColor = UIColor(red: 60 / 255, green: 90 / 255, blue: 40 / 255, alpha: 0.18).cgColor
         layer.addSublayer(shadowLayer)
+        strandLayer.lineJoin = .round
+        layer.addSublayer(strandLayer)
         layer.addSublayer(shadeLayer)
         litGroup.mask = litMask
         layer.addSublayer(litGroup)
@@ -94,6 +100,9 @@ final class SlimeView: UIView {
             dentLayers.append(l)
         }
         litGroup.addSublayer(highlightLayer)
+        eyeLightLayer.fillColor = UIColor.white.cgColor
+        eyeLineLayer.fillColor = nil; eyeLineLayer.lineCap = .round; eyeLineLayer.lineJoin = .round
+        litGroup.addSublayer(eyeFillLayer); litGroup.addSublayer(eyeLightLayer); litGroup.addSublayer(eyeLineLayer)
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
@@ -149,6 +158,8 @@ final class SlimeView: UIView {
         dropBaseLayer.fillColor = colors.base.cgColor
         dropHiLayer.fillColor = colors.light.cgColor
         dropLineLayer.strokeColor = colors.line.cgColor
+        strandLayer.fillColor = colors.base.cgColor; strandLayer.strokeColor = colors.line.cgColor
+        eyeFillLayer.fillColor = colors.eye.cgColor; eyeLineLayer.strokeColor = colors.eye.cgColor
         tintKey = -1
         CATransaction.commit()
     }
@@ -194,7 +205,8 @@ final class SlimeView: UIView {
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
-                       dropShadeLayer, dropLitGroup, dropMask, dropBaseLayer, dropHiLayer, dropLineLayer] as [CALayer]) + (speckLayers as [CALayer]) {
+                       dropShadeLayer, dropLitGroup, dropMask, dropBaseLayer, dropHiLayer, dropLineLayer,
+                       strandLayer, eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) {
                 l.frame = bounds
             }
             redraw()
@@ -534,12 +546,18 @@ final class SlimeView: UIView {
             tintKey = tk
             let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
             let sh = tinted(colors.shade, tr, w).cgColor, ba = tinted(colors.base, tr, w).cgColor
-            shadeLayer.fillColor = sh; baseLayer.fillColor = ba; dropShadeLayer.fillColor = sh; dropBaseLayer.fillColor = ba
+            shadeLayer.fillColor = sh; baseLayer.fillColor = ba; dropShadeLayer.fillColor = sh; dropBaseLayer.fillColor = ba; strandLayer.fillColor = ba
         }
         // v2.22 drops: an ellipse stretched along its speed; the base colour shifted up-left inside it, a small highlight, the outline
         let dv = rig.dropViews
         let dsh = CGMutablePath(), dba = CGMutablePath(), dhi = CGMutablePath()
-        for d in dv {
+        for d in dv where !d.pts.isEmpty {   // v2.23: the teardrop outline, drawn like the body
+            let c = rig.toScreen(d.x, d.y), r = d.r * z, P = d.pts.map { rig.toScreen($0.x, $0.y) }
+            dsh.addPath(bodyPath(P)); dba.addPath(bodyPath(P, dx: -r * 0.2, dy: -r * 0.24))
+            dhi.addEllipse(in: CGRect(x: -r * 0.24, y: -r * 0.11, width: r * 0.48, height: r * 0.22),
+                           transform: CGAffineTransform(rotationAngle: -0.5).concatenating(CGAffineTransform(translationX: c.x - r * 0.36, y: c.y - r * 0.4)))
+        }
+        for d in dv where d.pts.isEmpty {
             let c = rig.toScreen(d.x, d.y), r = d.r * z, sp = hypot(d.vx, d.vy), st = 1 + min(0.5, sp / (rig.R * 3)), a = atan2(d.vy, d.vx)
             let rect = CGRect(x: -r * st, y: -r / st, width: 2 * r * st, height: 2 * r / st), rot = CGAffineTransform(rotationAngle: a)
             dsh.addEllipse(in: rect, transform: rot.concatenating(CGAffineTransform(translationX: c.x, y: c.y)))
@@ -549,6 +567,41 @@ final class SlimeView: UIView {
         }
         dropShadeLayer.path = dsh; dropMask.path = dsh; dropBaseLayer.path = dba; dropHiLayer.path = dhi
         dropLineLayer.path = dsh; dropLineLayer.lineWidth = max(2.5, rig.R * 0.024)
+        // v2.23 strands: thick at both ends, thin in the middle; behind the body
+        let stp = CGMutablePath()
+        for poly in rig.strandViews where poly.count > 2 {
+            stp.addLines(between: poly.map { q -> CGPoint in let s = rig.toScreen(q.x, q.y); return CGPoint(x: s.x, y: s.y) }); stp.closeSubpath()
+        }
+        strandLayer.path = stp; strandLayer.lineWidth = max(2.5, rig.R * 0.024)
+        // v2.23 eyes (多米 11-02: try a face, eyes only): bean eyes looking where it looks; ∩ happy, ∪ asleep, > < squeezed, a line when shut
+        let ef = CGMutablePath(), el = CGMutablePath(), eli = CGMutablePath()
+        if let e = rig.eyeView {
+            let S = e.size * z, ew = S * 0.082 * sqrt(e.spread), eh = S * 0.118, ox = e.gx * S * 0.06, oy = e.gy * S * 0.045
+            eyeLineLayer.lineWidth = max(2.5, S * 0.034)
+            for (wx, wy, sd) in [(e.lx, e.ly, -1.0), (e.rx, e.ry, 1.0)] {
+                let c = rig.toScreen(wx, wy), x = c.x + ox, y = c.y + oy
+                switch e.mode {
+                case .happy:
+                    el.addArc(center: CGPoint(x: x, y: y + eh * 0.45), radius: ew * 1.15, startAngle: .pi * 1.15, endAngle: .pi * 1.85, clockwise: false)
+                case .sleep:
+                    el.addArc(center: CGPoint(x: x, y: y - eh * 0.35), radius: ew * 1.15, startAngle: .pi * 0.15, endAngle: .pi * 0.85, clockwise: false)
+                case .squeeze:
+                    let a = -sd
+                    el.move(to: CGPoint(x: x + a * ew * 0.9, y: y - eh * 0.55))
+                    el.addLine(to: CGPoint(x: x - a * ew * 0.8, y: y))
+                    el.addLine(to: CGPoint(x: x + a * ew * 0.9, y: y + eh * 0.55))
+                case .open:
+                    let h = eh * e.open * e.wide * e.blink, w = ew * e.wide
+                    if h < w * 0.35 {
+                        el.move(to: CGPoint(x: x - w, y: y)); el.addLine(to: CGPoint(x: x + w, y: y))
+                    } else {
+                        ef.addEllipse(in: CGRect(x: x - w, y: y - h, width: 2 * w, height: 2 * h))
+                        if h > w * 0.7 { let lr = w * 0.34; eli.addEllipse(in: CGRect(x: x - w * 0.32 - lr, y: y - h * 0.4 - lr, width: 2 * lr, height: 2 * lr)) }
+                    }
+                }
+            }
+        }
+        eyeFillLayer.path = ef; eyeLineLayer.path = el; eyeLightLayer.path = eli
 
         CATransaction.commit()
     }

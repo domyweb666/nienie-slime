@@ -12,7 +12,7 @@ struct TunePanel: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("調整面板").font(.rounded(17, .heavy))
-                Text(controller.material.name).font(.rounded(13)).foregroundStyle(Palette.inkSoft)
+                Text("\(controller.slime.name)・\(controller.material.name)").font(.rounded(13)).foregroundStyle(Palette.inkSoft)
                 Spacer()
                 Button("收起") { isPresented = false }
                     .font(.rounded(13))
@@ -36,6 +36,14 @@ struct TunePanel: View {
                 Text(controller.activeSlot.map { "\($0) 號" } ?? "未存")
                     .font(.rounded(13))
                     .foregroundStyle(Palette.inkSoft)
+            }
+
+            // v2.23: the material moved here from the bottom bar (the same slime on another material, for blind tests)
+            HStack(spacing: 6) {
+                ForEach(SlimeMaterial.allCases) { m in
+                    chip("材質：\(m.name)", on: controller.material == m) { controller.selectMaterial(m) }
+                }
+                Spacer(minLength: 0)
             }
 
             // second-batch candidates, one at a time: 存 1 (control) → 套候選 → 存 2 → 切 1／切 2

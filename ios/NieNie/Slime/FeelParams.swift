@@ -163,6 +163,15 @@ struct FeelParams: Equatable, Codable {
     var e3: Double = 1                // E3: the impression shows: trust 3–4× faster; trusting rounder, taller, warmer, slower breath; wary flatter, paler
     var e4: Double = 1                // E4: trusting and left alone 10–20 s, it swims to the front, waves a pseudopod, hums, goes back (3 times a run at most)
     var drops: Double = 1             // drops: long pulls, yanks, flings, pinches, slow lifts drop bits (body at most 15% smaller); they float, it swims over and takes them back; you can drag them; trusting it pushes one to you; hold one and it comes to snatch it
+    // v2.23 (多米 build 86: the drops look wrong and come off too easily, too many; still no feeling it reacts to you; try a face, eyes only;
+    // sleep, rhythm, swim-in and the collection all at once). All but eyes only count while life2 is 1
+    var dropsV: Double = 1            // drops v2.23: only a yank or a hard fling drops one (one a grab, 4 s apart, 2 on screen, body at least 0.9); a strand pulls out, thins and snaps; a teardrop that wobbles round. 0: v2.22
+    var eyes: Double = 1              // two small eyes: look at your finger, blink; squint held, > < pulled, ∩ purring or happy, ∪ asleep, wide when wary. 0: no face
+    var sleep: Double = 1             // B2: untouched 40 s (a tap on the empty screen counts) while resting, it falls asleep; a touch startles it awake, a finger beside it 1.2 s wakes it gently
+    var echo: Double = 1              // C6: tap the empty screen 2–8 times in a rhythm (0.12–1.2 s apart); it answers with the same count and rhythm; answer it back the same and it is happy
+    var introSwim: Double = 1         // the cold start (and a slime switch): it swims in from off the right edge, looks at you, waves, says hello. 0: the v2.17 hops
+    // v2.23 personality (set by the chosen slime, see SlimeKind): rest length, voice pitch, eye size, how fast trust and wariness grow, how soon it visits
+    var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -180,6 +189,7 @@ struct SlimeColors {
     var shade: UIColor
     var line: UIColor
     var light: UIColor
+    var eye = UIColor(hex: 0x3A2614)   // v2.23 eyes
 }
 
 enum SlimeMaterial: String, CaseIterable, Identifiable {
@@ -233,6 +243,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     func applyV27(_ p: inout FeelParams) {
         p.morph = 0; p.tentMem = 0
         p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0   // nothing of v2.20 to v2.22
+        p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
@@ -252,6 +263,35 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         case .clay:
             return SlimeColors(base: UIColor(hex: 0xFFD96B), shade: UIColor(hex: 0xF0B64A),
                                line: UIColor(hex: 0x8B5A20), light: UIColor(hex: 0xFFF6D6))
+        }
+    }
+}
+
+/// v2.23 收集 (多米 11-02: all of them there from the start): four slimes, each its own material, colours, shape seed and personality
+/// (rest length, how far it runs, voice pitch, eye size, how fast it trusts or turns wary, how soon it visits). Same table as the
+/// prototype's SLIMES. Each keeps its own impression for this run; the chosen one is remembered across launches.
+enum SlimeKind: String, CaseIterable, Identifiable {
+    case honey, mint, taro, peach
+    var id: String { rawValue }
+    var name: String { ["蜜蜜", "薄荷", "芋圓", "桃桃"][index] }
+    var desc: String { ["黏土，慢吞吞，最愛睡", "果凍，好動，愛到處跑", "麻糬，怕生，熟了很黏人", "黏土，愛撒嬌，常來找你"][index] }
+    var material: SlimeMaterial { [.clay, .jelly, .mochi, .clay][index] }
+    private var index: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+    var colors: SlimeColors {
+        switch self {
+        case .honey: return SlimeColors(base: UIColor(hex: 0xFFD96B), shade: UIColor(hex: 0xF0B64A), line: UIColor(hex: 0x8B5A20), light: UIColor(hex: 0xFFF6D6), eye: UIColor(hex: 0x3A2614))
+        case .mint: return SlimeColors(base: UIColor(hex: 0x9BEBD0), shade: UIColor(hex: 0x5CCBA8), line: UIColor(hex: 0x1F6B55), light: UIColor(hex: 0xECFFF8), eye: UIColor(hex: 0x173F33))
+        case .taro: return SlimeColors(base: UIColor(hex: 0xD2C2FF), shade: UIColor(hex: 0xA691EC), line: UIColor(hex: 0x4F3A8C), light: UIColor(hex: 0xF6F1FF), eye: UIColor(hex: 0x2E2350))
+        case .peach: return SlimeColors(base: UIColor(hex: 0xFFC2CF), shade: UIColor(hex: 0xF28FA6), line: UIColor(hex: 0x8C3349), light: UIColor(hex: 0xFFF0F3), eye: UIColor(hex: 0x4A1C28))
+        }
+    }
+    /// Shape seed and personality on top of the material's numbers.
+    func apply(_ p: inout FeelParams) {
+        switch self {
+        case .honey: p.seed = 7; p.restMul = 1.15; p.voicePitch = 1; p.dash = 0.2; p.eyeSize = 1; p.trRate = 1; p.wRate = 1; p.e4Mul = 1
+        case .mint: p.seed = 12; p.restMul = 0.6; p.voicePitch = 1.12; p.dash = 0.45; p.eyeSize = 0.95; p.trRate = 1; p.wRate = 0.8; p.e4Mul = 1
+        case .taro: p.seed = 4; p.restMul = 1; p.voicePitch = 0.94; p.dash = 0.2; p.eyeSize = 0.88; p.trRate = 0.7; p.wRate = 1.6; p.e4Mul = 0.7
+        case .peach: p.seed = 19; p.restMul = 0.9; p.voicePitch = 1.18; p.dash = 0.25; p.eyeSize = 1.1; p.trRate = 1.6; p.wRate = 0.8; p.e4Mul = 0.6
         }
     }
 }
@@ -300,6 +340,7 @@ struct Candidate: Identifiable {
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
         Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 222, name: "v2.22 對照（沒眼睛、舊黏液、不睡、不回節奏、跳過來）", hint: "v2.23 的五樣一起關") { p, _ in p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0 },
         Candidate(id: 221, name: "v2.21 對照（不出聲、沒有黏液）", hint: "沒有 E1 到 E4、沒有黏液") { p, _ in p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
         Candidate(id: 220, name: "v2.20 對照（整團只跟三成五）", hint: "單指拉只有三成五跟過去，果凍拉 1.6R 就頂住") { p, _ in p.slide = 0 },
         Candidate(id: 218, name: "v2.18 對照（沒有 v2.19 活物感）", hint: "一直在動、被拖著滑過去、一碰全停、固定節拍呼吸、隨機偽足、有影子") { p, _ in p.life2 = 0 },
@@ -350,6 +391,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.e3, name: "E3 看得出印象", hint: "1：熟得快三到四倍；熟的圓一點、挺一點、顏色偏暖、呼吸慢；戒的扁一點、顏色淡一點；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.e4, name: "E4 來找你", hint: "1：熟的時候你 10 到 20 秒沒碰它，它游到畫面前面揮一下偽足、哼一聲，再回去休息；一次打開最多 3 次；0 關（碰到不做清單的「主動找你」，多米 11-02 決定留著）", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.drops, name: "黏液", hint: "1：拉很長、猛扯、甩、兩指擠、按久慢慢抬手會掉黏液（身體最多小一成五）；黏液飄著，它會游過去吸回來；你可以拖黏液，丟到它身上就吸；熟的時候它會推給你；你抓著一滴它會來搶；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.dropsV, name: "黏液 v2.23", hint: "1：只有猛扯（拉開 1.2R 以上、手指每秒 5R 以上）、用力甩放手才掉，一抓最多 1 滴、4 秒內不再掉、畫面上最多 2 滴、身體最少 0.9；從身體拉出一條絲、變細、斷開，那滴先是水滴形、晃幾下才變圓；0 回 v2.22", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.eyes, name: "眼睛 v2.23", hint: "1：兩顆小眼睛（多米 11-02：加表情看看，只要眼睛）。看你的手指、會眨眼；被捏瞇起來、猛扯擠成 > <、呼嚕和開心彎成 ∩、睡著閉成 ∪、戒的時候睜大；0 回沒有臉", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.sleep, name: "B2 睡著", hint: "1：40 秒沒人碰（含點空白處），休息時慢慢閉眼睡著：呼吸慢、深一點、攤軟、不走；碰它嚇醒（縮大一點、「嗯？」），手指放旁邊 1.2 秒慢慢醒；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.echo, name: "C6 照你的節奏回你", hint: "1：在空白處用固定節奏點 2 到 8 下（間隔 0.12 到 1.2 秒），停下來後它照同樣的次數和節奏一縮一縮回你（每下「噗」、輕震）；你再點一樣的節奏，它開心；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.introSwim, name: "開場游過來", hint: "1：開場從畫面右邊外面一縮一衝游進來，到家看著你、揮一下偽足、打招呼（換史萊姆時也是）；0：v2.17 從遠處跳過來", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）", range: 0...0.15, step: 0.01, section: "活物感"),

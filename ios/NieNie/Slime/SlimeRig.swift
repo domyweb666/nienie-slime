@@ -12,6 +12,7 @@ enum SlimeEvent {
     case nudge                               // v2.20 C1: it reached your resting finger (one soft tap); v2.22 E2: it pushed back at your finger
     case voice(kind: String, gain: Double, rate: Double)   // v2.22 E1: one of its small sounds; rate from the impression
     case drip(gain: Double)                  // v2.22: a drop of slime came off
+    case beat                                // v2.23 C6: one beat of it answering your rhythm (a soft tap)
 }
 
 /// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
@@ -146,7 +147,7 @@ final class SlimeRig {
     // rest / look / go / arrive (A1, A2). sniffs: pseudopods reaching out to sniff (a = screen angle, L length, T1 out, T2 hold, T3 back;
     // cut: touched or flinching, drawn in within 0.15 s); att: a point queued to sniff at (A7); lifeWrg: wriggle share; goFade: the
     // jellyfish pulse fades while walking (the contraction is the walking); lifeUntil −1 = choose on the next frame
-    private enum LifeState { case rest, look, go, arrive }
+    private enum LifeState { case rest, look, go, arrive, sleep }   // v2.23 sleep (B2)
     private struct Sniff { var a, L, t0, T1, T2, T3, ph: Double; var cut = 0.0, eCut = 0.0, id = 0 }
     private var sniffSeq = 0
     private var lifeSt = LifeState.rest, lifeUntil = -1.0, lifeLooks = 0, lifeNoGo = false, sniffs: [Sniff] = []
@@ -200,6 +201,7 @@ final class SlimeRig {
     private final class Drop {
         var x, y, vx, vy, r, m, ph, born: Double
         var st = DropState.float, push = -9.0, k = 1.0, eatT0 = 0.0
+        var ai = -1, neck = 1.0, snapT = 0.0, ta = 0.0, bx = 0.0, by = 0.0   // v2.23: strand to boundary particle ai (−1 none), 0→1 pulling off, when it snapped, tail angle, strand root
         var hid: ObjectIdentifier?
         init(x: Double, y: Double, vx: Double, vy: Double, r: Double, m: Double, ph: Double, born: Double) {
             self.x = x; self.y = y; self.vx = vx; self.vy = vy; self.r = r; self.m = m; self.ph = ph; self.born = born
@@ -207,14 +209,82 @@ final class SlimeRig {
     }
     private var drops: [Drop] = [], mass = 1.0, massD = 1.0, lifeDrop: Drop?, lifeDropPush = false
     private(set) var impShownTrust = 0.0, impShownWary = 0.0
-    /// v2.22: the drops as drawn (world points; a drop flowing back in shrinks).
-    struct DropView { let x, y, r, vx, vy: Double }
+    /// v2.22: the drops as drawn (world points; a drop flowing back in shrinks). v2.23: pts = the teardrop outline (empty: v2.22's ellipse).
+    struct DropView { let x, y, r, vx, vy: Double; let pts: [(x: Double, y: Double)] }
     var dropViews: [DropView] {
         drops.compactMap { d in
             let r = d.r * (d.st == .eat ? max(0, d.k) : 1)
-            return r < 0.5 ? nil : DropView(x: d.x, y: d.y, r: r, vx: d.vx, vy: d.vy)
+            return r < 0.5 ? nil : DropView(x: d.x, y: d.y, r: r, vx: d.vx, vy: d.vy, pts: params.dropsV >= 0.5 ? dropPts(d, r) : [])
         }
     }
+    /// v2.23 a drop's outline: a circle with a tail toward its strand (sharper as it pulls, drawn back 0.15 s after the snap), wobbling
+    /// along the tail after the snap (0.35 s decay, 3 a second), a little longer along its speed, the rim slowly breathing.
+    private func dropPts(_ d: Drop, _ r: Double) -> [(x: Double, y: Double)] {
+        let u = t - d.snapT
+        let tl: Double = d.neck < 1 ? 0.5 + 0.7 * d.neck : 0.9 * exp(-max(0, u) / 0.15)
+        let wob: Double = d.neck < 1 ? 0 : 0.2 * exp(-u / 0.35) * cos(2 * .pi * 3 * u)
+        let sp = hypot(d.vx, d.vy), sv = 1 + min(0.15, sp / (R * 8)), va = atan2(d.vy, d.vx)
+        let ct = cos(d.ta), st = sin(d.ta), cv = cos(va), sn = sin(va), ws = 1 + wob
+        var P: [(x: Double, y: Double)] = []
+        P.reserveCapacity(20)
+        for k in 0..<20 {
+            let th = Double(k) / 20 * 2 * .pi, c = cos(th - d.ta)
+            let rr: Double = r * (1 + tl * pow(max(0, c), 6)) * (1 + 0.04 * sin(3 * th + t * 2.2 + d.ph))
+            var x = cos(th) * rr, y = sin(th) * rr
+            let a1 = x * ct + y * st, b1 = -x * st + y * ct
+            x = a1 * ws * ct - b1 / ws * st; y = a1 * ws * st + b1 / ws * ct
+            let a2 = x * cv + y * sn, b2 = -x * sn + y * cv
+            x = a2 * sv * cv - b2 / sv * sn; y = a2 * sv * sn + b2 / sv * cv
+            P.append((d.x + x, d.y + y))
+        }
+        return P
+    }
+    /// v2.23 strands (world points, closed polygons): from the boundary particle to the drop's tail, thick at both ends and thinner in the
+    /// middle as it pulls; after the snap the body half shrinks back in 0.15 s. Drawn behind the body so its root is covered.
+    var strandViews: [[(x: Double, y: Double)]] {
+        guard params.dropsV >= 0.5 else { return [] }
+        var out: [[(x: Double, y: Double)]] = []
+        for d in drops where d.ai >= 0 {
+            let u = t - d.snapT, on = d.neck < 1
+            if !on && !(u >= 0 && u < 0.15) { continue }
+            let r = d.r, ex = d.x + cos(d.ta) * r * 1.4, ey = d.y + sin(d.ta) * r * 1.4, len: Double = on ? 1 : 0.5 * (1 - u / 0.15)
+            let dx = (ex - d.bx) * len, dy = (ey - d.by) * len, l = max(1e-6, hypot(dx, dy)), nx = -dy / l, ny = dx / l, n: Double = on ? d.neck : 1
+            let wb = r * (0.95 - 0.4 * n), wm: Double = on ? r * (0.55 * pow(1 - n, 1.5) + 0.05) : 0, wd: Double = on ? r * (0.4 - 0.15 * n) : 0
+            var L: [(x: Double, y: Double)] = [], Rr: [(x: Double, y: Double)] = []
+            for s in 0...10 {
+                let q = Double(s) / 10, w = wb * (1 - q) * (1 - q) + wm * 2 * q * (1 - q) + wd * q * q, cx = d.bx + dx * q, cy = d.by + dy * q
+                L.append((cx + nx * w, cy + ny * w)); Rr.append((cx - nx * w, cy - ny * w))
+            }
+            out.append(L + Rr.reversed())
+        }
+        return out
+    }
+    // v2.23 (多米 build 86: the drops look wrong, come off too easily, too many; still no feeling it reacts to you; try a face, eyes only;
+    // sleep, rhythm, swim-in and the collection all at once). dropLast: a drop at most every 4 s; lastSdt: the substep, for the tip's speed
+    private var dropLast = -99.0, lastSdt = 1.0 / 240
+    /// Eyes: open (blinks, squints while held, shut a moment on a flinch, wide when wary), happy ∩ (purr, happy, hello, your rhythm back),
+    /// squeeze > < (pulled to flee, tickled, the start of a run, a yank), sleep ∪.
+    enum EyeMode { case open, happy, squeeze, sleep }
+    private var eyeL: [Int] = [], eyeR: [Int] = [], eyeD0 = 1.0, eyeGX = 0.0, eyeGY = 0.0, eyeSacT = 0.0, eyeSX = 0.0, eyeSY = 0.0
+    private var eyeUser = -9.0, eyeOpenD = 1.0, eyeWideD = 1.0, eyeBlinkT = -9.0, eyeNextBlink = 2.0, eyePulse = -9.0, eyeSqU = -9.0, eyeBlink = 1.0
+    private(set) var eyeMode = EyeMode.open
+    struct EyeView { let lx, ly, rx, ry, gx, gy, open, wide, blink, size, spread: Double; let mode: EyeMode }
+    /// The eyes as drawn (world points): each on the mean of its 4 particles; gaze −1...1; size = R × eyeSize; spread = how far apart vs rest.
+    var eyeView: EyeView? {
+        guard params.eyes >= 0.5, !eyeL.isEmpty, !eyeR.isEmpty else { return nil }
+        let l = eyeAt(eyeL), r = eyeAt(eyeR)
+        return EyeView(lx: l.x, ly: l.y, rx: r.x, ry: r.y, gx: eyeGX, gy: eyeGY, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
+                       size: R * params.eyeSize * sqrt(massD), spread: max(0.8, min(1.3, hypot(r.x - l.x, r.y - l.y) / eyeD0)), mode: eyeMode)
+    }
+    // B2 sleep: k eases 0...1 (1.6 s falling asleep, 0.25 s waking); lastAny = the last touch anywhere (a tap on empty space counts)
+    private var slpOn = false, slpK = 0.0, slpLastAny = -99.0, slpWakeT = -9.0, slpAskAt = -9.0, slpNearT = 0.0, flBoost = 1.0
+    // C6 echo: st 0 idle, 1 listening, 2 answering; beats = offsets from t0; prev = the rhythm it answered last (you repeating it = happy)
+    private var echoTaps: [Double] = [], echoSt = 0, echoX = 0.0, echoY = 0.0, echoBeats: [Double] = [], echoI = 0, echoT0 = 0.0
+    private var echoPrev: [Double]?, echoPrevT = -99.0, echoSame = false, echoJoyUntil = -9.0
+    private(set) var echoBeatT = -9.0
+    private var swimOn = false, swimT0 = 0.0   // swimming in (cold start, a slime switch)
+    /// v2.23 收集: switching slimes brings that one's impression back (this run only).
+    func setImpression(trust: Double, wary: Double) { impTrust = trust; impWary = wary; impShownTrust = trust; impShownWary = wary; impHas = false; impAskUntil = -9 }
     /// v2.22 E3: the body colour leans with the impression.
     var showsImpression: Bool { iv3(params.e3) }
 
@@ -223,6 +293,7 @@ final class SlimeRig {
     /// hop comes closer and bigger, the last lands at home. Reduce Motion: no travel, one small hop at home.
     func startIntro() {
         guard params.intro >= 0.5, N > 0 else { return }
+        if params.introSwim >= 0.5 && params.life2 >= 0.5 && lv(params.lifeGait) { swimIntro(1); return }   // v2.23 開場游過來
         var y1 = -1e9
         for i in bnd { y1 = max(y1, Y[i]) }
         let far = !reduceMotion
@@ -376,7 +447,7 @@ final class SlimeRig {
         // v2.17 follow: untouched and not big, the view is no longer pinned at home nor forced to frame the whole body. Once the centre
         // is followZone (1 = half the view) off, chase it until close, on a critically damped spring (followSpeed 1.4: about 2 s, eased
         // start and stop). Still while grabbed: the picture must not slide under a finger
-        let follow = params.camFollow >= 0.5 && !big && !grabbingNow && !introOn
+        let follow = params.camFollow >= 0.5 && !big && !grabbingNow && !introOn && !swimOn   // v2.23: swimming in, the view holds still
         // the target puts the slime back where it normally sits on screen (home cx, cy against the view centre), not dead centre;
         // the centre is the boundary mean (the centroid is still 0 on the first frame and the view thought it had run far)
         if follow, !bnd.isEmpty {
@@ -421,6 +492,7 @@ final class SlimeRig {
         var tkA: Double?, pushed2 = false            // v2.22 E2: last heading (tickle turns), pushed back once
         var saidProt = false, saidPurr = false       // v2.22 E1: protested / hummed once this grab
         var dragMax = 0.0, dropsMade = 0             // v2.22: how far this grab dragged it (E3); drops it has pulled off
+        var yank = false                             // v2.23: yanked (pulled open 1.2R at 5R/s): a drop flies off when it stops
         var tickAt = 0.0, tickNext = 0.0             // texture ticks: travel at the last tick, spacing to the next (提案第 13 條)
         var step = 0
         var stretch = 0.0                            // tanh-limited stretch at the last update, in radii
@@ -660,6 +732,8 @@ final class SlimeRig {
         dragOX = 0; dragOY = 0; dragVX = 0; dragVY = 0; dragBX = 0; dragBY = 0; dragGX = 0; dragGY = 0; dragSlipT = 0; lureOn = false; lureSn = -1; askOn = false
         drops = []; mass = 1; massD = 1; lifeDrop = nil; e4On = false; e4Wait = -1   // v2.22
         leanT = -9; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0
+        eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
+        echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false; dropLast = -99
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
     }
 
@@ -905,11 +979,17 @@ final class SlimeRig {
         guard N > 0 else { return }
         if introOn { let mini = introMini; endIntro(); if !mini { return } }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab; during a happy hop it grabs as usual
         let (x, y) = toWorld(sx, sy)
+        slpLastAny = t   // v2.23 B2: a tap anywhere counts as someone there
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         // v2.22: a touch on a drop picks up the drop, not the body
         let dropHit: Drop? = allowed && iv3(params.drops) ? drops.first(where: { $0.st != .eat && hypot($0.x - x, $0.y - y) < max($0.r * 1.6, R * 0.25) }) : nil
         let grab = allowed && dropHit == nil && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         if grab { escOn = false }   // v2.18: caught, it stops running
+        if grab { swimOn = false; wake(true) }   // v2.23: caught while swimming in, no hello; asleep, it startles awake
+        if !grab && allowed && dropHit == nil {   // v2.23: asleep, a tap beside it wakes it (that tap is no rhythm); awake, C6 listens
+            if slpOn { var db = 1e9; for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }; if db < R * 2 { wake(false) }; echoTaps = [] }
+            else { echoTap(x, y) }
+        }
         // v2.19: caught, the sniffing pseudopods draw in and it stops walking; A5 the dent still shows at once (below) and 0.1...0.25 s
         // later it flinches by itself; A7 a touch on empty space within 3R makes it turn and sniff that way 0.3 s later
         // v2.20 C5: wary, it flinches sooner
@@ -1034,6 +1114,7 @@ final class SlimeRig {
         if f.mode == .grab && !quiet && params.life2 >= 0.5 { lifeRelease(f) }
         if f.mode == .grab && !quiet { impAsk(f) }
         if f.mode == .grab && !quiet { e2Release(f); dropsOnRelease(f) }   // v2.22
+        if f.mode == .grab && !quiet && !escOn { eyeUser = t + 1.2 }   // v2.23: let go, it looks at you
         if f.mode == .drop, let d = drops.first(where: { $0.hid == id && $0.st == .held }) {   // let go of a drop: it floats on with half the finger's speed
             let c = R * 3
             d.st = .float; d.vx = max(-c, min(c, f.vxS * 0.5)); d.vy = max(-c, min(c, f.vyS * 0.5))
@@ -1283,7 +1364,10 @@ final class SlimeRig {
                 let r = d / pinchD0
                 if r <= pinchNext {
                     onEvent?(.squish(gain: 0.6 + 0.3 * (1 - r)))
-                    if pinchNext > 0.59 { dropSpawn((a.fx + b.fx) / 2, (a.fy + b.fy) / 2 - R * 0.2, 0, -R * 0.4, R * 0.11) }   // v2.22: the first squish presses out a small drop
+                    if pinchNext > 0.59 {   // v2.22: the first squish presses out a small drop; v2.23: 35% of the time, from the top edge
+                        if params.dropsV < 0.5 { dropSpawn((a.fx + b.fx) / 2, (a.fy + b.fy) / 2 - R * 0.2, 0, -R * 0.4, R * 0.11) }
+                        else if Double.random(in: 0..<1) < 0.35 { dropFromTip((a.fx + b.fx) / 2, (a.fy + b.fy) / 2, 0, -1, R * 0.5) }
+                    }
                     pinchNext -= 0.15
                 }
             } else {
@@ -1307,7 +1391,7 @@ final class SlimeRig {
         lifeLB = lv(mat.lifeHeld) ? max(Lamp, mat.heldBreath * (reduceMotion ? 0.5 : 1)) : Lamp   // v2.19 A4: the breathing goes on while held
         exert *= exp(-dt / 4)
         do {
-            let tw: Double = !lv(mat.lifeRest) ? 1 : (lifeSt == .rest ? mat.restWrig : (lifeSt == .look ? 0.6 : 0.5))
+            let tw: Double = !lv(mat.lifeRest) ? 1 : (lifeSt == .rest || lifeSt == .sleep ? mat.restWrig * (1 - 0.6 * slpK) : (lifeSt == .look ? 0.6 : 0.5))
             lifeWrg += (tw - lifeWrg) * (1 - exp(-dt / 0.8))   // v2.19 A1: the wriggle drops while resting
             let gf: Double = lv(mat.lifeGait) && (gaitOn || lifeSt == .arrive) ? 1 : 0
             goFade += (gf - goFade) * (1 - exp(-dt / 0.25))   // A3: the jellyfish pulse fades while walking; the contraction is the walking
@@ -1320,6 +1404,7 @@ final class SlimeRig {
                 let cp = max(0, moodC), ar = max(moodA, moodScare)
                 T *= (1 + 0.4 * cp) * (1 - 0.4 * ar); amp *= (1 + 0.5 * cp) * (1 - 0.4 * ar)
                 if iv3(mat.e3) { T *= 1 + 0.25 * impShownTrust }   // v2.22 E3: trusting, it breathes slower
+                if slpK > 0 { T *= 1 + 0.6 * slpK; amp *= 1 + 0.35 * slpK }   // v2.23 B2: asleep, slow and deep
             }
             if mat.breathDeep >= 0.5 {
                 // 23c: after a grab held longer than 10 s, the next 20 s breathe 1.5× deeper and 1.2× slower, fading linearly
@@ -1364,7 +1449,7 @@ final class SlimeRig {
             let ph = brPhase - floor(brPhase), c = 0.22
             let w = ph < c ? sin(.pi / 2 * ph / c) : 0.5 * (1 + cos(.pi * (ph - c) / (1 - c)))
             let dw = w - brJw
-            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare)) * brAmpX
+            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare)) * brAmpX * (1 + 0.35 * slpK)
             if dw > 0 { brLift += dw * mat.jellyLift * R * Lamp * mat.life * (1 - goFade) }
         }
         brLift *= exp(-dt / 1.0)
@@ -1459,6 +1544,7 @@ final class SlimeRig {
         moodStep(dt)
         impStep(dt)   // v2.20
         e1Step(); e2Step(dt); dropsSpawnStep(); dropsStep(dt)   // v2.22
+        sleepStep(dt); echoStep(dt)   // v2.23 B2, C6
         if mat.life2 >= 0.5 {
             lifeStep(dt, idle, engaged)   // v2.19: rest / look / go / arrive + the pulse gait + flinch, shake-off + sniffing (with lifeRest and lifeGait off, v2.18's walk-and-pause)
         } else if L > 0.5 && mat.wander > 0 && !introOn && !escOn && t > cowerUntil {
@@ -1508,9 +1594,11 @@ final class SlimeRig {
             ivS += (ts - ivS) * k; ivOX += (tx - ivOX) * k; ivOY += (ty - ivOY) * k
             if !introOn && abs(ivS - 1) < 1e-3 { ivS = 1; ivOX = 0; ivOY = 0 }
         }
+        lastSdt = sdt
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         plasticity(dt)
         twitch(L)
+        eyeStep(dt)   // v2.23
     }
 
     /// `L` gates rate-like idle motion (sway, twitch gating); `Lamp` and `tl` are the amplitude and clock
@@ -1574,6 +1662,7 @@ final class SlimeRig {
         }
         if shkT0 > 0 && t >= shkT0 && t < shkT0 + 0.6 { trm += R * 0.025 * shkAmp * exp(-(t - shkT0) / 0.2) * (reduceMotion ? 0.5 : 1) }   // v2.19 shaking off: the outline trembles too
         if iv3(mat.e3) { posX *= 1 - 0.02 * impShownTrust + 0.04 * impShownWary; posY *= 1 + 0.05 * impShownTrust - 0.06 * impShownWary }   // v2.22 E3: trusting rounder, taller; wary flatter
+        if slpK > 0 { posX *= 1 + 0.05 * slpK; posY *= 1 - 0.07 * slpK }   // v2.23 B2: asleep, a little melted
         let ms = sqrt(massD)   // v2.22: drops taken off make the body smaller
         let sp = mat.press2 >= 0.5 ? sqrt(max(0.5, 1 + mat.pressArea * pressSum)) : 1
         let bs = lifeLB * mat.life * 0.045 * brAmp * brWave * (1 - goFade), bsx = (1 + bs) * sp * (1 + introSq) * posX * ms, bsy = (1 - bs * 0.85) * sp * (1 - introSq) * posY * ms   // 提案第 23 條: waveform from update()
@@ -2272,7 +2361,7 @@ final class SlimeRig {
         if !lv(params.lifeRest) { return 0.8 + Double.random(in: 0..<2.2) }
         var d = 2.5 + Double.random(in: 0..<3.5)
         if Double.random(in: 0..<1) < 0.2 { d += 5 + Double.random(in: 0..<6) }
-        return d * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare)) * (iv2(params.impC5) ? 1 - 0.4 * impWary : 1)   // v2.20 C5: wary rests less
+        return d * params.restMul * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare)) * (iv2(params.impC5) ? 1 - 0.4 * impWary : 1)   // v2.20 C5: wary rests less
     }
     private func pickDir() -> Double {
         if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6) }   // too far out: sniff back
@@ -2362,14 +2451,15 @@ final class SlimeRig {
         lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<2)
     }
     private func lifeStep(_ dt: Double, _ idle: Double, _ engaged: Bool) {
+        swimGreet()   // v2.23: swum home, say hello
         // A5 flinch when its time comes (resting before the touch ×1.2, walking ×0.8; comfortable half; each flinch ×0.55, back with 7 s)
         flH += (1 - flH) * (1 - exp(-dt / 7))
         if flAt > 0 && t >= flAt {
             flAt = -9
             if lv(params.lifeFlinch) {
-                let pre: Double = flPre == .rest ? 1.2 : (flPre == .go ? 0.8 : 1)
+                let pre: Double = (flPre == .rest ? 1.2 : (flPre == .go ? 0.8 : 1)) * flBoost
                 let a = params.flinchAmp * pre * (moodC > 0.3 ? 0.5 : 1) * flH * (reduceMotion ? 0.5 : 1) * (iv2(params.impC5) ? 1 + 1.2 * impWary : 1)   // v2.20 C5
-                flAmp = a; flT0 = t; flH *= 0.55; cutSniffs()
+                flAmp = a; flT0 = t; flH *= 0.55; flBoost = 1; cutSniffs()
                 if lv(params.lifeBreath) { exert = max(exert, 0.1 + 2 * a) }   // a quick breath in with it
             }
         }
@@ -2406,6 +2496,13 @@ final class SlimeRig {
             return
         }
         if !free { return }
+        if slpOn {   // v2.23 B2: asleep it decides nothing; a finger resting beside it 1.2 s wakes it gently
+            slpNearT = (iv2(params.impC1) || iv2(params.impC2)) && lureFinger() != nil ? slpNearT + dt : 0
+            if slpNearT > 1.2 { wake(false) }
+            return
+        }
+        if echoSt != 0 { return }   // v2.23 C6: listening to your rhythm or answering it: it stays put
+        if lifeSt == .rest && sleepTry() { return }
         let lured = lureStep(dt)   // v2.20 C1 C2: a finger resting beside it takes over
         let e4 = !lured && e4Step(dt)   // v2.22 E4: trusting and left alone a while, it comes to the front to say hello
         // v2.22 drops: you hold one → it (not wary) comes to snatch it; on its way to a drop it keeps aiming at it
@@ -2566,11 +2663,13 @@ final class SlimeRig {
     private func impRelease(_ f: Finger) {
         guard params.imp >= 0.5 else { return }
         impLX = f.fx; impLY = f.fy; impHas = true
+        let w0 = impWary
         let quick = t - f.tDown < 0.25 && f.stretch < 0.3, nTaps = taps.filter { t - $0 < 1 }.count + 1, fling = f.peak / R > 6
         if moodStrainMax > 0.15 { impWary += 0.15 + 0.25 * moodStrainMax; impTrust -= 0.15 }
         else if quick { impWary += nTaps >= 3 ? 0.2 : 0.04; if nTaps >= 3 { impTrust -= 0.1 } }
         else if fling { impWary += 0.1; impTrust -= 0.05 }
         else { impWary *= 0.8; if iv3(params.e3) && f.dragMax > R * 0.5 { impTrust += 0.12 } }   // v2.22 E3: led along gently, a little more trust
+        if impWary > w0 { impWary = w0 + (impWary - w0) * params.wRate }   // v2.23 personality: how fast it turns wary
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
     }
     /// C4 begging: released after a purr (the happy hop), 0.9 s later it reaches toward where your finger left and edges over if far;
@@ -2587,7 +2686,7 @@ final class SlimeRig {
         for f in fingers.values where f.mode == .grab { if g == nil || bodyStretch(f) > bodyStretch(g!) { g = f } }
         if let g {
             let st = bodyStretch(g), sp = hypot(g.vxS, g.vyS) / R
-            let e3m: Double = iv3(params.e3) ? 3 : 1   // v2.22 E3: trust grows three times faster (5 s of stroking shows)
+            let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate   // v2.22 E3: trust grows three times faster (5 s of stroking shows); v2.23 personality
             if g.gentleT > 1 { impTrust += (0.04 + 0.04 * purr) * dt * e3m; impWary -= 0.05 * dt * e3m }
             else if st < 1.2 && sp > 0.3 && sp < 3 && moodStrain < 0.05 && hypot(dragOX, dragOY) > R * 0.3 { impTrust += 0.02 * dt * e3m }
         }
@@ -2692,7 +2791,7 @@ final class SlimeRig {
     private func voice(_ kind: String, _ g: Double = 0.8) {
         guard iv3(params.e1), t - voiceLast >= 0.3 else { return }
         voiceLast = t
-        onEvent?(.voice(kind: kind, gain: g, rate: (1 + 0.1 * impTrust - 0.08 * impWary) * Double.random(in: 0.96..<1.04)))
+        onEvent?(.voice(kind: kind, gain: g, rate: (1 + 0.1 * impTrust - 0.08 * impWary) * Double.random(in: 0.96..<1.04) * params.voicePitch))
     }
     private func firstGrab() -> Finger? { fingers.values.first { $0.mode == .grab } }
     /// E1: pulled until it wants to flee → "mm-mm"; purring → "mmm~" (once a grab each).
@@ -2757,7 +2856,7 @@ final class SlimeRig {
     private func e4Step(_ dt: Double) -> Bool {
         guard iv3(params.e4), !clusters.isEmpty else { e4On = false; return false }
         if !e4On {
-            if e4Wait < 0 { e4Wait = 10 + Double.random(in: 0..<10) }
+            if e4Wait < 0 { e4Wait = (10 + Double.random(in: 0..<10)) * params.e4Mul }
             guard impTrust > 0.5, e4Count < 3, t - lastTouch > e4Wait, t - e4LastT > 40, fingers.isEmpty, lifeSt == .rest, lifeDrop == nil else { return false }
             let q = toWorld(W / 2, viewV.y + H * 0.12), dx = q.x - clusters[gi].xc, dy = q.y - clusters[gi].yc, d = hypot(dx, dy)
             e4On = true; e4Wave = false; e4T0 = t
@@ -2772,19 +2871,64 @@ final class SlimeRig {
         if t - e4T0 > 2.2 { e4On = false; e4LastT = t; e4Wait = -1; e4Count += 1; lifeSt = .rest; lifeUntil = t + restDur() }
         return true
     }
-    /// A drop takes r²/R² of the body; the body keeps at least 0.85, at most 8 drops.
-    private func dropSpawn(_ x: Double, _ y: Double, _ vx: Double, _ vy: Double, _ r: Double) {
+    /// A drop takes r²/R² of the body; the body keeps at least 0.85, at most 8 drops. v2.23 (dropsV): at least 0.9, 2 on screen, 4 s apart;
+    /// `ai` = the boundary particle its strand comes from (the drip sounds when the strand snaps).
+    private func dropSpawn(_ x: Double, _ y: Double, _ vx: Double, _ vy: Double, _ r: Double, ai: Int = -1) {
         guard iv3(params.drops) else { return }
-        let m = (r / R) * (r / R)
-        guard mass - m >= 0.85, drops.count < 8 else { return }
+        let m = (r / R) * (r / R), v3 = params.dropsV >= 0.5
+        if v3 {
+            guard mass - m >= 0.9, drops.filter({ $0.st != .eat }).count < 2, t - dropLast >= 4 else { return }
+            dropLast = t
+        } else {
+            guard mass - m >= 0.85, drops.count < 8 else { return }
+        }
         mass -= m
-        drops.append(Drop(x: x, y: y, vx: vx, vy: vy, r: r, m: m, ph: Double.random(in: 0..<6.283), born: t))
-        onEvent?(.drip(gain: 0.5))
+        let d = Drop(x: x, y: y, vx: vx, vy: vy, r: r, m: m, ph: Double.random(in: 0..<6.283), born: t)
+        let neck = v3 && ai >= 0 && ai < N
+        d.ai = neck ? ai : -1; d.neck = neck ? 0 : 1; d.snapT = neck ? -9 : t; d.ta = atan2(-vy, -vx); d.bx = x; d.by = y
+        drops.append(d)
+        if !neck { onEvent?(.drip(gain: 0.5)) }
+    }
+    private func nearestBnd(_ x: Double, _ y: Double) -> Int {
+        var bi = bnd.first ?? 0, bd = 1e9
+        for i in bnd { let d = hypot(X[i] - x, Y[i] - y); if d < bd { bd = d; bi = i } }
+        return bi
+    }
+    /// The tip: of the boundary within 1.2R of (x, y), the one furthest along (ux, uy). A drop comes off there (from the finger the arm
+    /// reaches past it and the drop would sit on the body).
+    private func tipAlong(_ x: Double, _ y: Double, _ ux: Double, _ uy: Double) -> Int {
+        var bi = -1, bp = -1e9
+        for i in bnd {
+            let dx = X[i] - x, dy = Y[i] - y
+            if dx * dx + dy * dy > R * R * 1.44 { continue }
+            let pr = dx * ux + dy * uy
+            if pr > bp { bp = pr; bi = i }
+        }
+        return bi < 0 ? nearestBnd(x, y) : bi
+    }
+    /// The tip's own speed (its last substep) plus `sp` outward: the tip is still rushing out, so the drop can leave it.
+    private func dropFromTip(_ x: Double, _ y: Double, _ ux: Double, _ uy: Double, _ sp: Double) {
+        let i = tipAlong(x, y, ux, uy), r = R * (0.11 + 0.04 * Double.random(in: 0..<1)), c = R * 4
+        let tvx = max(-c, min(c, (X[i] - PX[i]) / lastSdt)), tvy = max(-c, min(c, (Y[i] - PY[i]) / lastSdt))
+        dropSpawn(X[i] + ux * r * 1.2, Y[i] + uy * r * 1.2, tvx + ux * sp, tvy + uy * sp, r, ai: i)
     }
     /// Stretched past 1.3R, every further 0.7R flings a drop out of the pulled end (1.5R/s, else the arm still out takes it straight back;
     /// at most 4 a grab).
+    /// v2.23: only a yank: the body pulled open 1.2R or more with the finger at 5R/s or faster; when the finger stops (the arm stops too)
+    /// the tip's momentum throws one drop; let go before stopping, it comes at the release. One a grab.
     private func dropsSpawnStep() {
         guard iv3(params.drops) else { return }
+        if params.dropsV >= 0.5 {
+            for f in fingers.values where f.mode == .grab && f.dropsMade == 0 {
+                if bodyStretch(f) > 1.2 && f.peak / R > 5 { f.yank = true }
+                if f.yank && hypot(f.vxS, f.vyS) < R * 1.5 {
+                    f.dropsMade = 1
+                    let el = max(1e-6, hypot(f.ex, f.ey))
+                    dropFromTip(f.fx, f.fy, f.ex / el, f.ey / el, R * 3.2)
+                }
+            }
+            return
+        }
         for f in fingers.values where f.mode == .grab {
             let st = f.stretch, n = min(4, st > 1.3 ? Int(floor((st - 1.3) / 0.7)) + 1 : 0)
             while f.dropsMade < n {
@@ -2798,6 +2942,14 @@ final class SlimeRig {
     private func dropsOnRelease(_ f: Finger) {
         guard iv3(params.drops), f.mode == .grab else { return }
         let pk = f.peak / R, c = R * 3
+        if params.dropsV >= 0.5 {   // v2.23: a hard fling (8R/s) or a yank not yet thrown; no drop from a slow lift
+            if (pk > 8 || f.yank) && f.dropsMade == 0 {
+                let vl = hypot(f.vxS, f.vyS)
+                if vl > R * 0.5 { dropFromTip(f.fx, f.fy, f.vxS / vl, f.vyS / vl, min(R * 3, max(R * 1.6, vl * 0.4))) }
+                else { let el = max(1e-6, hypot(f.ex, f.ey)); dropFromTip(f.fx, f.fy, f.ex / el, f.ey / el, R * 1.6) }
+            }
+            return
+        }
         if pk > 7 {
             let n = pk > 10 ? 2 : 1
             for k in 0..<n {
@@ -2817,13 +2969,17 @@ final class SlimeRig {
             while k >= 0 {
                 let d = drops[k]
                 defer { k -= 1 }
+                if d.neck < 1 {   // v2.23: pulling off along its strand; the drip sounds when it snaps
+                    if d.ai >= N { d.neck = 1 } else { d.bx = X[d.ai]; d.by = Y[d.ai]; d.ta = atan2(d.by - d.y, d.bx - d.x); d.neck = min(1, d.neck + dt / 0.32) }
+                    if d.neck >= 1 { d.snapT = t; onEvent?(.drip(gain: 0.5)) }
+                }
                 if d.st == .held {
                     if let id = d.hid, let f = fingers[id], f.mode == .drop {
                         d.vx = (f.x - d.x) / dt; d.vy = (f.y - d.y) / dt; d.x = f.x; d.y = f.y
                     } else { d.st = .float }
                 }
                 if d.st == .float {
-                    let k1 = exp(-dt / 0.6)
+                    let k1 = exp(-dt / (params.dropsV >= 0.5 && t - d.born < 0.8 ? 1 : 0.6))   // v2.23: just thrown, it glides further
                     d.vx *= k1; d.vy *= k1
                     d.x += d.vx * dt; d.y += (d.vy + sin(t * 1.3 + d.ph) * R * 0.06) * dt
                 }
@@ -2837,7 +2993,7 @@ final class SlimeRig {
                     }
                     continue
                 }
-                if grabbing || t - d.born < 1 { continue }
+                if grabbing || t - d.born < (params.dropsV >= 0.5 ? 2.5 : 1) { continue }   // v2.23: not taken back for 2.5 s (v2.22 1 s: the body slid over and swallowed it at once)
                 var near = 1e9
                 for i in bnd { near = min(near, hypot(X[i] - d.x, Y[i] - d.y)) }
                 if lifeDrop === d && lifeDropPush && d.st == .float && near < d.r + R * 0.2 {
@@ -2874,6 +3030,155 @@ final class SlimeRig {
         startSniff(ang, min(1, max(0.3, l / R - 0.8)), 0.5, 0.4, 0.5)
         gaitTo(b.x - dx / l * R * 0.75, b.y - dy / l * R * 0.75, dash: l > R * 4)
         return true
+    }
+
+    // MARK: - v2.23 eyes, B2 sleep, C6 echo, swim-in
+
+    private func eyeAt(_ a: [Int]) -> (x: Double, y: Double) {
+        var x = 0.0, y = 0.0
+        for i in a { x += X[i]; y += Y[i] }
+        let n = Double(max(1, a.count))
+        return (x / n, y / n)
+    }
+    private func eyeSetup() {
+        eyeL = []; eyeR = []
+        for (k, ex) in [-0.27, 0.27].enumerated() {
+            var o: [(Double, Int)] = []
+            for i in 0..<N where TID[i] < 0 { o.append((hypot(Q0X[i] - ex * R, Q0Y[i] + 0.05 * R), i)) }
+            o.sort { $0.0 < $1.0 }
+            let pick = o.prefix(4).map { $0.1 }
+            if k == 0 { eyeL = pick } else { eyeR = pick }
+        }
+        if !eyeL.isEmpty && !eyeR.isEmpty { let l = eyeAt(eyeL), r = eyeAt(eyeR); eyeD0 = max(1, hypot(r.x - l.x, r.y - l.y)) }
+        eyeGX = 0; eyeGY = 0; eyeSacT = 0; eyeUser = -9; eyeMode = .open; eyeOpenD = 1; eyeWideD = 1; eyeBlinkT = -9; eyePulse = -9; eyeSqU = -9; eyeBlink = 1
+    }
+    /// Where it looks: a grabbing finger → a finger beside it → where you tapped the rhythm → you (straight out) → the drop it is after →
+    /// where it walks → where it sniffs → glancing about by itself (45% of the glances at you).
+    private func eyeStep(_ dt: Double) {
+        guard params.eyes >= 0.5, !eyeL.isEmpty, !eyeR.isEmpty else { return }
+        if eyeNextBlink - t > 8 { eyeNextBlink = t + 2 }; if eyeSacT - t > 6 { eyeSacT = t }   // the clock went back (setup restarts it): no blink scheduled in the future
+        let l = eyeAt(eyeL), r = eyeAt(eyeR), cx = (l.x + r.x) / 2, cy = (l.y + r.y) / 2
+        func tow(_ x: Double, _ y: Double) -> (Double, Double) {
+            let dx = x - cx, dy = y - cy, d = max(1e-6, hypot(dx, dy)), k = min(1, d / (R * 1.2))
+            return (dx / d * k, dy / d * k)
+        }
+        var g: Finger?, pf: Finger?
+        for f in fingers.values { if f.mode == .grab { if g == nil { g = f } } else if pf == nil { pf = f } }
+        var o: (Double, Double)?
+        if let g { o = tow(g.fx, g.fy) }
+        else if let pf { o = tow(pf.fx, pf.fy) }
+        else if echoSt != 0 { o = tow(echoX, echoY) }
+        else if t < eyeUser || slpOn { o = (0, 0) }
+        else if escOn { o = tow(escDX, escDY) }
+        else if let d = lifeDrop { o = tow(d.x, d.y) }
+        else if gaitOn { o = (cos(gaitH), sin(gaitH)) }
+        else if let s = sniffs.last, !(s.cut > 0) { o = (cos(s.a), sin(s.a)) }
+        if o == nil {
+            if t >= eyeSacT {
+                eyeSacT = t + 1.2 + Double.random(in: 0..<2.8)
+                if Double.random(in: 0..<1) < 0.45 { eyeSX = 0; eyeSY = 0 }
+                else { let a = Double.random(in: 0..<(2 * .pi)), k = 0.5 + Double.random(in: 0..<0.5); eyeSX = cos(a) * k; eyeSY = sin(a) * k * 0.7 }
+            }
+            o = (eyeSX, eyeSY)
+        }
+        let kg = 1 - exp(-dt / 0.06)
+        eyeGX += (o!.0 - eyeGX) * kg; eyeGY += (o!.1 - eyeGY) * kg
+        if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
+        let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil
+        let squeeze = moodStrain > 0.4 || tkTimes.count >= 4 || (escOn && t - escT0 < 0.5) || t < eyeSqU
+        let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
+        if mode != eyeMode { eyeMode = mode; if mode == .open { eyeBlinkT = t - 0.08 } }   // back to open: opening from shut
+        var open = 1.0, wide = 1.0
+        if slpOn || slpK > 0.02 { open = max(0, 1 - slpK * 1.5) }
+        if let g { open = min(open, t - g.tDown < 0.3 ? 0.55 : 0.8) }
+        do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
+        if impWary > 0.5 || moodScare > 0.3 || t - slpWakeT < 0.8 { wide = 1.18 }
+        do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
+        if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1) < 0.2 ? 0.32 : 2 + Double.random(in: 0..<4)) }
+        let u = t - eyeBlinkT
+        eyeBlink = u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1)))
+        let k = 1 - exp(-dt / 0.05)
+        eyeOpenD += (open - eyeOpenD) * k; eyeWideD += (wide - eyeWideD) * k
+    }
+    /// B2: untouched 40 s (a tap on empty space counts) while resting, it falls asleep: eyes close, it melts a little, breathes slow and deep.
+    private func sleepTry() -> Bool {
+        guard iv3(params.sleep), !slpOn else { return false }
+        guard t - max(lastTouch, slpLastAny) >= 40, lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn, lifeDrop == nil else { return false }
+        slpOn = true; lifeSt = .sleep; cutSniffs()
+        return true
+    }
+    /// Awake again: sharp (touched) it flinches 1.6× and opens wide; gently (a finger beside it) it just opens; then "mm?".
+    private func wake(_ sharp: Bool) {
+        guard slpOn else { return }
+        slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1); eyeBlinkT = t
+        if sharp { flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
+        slpAskAt = t + (sharp ? 0.45 : 0.3)
+    }
+    private func sleepStep(_ dt: Double) {
+        if !iv3(params.sleep) && slpOn { wake(false) }
+        if slpOn, fingers.values.contains(where: { t - $0.hitT < 0.05 }) { wake(true) }   // a finger pushed in from outside touched it
+        slpK += ((slpOn ? 1 : 0) - slpK) * (1 - exp(-dt / (slpOn ? 1.6 : 0.25)))
+        if slpK < 1e-3 && !slpOn { slpK = 0 }
+        if slpAskAt > 0 && t >= slpAskAt { slpAskAt = -9; voiceLast = -9; voice("ask", 0.6); eyeUser = t + 1.2 }
+    }
+    /// C6: 2 to 8 taps on empty space, each 0.12–1.2 s apart; when you stop (1.4× the longest gap, at least 0.8 s) it looks where you
+    /// tapped for 0.35 s, then answers with the same count and gaps (a squeeze, "pu" and a soft tap each). The same rhythm back within
+    /// 15 s (same count, each gap within 25%): after answering it is happy (∩, a wag, "pu-yi", a little more trust).
+    private func echoTap(_ x: Double, _ y: Double) {
+        guard iv3(params.echo), echoSt != 2 else { return }
+        if let last = echoTaps.last, t - last > 1.3 { echoTaps = [] }
+        echoTaps.append(t)
+        if echoTaps.count > 8 { echoTaps.removeFirst() }
+        echoX = x; echoY = y; echoSt = 1
+    }
+    private func echoBeat(_ i: Int) {
+        flAmp = 0.07 * (reduceMotion ? 0.5 : 1); flT0 = t; eyePulse = t; echoBeatT = t
+        if iv3(params.e1) { onEvent?(.voice(kind: "poke", gain: 0.5, rate: (1 + 0.1 * impTrust - 0.08 * impWary) * params.voicePitch * (i % 2 == 1 ? 1.06 : 1))) }
+        onEvent?(.beat)
+    }
+    private func echoStep(_ dt: Double) {
+        guard iv3(params.echo) else { echoSt = 0; echoTaps = []; return }
+        if echoSt == 1 {
+            if fingers.values.contains(where: { $0.mode == .grab }) || escOn || introOn { echoSt = 0; echoTaps = []; return }
+            guard let last = echoTaps.last else { echoSt = 0; return }
+            var iv: [Double] = []
+            for i in 1..<max(1, echoTaps.count) { iv.append(echoTaps[i] - echoTaps[i - 1]) }
+            if t - last > max(0.8, 1.4 * (iv.max() ?? 0)) {
+                if !iv.isEmpty && iv.allSatisfy({ $0 >= 0.12 && $0 <= 1.2 }) {
+                    if let p = echoPrev, t - echoPrevT < 15, p.count == iv.count {
+                        echoSame = zip(iv, p).allSatisfy { abs($0 - $1) <= 0.25 * $1 + 0.04 }
+                    } else { echoSame = false }
+                    echoBeats = [0]
+                    for x in iv { echoBeats.append(echoBeats.last! + x) }
+                    echoT0 = t + 0.35; echoI = 0; echoSt = 2; echoPrev = iv; echoPrevT = t
+                    cutSniffs(); gaitOn = false; wanderMoving = false
+                    if lifeSt == .go || lifeSt == .look { lifeSt = .rest }
+                } else { echoSt = 0 }
+                echoTaps = []
+            }
+        } else if echoSt == 2 {
+            while echoI < echoBeats.count && t >= echoT0 + echoBeats[echoI] { echoBeat(echoI); echoI += 1 }
+            if echoI >= echoBeats.count && t > echoT0 + (echoBeats.last ?? 0) + 0.4 {
+                echoSt = 0; eyeUser = t + 1.5; lifeSt = .rest; lifeUntil = t + 2 + Double.random(in: 0..<1)
+                if echoSame {
+                    echoJoyUntil = t + 1.6; wagT = t; voiceLast = -9; voice("happy")
+                    if params.imp >= 0.5 { impTrust = min(1, impTrust + 0.08 * params.trRate) }
+                }
+            }
+        }
+    }
+    /// Swims in from off the right edge (Reduce Motion: 1.6R beside home), one squeeze-and-surge stroke after another, the view holding
+    /// still; home, it looks at you, wags and says hello.
+    private func swimIntro(_ side: Double) {
+        let rm = reduceMotion, dx = (rm ? R * 1.6 : W / 2 + R * 1.9) * side, dy = rm ? 0 : -H * 0.06
+        moveHome(dx, dy, 1.0 / 60); wanderVX = 0; wanderVY = 0
+        swimOn = true; swimT0 = t; lastTouch = t - 3
+        gaitTo(cx, cy, dash: !rm)
+    }
+    private func swimGreet() {
+        guard swimOn else { return }
+        if t - swimT0 > 9 { swimOn = false; return }
+        if lifeSt == .rest { swimOn = false; eyeUser = t + 2; wagT = t + 0.1; voiceLast = -9; voice("hello"); lifeUntil = t + 2.5 }
     }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
