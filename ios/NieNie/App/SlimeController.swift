@@ -260,9 +260,21 @@ final class SlimeController: ObservableObject {
         activeSlot = n
     }
 
+    /// A slot saved by an older build lacks the parameters added since; decoding it straight fails as a whole (every new
+    /// parameter broke the old slots). Lay the saved keys over the current numbers instead: missing keys keep today's value,
+    /// unknown keys are dropped.
+    private func decodeSlot(_ data: Data) -> FeelParams? {
+        guard let baseData = try? JSONEncoder().encode(current),
+              var base = (try? JSONSerialization.jsonObject(with: baseData)) as? [String: Any],
+              let saved = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        for (k, v) in saved where base[k] != nil { base[k] = v }
+        guard let merged = try? JSONSerialization.data(withJSONObject: base) else { return nil }
+        return try? JSONDecoder().decode(FeelParams.self, from: merged)
+    }
+
     func loadSlot(_ n: Int) {
         guard let data = UserDefaults.standard.data(forKey: Self.slotKey(n)),
-              let p = try? JSONDecoder().decode(FeelParams.self, from: data) else { return }
+              let p = decodeSlot(data) else { return }
         params[material] = p
         pushParams()
         activeSlot = n
