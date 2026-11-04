@@ -80,7 +80,7 @@ struct FeelParams: Equatable, Codable {
     var pinchSquish: Double = 1       // 1: squish events when two grabbing fingers close in (提案第 24 條)
     var slip: Double = 0              // 1: pulling past 1.2× maxPull for 120 ms slips out of the fingers (候選 25)
     var stick: Double = 0             // seconds a slow lift keeps holding before the release (候選 26: 0.1)
-    var localArea: Double = 0         // area pressure weighted towards the fingers (候選 27: 1)
+    var localArea: Double = 1         // area pressure weighted towards the fingers (候選 27, on since v2.26 F7; 0 before)
     var homeFrac: Double = 0.40       // home height as a fraction of the screen (候選 33: 0.46)
     var inkVar: Double = 0            // outline width follows compression, 1.3× squashed, 0.8× stretched (候選 34)
     var pressSharp: Double = 0.2      // sharpness of the press tap (提案第 15 條)
@@ -120,7 +120,7 @@ struct FeelParams: Equatable, Codable {
     var grabReach: Double = 1         // 1: grabbed from inside out of reach of the boundary, a strip to the boundary is added once the finger moves
     // v2.15 (多米 build 61: a tap should leave something, maybe a dent)
     var dent: Double = 1              // 1: a press leaves a dent (a crescent of shade upper-left), fading at the relax rate
-    var dentSize: Double = 0.3        // dent radius, in radii
+    var dentSize: Double = 0.5        // dent radius, in radii (v2.26 F7: 1.5 to 2 times the finger's contact patch, a ring shows outside the finger; 0.3 before)
     // v2.16 (多米: the press looked like a toy). Defaults are clay; jelly and mochi set theirs in `defaults`
     var press2: Double = 1            // 1: the whole body thins and spreads, the dent bends with the body, fast then slow sinking,
                                       // a material rebound on release, the highlight squeezed aside, a deeper shadow; 0: v2.15 crescent
@@ -184,6 +184,16 @@ struct FeelParams: Equatable, Codable {
     var inertiaDrag: Double = 3       // a drag's acceleration pushing the reference shape the other way, more the farther from the finger; 0 off
     var dragSpring: Double = 0.5      // the whole body follows the finger on a spring with this damping ratio (0.5 runs past by about 16%); 0: v2.24 (0.2 s smoothing, it stops dead)
     var dragHz: Double = 1.4          // that spring's swings a second; 1.4 lags about 0.1 s
+    // v2.26 F6: stroke or grab (measured: a finger sliding across dragged the body along 74 to 113 pt)
+    var strokeV: Double = 150         // moving this fast right after landing, not outward: a stroke (the finger slides over, nothing pinned); 0: v2.25 (a touch is a grab)
+    var strokeT: Double = 0.08        // within how long of landing; shorter is harder to count as a stroke
+    var strokeStop: Double = 60       // a stroke slower than this for 0.12 s becomes a grab
+    var strokeCarry: Double = 0.2     // how far a stroke carries the whole body at most, in radii; it comes back by itself
+    var strokePush: Double = 30       // how hard the finger pushes the skin aside
+    var strokeFric: Double = 20       // how much the skin is carried along with the finger; 0 slides as on ice
+    // v2.26 F7
+    var dentTrail: Double = 0.5       // a rub or a stroke leaves a trail fading in this many seconds; 0 none
+    var hiStretch: Double = 1         // 1: the highlight bends with the skin around it; 0: it only turns
     var camGrip: Double = 1           // the picture does not slide under the finger: while grabbed the view only zooms out about the finger; moved back in after the release. 0: v2.23 (centred on the shape from 0.5R)
     var camPad: Double = 0.2          // margin around the framed shape (× radius); 0.35 before
     var pressLocal: Double = 1        // until the finger moves off its spot only the part near it remembers (holding still no longer folds the far edge). 0: the whole body (v2.23)
@@ -371,6 +381,7 @@ struct Candidate: Identifiable {
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.off24(); p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
         Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 225, name: "v2.25 對照（一碰就抓、凹痕小）", hint: "手指一碰就抓，劃過身體會整團被帶走；凹痕整個在手指底下，揉和摸沒有痕跡，亮光只會轉") { p, _ in p.off26() },
         Candidate(id: 224, name: "v2.24 對照（放手一閃就回去、舊觸覺）", hint: "沒有參考形狀的慣性、拖到停不會衝過頭；連續觸覺跟變形量、沒有顆粒、按下去只有一下、呼嚕是兩下輕敲") { p, _ in p.off25() },
         Candidate(id: 223, name: "v2.23 對照（身體小、反應小、揉沒反應）", hint: "身體 0.22、抓著時畫面會滑、縮傾蹭看都小、揉要很慢才有反應、來回揉會逃") { p, _ in p.off24() },
         Candidate(id: 222, name: "v2.22 對照（沒眼睛、舊黏液、不睡、不回節奏、跳過來）", hint: "v2.23 的五樣一起關") { p, _ in p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0 },
@@ -386,8 +397,12 @@ struct Candidate: Identifiable {
 /// One tunable slider in the hidden panel (prototype's `F`).
 extension FeelParams {
     /// v2.24 off: the body, the camera, the reactions to the finger and the rub thresholds back to v2.23 (the older controls stack on this)
-    /// v2.25 off: no inertia, the old haptics
+    /// v2.26 off: a touch is a grab, the small dent. v2.25 off: no inertia, the old haptics
+    mutating func off26() {
+        strokeV = 0; dentTrail = 0; hiStretch = 0; localArea = 0; dentSize = 0.3
+    }
     mutating func off25() {
+        off26()
         inertiaHz = 0; dragSpring = 0; hapStatic = 1; hapSharpStretch = 0; popCount = 1; popDecay = 0.5; popSharp = 0.45
         tickSpacing = 0; tickMin = 0.1; tickMax = 0.3; tickSharp = 0.4; pressGrain = 0; purrRoll = 0
     }
@@ -414,7 +429,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.damp, name: "晃動阻尼", hint: "越小放手晃越久", range: 0.85...0.999, step: 0.001),
         TuneField(key: \.grabR, name: "抓取範圍（×半徑）", hint: "一指抓到多大一塊", range: 0.2...0.8, step: 0.01),
         TuneField(key: \.dent, name: "點一下留凹痕", hint: "1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）", range: 0...1, step: 1),
-        TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑", range: 0.1...0.5, step: 0.01),
+        TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑；v2.26 0.5，手指接觸面的 1.5 到 2 倍，手指外面看得到一圈（v2.25 0.3，整個在手指底下）", range: 0.1...0.9, step: 0.01),
         TuneField(key: \.intro, name: "開場跑過來", hint: "1：冷啟動時從遠處一跳一跳跑過來（約 2.8 秒），途中碰一下就直接到家；0 關（v2.17）", range: 0...1, step: 1),
         TuneField(key: \.camFollow, name: "鏡頭跟著走", hint: "1：史萊姆走離中心就慢慢跟過去，它可以跑出畫面；抓著時鏡頭不動。0 是 v2.16（鏡頭釘在家）", range: 0...1, step: 1),
         TuneField(key: \.followZone, name: "鏡頭開始追（×半個畫面）", hint: "史萊姆中心離平常位置多遠鏡頭才開始追；0.65 是 v2.24（身體變大），0.8 是 v2.18，v2.17 是 0.5", range: 0.1...1, step: 0.05),
@@ -509,6 +524,14 @@ struct TuneField: Identifiable {
         TuneField(key: \.inertiaDrag, name: "拖動的慣性", hint: "抓著拖時整團加速度反過來推參考形狀，離手指越遠推越多；0 關", range: 0...6, step: 0.1),
         TuneField(key: \.dragSpring, name: "拖到停會衝過頭", hint: "整團跟手指用帶慣性的彈簧（阻尼比，0.5 衝過頭約一成六，越小衝越多）；0 回 v2.24", range: 0...1, step: 0.05),
         TuneField(key: \.dragHz, name: "整團跟上的快慢", hint: "上面那條彈簧每秒幾下", range: 0.5...4, step: 0.1),
+        TuneField(key: \.strokeV, name: "摸的速度門檻（點／秒）", hint: "手指落下這麼快就在移動、方向不是往外，算摸（手指滑過去，不釘粒子）；0 回 v2.25（一碰就抓）", range: 0...600, step: 10),
+        TuneField(key: \.strokeT, name: "摸的判斷時間（秒）", hint: "手指落下多久內要走到上面那個速度；越短越不容易判成摸", range: 0.03...0.2, step: 0.01),
+        TuneField(key: \.strokeStop, name: "摸到一半變抓（點／秒）", hint: "摸的時候慢過這個速度 0.12 秒，手指底下那塊就被抓住", range: 10...200, step: 5),
+        TuneField(key: \.strokeCarry, name: "摸時整團被帶多遠（×半徑）", hint: "手指劃過去整團最多被帶多遠，之後自己回來", range: 0...0.6, step: 0.02),
+        TuneField(key: \.strokePush, name: "摸時皮膚被推開", hint: "手指把旁邊的皮膚往外推多少", range: 0...100, step: 1),
+        TuneField(key: \.strokeFric, name: "摸時皮膚被帶著走", hint: "手指帶著旁邊的皮膚走多少；0 像滑過冰", range: 0...60, step: 1),
+        TuneField(key: \.dentTrail, name: "手指走過的痕跡（秒）", hint: "揉、摸的時候留下的痕跡多久淡掉；0 沒有痕跡", range: 0...1.5, step: 0.05),
+        TuneField(key: \.hiStretch, name: "亮光跟著拉伸", hint: "1：身體被拉長、壓扁，白色亮光跟著變形；0 亮光只會轉", range: 0...1, step: 1),
         TuneField(key: \.camGrip, name: "手指底下不滑", hint: "1：抓著時畫面不在手指底下滑（只在拉很長時以手指為中心拉遠，放手才把形狀挪回畫面）；0：v2.23（拉開 0.5R 就對準形狀中心）", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.camPad, name: "鏡頭框形狀的邊（×半徑）", hint: "框形狀時四周多留多少；v2.24 0.2，v2.23 0.35", range: 0.05...0.5, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.pressLocal, name: "只按時手指附近才記形", hint: "1：手指還沒拖開時只有手指附近記形（按久了對面的邊不會折）；0：整團都記（v2.23）", range: 0...1, step: 1, section: "按壓與記形"),

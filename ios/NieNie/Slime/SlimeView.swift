@@ -45,6 +45,7 @@ final class SlimeView: UIView {
     private let dentShadeLayer = CAShapeLayer()  // v2.15 dents (press2 0): an ellipse in the shade colour...
     private let dentLitLayer = CAShapeLayer()    // ...covered by the base colour shifted down-right, leaving a crescent upper-left
     private var dentLayers: [CALayer] = []       // v2.16 dents: a soft pit image each, stretched with the skin
+    private var trailLayers: [CAShapeLayer] = []  // v2.26 F7 the trail: five ages, each a wide faint and a narrow darker band, in the shade colour up-left and the light colour down-right
     private var dentImage: CGImage?
     private let dentUnit: CGFloat = 40           // the pit image is drawn for this radius (points)
     private let highlightLayer = CAShapeLayer()
@@ -92,7 +93,13 @@ final class SlimeView: UIView {
         litGroup.addSublayer(baseLayer)
         litGroup.addSublayer(dentShadeLayer)
         litGroup.addSublayer(dentLitLayer)
-        for _ in 0..<4 {
+        for _ in 0..<20 {
+            let l = CAShapeLayer()
+            l.fillColor = nil; l.lineCap = .butt; l.lineJoin = .round; l.isHidden = true
+            litGroup.addSublayer(l)
+            trailLayers.append(l)
+        }
+        for _ in 0..<6 {   // four dents and up to two stroking fingers
             let l = CALayer()
             l.bounds = CGRect(x: 0, y: 0, width: dentUnit * 2.6, height: dentUnit * 2.6)
             l.isHidden = true
@@ -151,6 +158,13 @@ final class SlimeView: UIView {
         dentLitLayer.fillColor = colors.base.cgColor
         dentImage = makeDentImage()
         for l in dentLayers { l.contents = dentImage }
+        for b in 0..<5 {
+            let kk = (CGFloat(b) + 0.5) / 5
+            trailLayers[b * 4].strokeColor = colors.shade.withAlphaComponent(0.22 * kk).cgColor
+            trailLayers[b * 4 + 1].strokeColor = colors.shade.withAlphaComponent(0.28 * kk).cgColor
+            trailLayers[b * 4 + 2].strokeColor = colors.light.withAlphaComponent(0.16 * kk).cgColor
+            trailLayers[b * 4 + 3].strokeColor = colors.light.withAlphaComponent(0.2 * kk).cgColor
+        }
         highlightLayer.fillColor = colors.light.cgColor
         outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
         outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
@@ -206,7 +220,7 @@ final class SlimeView: UIView {
             skyLayer.frame = bounds
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
                        dropShadeLayer, dropLitGroup, dropMask, dropBaseLayer, dropHiLayer, dropLineLayer,
-                       strandLayer, eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) {
+                       strandLayer, eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
                 l.frame = bounds
             }
             redraw()
@@ -434,6 +448,24 @@ final class SlimeView: UIView {
         speckLayers[0].path = paths[0]; speckLayers[1].path = paths[1]
     }
 
+    /// v2.26 F7: one age band of the trail, in one continuous path where it can be (short pieces drawn apart go jagged around a small circle)
+    private func trailPath(_ tr: [(x: Double, y: Double, k: Double, n: Double)], _ k0: Double, _ k1: Double, _ last: Bool, _ ox: Double, _ oy: Double) -> CGPath {
+        let p = CGMutablePath()
+        var open = false
+        for j in 1..<tr.count {
+            let q = tr[j], a = tr[j - 1]
+            if q.n != a.n || q.k < k0 || (q.k >= k1 && !last) { open = false; continue }
+            if !open {
+                let s = rig.toScreen(a.x, a.y)
+                p.move(to: CGPoint(x: s.x + ox, y: s.y + oy))
+                open = true
+            }
+            let s = rig.toScreen(q.x, q.y)
+            p.addLine(to: CGPoint(x: s.x + ox, y: s.y + oy))
+        }
+        return p
+    }
+
     private func redraw() {
         // v2.12 camera: everything is drawn in screen points through rig.toScreen; sizes scale with the zoom, the outline
         // keeps its on-screen width
@@ -486,6 +518,33 @@ final class SlimeView: UIView {
                 l.opacity = Float(dn.d * (1 - 0.35 * dn.w))
             }
         }
+        // v2.26 F7: the ring beside a stroking finger, and the trail it leaves
+        if press2 {
+            for h in rig.strokeHeads where used < dentLayers.count {
+                let l = dentLayers[used]; used += 1
+                let r: Double = R * rig.params.dentSize * 0.75, k: Double = r / Double(dentUnit)
+                l.isHidden = false
+                let c = rig.toScreen(h.x, h.y)
+                l.position = CGPoint(x: c.x, y: c.y)
+                l.setAffineTransform(CGAffineTransform(scaleX: k, y: k))
+                l.opacity = 0.6
+            }
+        }
+        let trailNow = press2 ? rig.trailView : []
+        if trailNow.count > 1 {
+            let ox: Double = -0.64 * R * 0.14, oy: Double = -0.77 * R * 0.14
+            for b in 0..<5 {
+                let k0: Double = Double(b) / 5, k1: Double = Double(b + 1) / 5, wd: Double = R
+                let dark = trailPath(trailNow, k0, k1, b == 4, ox, oy), lit = trailPath(trailNow, k0, k1, b == 4, -ox, -oy)
+                trailLayers[b * 4].path = dark; trailLayers[b * 4].lineWidth = CGFloat(wd * 0.2)
+                trailLayers[b * 4 + 1].path = dark; trailLayers[b * 4 + 1].lineWidth = CGFloat(wd * 0.1)
+                trailLayers[b * 4 + 2].path = lit; trailLayers[b * 4 + 2].lineWidth = CGFloat(wd * 0.16)
+                trailLayers[b * 4 + 3].path = lit; trailLayers[b * 4 + 3].lineWidth = CGFloat(wd * 0.08)
+            }
+            for l in trailLayers { l.isHidden = false }
+        } else if !trailLayers[0].isHidden {
+            for l in trailLayers { l.isHidden = true; l.path = nil }
+        }
         for l in dentLayers[used...] { l.isHidden = true }
         for dn in dents where !press2 {
             let r = R * rig.params.dentSize * dn.d
@@ -518,7 +577,9 @@ final class SlimeView: UIView {
             let k = -0.4 * sq, k2 = 0.25 * sq
             S = CGAffineTransform(a: 1 + k * ux * ux + k2 * uy * uy, b: (k - k2) * ux * uy, c: (k - k2) * ux * uy, d: 1 + k * uy * uy + k2 * ux * ux, tx: 0, ty: 0)
         }
-        let at = CGAffineTransform(translationX: hp.x, y: hp.y)
+        let hf = rig.highlightFrame   // v2.26 F7: bends with the skin around it
+        let HF = CGAffineTransform(a: CGFloat(hf.0), b: CGFloat(hf.1), c: CGFloat(hf.2), d: CGFloat(hf.3), tx: 0, ty: 0)
+        let at = HF.concatenating(CGAffineTransform(translationX: hp.x, y: hp.y))
         let hl = CGMutablePath()
         let t = CGAffineTransform(rotationAngle: ang - 0.5).concatenating(S).concatenating(at)
         hl.addEllipse(in: CGRect(x: -R * 0.17, y: -R * 0.085, width: R * 0.34, height: R * 0.17), transform: t)

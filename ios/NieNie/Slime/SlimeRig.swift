@@ -42,6 +42,11 @@ final class SlimeRig {
     private var QX: [Double] = [], QY: [Double] = []     // remembered (plastic) rest shape
     // v2.25 F4: QD is the reference shape with inertia (the body chases QD, QD chases Q on a spring); QV its velocity; QW how much a drag's acceleration pushes each particle
     private var QDX: [Double] = [], QDY: [Double] = [], QVX: [Double] = [], QVY: [Double] = [], QW: [Double] = []
+    // v2.26 F6: the offset a stroke carries the whole body by; comfort adding up over strokes; F7: the trail in the body's frame; the highlight's neighbours
+    private var stkOX = 0.0, stkOY = 0.0, stkVX = 0.0, stkVY = 0.0, stkG = 0.0, stkLast = -9.0, stkSaid = false, stkPet = false
+    private struct TrailPoint { let x, y, t0, n: Double }
+    private var trail: [TrailPoint] = []
+    private var hiDent: Dent?
     private var cvX = 0.0, cvY = 0.0, caX = 0.0, caY = 0.0, cpX: Double?, cpY: Double?, tickLastT = -9.0   // centroid velocity, acceleration, last position; v2.25 F5: the last grain
     private var EX: [Double] = [], EY: [Double] = []     // rest shape with idle breathing / wriggle / drift
     private var GX: [Double] = [], GY: [Double] = [], GW: [Double] = []
@@ -370,11 +375,16 @@ final class SlimeRig {
         } else {
             moodStrain *= exp(-dt / 0.2)
             let k = 1 - exp(-dt / 6)
-            moodC -= moodC * k; moodA -= moodA * k
+            if stkG > 1 && t - stkLast < 0.05 {   // v2.26 F6: a stroke counts as comfort; the finger is on it half the time, so it rises twice as fast as a rub
+                moodC = min(1, moodC + 1.2 * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5))
+            } else {
+                moodC -= moodC * k; moodA -= moodA * k
+            }
         }
         moodScare *= exp(-dt / 0.8)
         let tg = moodStrain * R * 0.35; tugX = -pullDX * tg; tugY = -pullDY * tg   // tug of war: you can still pull it
-        let pt = g != nil && g!.gentleT > 1 && moodC > 0.2 ? min(1, (moodC - 0.2) / 0.5) : 0
+        let gentleNow: Bool = g != nil ? g!.gentleT > 1 : (stkG > 1 && t - stkLast < 0.6)
+        let pt: Double = gentleNow && moodC > 0.2 ? min(1, (moodC - 0.2) / 0.5) : 0
         purr += (pt - purr) * (1 - exp(-dt / 0.3))
         if escOn {
             let p = min(1, (t - escT0) / escT), e = 1 - pow(1 - p, 3)
@@ -513,7 +523,7 @@ final class SlimeRig {
     private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
 
     final class Finger {
-        enum Mode { case grab, push, none, drop }   // v2.22 drop: holding a drop of slime
+        enum Mode { case grab, push, none, drop, stroke }   // v2.22 drop: holding a drop of slime; v2.26 F6 stroke: sliding over it, nothing pinned
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
         var rawX, rawY, lastRawX, lastRawY: Double   // real finger position (never a prediction)
         var predX = 0.0, predY = 0.0, hasPrediction = false, movedThisFrame = false
@@ -529,6 +539,7 @@ final class SlimeRig {
         var ex = 0.0, ey = 0.0, sb = -1.0            // v2.20: the limited stretch vector; how far the body itself is pulled open (minus what followed), −1 = not yet
         var lure = false, edge = 0.0                 // v2.20 C1 C2: landed on empty space (left to lureStep); distance to the body's edge
         var tkA: Double?, pushed2 = false            // v2.22 E2: last heading (tickle turns), pushed back once
+        var judge = false, slowT = 0.0, on = false, trD = 0.0, tGrab = -9.0, rBase = 0.0   // v2.26 F6: still to be judged (stroke or grab); how long slow; on the body; travel since the last trail point; when a stroke became a grab; contact size to compare with
         var grainI = 0, grR = 0.0, grT = -9.0        // v2.25 F5: press grains played, contact size at the last grain, its time
         var tkP = 0.0, far = false, reachN: Int?     // v2.24: travel since the last turn (tickle or rub); moved off its spot (0.15R, it is no longer just a press); mem count before the reach strip
         var saidProt = false, saidPurr = false       // v2.22 E1: protested / hummed once this grab
@@ -750,6 +761,14 @@ final class SlimeRig {
             let d = hypot(Q0X[i] + R * 0.28, Q0Y[i] + R * 0.32)
             if d < bd { bd = d; hiIdx = i }
         }
+        do {   // v2.26 F7: the highlight bends with the skin around it, fitted like a dent
+            let h = Dent(i: hiIdx, finger: nil), rr: Double = R * 0.3
+            for i in 0..<N where i != hiIdx {
+                let ox: Double = Q0X[i] - Q0X[hiIdx], oy: Double = Q0Y[i] - Q0Y[hiIdx]
+                if ox * ox + oy * oy < rr * rr { h.nb.append((i, ox, oy)) }
+            }
+            hiDent = h
+        }
         fingers.removeAll()
         A0 = polygonArea()
         builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize; builtDens = params.dens
@@ -774,6 +793,7 @@ final class SlimeRig {
         drops = []; mass = 1; massD = 1; lifeDrop = nil; e4On = false; e4Wait = -1   // v2.22
         leanT = -9; leanO = 0; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0; camRSt = 0; camRUntil = -9
         QDX = QX; QDY = QY; QVX = [Double](repeating: 0, count: N); QVY = QVX; QW = QVX; cvX = 0; cvY = 0; caX = 0; caY = 0; cpX = nil; cpY = nil; tickLastT = -9   // v2.25
+        stkOX = 0; stkOY = 0; stkVX = 0; stkVY = 0; stkG = 0; stkLast = -9; stkSaid = false; stkPet = false; trail = []   // v2.26
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false; dropLast = -99
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
@@ -892,6 +912,26 @@ final class SlimeRig {
     var centroid: (x: Double, y: Double) { (clusters.isEmpty ? cx : clusters[gi].xc, clusters.isEmpty ? cy : clusters[gi].yc) }
     var bodyAngle: Double { clusters.isEmpty ? 0 : atan2(clusters[gi].sn, clusters[gi].cs) }
     var highlight: (x: Double, y: Double) { N > 0 ? (X[hiIdx], Y[hiIdx]) : (cx, cy) }
+    /// v2.26 F7: how the highlight bends with the skin (a b c d of a CGAffineTransform, rotation removed, pulled back toward identity when extreme)
+    var highlightFrame: (Double, Double, Double, Double) {
+        guard params.hiStretch >= 0.5, let h = hiDent, h.i < N, h.i == hiIdx else { return (1, 0, 0, 1) }
+        let m = dentFrame(h)
+        let h0: Double = (m.0 + m.3) / 2, h1: Double = hypot((m.0 - m.3) / 2, (m.1 + m.2) / 2), lb: Double = h0 + h1, ls: Double = h0 - h1
+        var q = 1.0
+        if lb > 1.8 { q = min(q, 0.8 / (lb - 1)) }
+        if ls < 0.55 { q = min(q, 0.45 / (1 - ls)) }
+        return (1 + q * (m.0 - 1), q * m.1, q * m.2, 1 + q * (m.3 - 1))
+    }
+    /// v2.26 F7: the trail in world points, oldest first; k how fresh (1...0); n which touch
+    var trailView: [(x: Double, y: Double, k: Double, n: Double)] {
+        guard params.dentTrail > 0, !clusters.isEmpty, trail.count > 1 else { return [] }
+        let g = clusters[gi], keep: Double = params.dentTrail
+        return trail.map { q -> (x: Double, y: Double, k: Double, n: Double) in
+            (g.xc + g.cs * q.x - g.sn * q.y, g.yc + g.sn * q.x + g.cs * q.y, 1 - (t - q.t0) / keep, q.n)
+        }
+    }
+    /// v2.26 F7: stroking fingers on the body (the ring beside the finger)
+    var strokeHeads: [(x: Double, y: Double)] { fingers.values.filter { $0.mode == .stroke && $0.on }.map { (x: $0.rawX, y: $0.rawY) } }
     /// Dents (v2.15, 多米 build 61: just tapping should do something, maybe a dent). Only the boundary is drawn, so a press in the
     /// middle was invisible. Each dent rides a particle; held it sinks in 0.08 s, a finger dragged 0.4R or more is a pull and the
     /// dent goes; released it fades at the relax rate (clay: half in about 15 s). World position and depth 0...1
@@ -911,7 +951,7 @@ final class SlimeRig {
     private final class Dent { let i: Int; var d = 0.0; var finger: ObjectIdentifier?; var pull = false
         var p = 0.0, v = 0.0, p0 = 0.0, tau = 0.0, w = 0.0, held = 0.0
         var nb: [(i: Int, ox: Double, oy: Double)] = []
-        init(i: Int, finger: ObjectIdentifier) { self.i = i; self.finger = finger } }
+        init(i: Int, finger: ObjectIdentifier?) { self.i = i; self.finger = finger } }
     private var dentList: [Dent] = []
     /// v2.16: all dents' physical press added up (area, shadow), clamped to -0.6...1.5
     private(set) var pressSum = 0.0
@@ -1023,6 +1063,54 @@ final class SlimeRig {
         return false
     }
 
+    /// v2.26: the grab itself, on landing or when a stroke stops on the body
+    private func fingerGrab(_ f: Finger, id: ObjectIdentifier, x: Double, y: Double) {
+        // mem: particle, offset from the finger, follow weight, and the spread direction for the press
+        // (unit vector away from the finger × (1 − u²)², so the patch squashes flat under the finger)
+        let gr = params.grabR * R
+        for i in 0..<N where !GRAB[i] {
+            let ox = X[i] - x, oy = Y[i] - y, d = hypot(ox, oy)
+            if d < gr {
+                let u = d / gr, wp = (1 - u * u) * (1 - u * u), inv = d > 1e-6 ? wp / d : 0
+                f.mem.append((i, ox, oy, exp(-u * u * 2.5) * (1 - u * u), ox * inv, oy * inv))
+                GRAB[i] = true
+            }
+        }
+        // grabReach (v2.14, 多米 build 59: pulling from the middle did nothing; measured: the right edge went back 0.08R): only the
+        // inner patch was held, and dragged out of the body it is invisible (only the boundary is drawn). Mark it; reachGrab adds
+        // a strip to the boundary in the pull direction once the finger moves
+        if params.grabReach > 0 && insideBody(x, y) {
+            var db = 1e9
+            for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }
+            if db > gr * 0.8 { f.reach = true }
+        }
+        if f.mem.isEmpty {
+            let order = (0..<N).sorted { hypot(X[$0] - x, Y[$0] - y) < hypot(X[$1] - x, Y[$1] - y) }
+            for i in order.prefix(6) {
+                let ox = X[i] - x, oy = Y[i] - y, d = hypot(ox, oy), inv = d > 1e-6 ? 1 / d : 0
+                f.mem.append((i, ox, oy, 1, ox * inv, oy * inv))
+                GRAB[i] = true
+            }
+        }
+        if params.dent > 0 {
+            var bi = 0, bd = 1e9
+            for i in 0..<N { let d = hypot(X[i] - x, Y[i] - y); if d < bd { bd = d; bi = i } }
+            // v2.16: pressing near an old dent reuses it (pressing one spot keeps deepening it, not two dents side by side that
+            // read as eyes); remember the neighbours' offsets so the drawing bends with the body
+            if params.press2 >= 0.5, let old = dentList.first(where: { $0.finger == nil && hypot(X[$0.i] - x, Y[$0.i] - y) < R * params.dentSize * 0.9 }) {
+                old.finger = id; old.pull = false; old.tau = 0; old.p0 = max(0, old.p)
+            } else {
+                let dn = Dent(i: bi, finger: id), rr = R * params.dentSize * 1.3
+                for i in 0..<N where i != bi {
+                    let ox = X[i] - X[bi], oy = Y[i] - Y[bi]
+                    if ox * ox + oy * oy < rr * rr { dn.nb.append((i, ox, oy)) }
+                }
+                dentList.append(dn)
+                if dentList.count > (params.press2 >= 0.5 ? 4 : 6) { dentList.removeFirst() }
+            }
+        }
+    }
+
     /// `allowed` is false for touches in the system-gesture bands near the screen edges.
     /// `radius` is UITouch.majorRadius (contact size, points; 0 if unknown).
     /// `x, y` are screen points; the rig turns them into world points through the camera.
@@ -1059,33 +1147,7 @@ final class SlimeRig {
         // C4: touched again while it begs, the purr comes in 0.3 s (a stroke normally takes 1 s)
         if grab && iv2(params.impC4) && t < impAskUntil { f.gentleT = 0.7; moodC = max(moodC, 0.5); impTrust = min(1, impTrust + 0.05); impAskUntil = -9 }
         if grab {
-            // mem: particle, offset from the finger, follow weight, and the spread direction for the press
-            // (unit vector away from the finger × (1 − u²)², so the patch squashes flat under the finger)
-            let gr = params.grabR * R
-            for i in 0..<N where !GRAB[i] {
-                let ox = X[i] - x, oy = Y[i] - y, d = hypot(ox, oy)
-                if d < gr {
-                    let u = d / gr, wp = (1 - u * u) * (1 - u * u), inv = d > 1e-6 ? wp / d : 0
-                    f.mem.append((i, ox, oy, exp(-u * u * 2.5) * (1 - u * u), ox * inv, oy * inv))
-                    GRAB[i] = true
-                }
-            }
-            // grabReach (v2.14, 多米 build 59: pulling from the middle did nothing; measured: the right edge went back 0.08R): only the
-            // inner patch was held, and dragged out of the body it is invisible (only the boundary is drawn). Mark it; reachGrab adds
-            // a strip to the boundary in the pull direction once the finger moves
-            if params.grabReach > 0 && insideBody(x, y) {
-                var db = 1e9
-                for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }
-                if db > gr * 0.8 { f.reach = true }
-            }
-            if f.mem.isEmpty {
-                let order = (0..<N).sorted { hypot(X[$0] - x, Y[$0] - y) < hypot(X[$1] - x, Y[$1] - y) }
-                for i in order.prefix(6) {
-                    let ox = X[i] - x, oy = Y[i] - y, d = hypot(ox, oy), inv = d > 1e-6 ? 1 / d : 0
-                    f.mem.append((i, ox, oy, 1, ox * inv, oy * inv))
-                    GRAB[i] = true
-                }
-            }
+            fingerGrab(f, id: id, x: x, y: y)
             onEvent?(.press(gain: 0.7))
             // press flat (多米 2026-11-01: wanted to see it): a press counts only if it lands on the upper half; remember the
             // height and the bottom then (the invisible table is at that bottom)
@@ -1095,24 +1157,11 @@ final class SlimeRig {
                 if y < clusters[gi].yc { f.flatOn = true; f.h0 = max(R * 0.5, y1 - y0); f.bot = y1; f.flat = 1 }
             }
         }
-        if grab && params.dent > 0 {
-            var bi = 0, bd = 1e9
-            for i in 0..<N { let d = hypot(X[i] - x, Y[i] - y); if d < bd { bd = d; bi = i } }
-            // v2.16: pressing near an old dent reuses it (pressing one spot keeps deepening it, not two dents side by side that
-            // read as eyes); remember the neighbours' offsets so the drawing bends with the body
-            if params.press2 >= 0.5, let old = dentList.first(where: { $0.finger == nil && hypot(X[$0.i] - x, Y[$0.i] - y) < R * params.dentSize * 0.9 }) {
-                old.finger = id; old.pull = false; old.tau = 0; old.p0 = max(0, old.p)
-            } else {
-                let dn = Dent(i: bi, finger: id), rr = R * params.dentSize * 1.3
-                for i in 0..<N where i != bi {
-                    let ox = X[i] - X[bi], oy = Y[i] - Y[bi]
-                    if ox * ox + oy * oy < rr * rr { dn.nb.append((i, ox, oy)) }
-                }
-                dentList.append(dn)
-                if dentList.count > (params.press2 >= 0.5 ? 4 : 6) { dentList.removeFirst() }
-            }
-        }
         fingers[id] = f
+        if grab && params.strokeV > 0 && params.inertiaHz > 0 {   // v2.26 F6: a second finger right after the first is a pinch or a two-finger pull: the first goes back to a grab
+            f.judge = true
+            for (qid, q) in fingers where q !== f && q.mode == .stroke && t - q.tDown < 0.2 { strokeGrab(q, id: qid) }
+        }
         if grab { dragRebase() }
         if let d = dropHit { d.st = .held; d.hid = id }
     }
@@ -1153,6 +1202,125 @@ final class SlimeRig {
     }
 
     /// Lets a finger go. `quiet` skips the release pop (cancelled touches, a stuck finger pressed again).
+    /// v2.26 F6 stroke or grab (measured: a finger sliding across dragged the whole body along 74 to 113 pt). Moved strokeV × strokeT points within strokeT of landing, not outward: a stroke.
+    /// Grabbing is the main verb: taken for a stroke it feels like it cannot be held, taken for a grab it is just v2.25; so when in doubt a grab: another finger on it, leaving from the middle (within 0.35R), or heading outward (within 60 degrees).
+    private func strokeJudge(_ f: Finger, id: ObjectIdentifier) {
+        if t - f.tDown > params.strokeT { f.judge = false; return }
+        let dx: Double = f.rawX - f.ax, dy: Double = f.rawY - f.ay, dl: Double = hypot(dx, dy)
+        if dl * camZ < params.strokeV * params.strokeT { return }
+        f.judge = false
+        for q in fingers.values where q !== f && (q.mode == .grab || q.mode == .stroke) { return }
+        guard !clusters.isEmpty else { return }
+        let rx: Double = f.ax - clusters[gi].xc, ry: Double = f.ay - clusters[gi].yc, rl: Double = hypot(rx, ry)
+        if rl < R * 0.35 || (rx * dx + ry * dy) / (rl * dl) > 0.5 { return }
+        f.mode = .stroke
+        inertiaCatch()
+        for m in f.mem { GRAB[m.i] = false }
+        f.mem = []; f.reach = false; f.reachN = nil; f.slowT = 0; f.stretch = 0; f.ex = 0; f.ey = 0; f.sb = 0; f.press = 0; f.pressOn = false; f.flatOn = false; f.on = true; f.hitT = t
+        for dn in dentList where dn.finger == id { dn.finger = nil; dn.pull = true; dn.held = 0 }
+        dragRelease(glide: false)
+        if flAt > t && !(impWary > 0.4) { flAt = -9 }   // a stroke does not startle it; wary, it still flinches
+    }
+
+    /// A stroke stops on the body (or the contact patch grows): the skin under the finger is held from here
+    private func strokeGrab(_ f: Finger, id: ObjectIdentifier) {
+        f.mode = .grab
+        f.ax = f.rawX; f.ay = f.rawY; f.x = f.rawX; f.y = f.rawY; f.fx = f.rawX; f.fy = f.rawY
+        f.stretch = 0; f.ex = 0; f.ey = 0; f.sb = 0; f.step = 0; f.hold = 0; f.press = 0; f.pressOn = false; f.peak = 0; f.on = false; f.far = false
+        f.tGrab = t; f.grainI = 0; f.grR = 0
+        fingerGrab(f, id: id, x: f.rawX, y: f.rawY)
+        onEvent?(.press(gain: 0.35))
+        dragRebase()
+    }
+
+    private func trailAdd(_ f: Finger) {
+        guard !clusters.isEmpty else { return }
+        let g = clusters[gi], px: Double = f.rawX - g.xc, py: Double = f.rawY - g.yc
+        trail.append(TrailPoint(x: g.cs * px + g.sn * py, y: -g.sn * px + g.cs * py, t0: t, n: f.tDown))
+        if trail.count > 64 { trail.removeFirst() }
+    }
+
+    /// Each frame: judging, stroke and grab turning into each other, the trail, grains on a stroke, and how far the body is carried (moved with its previous step, no velocity left; home moves along)
+    private func strokeStep(_ dt: Double) {
+        let mat = params, strokeOn: Bool = mat.strokeV > 0 && mat.inertiaHz > 0
+        if !strokeOn { for (id, f) in fingers where f.mode == .stroke { strokeGrab(f, id: id) } }
+        var tx = 0.0, ty = 0.0, n = 0.0, on = false, grab = false
+        for (id, f) in fingers {
+            let sp: Double = hypot(f.vxS, f.vyS) * camZ
+            if f.judge && f.mode == .grab { strokeJudge(f, id: id) }
+            if strokeOn && f.mode == .push && sp >= mat.strokeV && (insideBody(f.rawX, f.rawY) || nearBody(f.rawX, f.rawY, R * 0.22)) {   // sliding in from outside is a stroke too
+                f.mode = .stroke; f.lure = false; f.slowT = 0; f.on = true; f.hitT = t; f.pushed = true
+                onEvent?(.nudge)
+            }
+            if f.mode == .grab {
+                grab = true
+                if mat.dentTrail > 0 && f.stretch < 0.6 && sp > R * 0.3 {
+                    f.trD += hypot(f.vx, f.vy) * dt
+                    if f.trD >= R * 0.05 { f.trD = 0; trailAdd(f) }
+                }
+                continue
+            }
+            guard f.mode == .stroke else { continue }
+            f.on = insideBody(f.rawX, f.rawY) || nearBody(f.rawX, f.rawY, R * 0.15)
+            f.slowT = sp < mat.strokeStop ? f.slowT + dt : 0
+            // the contact patch growing is a press (the first 100 ms it grows by itself as the finger lands)
+            if f.radius > 0 {
+                if f.rBase <= 0 && t - f.tDown >= 0.1 { f.rBase = f.radius }
+                if f.rBase > 0 && f.on && f.radius >= f.rBase + 8 { strokeGrab(f, id: id); grab = true; continue }
+            }
+            if f.slowT >= 0.12 {
+                if f.on { strokeGrab(f, id: id); grab = true }
+                else { f.mode = .push; f.pushed = false; f.lure = iv2(mat.impC1) || iv2(mat.impC2) }
+                continue
+            }
+            if !f.on { continue }
+            f.hitT = t; lastTouch = t; on = true; stkLast = t; tx += f.vxS; ty += f.vyS; n += 1
+            if sp < mat.rubSpeed * 60 { stkG = min(3, stkG + 2 * dt); if stkG > 1 { stkPet = true } }
+            if mat.dentTrail > 0 {
+                f.trD += hypot(f.vx, f.vy) * dt
+                if f.trD >= R * 0.05 { f.trD = 0; trailAdd(f) }
+            }
+            // the skin under the finger: grains by travel, the same limit, a little softer than a rub
+            if mat.tickSpacing > 0 {
+                if f.tickNext <= 0 { f.tickNext = mat.tickSpacing; f.tickAt = f.travel }
+                if f.travel - f.tickAt >= f.tickNext && f.speedC > R * 0.1 && t - tickLastT >= 1 / max(1, mat.tickRate) {
+                    f.tickAt = f.travel
+                    f.tickNext = mat.tickSpacing * (0.7 + 0.6 * Double.random(in: 0..<1))
+                    tickLastT = t
+                    onEvent?(.tick(gain: 0.7 * min(1, f.speedC / (R * 3))))
+                }
+            }
+        }
+        if !on { stkG = max(0, stkG - 0.6 * dt) }
+        if stkG < 0.5 { stkSaid = false }
+        let keep: Double = mat.dentTrail
+        while let q = trail.first, t - q.t0 > keep { trail.removeFirst() }
+        // done stroking (0.7 s without another): comfortable, it is happy
+        if stkPet && fingers.isEmpty && t - stkLast > 0.7 {
+            stkPet = false
+            if moodC > 0.35 && mat.emo >= 0.5 && !escOn { happyT = t; wagT = t + 0.1; hop(); voice("happy") }
+        }
+        // the body carried: the target follows the finger's speed (400 pt a second about 0.2R), at most strokeCarry; a spring with inertia follows, let go it runs past a little and comes back
+        if n > 0 && !grab {
+            tx = tx / n * 0.06; ty = ty / n * 0.06
+            let l: Double = hypot(tx, ty), cap: Double = mat.strokeCarry * R * (reduceMotion ? 0.5 : 1)
+            if l > cap { tx *= cap / l; ty *= cap / l }
+        } else { tx = 0; ty = 0 }
+        if stkOX != 0 || stkOY != 0 || tx != 0 || ty != 0 {
+            let w: Double = 2 * Double.pi * mat.dragHz, zz: Double = 2 * (reduceMotion ? 0.9 : max(0.5, mat.dragSpring)) * w
+            stkVX += (w * w * (tx - stkOX) - zz * stkVX) * dt
+            stkVY += (w * w * (ty - stkOY) - zz * stkVY) * dt
+            let dx: Double = stkVX * dt, dy: Double = stkVY * dt
+            stkOX += dx; stkOY += dy
+            if tx == 0 && ty == 0 && hypot(stkOX, stkOY) < 0.05 && hypot(stkVX, stkVY) < 0.5 {
+                stkOX = 0; stkOY = 0; stkVX = 0; stkVY = 0
+            } else {
+                homeX += dx; homeY += dy
+                for i in 0..<N where !GRAB[i] { X[i] += dx; Y[i] += dy; PX[i] += dx; PY[i] += dy }
+            }
+        }
+    }
+
     /// v2.25 F4: at a release QD catches the body's shape as it is (minus the performance: the breathing and mood scale, the press push), so the next target is on the body
     /// and nothing jumps; it also takes the body's velocity about its centre (inertiaCarry, at most 6R a second). From here the spring alone decides how it goes back.
     private func inertiaCatch() {
@@ -1191,7 +1359,7 @@ final class SlimeRig {
         if f.mode == .grab && !quiet && params.life2 >= 0.5 { lifeRelease(f) }
         if f.mode == .grab && !quiet { impAsk(f) }
         if f.mode == .grab && !quiet { e2Release(f); dropsOnRelease(f) }   // v2.22
-        if f.mode == .grab && !quiet && !escOn { eyeUser = t + 1.2 }   // v2.23: let go, it looks at you
+        if (f.mode == .grab || f.mode == .stroke) && !quiet && !escOn { eyeUser = t + 1.2 }   // v2.23: let go, it looks at you
         if f.mode == .drop, let d = drops.first(where: { $0.hid == id && $0.st == .held }) {   // let go of a drop: it floats on with half the finger's speed
             let c = R * 3
             d.st = .float; d.vx = max(-c, min(c, f.vxS * 0.5)); d.vy = max(-c, min(c, f.vyS * 0.5))
@@ -1294,7 +1462,7 @@ final class SlimeRig {
             for dn in dentList {
                 if let id = dn.finger, let f = fingers[id] {
                     let moved = hypot(f.rawX - f.ax, f.rawY - f.ay)
-                    if moved > R * 0.4 { dn.pull = true }
+                    if moved > R * 0.4 && (mat.dentTrail <= 0 || f.stretch > 0.8) { dn.pull = true }   // v2.26 F7: rubbing (not really pulled open), the dent goes along with the finger
                     if dn.pull {
                         let k2 = 1 - exp(-dt / 0.12)
                         dn.d -= dn.d * k2; dn.p -= dn.p * k2; dn.v = 0
@@ -1405,7 +1573,7 @@ final class SlimeRig {
                 // every kind of grain shares the one limit (tickLastT); a contact size that flickers on a still finger must not buzz, so at most 4 of those a second
                 if mat.pressGrain >= 0.5 && !f.far {
                     let free: Bool = t - tickLastT >= 1 / max(1, mat.tickRate)
-                    if free && f.grainI < Self.grainTimes.count && t - f.tDown >= Self.grainTimes[f.grainI] {
+                    if free && f.grainI < Self.grainTimes.count && t - max(f.tDown, f.tGrab) >= Self.grainTimes[f.grainI] {
                         onEvent?(.grain(gain: Self.grainGains[f.grainI])); f.grainI += 1; tickLastT = t
                     } else if f.radius > 0 {
                         if f.grR <= 0 { f.grR = f.radius }
@@ -1415,6 +1583,7 @@ final class SlimeRig {
             }
         }
 
+        strokeStep(dt)   // v2.26 F6
         dragStep(dt)   // v2.20 D1: home follows `drag` of the fingers' travel; how far the body itself is pulled open (sb); C3 slipping free
 
         // press flat: as far as the finger went down (relative to the height when it began) the remembered shape squashes,
@@ -1808,6 +1977,24 @@ final class SlimeRig {
             let w: Double = 2 * Double.pi * mat.inertiaHz, w2: Double = w * w, zz: Double = 2 * (reduceMotion ? max(mat.inertiaZ, 0.7) : mat.inertiaZ) * w
             let g = clusters[gi], kd: Double = mat.inertiaDrag * (reduceMotion ? 0.5 : 1)
             let fx: Double = -(g.cs * caX + g.sn * caY) * kd, fy: Double = -(-g.sn * caX + g.cs * caY) * kd
+            // v2.26 F6 a stroke pins nothing: the finger is a round head sliding over it and pushes the reference shape: the skin beside it is pushed aside and carried along, and swings back once the finger has gone; clay does not remember it
+            if mat.strokeV > 0 {
+                for f in fingers.values where f.mode == .stroke && f.on {
+                    let px: Double = f.x - g.xc, py: Double = f.y - g.yc
+                    let lx: Double = g.qcx + g.cs * px + g.sn * py, ly: Double = g.qcy - g.sn * px + g.cs * py
+                    let vl: Double = hypot(f.vxS, f.vyS), vs: Double = vl > R * 6 ? R * 6 / vl : 1
+                    let vx: Double = (g.cs * f.vxS + g.sn * f.vyS) * vs, vy: Double = (-g.sn * f.vxS + g.cs * f.vyS) * vs
+                    let rk: Double = R * 0.5, rm: Double = reduceMotion ? 0.5 : 1
+                    let pu: Double = mat.strokePush * R * rm * dt, fr: Double = mat.strokeFric * rm * dt
+                    for i in 0..<N {
+                        let dx: Double = QDX[i] - lx, dy: Double = QDY[i] - ly, d2: Double = dx * dx + dy * dy
+                        if d2 >= rk * rk || d2 < 1e-6 { continue }
+                        let d: Double = d2.squareRoot(), u: Double = 1 - d / rk, wk: Double = u * u
+                        QVX[i] += dx / d * wk * pu + (vx - QVX[i]) * wk * fr
+                        QVY[i] += dy / d * wk * pu + (vy - QVY[i]) * wk * fr
+                    }
+                }
+            }
             for i in 0..<N {
                 QVX[i] += (w2 * (QX[i] - QDX[i]) - zz * QVX[i] + fx * QW[i]) * dt
                 QVY[i] += (w2 * (QY[i] - QDY[i]) - zz * QVY[i] + fy * QW[i]) * dt
@@ -2839,6 +3026,9 @@ final class SlimeRig {
             let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate   // v2.22 E3: trust grows three times faster (5 s of stroking shows); v2.23 personality
             if g.gentleT > 1 { impTrust += (0.04 + 0.04 * purr) * dt * e3m; impWary -= 0.05 * dt * e3m }
             else if st < 1.2 && sp > 0.3 && sp < 3 && moodStrain < 0.05 && hypot(dragOX, dragOY) > R * 0.3 { impTrust += 0.02 * dt * e3m }
+        } else if stkG > 1 && t - stkLast < 0.05 {   // v2.26 F6: strokes build trust too
+            let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate
+            impTrust += (0.04 + 0.04 * purr) * dt * e3m; impWary -= 0.05 * dt * e3m
         }
         impWary *= exp(-dt / 260)
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
@@ -2946,7 +3136,11 @@ final class SlimeRig {
     private func firstGrab() -> Finger? { fingers.values.first { $0.mode == .grab } }
     /// E1: pulled until it wants to flee → "mm-mm"; purring → "mmm~" (once a grab each).
     private func e1Step() {
-        guard iv3(params.e1), let g = firstGrab() else { return }
+        guard iv3(params.e1) else { return }
+        guard let g = firstGrab() else {
+            if purr > 0.3 && stkG > 1 && !stkSaid && t - stkLast < 0.6 { stkSaid = true; voice("mmm", 0.6) }   // v2.26 F6
+            return
+        }
         if moodStrain > 0.5 && !g.saidProt { g.saidProt = true; voice("protest") }
         if purr > 0.3 && !g.saidPurr { g.saidPurr = true; if !nuzSaid { voice("mmm", 0.6) } }   // already nuzzling and hummed: not again
     }
@@ -3245,7 +3439,7 @@ final class SlimeRig {
         do {
             var tx = 0.0, ty = 0.0, dk = 0.0
             if params.dodge > 0 {
-                for f in fingers.values where f.mode == .grab || f.mode == .push {
+                for f in fingers.values where f.mode == .grab || f.mode == .push || f.mode == .stroke {
                     let vx: Double = cx - f.rawX, vy: Double = cy - f.rawY, d: Double = max(1e-6, hypot(vx, vy)), kk: Double = smooth01(1 - d / (R * 0.85))
                     if kk <= dk { continue }
                     dk = kk
@@ -3376,7 +3570,7 @@ final class SlimeRig {
     func rubLevel() -> Double {
         var sp = 0.0
         // smoothed travel rate from coalesced touches (a per-frame difference flickers at 120 Hz)
-        for f in fingers.values where f.mode == .grab { sp = max(sp, f.speedC / R) }
+        for f in fingers.values where f.mode == .grab || (f.mode == .stroke && f.on) { sp = max(sp, f.speedC / R) }
         return fingers.isEmpty ? 0 : min(1, sp / 5)   // the controller scales this by `rubMax`
     }
 
