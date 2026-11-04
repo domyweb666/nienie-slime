@@ -185,7 +185,7 @@ struct FeelParams: Equatable, Codable {
     var dragSpring: Double = 0.5      // the whole body follows the finger on a spring with this damping ratio (0.5 runs past by about 16%); 0: v2.24 (0.2 s smoothing, it stops dead)
     var dragHz: Double = 1.4          // that spring's swings a second; 1.4 lags about 0.1 s
     // v2.26 F6: stroke or grab (measured: a finger sliding across dragged the body along 74 to 113 pt)
-    var strokeV: Double = 150         // moving this fast right after landing, not outward: a stroke (the finger slides over, nothing pinned); 0: v2.25 (a touch is a grab)
+    var strokeV: Double = 400         // 150 before v2.26.1 (12 pt in 80 ms: a quick drag from the side slid off); moving this fast right after landing, not outward: a stroke (the finger slides over, nothing pinned); 0: v2.25 (a touch is a grab)
     var strokeT: Double = 0.08        // within how long of landing; shorter is harder to count as a stroke
     var strokeStop: Double = 60       // a stroke slower than this for 0.12 s becomes a grab
     var strokeCarry: Double = 0.2     // how far a stroke carries the whole body at most, in radii; it comes back by itself

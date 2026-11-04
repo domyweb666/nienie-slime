@@ -1213,6 +1213,8 @@ final class SlimeRig {
         guard !clusters.isEmpty else { return }
         let rx: Double = f.ax - clusters[gi].xc, ry: Double = f.ay - clusters[gi].yc, rl: Double = hypot(rx, ry)
         if rl < R * 0.35 || (rx * dx + ry * dy) / (rl * dl) > 0.5 { return }
+        let held: Double = t - f.tDown
+        if dl * camZ < params.rubSpeed * 60 * max(held, 1.0 / 240.0) { stkG = min(3, stkG + 2 * held) }   // v2.26.1: the finger was already stroking while this was judged; without it three strokes no longer soothe at the higher threshold
         f.mode = .stroke
         inertiaCatch()
         for m in f.mem { GRAB[m.i] = false }

@@ -639,13 +639,18 @@ final class SlimeView: UIView {
         if let e = rig.eyeView {
             let S = e.size * z, ew = S * 0.082 * sqrt(e.spread), eh = S * 0.118, ox = e.lookX * S, oy = e.lookY * S
             eyeLineLayer.lineWidth = max(2.5, S * 0.034)
+            // addArc draws a line from the current point, so each arc needs its own move, or the two eyes get joined by a line (web: beginPath per eye)
+            let eyeArc: (Double, Double, Double, Double, Double) -> Void = { ax, ay, ar, a0, a1 in
+                el.move(to: CGPoint(x: ax + ar * cos(a0), y: ay + ar * sin(a0)))
+                el.addArc(center: CGPoint(x: ax, y: ay), radius: ar, startAngle: a0, endAngle: a1, clockwise: false)
+            }
             for (wx, wy, sd) in [(e.lx, e.ly, -1.0), (e.rx, e.ry, 1.0)] {
                 let c = rig.toScreen(wx, wy), x = c.x + ox, y = c.y + oy
                 switch e.mode {
                 case .happy:
-                    el.addArc(center: CGPoint(x: x, y: y + eh * 0.45), radius: ew * 1.15, startAngle: .pi * 1.15, endAngle: .pi * 1.85, clockwise: false)
+                    eyeArc(x, y + eh * 0.45, ew * 1.15, .pi * 1.15, .pi * 1.85)
                 case .sleep:
-                    el.addArc(center: CGPoint(x: x, y: y - eh * 0.35), radius: ew * 1.15, startAngle: .pi * 0.15, endAngle: .pi * 0.85, clockwise: false)
+                    eyeArc(x, y - eh * 0.35, ew * 1.15, .pi * 0.15, .pi * 0.85)
                 case .squeeze:
                     let a = -sd
                     el.move(to: CGPoint(x: x + a * ew * 0.9, y: y - eh * 0.55))
