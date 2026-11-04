@@ -1,23 +1,23 @@
-# Handoff: 第十二會話，手感診斷與 v2.24 到 v2.26 都做完，build 97 已上傳，多米正在捏
+# Handoff: 第十三會話，limrun 上第一次跑 Swift 版，修了兩個問題，build 99 已上傳
 
-> 產出時間：2026-11-04 11:35
+> 產出時間：2026-11-04 13:06
 > 給下一個會話接續用。舊版備份在 `.vibe/handoff/archive/`
 
 ## ✅ 這次完成了什麼
 
-- 量完手感，寫了 `.uiux/04-手感/手感診斷-暫定.md`，排成四版：v2.24 看得到、v2.25 有重量與手上有東西、v2.26 摸得到表面、v2.27 身體會變（還沒做）
-- 做完 v2.24（build 93）：身體放大到 0.30、對手指的反應放大、揉打通、抓著時畫面不在手指底下滑
-- 做完 v2.25（build 95）：放手第一下從 29 毫秒變 158 到 192 毫秒、拖到停衝過頭約 16 點、觸覺改成跟手指走的顆粒、呼嚕改連續低頻、面板加觸覺階梯
-- 做完 v2.26（build 97）：手指快速劃過去算摸，整團只被帶 0.23R 再回原位（原本 1.07R 到 1.64R，停在 126 到 193 點），黏土不記形，摸兩三下舒服；摸到一半停住才變抓。凹痕放大到手指外面看得到、揉和摸留 0.5 秒痕跡、局部鼓起開、亮光跟著拉伸
-- 把 selftest 加到 T41（42 項），新頁面連跑 3 輪全過。這 3 輪之後只再改過痕跡的畫法（線寬固定）和拿掉一個沒用到的欄位，沒有動物理，沒有重跑
-- 雲端編譯 run 96 一次過、沒有警告；TestFlight build 97 上傳成功；`swiftui-port`、`main` 都已同步
-- 做了前後對照圖 `.uiux/04-手感/手指旁邊-對照.jpg`，傳給多米看了，多米還沒對畫風表示意見
+- 多米改用 limrun。v2.24 到 v2.26 的 Swift 第一次實際執行，沒有閃退，按、拉、揉、摸、兩指、果凍放手的晃都有動作。數字在 `.uiux/04-手感/手感測試紀錄-暫定.md` 第 0ad 輪
+- 修 v2.26.1（build 99）：開心和睡著時兩隻眼睛之間那條線拿掉；strokeV 150 改 400，側邊快拖抓得住；判斷摸或抓的那幾幀算進舒服
+- selftest 42 項連跑 3 輪全過。T41 摸的手指改每秒 500 點，加側邊快拖一項
+- 雲端編譯 run 98 過；TestFlight build 99 上傳成功；`swiftui-port`、`main` 都已同步
 
 ## 🚧 還沒做完 / 待決定
 
-- 多米說「我先捏 build 97」，結果還沒回來。v2.24、v2.25、v2.26 三版的 Swift 都只確認編譯過，沒在手機上跑過
-- 完全沒有程式自測的部分：F5 觸覺（顆粒、按下去、放手幾下、呼嚕、階梯）、接觸面變大算抓、Swift 痕跡的 CAShapeLayer 畫法
-- 等多米回答。v2.26：快速拉有沒有被判成摸（最可能要退回）、摸得舒不舒服、手指旁邊那一圈和痕跡好不好看。v2.25：放手晃得對不對、果凍 9 下會不會太久、拖到停會不會飄、一粒一粒舒不舒服、觸覺階梯「單下」「連續」最小各哪一格。v2.24：身體會不會太大、揉 1.3 秒呼嚕來得對不對、反應會不會太誇張
+- 多米還沒捏 build 99，也還沒回報 build 97 那批問題（下面第 2 點）
+- Swift 版「摸三下會舒服」沒驗成：試 3 次，身體走開，手指沒打中。網頁版有驗（呼嚕 0.63）
+- 起手就很快的拖法（80 毫秒超過 32 點、方向不是往外）現在還是算摸，只有真機知道夠不夠
+- 量到但沒動：搔癢扭動很小（寬度變 16 點、重心動 6 點）；黏土放手 2 秒約留六成（標準約八成，網頁 T41 是 0.73，量法不同，只跑一次）
+- 完全沒有測過的：F5 觸覺、聲音、真實延遲、接觸面變大算抓，模擬器都量不到
+- 等多米回答。v2.26：摸得舒不舒服、手指旁邊那一圈和痕跡好不好看。v2.25：放手晃得對不對、果凍 9 下會不會太久、拖到停會不會飄、一粒一粒舒不舒服、觸覺階梯「單下」「連續」最小各哪一格。v2.24：身體會不會太大、揉 1.3 秒呼嚕來得對不對、反應會不會太誇張
 - `.vibe/CLAUDE-md-v2.24-草稿.md`、`CLAUDE-md-v2.25-草稿.md`、`CLAUDE-md-v2.26-草稿.md` 等多米點頭才改 `CLAUDE.md`
 - v2.27（F8 肌肉、F9 自己收回形狀、F10 手指下的呼吸）還沒做，等捏完再決定
 - 舊帳：閘門 3（延遲、最舊機低電量）沒量；一個參數都沒盲測過；新的手 0 輪；核心動作卡沒過閘門 1；`README.md` 過時
@@ -25,6 +25,9 @@
 
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
+- strokeV 定 400，多米同意。試過 300，是我誤判呼嚕低跟門檻有關，真正原因是判斷時間沒算進舒服
+- limrun 以分鐘計費，測完立刻刪自己開的實例；別的專案（`project=` 標籤）的不動
+- limrun 量動作有沒有發生，手感驗收照舊要真機和沒看過的人
 - 反應的數量夠了（60 秒自然玩法 14 到 15 種），先不加新反應種類；缺的是看得到、有重量、接觸、觸覺、狀態改物理
 - 只放大對手指的反應，休息時的呼吸與蠕動比例不動（多米 v2.11：自身形變不要太大）
 - 跟手要量螢幕座標：手指真實位置對被抓那塊畫出來的位置
@@ -42,8 +45,10 @@
 - `swiftui-port` 有 Swift＋web＋docs；`main` 只放 web＋docs（Pages 自動發布）。推 main：
   `git worktree add <scratchpad>/wt-main origin/main -B main-sync` → `git cherry-pick -n <hash>` → `git checkout HEAD -- ios`（cherry-pick 在 ios 衝突時這步也會解掉）→ `git diff --cached --name-only --diff-filter=A -- ios | xargs -r git rm -q --cached` → 確認 `git diff --cached --quiet <hash> -- prototype .uiux CLAUDE.md` → `git commit -C <hash>` → 確認 `git diff --stat HEAD~1 HEAD -- ios` 是空的、ios 檔維持 18 個 → `git push origin main-sync:main` → 移除 worktree 與分支
 - 發 TestFlight：等 push 觸發的編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，上傳完才能再推同一條分支；等編譯用 `gh run watch <id> --exit-status`，放背景跑
+- limrun：`npx -y lim@0.51.0`，這台電腦的登入是所有專案共用的。`lim xcode create --ios` 開機器（加 `--label project=nienie-slime`、`--inactivity-timeout 10m`），`lim xcode build ./ios --id <sandbox> --xcodegen-spec project.yml --scheme NieNieSlime --configuration Release --sdk iphonesimulator` 約 1 分鐘編好並裝進模擬器。測完 `ios delete`、`xcode delete`。手勢腳本沒進專案，校正數字在記憶 `reference_limrun_gestures`：`wait` 3 約 18 毫秒、雙指用 `x2`、`y2`、手勢前截圖定位要算進身體會走開
 - 本機預覽：`preview_start` 名稱 `web-proto`，網址 `http://localhost:8765/`，viewport 設 393×852
 - 瀏覽器面板藏著時 rAF 被節流、截圖會逾時。要看畫面：把 `requestAnimationFrame` 換成空函式，自己呼叫 `update(1/60)` 和 `draw()`，畫到一個 canvas，toBlob 後 POST 到本機小伺服器（node 寫的，收到就存進 scratchpad，用完關掉），再用 Read 看圖
+- 跑 selftest 放進固定 393×852 的 iframe（`iframe.contentWindow.eval(src)`）：面板的手機尺寸在回合結束會被清掉，R 從 118 變 160，那輪會多一堆假失敗
 - selftest 現在一輪要幾分鐘，跑的時候頁面不回應，javascript_tool 會逾時，隔一下再問。連跑用 setTimeout 鏈，結果放 `window.__runs`；重新載入頁面就沒了，數字要先抄
 - 只想重跑某一項：抽 `selftest.js` 開頭到「// T1 輕按」＋那一項的區塊＋收尾，eval。它會把 PRESETS 換成關新功能的版本，收尾要 `Object.assign(PRESETS, PSAVE)` 或重新載入，每輪先印 R 分辨版本
 - Swift 這台電腦編譯不了，v2.23 以來的大改雲端都一次過；複雜運算照舊寫明型別
@@ -62,9 +67,9 @@
 ## ⏭️ 下一步從哪繼續
 
 1. 讀這份，再讀 `.uiux/04-手感/手感診斷-暫定.md` 第二節 v2.24 到 v2.27。
-2. 第一句話問多米 build 97 捏得怎樣，特別是快速拉有沒有抓不住，還有觸覺階梯「單下」「連續」最小各哪一格。多米還在捏的話就等，先不要動程式。
+2. 第一句話問多米 build 99 捏得怎樣，特別是從側邊快速拖抓不抓得住、摸兩三下會不會舒服，還有觸覺階梯「單下」「連續」最小各哪一格。多米還在捏的話就等，先不要動程式。
 3. 照回報走：
-   - 抓不住、快拉會滑掉：請多米把面板「摸的速度門檻」調高試（越高越不容易判成摸，0 全關）。有效就改預設 strokeV，網頁 PRESETS 和 `FeelParams.swift` 兩邊都改；不要摸就預設 0。
+   - 抓不住、快拉會滑掉：請多米把面板「摸的速度門檻」從 400 往上調（最高 600，越高越不容易判成摸，0 全關）。有效就改預設 strokeV，網頁 PRESETS 和 `FeelParams.swift` 兩邊都改；不要摸就預設 0。
    - 那一圈或痕跡不好看：面板「凹痕大小」「手指走過的痕跡」先調，多米定了再改 `drawTrail` 和 `SlimeView.swift` 的 `trailPath`。
    - 手機感覺不到震：tickMin、grainMin 不能低於階梯量到的最小格。手麻：面板「顆粒每秒最多幾下」往下調。
    - 回彈太飄：面板「回彈阻尼比」「拖到停會衝過頭」調大。
