@@ -88,7 +88,7 @@ struct FeelParams: Equatable, Codable {
     var pods: Double = 2              // pseudopods growing at once while untouched; 0 = off
     var podLen: Double = 0.6          // pseudopod length at full extension, in radii (each one 0.7 to 1.2× of it; 1.1 in v2.10)
     var idlePace: Double = 0.45       // pace of the idle morph and the pseudopods (1 = v2.9 web, which 多米 found too fast)
-    var bodySize: Double = 0.22       // body radius as a fraction of the screen width (0.26 before; changing it rebuilds the body)
+    var bodySize: Double = 0.30       // body radius as a fraction of the screen width (0.26 before v2.9, 0.22 v2.10 to v2.23; changing it rebuilds the body)
     var jelly: Double = 1             // 1: jellyfish pulse (fast contraction, slow relax, a lift on each contraction); 0: the plain breathing
     var jellyT: Double = 3            // jellyfish pulse period, seconds
     var jellyAmp: Double = 0.06       // how much narrower at full contraction (taller by 0.85 of it; 0.1 in v2.10)
@@ -106,7 +106,7 @@ struct FeelParams: Equatable, Codable {
     // v2.12 (多米 build 55: pulled a little bigger and it would not go further; measured: the screen edge, right 1.1R, up 1.8R)
     var zoomMin: Double = 0           // the view zooms out to fit a big shape, down to this; 0 = no limit and no walls (v2.13, 多米), 1 = off, v2.12 was 0.45
     // v2.13 (多米: zoom out without limit, as far as the slime is pulled)
-    var camFill: Double = 0.7         // while grabbed the shape fills at most this much of the view, leaving room for the finger; 1 = tight (v2.12)
+    var camFill: Double = 0.85        // v2.24 (0.7 before: with the bigger body a short pull zoomed the view); while grabbed the shape fills at most this much of the view, leaving room for the finger; 1 = tight (v2.12)
     var camCenter: Double = 1         // 1: once big or pulled the view centres on the shape, so there is room ahead of the finger to pull again
                                       // (v2.15 default; in v2.13 it ran to 15R because the resting finger was dragged out by the view); 0: on home
     // v2.14 (多米 build 59: only the edge could be pulled; nothing happened pulling from the middle)
@@ -125,7 +125,7 @@ struct FeelParams: Equatable, Codable {
     // sometimes off screen, and the camera follows slowly)
     var intro: Double = 1             // 1: four hops in from far away on a cold start (about 2.8 s), a touch on the way brings it home at once
     var camFollow: Double = 1         // 1: the camera follows once it walks off-centre, it may leave the screen; still while grabbed. 0: v2.16
-    var followZone: Double = 0.8      // how far off its usual spot (1 = half the view) before the camera follows; v2.18 0.8 (near the edge), v2.17 0.5
+    var followZone: Double = 0.65     // v2.24 (0.8 before: with the bigger body it was half off screen before the camera moved); how far off its usual spot (1 = half the view) before the camera follows; v2.18 0.8 (near the edge), v2.17 0.5
     var followStop: Double = 0.35     // the chase stops this close, it does not pull the slime back to dead centre (v2.18; v2.17 0.06)
     // v2.18 (多米: it always sits in the middle; pulled it should want to run away, stroked it should purr; no face)
     var emo: Double = 1               // 1: comfort softens it and purrs, happiness wags a pseudopod and hops, a hard pull makes it flee, pokes make it dart
@@ -145,7 +145,7 @@ struct FeelParams: Equatable, Codable {
     var shadow: Double = 0            // A8: 1 draws the shadow (v2.18); 0 none (floating and walking every way, a shadow contradicts the space). Always drawn with life2 0
     var heldBreath: Double = 0.75     // breathing while held, share of normal (the pinned middle eats some: 0.75 reads as about 0.6)
     var restWrig: Double = 0.3        // wriggle while resting, share of normal (looking 0.6, walking 0.5)
-    var flinchAmp: Double = 0.05      // how much the flinch shrinks it (resting ×1.2, comfortable ×0.5, each flinch ×0.55, back with a 7 s time constant)
+    var flinchAmp: Double = 0.1       // v2.24 (0.05 before); how much the flinch shrinks it (resting ×1.2, comfortable ×0.5, each flinch ×0.55, back with a 7 s time constant)
     // v2.20 (多米 build 75: dragging only deforms it, nothing moves; a tap's dent takes too long to go; it still does not feel like it
     // reacts to you, wants second-order effects of how you treat it) .uiux/04-手感/互動與拖拉提案-暫定.md
     var slide: Double = 1.5           // v2.21 D1' pull (多米 build 77 video: pulled down-right, it should go down-right too): stretched about this far (×R), pulling further drags the whole body; two fingers apart still stretch long; 0 = v2.20 (jelly 0.6, mochi 0.9, clay 1.5)
@@ -169,6 +169,20 @@ struct FeelParams: Equatable, Codable {
     var eyes: Double = 1              // two small eyes: look at your finger, blink; squint held, > < pulled, ∩ purring or happy, ∪ asleep, wide when wary. 0: no face
     var sleep: Double = 1             // B2: untouched 40 s (a tap on the empty screen counts) while resting, it falls asleep; a touch startles it awake, a finger beside it 1.2 s wakes it gently
     var echo: Double = 1              // C6: tap the empty screen 2–8 times in a rhythm (0.12–1.2 s apart); it answers with the same count and rhythm; answer it back the same and it is happy
+    // v2.24 (多米 11-04: make the feel the best it can be; .uiux/04-手感/手感診斷-暫定.md): the body was 3 cm wide under a 1.6 to 2 cm finger, reactions under 1 mm, ordinary rubbing got no reaction
+    var camGrip: Double = 1           // the picture does not slide under the finger: while grabbed the view only zooms out about the finger; moved back in after the release. 0: v2.23 (centred on the shape from 0.5R)
+    var camPad: Double = 0.2          // margin around the framed shape (× radius); 0.35 before
+    var pressLocal: Double = 1        // until the finger moves off its spot only the part near it remembers (holding still no longer folds the far edge). 0: the whole body (v2.23)
+    var leanAmp: Double = 0.28        // the lean's bulge toward the finger (× radius); 0.16 before
+    var leanMove: Double = 0.11       // the whole body shifts toward the finger and back during the lean (× radius); 0: v2.23
+    var nuzAmp: Double = 0.12         // nuzzling sway (× radius); 0.05 before
+    var gazeAmp: Double = 0.18        // how far the whole face slides when it looks at something (× radius); 0.06 before
+    var dodge: Double = 0.22          // the face slides out from under a nearby finger (× radius); 0: v2.23
+    var rubSpeed: Double = 12         // rubbing up to this many cm a second counts as gentle; 0: v2.23 (2R a second, about 2.9 cm, ordinary rubbing got nothing)
+    var tickRev: Double = 6           // turns within a second that make a tickle (3 trips a second); 4 before (rubbing to and fro set it off)
+    var tickSeg: Double = 48          // a leg longer than this (points, about 8 mm) is rubbing, not tickling; 0: any length (v2.23)
+    var tickFree: Double = 6          // seconds of tickling before it breaks free, protesting the last 2; 3 before
+    var reachV: Double = 1            // only a straight pull adds the strip out to the boundary, rubbing does not; 0: at 0.12R (v2.23, the outline folded while rubbing)
     var introSwim: Double = 1         // the cold start (and a slime switch): it swims in from off the right edge, looks at you, waves, says hello. 0: the v2.17 hops
     // v2.23 personality (set by the chosen slime, see SlimeKind): rest length, voice pitch, eye size, how fast trust and wariness grow, how soon it visits
     var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
@@ -241,6 +255,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     /// v2.7 control (before the build 46 device report): the starfish shape with five tentacles, travelling-wave wriggle,
     /// plain breathing; clay elastic for 0.2 s, tips spring back, 33 s to forget
     func applyV27(_ p: inout FeelParams) {
+        p.off24()
         p.morph = 0; p.tentMem = 0
         p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0   // nothing of v2.20 to v2.22
         p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
@@ -338,8 +353,9 @@ struct Candidate: Identifiable {
         Candidate(id: 33, name: "33 家 0.46H", hint: "身體的家往下 6%") { p, _ in p.homeFrac = 0.46 },
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
-            p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
+            p.off24(); p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
         Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 223, name: "v2.23 對照（身體小、反應小、揉沒反應）", hint: "身體 0.22、抓著時畫面會滑、縮傾蹭看都小、揉要很慢才有反應、來回揉會逃") { p, _ in p.off24() },
         Candidate(id: 222, name: "v2.22 對照（沒眼睛、舊黏液、不睡、不回節奏、跳過來）", hint: "v2.23 的五樣一起關") { p, _ in p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0 },
         Candidate(id: 221, name: "v2.21 對照（不出聲、沒有黏液）", hint: "沒有 E1 到 E4、沒有黏液") { p, _ in p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
         Candidate(id: 220, name: "v2.20 對照（整團只跟三成五）", hint: "單指拉只有三成五跟過去，果凍拉 1.6R 就頂住") { p, _ in p.slide = 0 },
@@ -351,6 +367,14 @@ struct Candidate: Identifiable {
 }
 
 /// One tunable slider in the hidden panel (prototype's `F`).
+extension FeelParams {
+    /// v2.24 off: the body, the camera, the reactions to the finger and the rub thresholds back to v2.23 (the older controls stack on this)
+    mutating func off24() {
+        bodySize = 0.22; followZone = 0.8; flinchAmp = 0.05; camFill = 0.7; camPad = 0.35; camGrip = 0; pressLocal = 0; leanMove = 0; leanAmp = 0.16; nuzAmp = 0.05
+        gazeAmp = 0.06; dodge = 0; rubSpeed = 0; tickRev = 4; tickSeg = 0; tickFree = 3; reachV = 0
+    }
+}
+
 struct TuneField: Identifiable {
     let key: WritableKeyPath<FeelParams, Double>
     let name: String
@@ -370,7 +394,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.dentSize, name: "凹痕大小（×半徑）", hint: "凹痕最大半徑", range: 0.1...0.5, step: 0.01),
         TuneField(key: \.intro, name: "開場跑過來", hint: "1：冷啟動時從遠處一跳一跳跑過來（約 2.8 秒），途中碰一下就直接到家；0 關（v2.17）", range: 0...1, step: 1),
         TuneField(key: \.camFollow, name: "鏡頭跟著走", hint: "1：史萊姆走離中心就慢慢跟過去，它可以跑出畫面；抓著時鏡頭不動。0 是 v2.16（鏡頭釘在家）", range: 0...1, step: 1),
-        TuneField(key: \.followZone, name: "鏡頭開始追（×半個畫面）", hint: "史萊姆中心離平常位置多遠鏡頭才開始追；0.8＝快出畫面（v2.18），v2.17 是 0.5", range: 0.1...1, step: 0.05),
+        TuneField(key: \.followZone, name: "鏡頭開始追（×半個畫面）", hint: "史萊姆中心離平常位置多遠鏡頭才開始追；0.65 是 v2.24（身體變大），0.8 是 v2.18，v2.17 是 0.5", range: 0.1...1, step: 0.05),
         TuneField(key: \.followStop, name: "鏡頭追到哪停（×半個畫面）", hint: "追到史萊姆離平常位置這麼近就停，不再拉回正中間（v2.18 0.35；v2.17 是 0.06）", range: 0.02...0.8, step: 0.01),
         TuneField(key: \.emo, name: "情緒", hint: "1：舒服會攤軟呼嚕、開心會搖偽足小跳、被拉扯想逃、連戳會閃開；0 關（v2.18）", range: 0...1, step: 1),
         TuneField(key: \.flee, name: "逃多遠", hint: "被拉扯放手後衝出去的距離倍數（1＝半個到 0.8 個畫面寬，拉越久越遠）", range: 0...2, step: 0.1),
@@ -395,10 +419,19 @@ struct TuneField: Identifiable {
         TuneField(key: \.eyes, name: "眼睛 v2.23", hint: "1：兩顆小眼睛（多米 11-02：加表情看看，只要眼睛）。看你的手指、會眨眼；被捏瞇起來、猛扯擠成 > <、呼嚕和開心彎成 ∩、睡著閉成 ∪、戒的時候睜大；0 回沒有臉", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.sleep, name: "B2 睡著", hint: "1：40 秒沒人碰（含點空白處），休息時慢慢閉眼睡著：呼吸慢、深一點、攤軟、不走；碰它嚇醒（縮大一點、「嗯？」），手指放旁邊 1.2 秒慢慢醒；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.echo, name: "C6 照你的節奏回你", hint: "1：在空白處用固定節奏點 2 到 8 下（間隔 0.12 到 1.2 秒），停下來後它照同樣的次數和節奏一縮一縮回你（每下「噗」、輕震）；你再點一樣的節奏，它開心；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.leanAmp, name: "傾一下的幅度（×半徑）", hint: "點它、按著時朝手指傾的鼓包有多大；v2.24 0.28，v2.23 0.16", range: 0...0.5, step: 0.01, section: "活物感"),
+        TuneField(key: \.leanMove, name: "傾的時候整團靠過去（×半徑）", hint: "傾一下時整團往手指挪多少再回來；v2.24 0.11，0 回 v2.23", range: 0...0.3, step: 0.01, section: "活物感"),
+        TuneField(key: \.nuzAmp, name: "蹭的幅度（×半徑）", hint: "手指放著不動時它左右蹭多少；v2.24 0.12，v2.23 0.05", range: 0...0.25, step: 0.01, section: "活物感"),
+        TuneField(key: \.gazeAmp, name: "看的幅度（×半徑）", hint: "看東西時整張臉在身上滑多少；v2.24 0.18，v2.23 0.06", range: 0...0.3, step: 0.01, section: "活物感"),
+        TuneField(key: \.dodge, name: "臉躲手指（×半徑）", hint: "手指靠近臉時整張臉滑開多少，不被手指蓋住；0 關（v2.23）", range: 0...0.4, step: 0.01, section: "活物感"),
+        TuneField(key: \.rubSpeed, name: "揉的速度上限（公分／秒）", hint: "手指每秒幾公分以內都算舒服的揉（v2.24 12）；0 回 v2.23（約 2.9 公分，一般手速的揉沒反應）", range: 0...30, step: 1, section: "活物感"),
+        TuneField(key: \.tickRev, name: "搔癢要幾次折返", hint: "1 秒內手指折返幾次算搔癢；v2.24 6（一秒 3 趟），v2.23 4", range: 2...12, step: 1, section: "活物感"),
+        TuneField(key: \.tickSeg, name: "搔癢的幅度上限（點）", hint: "手指每一段超過這麼長就算揉、不算搔癢；v2.24 48（約 8 毫米）；0 不看幅度（v2.23）", range: 0...120, step: 1, section: "活物感"),
+        TuneField(key: \.tickFree, name: "撥多久掙脫（秒）", hint: "搔癢撥多久它掙脫，最後 2 秒先抗議；v2.24 6，v2.23 3", range: 1...15, step: 0.5, section: "活物感"),
         TuneField(key: \.introSwim, name: "開場游過來", hint: "1：開場從畫面右邊外面一縮一衝游進來，到家看著你、揮一下偽足、打招呼（換史萊姆時也是）；0：v2.17 從遠處跳過來", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
-        TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）", range: 0...0.15, step: 0.01, section: "活物感"),
+        TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）；v2.24 0.1，v2.23 0.05", range: 0...0.25, step: 0.01, section: "活物感"),
         TuneField(key: \.slide, name: "D1' 拉到多長開始整團走（×半徑）", hint: "v2.21 拉力：先被拉長，拉長到這附近再拉就整團被拖著走（果凍 0.6、麻糬 0.9、黏土 1.5）；兩指往兩邊拉不會被拖走、照樣拉很長；0 回 v2.20（整團只跟三成五）", range: 0...3, step: 0.1),
         TuneField(key: \.drag, name: "D1 拖著走", hint: "抓著時身體的原位跟著手指移幾成（v2.20 0.35，約 0.25 秒跟上；放手停在被拖到的地方，甩著放手再滑一小段）；0 是 v2.19（只變形不位移）", range: 0...1, step: 0.05),
         TuneField(key: \.dentFade, name: "D2 凹痕退的時間（秒）", hint: "點一下放手後凹痕多久退完（按越久越慢，按 1 秒以上 2.5 倍）；10 是 v2.19（跟回原形一起退，黏土 15 秒退一半）", range: 0.2...10, step: 0.1, section: "按壓與記形"),
@@ -447,7 +480,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住", range: 0.5...4, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.pressFlat, name: "一壓就攤平", hint: "1：從上半部往下壓時下面有看不見的桌面，壓多少扁多少；v2.12 起預設關", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.zoomMin, name: "鏡頭最遠", hint: "形狀變大時畫面自動縮小，最小縮到幾倍；0 不限制、也沒有牆（多米：鏡頭無限拉遠），1 關，v2.12 是 0.45", range: 0...1, step: 0.05, section: "按壓與記形"),
-        TuneField(key: \.camFill, name: "鏡頭留邊", hint: "抓著時形狀最多佔畫面幾成就開始退；1 貼邊（v2.12），越小留越多邊給手指繼續拉；沒碰時都貼邊", range: 0.3...1, step: 0.05, section: "按壓與記形"),
+        TuneField(key: \.camGrip, name: "手指底下不滑", hint: "1：抓著時畫面不在手指底下滑（只在拉很長時以手指為中心拉遠，放手才把形狀挪回畫面）；0：v2.23（拉開 0.5R 就對準形狀中心）", range: 0...1, step: 1, section: "按壓與記形"),
+        TuneField(key: \.camPad, name: "鏡頭框形狀的邊（×半徑）", hint: "框形狀時四周多留多少；v2.24 0.2，v2.23 0.35", range: 0.05...0.5, step: 0.01, section: "按壓與記形"),
+        TuneField(key: \.pressLocal, name: "只按時手指附近才記形", hint: "1：手指還沒拖開時只有手指附近記形（按久了對面的邊不會折）；0：整團都記（v2.23）", range: 0...1, step: 1, section: "按壓與記形"),
+        TuneField(key: \.reachV, name: "揉的時候不補抓", hint: "1：直直往外拉才把外圈帶出去，揉的時候不會；0：手指動 0.12R 就補抓（v2.23，揉的時候外框會折）", range: 0...1, step: 1, section: "按壓與記形"),
+        TuneField(key: \.camFill, name: "鏡頭留邊", hint: "抓著時形狀最多佔畫面幾成就開始退；1 貼邊（v2.12），越小留越多邊給手指繼續拉；沒碰時都貼邊；v2.24 0.85，v2.23 0.7", range: 0.3...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.camCenter, name: "鏡頭對準形狀", hint: "1：形狀大到要縮鏡頭、或抓著拉開時，鏡頭對準形狀中心，兩邊都留邊，再抓那一端還有地方拉（v2.15 預設）；0 對準家", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.dens, name: "點的密度", hint: "每個半徑幾個點；12（v2.13），以前 9：拉到 8R 時外圈太疏、尾端交叉。越密越吃效能，改了會重建身體", range: 6...14, step: 1, section: "按壓與記形"),
         TuneField(key: \.flatMin, name: "最扁", hint: "壓到最扁是原本高度的幾成", range: 0.15...0.8, step: 0.05, section: "按壓與記形"),
@@ -506,7 +543,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.sndPressSize, name: "按的音量跟接觸面積", hint: "指尖輕、指腹重的差多少；0 關", range: 0...1, step: 0.05, section: "聲音"),
 
         TuneField(key: \.seed, name: "外形亂數種子", hint: "換一個數字就換一個形狀（會重置）", range: 1...30, step: 1, section: "外形"),
-        TuneField(key: \.bodySize, name: "身體大小", hint: "半徑是畫面寬的幾成（會重置）；以前 0.26，0.22 留空間拉長、攤平", range: 0.15...0.3, step: 0.01, section: "外形"),
+        TuneField(key: \.bodySize, name: "身體大小", hint: "半徑是畫面寬的幾成（會重置）；0.30 是 v2.24（寬約 4 公分），0.22 是 v2.10 到 v2.23，0.26 是 v2.9 以前", range: 0.15...0.4, step: 0.01, section: "外形"),
         TuneField(key: \.limbs, name: "固定觸手數", hint: "0：沒有固定觸手的一團；5：以前的海星外形（會重置）", range: 0...5, step: 1, section: "外形"),
         TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
         TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),

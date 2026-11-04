@@ -576,7 +576,7 @@ final class SlimeView: UIView {
         // v2.23 eyes (多米 11-02: try a face, eyes only): bean eyes looking where it looks; ∩ happy, ∪ asleep, > < squeezed, a line when shut
         let ef = CGMutablePath(), el = CGMutablePath(), eli = CGMutablePath()
         if let e = rig.eyeView {
-            let S = e.size * z, ew = S * 0.082 * sqrt(e.spread), eh = S * 0.118, ox = e.gx * S * 0.06, oy = e.gy * S * 0.045
+            let S = e.size * z, ew = S * 0.082 * sqrt(e.spread), eh = S * 0.118, ox = e.lookX * S, oy = e.lookY * S
             eyeLineLayer.lineWidth = max(2.5, S * 0.034)
             for (wx, wy, sd) in [(e.lx, e.ly, -1.0), (e.rx, e.ry, 1.0)] {
                 let c = rig.toScreen(wx, wy), x = c.x + ox, y = c.y + oy

@@ -191,7 +191,7 @@ final class SlimeRig {
     // E1 voice, E2 every action answered, E3 the impression shows, E4 comes to say hello, drops
     private func iv3(_ v: Double) -> Bool { params.life2 >= 0.5 && v >= 0.5 }
     // E2: lean* = leans toward the finger (S −1: wary, away); nuz* = nuzzling; tkTimes = when the tickling finger turned back
-    private var leanT = -9.0, leanA = 0.0, leanS = 1.0, nuzT0 = -1.0, nuzO = 0.0, nuzSaid = false, tkTimes: [Double] = [], tkT = 0.0, gigNext = 0.0
+    private var leanO = 0.0, leanT = -9.0, leanA = 0.0, leanS = 1.0, nuzT0 = -1.0, nuzO = 0.0, nuzSaid = false, tkTimes: [Double] = [], tkT = 0.0, gigNext = 0.0
     // E4: wait = idle seconds before it comes this time; count = visits this run; wave = arrived and waving
     private var e4Wait = -1.0, e4Count = 0, e4On = false, e4Wave = false, e4T0 = 0.0, e4LastT = -99.0
     private var voiceLast = -9.0
@@ -267,13 +267,15 @@ final class SlimeRig {
     enum EyeMode { case open, happy, squeeze, sleep }
     private var eyeL: [Int] = [], eyeR: [Int] = [], eyeD0 = 1.0, eyeGX = 0.0, eyeGY = 0.0, eyeSacT = 0.0, eyeSX = 0.0, eyeSY = 0.0
     private var eyeUser = -9.0, eyeOpenD = 1.0, eyeWideD = 1.0, eyeBlinkT = -9.0, eyeNextBlink = 2.0, eyePulse = -9.0, eyeSqU = -9.0, eyeBlink = 1.0
+    private var eyeDX = 0.0, eyeDY = 0.0, eyeDK = 0.0   // v2.24: the face sliding out from under a finger (× eye size), and how close the finger is 0...1
     private(set) var eyeMode = EyeMode.open
-    struct EyeView { let lx, ly, rx, ry, gx, gy, open, wide, blink, size, spread: Double; let mode: EyeMode }
+    struct EyeView { let lx, ly, rx, ry, gx, gy, lookX, lookY, open, wide, blink, size, spread: Double; let mode: EyeMode }
     /// The eyes as drawn (world points): each on the mean of its 4 particles; gaze −1...1; size = R × eyeSize; spread = how far apart vs rest.
     var eyeView: EyeView? {
         guard params.eyes >= 0.5, !eyeL.isEmpty, !eyeR.isEmpty else { return nil }
         let l = eyeAt(eyeL), r = eyeAt(eyeR)
-        return EyeView(lx: l.x, ly: l.y, rx: r.x, ry: r.y, gx: eyeGX, gy: eyeGY, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
+        let ga: Double = params.gazeAmp * (1 - 0.8 * eyeDK)   // v2.24: the whole face slides on the body; the closer the finger, the less it slides toward it
+        return EyeView(lx: l.x, ly: l.y, rx: r.x, ry: r.y, gx: eyeGX, gy: eyeGY, lookX: eyeGX * ga + eyeDX, lookY: eyeGY * ga * 0.75 + eyeDY, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
                        size: R * params.eyeSize * sqrt(massD), spread: max(0.8, min(1.3, hypot(r.x - l.x, r.y - l.y) / eyeD0)), mode: eyeMode)
     }
     // B2 sleep: k eases 0...1 (1.6 s falling asleep, 0.25 s waking); lastAny = the last touch anywhere (a tap on empty space counts)
@@ -340,14 +342,18 @@ final class SlimeRig {
         introU = 1; introS0 = 1; introOX0 = 0; introOY0 = 0; introPX = homeX; introPY = y1
     }
     /// Every frame: the mood follows the hand (the most stretched grabbing finger), the purr, home while fleeing.
+    private var tickOn: Bool { Double(tkTimes.count) >= params.tickRev }   // v2.24
     private func moodStep(_ dt: Double) {
         guard params.emo >= 0.5 else { moodStrain = 0; tugX = 0; tugY = 0; purr = 0; escOn = false; return }
         var g: Finger?
         for f in fingers.values where f.mode == .grab { if g == nil || bodyStretch(f) > bodyStretch(g!) { g = f } }
         if let g {
             let st = bodyStretch(g), sp = hypot(g.vxS, g.vyS) / R   // v2.20: how far the body itself is pulled open (dragging it along is not a hard pull)
-            g.gentleT = st < 0.6 && sp < 2 ? g.gentleT + dt : max(0, g.gentleT - 2 * dt)
-            if g.gentleT > 1 { moodC = min(1, moodC + 0.35 * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5)) }
+            // v2.24 rubSpeed: the limit in real speed (60 pt a second is about 1 cm), a tickle does not count; really rubbing, comfort comes twice as fast as held still
+            let v24: Bool = params.rubSpeed > 0, spPt: Double = sp * R, rubbing: Bool = v24 && spPt > R * 0.3
+            let rubOK: Bool = v24 ? (spPt < params.rubSpeed * 60 && !tickOn) : sp < 2
+            g.gentleT = st < 0.6 && rubOK ? g.gentleT + dt * (rubbing ? 2 : 1) : max(0, g.gentleT - 2 * dt)
+            if g.gentleT > 1 { moodC = min(1, moodC + (rubbing ? 0.6 : 0.35) * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5)) }
             g.strainT = st > 1.5 ? g.strainT + dt : max(0, g.strainT - dt)
             let sv = max(0, min(1, (g.strainT - 0.5) / 1))
             moodStrain += (sv - moodStrain) * (1 - exp(-dt / 0.15)); moodStrainMax = max(moodStrainMax, moodStrain)
@@ -421,8 +427,9 @@ final class SlimeRig {
         let v = viewV, zm = camMin, ax = (W - 16) / 2 / zm, ay = (H - 210) / 2 / zm
         return (v.x - ax, v.x + ax, v.y - ay, v.y + ay)
     }
+    private var camRSt = 0.0, camRUntil = -9.0   // v2.24 camGrip: how far this grab pulled; until when a release may move the shape back in
     private func updateCam(_ dt: Double) {
-        let v = viewV, pad = R * 0.35
+        let v = viewV, pad = R * (params.camPad > 0 ? params.camPad : 0.35)
         var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
         for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]); y1 = max(y1, Y[i]) }
         let ax = (W - 16) / 2, ay = (H - 210) / 2, zm = camMin
@@ -434,6 +441,20 @@ final class SlimeRig {
         // two-finger pinch the fingers' world distance stopped shrinking and a squish went missing)
         let grabs = fingers.values.filter { $0.mode == .grab }
         let grabbingNow = !grabs.isEmpty, stMax = grabs.map(\.stretch).max() ?? 0
+        // v2.24 camGrip: untouched, the view looks at the remembered shape only, not the performance. A pseudopod reaching after a release made the
+        // shape bigger, and with the bigger body the view zoomed out and in with it (measured: pull 70 pt and let go, z under 0.95, the edge jumping 40 pt)
+        if params.camGrip >= 0.5 && !grabbingNow && !clusters.isEmpty {
+            let g = clusters[gi], gx: Double = g.xc != 0 ? g.xc : cx, gy: Double = g.yc != 0 ? g.yc : cy
+            x0 = 1e9; x1 = -1e9; y0 = 1e9; y1 = -1e9
+            for i in bnd {
+                let rx: Double = g.cs * QX[i] - g.sn * QY[i], ry: Double = g.sn * QX[i] + g.cs * QY[i]
+                x0 = min(x0, rx); x1 = max(x1, rx); y0 = min(y0, ry); y1 = max(y1, ry)
+            }
+            x0 += gx; x1 += gx; y0 += gy; y1 += gy
+        }
+        // pulled, then let go: for 1.2 s a shape too close to the screen edge is moved back in (0.45R left for the next grab; if it fits nothing moves)
+        if !grabbingNow { if camRSt > 0.25 { camRUntil = t + 1.2 }; camRSt = 0 }
+        let rc: Bool = params.camGrip >= 0.5 && !grabbingNow && t < camRUntil
         // once the shape is big enough to zoom (v2.15), keep a margin even untouched (camFill + 0.1) and centre on the shape: otherwise
         // after a release the pulled end sits on the screen edge and grabbing it again leaves nowhere to pull (measured the device
         // way, pull to the edge, let go, grab again: 5 pulls reached 5.2R). Before, the resting finger dragged out by the view did it,
@@ -447,7 +468,7 @@ final class SlimeRig {
         // v2.17 follow: untouched and not big, the view is no longer pinned at home nor forced to frame the whole body. Once the centre
         // is followZone (1 = half the view) off, chase it until close, on a critically damped spring (followSpeed 1.4: about 2 s, eased
         // start and stop). Still while grabbed: the picture must not slide under a finger
-        let follow = params.camFollow >= 0.5 && !big && !grabbingNow && !introOn && !swimOn   // v2.23: swimming in, the view holds still
+        let follow = params.camFollow >= 0.5 && !big && !grabbingNow && !introOn && !swimOn && !rc   // v2.23: swimming in, the view holds still
         // the target puts the slime back where it normally sits on screen (home cx, cy against the view centre), not dead centre;
         // the centre is the boundary mean (the centroid is still 0 on the first frame and the view thought it had run far)
         if follow, !bnd.isEmpty {
@@ -467,8 +488,21 @@ final class SlimeRig {
         let cc = (big || grabbingNow && fillK > 0) && params.camCenter >= 0.5
         let ox = cc ? (x0 + x1) / 2 : fo ? folX : v.x, oy = cc ? (y0 + y1) / 2 : fo ? folY : v.y
         let fit = !fo || big || fillK > 0   // following, frame the whole body only when big or pulled (else grabbing a half-out body slides the view)
-        let cxT = fit ? clampC(ox, x1 + pad - hx, x0 - pad + hx) : ox, cyT = fit ? clampC(oy, y1 + pad - hy, y0 - pad + hy) : oy
+        var cxT = fit ? clampC(ox, x1 + pad - hx, x0 - pad + hx) : ox, cyT = fit ? clampC(oy, y1 + pad - hy, y0 - pad + hy) : oy
+        if rc && !big { let m: Double = R * 0.45; cxT = clampC(camX, x1 + m - hx, x0 - m + hx); cyT = clampC(camY, y1 + m - hy, y0 - m + hy) }
         let k = follow ? 1 : 1 - exp(-dt / 0.35), kz = 1 - exp(-dt / 0.35)
+        // v2.24 camGrip (measured on v2.23: pull 70 pt and hold, the view centred on the shape and the held patch ended 79 pt from the finger; pull 300 pt down, 145 pt):
+        // while grabbed the view does not pan, it only zooms out about the finger when the shape no longer fits, so the point under the finger stays under it
+        if params.camGrip >= 0.5 && grabbingNow {
+            let z0 = camZ; camZ += (zt - camZ) * kz
+            var sx = 0.0, sy = 0.0
+            for f in grabs { sx += f.rawX; sy += f.rawY }
+            sx /= Double(grabs.count); sy /= Double(grabs.count)
+            let r: Double = z0 / camZ
+            camX = sx - (sx - camX) * r; camY = sy - (sy - camY) * r
+            camRSt = max(camRSt, stMax)
+            return
+        }
         camZ += (zt - camZ) * kz; camX += (cxT - camX) * k; camY += (cyT - camY) * k
     }   // press flat: pressing now, table height, remembered bottom below the centroid
     private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
@@ -490,6 +524,7 @@ final class SlimeRig {
         var ex = 0.0, ey = 0.0, sb = -1.0            // v2.20: the limited stretch vector; how far the body itself is pulled open (minus what followed), −1 = not yet
         var lure = false, edge = 0.0                 // v2.20 C1 C2: landed on empty space (left to lureStep); distance to the body's edge
         var tkA: Double?, pushed2 = false            // v2.22 E2: last heading (tickle turns), pushed back once
+        var tkP = 0.0, far = false, reachN: Int?     // v2.24: travel since the last turn (tickle or rub); moved off its spot (0.15R, it is no longer just a press); mem count before the reach strip
         var saidProt = false, saidPurr = false       // v2.22 E1: protested / hummed once this grab
         var dragMax = 0.0, dropsMade = 0             // v2.22: how far this grab dragged it (E3); drops it has pulled off
         var yank = false                             // v2.23: yanked (pulled open 1.2R at 5R/s): a drop flies off when it stops
@@ -596,7 +631,7 @@ final class SlimeRig {
 
     func setup(width: Double, height: Double) {
         W = width; H = height
-        R = max(60, min(W * params.bodySize, H * 0.14, 160))   // bodySize: 0.26 before v2.9; smaller leaves room to pull and spread
+        R = max(60, min(W * params.bodySize, H * 0.18, 160))   // bodySize: 0.26 before v2.9, 0.22 v2.10 to v2.23, 0.30 v2.24 (about 4 cm wide; a finger is 1.6 to 2 cm)
         cx = W / 2
         defineShape()
 
@@ -731,7 +766,7 @@ final class SlimeRig {
         // later tests leaned with it, a 3 s press moved 61 pt instead of 30)
         dragOX = 0; dragOY = 0; dragVX = 0; dragVY = 0; dragBX = 0; dragBY = 0; dragGX = 0; dragGY = 0; dragSlipT = 0; lureOn = false; lureSn = -1; askOn = false
         drops = []; mass = 1; massD = 1; lifeDrop = nil; e4On = false; e4Wait = -1   // v2.22
-        leanT = -9; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0
+        leanT = -9; leanO = 0; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0; camRSt = 0; camRUntil = -9
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false; dropLast = -99
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
@@ -924,7 +959,16 @@ final class SlimeRig {
     /// boundary (a bigger radius) only moved the whole body
     private func reachGrab(_ f: Finger) {
         let mx = f.rawX - f.ax, my = f.rawY - f.ay, ml = hypot(mx, my)
-        guard ml >= R * 0.12, !f.mem.isEmpty else { return }
+        guard !f.mem.isEmpty else { return }
+        // v2.24 reachV: rubbing the finger keeps circling; at 0.12R a strip with boundary points got pinned to it and the outline folded (measured 43°, 14° at rest).
+        // Now only a straight pull outward adds the strip (moving within 25° of the way it has moved, 0.5R out), past 0.8R always; back within 0.25R of the start it lets go
+        if params.reachV >= 0.5 {
+            let vl: Double = hypot(f.vxS, f.vyS), c: Double = vl > R * 0.2 && ml > 1e-6 ? (mx * f.vxS + my * f.vyS) / (ml * vl) : 0
+            guard ml > R * 0.8 || (ml > R * 0.5 && c > 0.9) else { return }
+            f.reachN = f.mem.count
+        } else {
+            guard ml >= R * 0.12 else { return }
+        }
         f.reach = false
         let ux = mx / ml, uy = my / ml
         var cx = 0.0, cy = 0.0
@@ -1202,7 +1246,13 @@ final class SlimeRig {
         for (id, f) in fingers where f.sticking && t >= f.releaseAt { release(id, quiet: false) }
 
         updateCam(dt)
-        for f in fingers.values where f.reach && f.mode == .grab { reachGrab(f) }
+        for f in fingers.values where f.mode == .grab {
+            if f.reach { reachGrab(f) }
+            else if let n = f.reachN, n <= f.mem.count, hypot(f.rawX - f.ax, f.rawY - f.ay) < R * 0.25 {   // v2.24: back near the start, the strip lets go
+                for k in n..<f.mem.count { GRAB[f.mem[k].i] = false }
+                f.mem.removeLast(f.mem.count - n); f.reachN = nil; f.reach = true
+            }
+        }
         pressSum = 0
         if mat.press2 >= 0.5 {
             // v2.16 (多米: the press looked like a toy): 60% in 40 ms, the rest by the material (pressSink); held longer it gets
@@ -1508,7 +1558,12 @@ final class SlimeRig {
                 let ga = atan2(clusters[gi].sn, clusters[gi].cs), rm = reduceMotion ? 0.5 : 1.0, u = t - leanT
                 if u > 0 && u < 0.7 {
                     let e = sin(.pi * u / 0.7), a = leanA - ga + (leanS < 0 ? .pi : 0)
-                    podE.append((cos(a), sin(a), R * 0.16 * e * rm, 0.9, 0))
+                    podE.append((cos(a), sin(a), R * mat.leanAmp * e * rm, 0.9, 0))
+                }
+                do {   // v2.24: the whole body shifts toward the finger and back (the bulge alone only adds 0.07R at the edge)
+                    let env: Double = u > 0 && u < 0.7 ? sin(Double.pi * u / 0.7) : 0, way: Double = leanS < 0 ? -1 : 1
+                    let tg: Double = R * mat.leanMove * env * rm * way, dO: Double = tg - leanO
+                    if dO != 0 { moveHome(cos(leanA) * dO, sin(leanA) * dO, dt); leanO = tg }
                 }
                 if let g = firstGrab(), impWary > 0.4, moodStrain < 0.02 {
                     let aw = atan2(clusters[gi].yc - g.fy, clusters[gi].xc - g.fx) - ga, am = R * 0.3 * min(1, (impWary - 0.4) / 0.4) * rm
@@ -2048,7 +2103,12 @@ final class SlimeRig {
                 let x = max(0, min(1, (t - f.tDown - lo) / (hi - lo)))
                 g = max(g, x * x * (3 - 2 * x))
             }
-            let yl = mat.yield * R, kc = min(1, mat.creep * dt * g)
+            let yl = mat.yield * R, kc: Double = min(1, mat.creep * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
+            // v2.24 pressLocal: while the finger has not moved off (0.15R) only the part near it remembers. With the whole body remembering, holding still wrote the
+            // small shape-matching errors into the far edge, a 48° corner in 4 s (in Q itself); once it moves the whole body remembers as before, pulls keep their shape
+            let plGrabs = fingers.values.filter { $0.mode == .grab }
+            for f in plGrabs where !f.far && hypot(f.rawX - f.ax, f.rawY - f.ay) > R * 0.15 { f.far = true }
+            let plOn: Bool = mat.pressLocal >= 0.5 && plGrabs.allSatisfy { !$0.far }, plK: Double = 1 / (0.49 * R * R)
             // v2.16: the press push is a performance, taken off before remembering (turned into rest space). Kept, clay remembered
             // the pushed shape and the next step pushed again on top: the longer the hold the wider (measured: 1.5 s moved 48 pt, was 24)
             let pf = pressField(), gcs = clusters[gi].cs, gsn = clusters[gi].sn
@@ -2060,7 +2120,9 @@ final class SlimeRig {
                     if !pf.isEmpty { let q = pressPush(pf, X[i], Y[i]); rx -= gcs * q.0 + gsn * q.1; ry -= -gsn * q.0 + gcs * q.1 }
                     let sx = usePS ? SX2[i] / GW[i] : EX[i], sy = usePS ? SY2[i] / GW[i] : EY[i], dx = rx - sx, dy = ry - sy, dl = hypot(dx, dy)
                     if dl > yl {
-                        let s = (1 - yl / dl) * kc * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
+                        var plw = 1.0
+                        if plOn { plw = 0; for f in plGrabs { let ax: Double = X[i] - f.fx, ay: Double = Y[i] - f.fy; plw = max(plw, exp(-(ax * ax + ay * ay) * plK)) } }
+                        let s: Double = (1 - yl / dl) * kc * plw * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
                         QX[i] += dx * s; QY[i] += dy * s
                         let ex = QX[i] - Q0X[i], ey = QY[i] - Q0Y[i], el = hypot(ex, ey), lim = R * mat.memMax   // clay 4R: pull long, spread flat
                         if el > lim { QX[i] = Q0X[i] + ex * lim / el; QY[i] = Q0Y[i] + ey * lim / el }
@@ -2814,18 +2876,24 @@ final class SlimeRig {
             g.pushed2 = true
             if Double.random(in: 0..<1) < 0.3 { leanT = t; leanA = atan2(dy, dx); leanS = 1; onEvent?(.nudge) }
         }
-        // tickling: the finger at 1.5R/s or more turning back by more than 120°, 4 times within a second
+        // tickling: the finger at 1.5R/s or more turning back by more than 120°, tickRev times within a second
+        // v2.24 tickSeg: a leg longer than this is rubbing, not tickling (the travel between turns: the speed is smoothed, the turn is seen late and two points would measure short)
+        g.tkP += hypot(g.vx, g.vy) * dt
         if sp > 1.5 && g.stretch < 0.6 {
             let a = atan2(g.vyS, g.vxS)
-            if let p = g.tkA, abs(atan2(sin(a - p), cos(a - p))) > 2.1 { tkTimes.append(t) }
+            if let p = g.tkA, abs(atan2(sin(a - p), cos(a - p))) > 2.1 {
+                if params.tickSeg > 0 && g.tkP > params.tickSeg { tkTimes.removeAll() } else { tkTimes.append(t) }
+                g.tkP = 0
+            }
             g.tkA = a
         }
         tkTimes.removeAll { t - $0 >= 1 }
-        let tickling = tkTimes.count >= 4
+        let tickling = tickOn
         if tickling {
             tkT += dt
-            if t >= gigNext { gigNext = t + 0.7; shkAt = -9; shkT0 = t; shkAmp = 0.45; voice("giggle") }
-            if tkT > 3 {
+            let warn: Bool = params.tickFree > 3 && tkT > params.tickFree - 2   // v2.24: the last 2 s it protests and squirms harder before it breaks free
+            if t >= gigNext { gigNext = t + 0.7; shkAt = -9; shkT0 = t; shkAmp = warn ? 0.8 : 0.45; voice(warn ? "protest" : "giggle") }
+            if tkT > params.tickFree {
                 tkT = 0; tkTimes.removeAll()
                 for m in g.mem { GRAB[m.i] = false }
                 g.mem = []; g.mode = .none; lastTouch = t; dragRelease(glide: true)
@@ -2843,7 +2911,7 @@ final class SlimeRig {
             let u = t - nuzT0 - 0.8
             if u > 0 {
                 if !nuzSaid { nuzSaid = true; voice("mmm", 0.6) }
-                let o = R * 0.05 * (reduceMotion ? 0.5 : 1) * sin(2 * .pi * 0.6 * u) * min(1, u / 0.5), d = o - nuzO
+                let o = R * params.nuzAmp * (reduceMotion ? 0.5 : 1) * sin(2 * .pi * 0.6 * u) * min(1, u / 0.5), d = o - nuzO
                 nuzO = o; moveHome(-dy / l * d, dx / l * d, dt)
             }
         } else {
@@ -3050,7 +3118,7 @@ final class SlimeRig {
             if k == 0 { eyeL = pick } else { eyeR = pick }
         }
         if !eyeL.isEmpty && !eyeR.isEmpty { let l = eyeAt(eyeL), r = eyeAt(eyeR); eyeD0 = max(1, hypot(r.x - l.x, r.y - l.y)) }
-        eyeGX = 0; eyeGY = 0; eyeSacT = 0; eyeUser = -9; eyeMode = .open; eyeOpenD = 1; eyeWideD = 1; eyeBlinkT = -9; eyePulse = -9; eyeSqU = -9; eyeBlink = 1
+        eyeDX = 0; eyeDY = 0; eyeDK = 0; eyeGX = 0; eyeGY = 0; eyeSacT = 0; eyeUser = -9; eyeMode = .open; eyeOpenD = 1; eyeWideD = 1; eyeBlinkT = -9; eyePulse = -9; eyeSqU = -9; eyeBlink = 1
     }
     /// Where it looks: a grabbing finger → a finger beside it → where you tapped the rhythm → you (straight out) → the drop it is after →
     /// where it walks → where it sniffs → glancing about by itself (45% of the glances at you).
@@ -3077,15 +3145,34 @@ final class SlimeRig {
             if t >= eyeSacT {
                 eyeSacT = t + 1.2 + Double.random(in: 0..<2.8)
                 if Double.random(in: 0..<1) < 0.45 { eyeSX = 0; eyeSY = 0 }
-                else { let a = Double.random(in: 0..<(2 * .pi)), k = 0.5 + Double.random(in: 0..<0.5); eyeSX = cos(a) * k; eyeSY = sin(a) * k * 0.7 }
+                else { let a = Double.random(in: 0..<(2 * .pi)), k = (0.5 + Double.random(in: 0..<0.5)) * (params.gazeAmp > 0.1 ? 0.5 : 1); eyeSX = cos(a) * k; eyeSY = sin(a) * k * 0.7 }   // v2.24: idle glances do not grow with gazeAmp
             }
             o = (eyeSX, eyeSY)
         }
         let kg = 1 - exp(-dt / 0.06)
         eyeGX += (o!.0 - eyeGX) * kg; eyeGY += (o!.1 - eyeGY) * kg
+        // v2.24 dodge (measured: pressing the middle, the finger covers the edge of both eyes): near a finger the whole face slides away: up as a rule (the finger comes from below,
+        // above the fingertip is in sight); over 0.2R below the fingertip (under the finger, taken as coming from the lower right) to the nearer side of the finger
+        do {
+            var tx = 0.0, ty = 0.0, dk = 0.0
+            if params.dodge > 0 {
+                for f in fingers.values where f.mode == .grab || f.mode == .push {
+                    let vx: Double = cx - f.rawX, vy: Double = cy - f.rawY, d: Double = max(1e-6, hypot(vx, vy)), kk: Double = smooth01(1 - d / (R * 0.85))
+                    if kk <= dk { continue }
+                    dk = kk
+                    var ux: Double = vx / d, uy: Double = vy / d
+                    if vy > R * 0.2 { let sd: Double = ux * 0.866 - uy * 0.5; ux = sd >= 0 ? 0.866 : -0.866; uy = sd >= 0 ? -0.5 : 0.5 }
+                    else { ux *= min(1, d / (R * 0.3)); uy = min(uy, 0) - 0.6 }
+                    let ul: Double = max(1e-6, hypot(ux, uy)), m: Double = kk * params.dodge * (reduceMotion ? 0.5 : 1)
+                    tx = ux / ul * m; ty = uy / ul * m
+                }
+            }
+            let kd: Double = 1 - exp(-dt / 0.1)
+            eyeDX += (tx - eyeDX) * kd; eyeDY += (ty - eyeDY) * kd; eyeDK += (dk - eyeDK) * kd
+        }
         if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
         let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil
-        let squeeze = moodStrain > 0.4 || tkTimes.count >= 4 || (escOn && t - escT0 < 0.5) || t < eyeSqU
+        let squeeze = moodStrain > 0.4 || tickOn || (escOn && t - escT0 < 0.5) || t < eyeSqU
         let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
         if mode != eyeMode { eyeMode = mode; if mode == .open { eyeBlinkT = t - 0.08 } }   // back to open: opening from shut
         var open = 1.0, wide = 1.0
