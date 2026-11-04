@@ -716,14 +716,14 @@
     r39.abuse = { clay: abuse('clay'), mochi: abuse('mochi'), jelly: abuse('jelly') };
     res.T39_v224 = r39; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
 
-  // T40 v2.25 F4（診斷第二節：放手 33 毫秒彈完、每秒晃 7 下）。舊項目與 T39 都關慣性（OFF25），這裡全開。F5 觸覺只在 Swift，這裡測不到。
+  // T40 v2.25 F4（診斷第二節：放手 33 毫秒彈完、每秒晃 7 下）。舊項目與 T39 都關慣性（OFF25），這裡開慣性、關 v2.26（OFF26，T41 才開）。F5 觸覺只在 Swift，這裡測不到。
   //   a 放手：抓右緣拉 1R 放手，第一下 120 毫秒以上（關掉不到 50）、放手那一幀跳動 8 點內（關掉 16 到 47）、麻糬果凍晃 3 下以上、黏土 1 秒留形不比關掉差；
   //   b 拖到一半停：整隻衝過頭 8 點以上（關掉 1 點內）、0.15 到 0.6 秒到頂；c 拉力、跟手不變（整團跟隨差 0.05R 內、手指跟被抓那塊差 3 點內）；
   //   d 猛甩放手、兩指放一指、按住放手、揉回原形：零交叉、不炸（QD 離 Q 不超過 2.5R）、放手跳動小；e 放著：QD 收回 Q、不漂；f 減少動態：不過衝；g 三種材質全開暴力玩法零交叉
   { const clock = saveClock(); Math.random = seeded(20261225); const r40 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
     const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
-    const L8 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
+    const L8 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], ...OFF26, seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
     const OFF = { inertiaHz: 0, dragSpring: 0 };
     const edgeI = (dx, dy) => { let bi = -1, bb = -1e9; for (const i of bnd) { const p = X[i] * dx + Y[i] * dy; if (p > bb) { bb = p; bi = i; } } return bi; };
     const jumpFrom = (x0, y0) => { let m = 0; for (const i of bnd) m = Math.max(m, Math.hypot(X[i] - x0[i], Y[i] - y0[i])); return m; };
@@ -797,8 +797,57 @@
 
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
+  // T41 v2.26 F6 F7（診斷第二節：手指劃過身體整團被帶走 74 到 113 點、凹痕整個在手指底下）。舊項目、T39、T40 都關（OFF26），這裡全開。
+  //   a 摸：左半劃到右外，手指滑過去（stroke），整團最多被帶 0.3R 內、放開回來 2 點內、零交叉、黏土不記形（關掉帶 0.5R 以上）；
+  //   b 拉（抓是主要動作，寧可判成抓）：邊緣往外扯、往右下拉（T36，多米 build 77 錄影的拉法）、中心往外甩、一般拖法（慢慢加速）、猛扯、兩指快拉都還是抓，拉力跟關掉差 0.05R 內；第二根手指緊接著落下，第一根摸回抓；
+  //   c 摸到一半停住變抓，接著拉得動；d 從外面劃進來是摸，慢慢推還是推；e 摸三下：2.5 秒內舒服、呼嚕、熟，不縮、不逃；
+  //   f 按著：手指外面看得到的變化比關掉多 1500 平方點以上；揉的時候凹痕還在、痕跡半秒內淡完；g 亮光跟著拉伸；h 全開暴力玩法（含一直劃過去）零交叉、留形不變
+  { const clock = saveClock(); Math.random = seeded(20261226); const r41 = {};
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
+    const L10 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
+    const OFF = OFF26, MATS = ['clay', 'mochi', 'jelly'], U = Math.SQRT1_2;
+    const go = (name, o, lx, ly, dx, dy, peak, rampT, T, full) => { L10(name, o, full); const q = sc(globalC.xc + lx * R, globalC.yc + ly * R); let x = q[0], y = q[1]; const c0x = globalC.xc, c0y = globalC.yc; ev('pointerdown', 1, x, y); const f = fingers.get(1); let first = null, pk = 0, xf = 0; const fr = Math.round(T * 60);
+      for (let i = 1; i <= fr; i++) { const vv = peak * Math.min(1, (i / 60) / rampT); x += dx * vv / 60; y += dy * vv / 60; ev('pointermove', 1, x, y); steps(1); if (!first && !f.judge) first = f.mode; pk = Math.max(pk, Math.hypot(globalC.xc - c0x, globalC.yc - c0y)); if (selfX()) xf++; }
+      const end = f.mode, mv = Math.hypot(globalC.xc - c0x, globalC.yc - c0y); ev('pointerup', 1, x, y); for (let i = 0; i < 120; i++) { steps(1); pk = Math.max(pk, Math.hypot(globalC.xc - c0x, globalC.yc - c0y)); if (selfX()) xf++; }
+      return { first, end, moveR: +(mv / R).toFixed(2), peakR: +(pk / R).toFixed(3), backPt: +Math.hypot(globalC.xc - c0x, globalC.yc - c0y).toFixed(1), crossFrames: xf, qdev: +qdev().toFixed(2) }; };
+    // a 摸
+    r41.swipe = {}; for (const k of MATS) { r41.swipe[k] = go(k, {}, -.55, 0, 1, 0, 400, .001, .52); r41.swipe[k + 'Fast'] = go(k, {}, -.55, .2, 1, 0, 1200, .001, .25); r41.swipe[k + 'Off'] = go(k, OFF, -.55, 0, 1, 0, 400, .001, .52); }
+    // b 拉
+    const pair = (name, ...a) => ({ on: go(name, {}, ...a), off: go(name, OFF, ...a) });
+    r41.pull = { edge: pair('jelly', .8, .3, 1, 0, 600, .001, .5), rb: pair('jelly', .7, .7, U, U, 590, .001, .5), center: pair('jelly', 0, 0, 1, 0, 240, .001, .4), dragSlow: pair('clay', -.5, 0, 1, 0, 600, .25, .5), yank: pair('clay', .75, .4, 1, .3, 1500, .001, .12), press: pair('mochi', -.5, 0, 1, 0, 100, .001, 1) };
+    { L10('clay', {}); const c = sc(globalC.xc, globalC.yc); let a = c[0] - R * .7, b = c[0] + R * .7; const y = c[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); const f1 = fingers.get(1), f2 = fingers.get(2); for (let i = 0; i < 30; i++) { a -= 12; b += 12; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); steps(1); } let x0 = 1e9, x1 = -1e9; for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } r41.twoFinger = { m1: f1.mode, m2: f2.mode, widthR: +((x1 - x0) / R).toFixed(2) }; ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); steps(30); }
+    { L10('clay', {}); const c = sc(globalC.xc, globalC.yc); let a = c[0] - R * .7; const y = c[1]; ev('pointerdown', 1, a, y); const f1 = fingers.get(1); for (let i = 0; i < 4; i++) { a += 8; ev('pointermove', 1, a, y); steps(1); } const m0 = f1.mode; ev('pointerdown', 2, c[0] + R * .7, y); steps(1); r41.secondFinger = { before: m0, after: f1.mode, m2: fingers.get(2).mode }; ev('pointerup', 1, a, y); ev('pointerup', 2, c[0] + R * .7, y); steps(30); }
+    // c 摸到一半停住
+    { L10('clay', {}); const q = sc(globalC.xc - R * .6, globalC.yc); let x = q[0]; ev('pointerdown', 1, x, q[1]); const f = fingers.get(1); for (let i = 0; i < 12; i++) { x += 400 / 60; ev('pointermove', 1, x, q[1]); steps(1); } const mid = f.mode, memMid = f.mem.length; steps(18); const after = f.mode, memAfter = f.mem.length, c0 = globalC.xc; for (let i = 0; i < 30; i++) { x -= 6; ev('pointermove', 1, x, q[1]); steps(1); } steps(20); r41.stopGrab = { mid, memMid, after, memAfter, movedPt: +Math.abs(globalC.xc - c0).toFixed(1) }; ev('pointerup', 1, x, q[1]); steps(30); }
+    // d 從外面
+    r41.fromOut = go('clay', {}, -1.5, 0, 1, 0, 500, .001, .7); r41.slowPush = go('clay', {}, -1.5, 0, 1, 0, 100, .001, 1.2);
+    // e 摸三下（行為全開）
+    { L10('clay', {}, true); LIFE.st = 'rest'; LIFE.until = 1e9; SLP.lastAny = t; WANDER.next = 1e9; const t0 = t, f0 = FLN.t0; let first = -1, pm = 0, cm = 0;
+      for (let s3 = 0; s3 < 3; s3++) { const q = sc(globalC.xc - R * .6, globalC.yc + R * .1); let x = q[0]; ev('pointerdown', 1, x, q[1]); for (let i = 0; i < 21; i++) { x += 400 / 60; ev('pointermove', 1, x, q[1]); steps(1); pm = Math.max(pm, PURR); cm = Math.max(cm, MOOD.c); if (first < 0 && PURR > .03) first = t - t0; } ev('pointerup', 1, x, q[1]); for (let i = 0; i < 18; i++) { steps(1); pm = Math.max(pm, PURR); if (first < 0 && PURR > .03) first = t - t0; } }
+      r41.pet = { firstPurrS: +first.toFixed(2), purrMax: +pm.toFixed(2), cMax: +cm.toFixed(2), tr: +IMP.tr.toFixed(3), esc: ESC.on, flinched: FLN.t0 !== f0 }; steps(70); r41.pet.happy = MOOD.happyT > t0; for (let i = 0; i < 60; i++) steps(1); }
+    // f 手指外面看得到多少（手指畫成寬 96、高 140 的橢圓，指尖在按的點上方 30 點）
+    const visible = (o, name) => { L10(name, o); draw(); const W2 = cv.width, H2 = cv.height, g0 = ctx.getImageData(0, 0, W2, H2).data.slice(), q = sc(globalC.xc, globalC.yc), d0 = W2 / W; ev('pointerdown', 1, q[0], q[1]); steps(30); draw(); const d1 = ctx.getImageData(0, 0, W2, H2).data; let n = 0; const st = 2; for (let y = 0; y < H2; y += st) for (let x = 0; x < W2; x += st) { const ex = (x / d0 - q[0]) / 48, ey = (y / d0 - q[1] - 40) / 70; if (ex * ex + ey * ey < 1) continue; const k = (y * W2 + x) * 4; if (Math.abs(g0[k] - d1[k]) + Math.abs(g0[k + 1] - d1[k + 1]) + Math.abs(g0[k + 2] - d1[k + 2]) > 12) n++; } ev('pointerup', 1, q[0], q[1]); steps(30); return Math.round(n * st * st / (d0 * d0)); };
+    r41.visible = { clay: visible({}, 'clay'), clayOff: visible(OFF, 'clay'), jelly: visible({}, 'jelly'), jellyOff: visible(OFF, 'jelly') };
+    { L10('clay', {}); const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(12); let x, y; for (let i = 0; i < 60; i++) { const a = i / 60 * 2 * Math.PI * 1.5; x = q[0] + R * .3 * (1 - Math.cos(a)); y = q[1] + R * .3 * Math.sin(a); ev('pointermove', 1, x, y); steps(1); } const dn = DENTS.find(o => o.f === 1); r41.rub = { dentD: dn ? +dn.d.toFixed(2) : 0, trail: TRAIL.length, mode: fingers.get(1).mode }; ev('pointerup', 1, x, y); steps(40); r41.rub.trailAfter = TRAIL.length; }
+    // g 亮光
+    { L10('clay', {}); const q = sc(X[hiIdx] - R * .05, Y[hiIdx] - R * .05); ev('pointerdown', 1, q[0], q[1]); steps(6); let x = q[0], y = q[1]; for (let i = 0; i < 30; i++) { x -= R * 1.2 * .64 / 30; y -= R * 1.2 * .77 / 30; ev('pointermove', 1, x, y); steps(1); } steps(10); const [a, b, c, d] = dentFrame(HIF), h0 = (a + d) / 2, h1 = Math.hypot((a - d) / 2, (b + c) / 2); r41.hi = { big: +(h0 + h1).toFixed(2), small: +(h0 - h1).toFixed(2) }; ev('pointerup', 1, x, y); steps(30); }
+    // h 暴力玩法、留形
+    const abuse = name => { L10(name, { drops: 0, dropsV: 0 }, true); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / (A0 * MASSD); aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
+      const c = () => sc(globalC.xc, globalC.yc); let q = c(); ev('pointerdown', 1, q[0] + R * .7, q[1]); let x = q[0] + R * .7, y = q[1]; tick(25, () => { x += R * 2.5 / 25; ev('pointermove', 1, x, y); }); tick(30); ev('pointerup', 1, x, y); tick(60);
+      q = c(); x = q[0] - R * .6; y = q[1]; ev('pointerdown', 1, x, y); tick(6, () => { x -= R * .35; y += R * .2; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(90);
+      q = c(); let a = q[0] - R * .7, b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a += R * .55 / 30; b -= R * .55 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(30); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(60);
+      q = c(); a = q[0] - R * .7; b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a -= R * 1.2 / 30; b += R * 1.2 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(20); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(90);
+      q = c(); ev('pointerdown', 1, q[0], q[1]); let th = 0; tick(240, () => { th += 2 * Math.PI * 2 * DT; ev('pointermove', 1, q[0] + 35 * Math.cos(th), q[1] + 35 * Math.sin(th)); }); ev('pointerup', 1, q[0], q[1]); tick(120);
+      for (let k = 0; k < 6; k++) { q = c(); x = q[0] - R * .8; y = q[1] + R * (k * .25 - .6); ev('pointerdown', 1, x, y); tick(24, () => { x += R * 2 / 24; y += R * .1 / 24; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(8); } tick(60);
+      return { frames: n, crossFrames: xf, aMin: +aMin.toFixed(3), aMax: +aMax.toFixed(3), endSelfX: selfX() }; };
+    r41.abuse = { clay: abuse('clay'), mochi: abuse('mochi'), jelly: abuse('jelly') };
+    const keep = o => { L10('clay', o); let bi = bnd[0]; for (const i of bnd) if (X[i] > X[bi]) bi = i; const rest = X[bi] - globalC.xc, q = sc(X[bi] - R * .1, Y[bi]); let x = q[0]; ev('pointerdown', 1, x, q[1]); steps(6); for (let i = 0; i < 15; i++) { x += R / 15; ev('pointermove', 1, x, q[1]); steps(1); } steps(30); const pre = X[bi] - globalC.xc; ev('pointerup', 1, x, q[1]); steps(120); return +((X[bi] - globalC.xc - rest) / (pre - rest)).toFixed(2); };
+    r41.keep2s = { on: keep({}), off: keep(OFF) };
+    res.T41_v226 = r41; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
+
   const L9 = res.T34_life;
-  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223, Y9 = res.T39_v224, Z0 = res.T40_v225;
+  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223, Y9 = res.T39_v224, Z0 = res.T40_v225, A1 = res.T41_v226;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -873,6 +922,15 @@
       && X8.echo.beats === 3 && X8.echo.iv.every(x => x > 0.35 && x < 0.45) && X8.echo.firstAfter > 0.9 && X8.echo.firstAfter < 1.6 && X8.echo.again === 3 && X8.echo.joy && X8.echo.single === 0
       && X8.swim.startOffR > 2 && X8.swim.arriveS > 0 && X8.swim.arriveS < 4.5 && X8.swim.helloS > 0 && X8.swim.camMoved < 5 && X8.swim.end.selfX === 0
       && X8.collect.slimes.every(q => q.mat && q.seed && q.color && q.aMin > 0.97 && q.aMax < 1.03 && q.selfX === 0) && X8.collect.impBack === 0.7 && X8.worstSelfX === 0,
+    // v2.26：見 T41 開頭的 a 到 h
+    v226: ['clay', 'mochi', 'jelly'].every(k => { const a = A1.swipe[k], q = A1.swipe[k + 'Fast'], o = A1.swipe[k + 'Off']; return a.first === 'stroke' && a.end === 'stroke' && a.peakR < .3 && a.backPt < 2 && a.crossFrames === 0 && a.qdev < 1 && q.first === 'stroke' && q.peakR < .3 && q.crossFrames === 0 && o.first === 'grab' && o.peakR > .5; })
+      && ['edge', 'rb', 'center', 'dragSlow', 'yank', 'press'].every(k => { const p = A1.pull[k]; return p.on.first === 'grab' && p.on.end === 'grab' && Math.abs(p.on.moveR - p.off.moveR) < .05 && p.on.crossFrames === 0; })
+      && A1.twoFinger.m1 === 'grab' && A1.twoFinger.m2 === 'grab' && A1.twoFinger.widthR > 3.2 && A1.secondFinger.before === 'stroke' && A1.secondFinger.after === 'grab' && A1.secondFinger.m2 === 'grab'
+      && A1.stopGrab.mid === 'stroke' && A1.stopGrab.memMid === 0 && A1.stopGrab.after === 'grab' && A1.stopGrab.memAfter > 0 && A1.stopGrab.movedPt > 40
+      && A1.fromOut.end === 'stroke' && A1.fromOut.peakR < .35 && A1.fromOut.backPt < 2 && A1.fromOut.crossFrames === 0 && A1.slowPush.end === 'push'
+      && A1.pet.firstPurrS > 0 && A1.pet.firstPurrS < 2.5 && A1.pet.purrMax > .2 && A1.pet.tr > 0 && !A1.pet.esc && !A1.pet.flinched && A1.pet.happy
+      && A1.visible.clay > A1.visible.clayOff + 1500 && A1.visible.jelly > A1.visible.jellyOff + 1500 && A1.rub.mode === 'grab' && A1.rub.dentD > .5 && A1.rub.trail > 5 && A1.rub.trailAfter === 0
+      && A1.hi.big > 1.1 && ['clay', 'mochi', 'jelly'].every(k => A1.abuse[k].crossFrames === 0 && A1.abuse[k].endSelfX === 0) && A1.keep2s.on >= A1.keep2s.off - .03,
     // v2.25：見 T40 開頭的 a 到 g
     v225: ['clay', 'mochi', 'jelly'].every(k => Z0.ring[k].firstMs > 120 && Z0.ring[k + 'Off'].firstMs < 50 && Z0.ring[k].jump < 8 && Z0.ring[k].maxV < Z0.ring[k + 'Off'].maxV / 2) && Z0.ring.mochi.swings >= 3 && Z0.ring.jelly.swings >= 3 && Z0.ring.clay.keep1s >= Z0.ring.clayOff.keep1s - .02 && Z0.ring.jellyOff.jump > 20
       && ['clay', 'mochi', 'jelly'].every(k => Z0.stop[k].overPt > 8 && Z0.stop[k].atS > .15 && Z0.stop[k].atS < .6 && Z0.stop[k].crossFrames === 0) && Z0.stop.clayOff.overPt < 1 && Z0.stop.jellyOff.overPt < 1
