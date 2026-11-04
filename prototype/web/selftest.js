@@ -38,7 +38,8 @@
   // v2.20：舊項目量的是 v2.19 的行為，一律關掉拖著走、凹痕退快、印象（跟關情緒、關活物一樣）；v2.20 在 T35 用 P0 打開（拉力 slide 0），v2.21 拉力在 T36。跑完換回來
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
-  const P1 = PRESETS.clay, OFF23 = { dropsV: 0, eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, ...OFF23 };
+  // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
+  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { dropsV: 0, eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, ...OFF23 };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -664,6 +665,57 @@
     r38.worstSelfX = worst;
     res.T38_v223 = r38; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
+  // T39 v2.24（多米 11-04：手感做到極致；.uiux/04-手感/手感診斷-暫定.md）。舊項目一律回 v2.23（OFF24），v2.24 只在這裡測，用 PSAVE（全開）。
+  //   a F1：身體 0.30；b F2：點一下縮到 0.91 以下、外緣朝手指多 0.12R 以上（鼓包加整團靠過去）、按著蹭擺幅 0.15R 以上、手指在右邊空白臉滑 0.15R 以上、按正中兩顆眼睛都不被手指蓋住；
+  //   c F3：一般手速的揉 1.7 秒內呼嚕、不搔癢、不逃；很快的小撥 1 秒內搔癢、先抗議、5.5 到 7.5 秒才掙脫；按著不動的呼嚕比揉慢；
+  //   d 揉不補抓：外圈沒有點被釘住、輪廓折角 25 度以內；從中間直直往外拉，外圈照樣跟出去；e camGrip：抓著時畫面不滑（手指跟被抓那塊差很少）、放手形狀太靠邊會挪回來；
+  //   f 留形不動：拉 1.5R 放手 2 秒還留七成五；g 三種材質暴力玩法（拉、甩、兩指擠、兩指拉、揉）零交叉、面積回來
+  { const clock = saveClock(); Math.random = seeded(20261104); const r39 = {};
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };
+    const box = () => { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); c = Math.min(c, Y[i]); d = Math.max(d, Y[i]); } return [a, b, c, d]; };
+    const kink = () => { const n = bnd.length; let m = 0; for (let k = 0; k < n; k++) { const a = bnd[(k + n - 1) % n], b = bnd[k], c = bnd[(k + 1) % n], u = Math.atan2(Y[b] - Y[a], X[b] - X[a]), w = Math.atan2(Y[c] - Y[b], X[c] - X[b]); m = Math.max(m, Math.abs(Math.atan2(Math.sin(w - u), Math.cos(w - u)))); } return m * 180 / Math.PI; };
+    const hidden = (p, fx, fy) => { const qx = p[0] - fx, qy = p[1] - fy, u = qx * .5 + qy * .866, uc = Math.max(0, Math.min(160, u)), rr = 30 + 18 * uc / 160; return Math.hypot(qx - .5 * uc, qy - .866 * uc) < rr; };   // 手指：接觸面半徑 30 點、從右下伸過來、往後變寬到 48 點
+    const face = () => { const [lx, ly] = eyeAt(EYE.L), [rx, ry] = eyeAt(EYE.R), S = R * (mat.eyeSize || 1) * Math.sqrt(MASSD), ga = mat.gazeAmp * (1 - .8 * EYE.dk), ox = (EYE.gx * ga + EYE.dx) * S, oy = (EYE.gy * ga * .75 + EYE.dy) * S; return { l: [lx + ox, ly + oy], r: [rx + ox, ry + oy], ox, oy }; };
+    // a F1
+    L7('clay', {}); { const b = box(); r39.size = { rOverW: +(R / W).toFixed(3), widthPt: +(b[1] - b[0]).toFixed(0), z: +CAM.z.toFixed(3) }; }
+    // b F2 縮、傾（關掉放手後的探，只看傾）
+    L7('clay', { lifeAttend: 0 }); { const b0 = box(), c0 = globalC.xc; let q = sc(globalC.xc + R * .6, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(4); ev('pointerup', 1, q[0], q[1]); let sMin = 1, lean = -1e9; for (let k = 0; k < 90; k++) { steps(1); sMin = Math.min(sMin, FLN.s); if (t - E2.leanT > 0) lean = Math.max(lean, box()[1]); } r39.tap = { flinchMin: +sMin.toFixed(3), leanGainR: +((lean - b0[1]) / R).toFixed(3), voices: log.filter(x => String(x[0]).startsWith('voice.')).map(x => x[0].slice(6)) }; }
+    // 蹭：按著不動，重心上下擺幅
+    L7('clay', {}); { const q = sc(globalC.xc + R * .45, globalC.yc + R * .1); ev('pointerdown', 1, q[0], q[1]); steps(60); let a = 1e9, b = -1e9; for (let k = 0; k < 180; k++) { steps(1); a = Math.min(a, globalC.yc); b = Math.max(b, globalC.yc); } r39.nuzzleSwingR = +((b - a) / R).toFixed(3); ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // 看：手指按在右邊 2.2R 的空白處
+    L7('clay', {}); { const q = sc(globalC.xc + R * 2.2, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(60); r39.gazeR = +(face().ox / R).toFixed(3); ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // 按正中：兩顆眼睛都不被手指蓋住；關 dodge 當對照
+    for (const [nm, o] of [['on', {}], ['off', { dodge: 0, gazeAmp: .06 }]]) { L7('clay', o); const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); steps(60); const F = face(); (r39.dodge = r39.dodge || {})[nm] = { l: hidden(F.l, f.x, f.y), r: hidden(F.r, f.x, f.y), oy: +(F.oy / R).toFixed(3) }; ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // c F3 揉（kind：c 圓圈、l 來回；r 點、hz；T 秒）
+    const rub = (name, kind, r, hz, T, o = {}) => { L7(name, o); const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(6); let th = 0, tP = -1, tT = -1, tF = -1, tProt = -1, sp = 0, n = 0, mk = 0;
+      for (let k = 0; k < T * 60; k++) { th += 2 * Math.PI * hz * DT; const px = kind === 'c' ? q[0] + r * Math.cos(th) : q[0] + r * Math.sin(th), py = kind === 'c' ? q[1] + r * Math.sin(th) : q[1]; if (r > 0) ev('pointermove', 1, px, py); steps(1); const g = fingers.get(1); if (!g || g.mode !== 'grab') { tF = k * DT; break; } sp += Math.hypot(g.vxS, g.vyS); n++; mk = Math.max(mk, kink()); if (tP < 0 && PURR > .3) tP = k * DT; if (tT < 0 && tickOn()) tT = k * DT; if (tProt < 0 && log.some(x => x[0] === 'voice.protest')) tProt = k * DT; }
+      const res1 = { cmS: +(sp / Math.max(1, n) / 60).toFixed(1), purr: +tP.toFixed(2), tickle: +tT.toFixed(2), free: +tF.toFixed(2), protest: +tProt.toFixed(2), kink: +mk.toFixed(0) }; if (fingers.size) ev('pointerup', 1, q[0], q[1]); steps(4); return res1; };
+    r39.rub = { c1cm: rub('clay', 'c', 10, 1, 4), c5cm: rub('clay', 'c', 30, 1.5, 4), c12cm: rub('clay', 'c', 50, 2.5, 4), l5cm: rub('clay', 'l', 30, 3, 8), l7cm: rub('clay', 'l', 60, 2, 8), jelly: rub('jelly', 'c', 30, 1.5, 4), mochi: rub('mochi', 'c', 30, 1.5, 4), hold: rub('clay', 'c', 0, 1, 4), tickle: rub('clay', 'l', 20, 4, 9), oldRub: rub('clay', 'c', 30, 1.5, 4, { rubSpeed: 0 }) };
+    // 按著不動 4 秒：外框不折（Q 不記遠端的小誤差）；關 pressLocal 當對照
+    for (const [nm, o] of [['on', {}], ['off', { pressLocal: 0 }]]) { L7('clay', o); const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); let mk = 0; for (let k = 0; k < 240; k++) { steps(1); mk = Math.max(mk, kink()); } (r39.hold = r39.hold || {})[nm] = +mk.toFixed(0); ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // 按一下留痕還在：按 1.5 秒，手指附近的形狀記住了
+    L7('clay', {}); { const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(90); let qm = 0; for (let i = 0; i < N; i++) qm = Math.max(qm, Math.hypot(QX[i] - Q0X[i], QY[i] - Q0Y[i])); r39.pressMemPt = +qm.toFixed(1); ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // d 揉不補抓
+    for (const [nm, o] of [['on', {}], ['off', { reachV: 0 }]]) { L7('clay', o); const q = sc(globalC.xc, globalC.yc + R * .1); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); let th = 0, mk = 0; for (let k = 0; k < 180; k++) { th += 2 * Math.PI * 1.5 * DT; ev('pointermove', 1, q[0] + 30 * Math.cos(th), q[1] + 30 * Math.sin(th)); steps(1); mk = Math.max(mk, kink()); } (r39.reach = r39.reach || {})[nm] = { edgePinned: f.mem.filter(m => BIDX[m[0]] >= 0).length, kink: +mk.toFixed(0) }; ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // 從中間直直往外拉 1.5R（手指真的走得到的距離）：外圈要跟出去
+    for (const [nm, ux, uy] of [['right', 1, 0], ['up', 0, -1]]) { L7('clay', {}); const b0 = box(), cx = globalC.xc, cy = globalC.yc; let q = sc(cx, cy); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); let wx = 0; for (let k = 1; k <= 90; k++) { const a = Math.min(1, k / 45) * 1.5 * R; q = [q[0] + (cx + ux * a - f.x) * CAM.z, q[1] + (cy + uy * a - f.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (k % 3 === 0) wx = Math.max(wx, selfX()); } const b1 = box(); r39.reach[nm] = { edgeMovedR: +((ux ? b1[1] - b0[1] : b0[2] - b1[2]) / R).toFixed(2), selfX: wx }; ev('pointerup', 1, q[0], q[1]); steps(4); }
+    // e camGrip：抓右緣往右 70、90 點，往下 300 點，停 0.67 秒量手指跟被抓那塊在畫面上差多少
+    const gap = (o, dist, dx, dy) => { L7('clay', { lifeAttend: 0, ...o }); let bi = -1, bb = -1e9; for (const i of bnd) { const p = X[i] * dx + Y[i] * dy; if (p > bb) { bb = p; bi = i; } } const q0 = sc(X[bi] - dx * R * .15, Y[bi] - dy * R * .15); let x = q0[0], y = q0[1]; ev('pointerdown', 1, x, y); steps(6); const f = fingers.get(1), mem = f.mem; for (let k = 0; k < 20; k++) { x += dx * dist / 20; y += dy * dist / 20; ev('pointermove', 1, x, y); steps(1); } steps(40); let px = 0, py = 0, w = 0; for (const m of mem) { const a = m[3]; px += (X[m[0]] - m[1]) * a; py += (Y[m[0]] - m[2]) * a; w += a; } const s1 = sc(px / w, py / w), z = CAM.z; ev('pointerup', 1, x, y); steps(90); const b = box(), right = sc(b[1], b[2])[0]; return { gapPt: +Math.hypot(x - s1[0], y - s1[1]).toFixed(1), z: +z.toFixed(3), rightAfter: +right.toFixed(0) }; };
+    r39.cam = { r70: gap({}, 70, 1, 0), r90: gap({}, 90, 1, 0), d300: gap({}, 300, 0, 1), oldR100: gap({ camGrip: 0 }, 100, 1, 0), oldD300: gap({ camGrip: 0 }, 300, 0, 1) };
+    // f 留形：抓最右邊往右拉 1.5R、停 1 秒放手，量放手 2 秒還留幾成拉出來的寬度
+    L7('clay', { lifeAttend: 0 }); { const wd = () => { const b = box(); return (b[1] - b[0]) / R; }, w0 = wd(); let bi = -1; for (const i of bnd) if (bi < 0 || X[i] > X[bi]) bi = i; const sx = X[bi] - R * .15, sy = Y[bi]; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); for (let k = 1; k <= 90; k++) { const a = sx + 1.5 * R * Math.min(1, k / 30); q = [q[0] + (a - f.x) * CAM.z, q[1]]; ev('pointermove', 1, q[0], q[1]); steps(1); } const wh = wd(); ev('pointerup', 1, q[0], q[1]); steps(120); r39.keep = { heldR: +wh.toFixed(2), keep2s: +((wd() - w0) / (wh - w0)).toFixed(2) }; }
+    // g 暴力玩法
+    const abuse = name => { L7(name, {}); mat.drops = 0; mat.dropsV = 0; let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / (A0 * MASSD); aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
+      const c = () => sc(globalC.xc, globalC.yc); let q = c(); ev('pointerdown', 1, q[0] + R * .7, q[1]); let x = q[0] + R * .7, y = q[1]; tick(25, () => { x += R * 2.5 / 25; ev('pointermove', 1, x, y); }); tick(30); ev('pointerup', 1, x, y); tick(60);
+      q = c(); x = q[0] - R * .6; y = q[1]; ev('pointerdown', 1, x, y); tick(6, () => { x -= R * .35; y += R * .2; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(90);
+      q = c(); let a = q[0] - R * .7, b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a += R * .55 / 30; b -= R * .55 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(30); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(60);
+      q = c(); a = q[0] - R * .7; b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a -= R * 1.2 / 30; b += R * 1.2 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(20); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(90);
+      q = c(); ev('pointerdown', 1, q[0], q[1]); let th = 0; tick(240, () => { th += 2 * Math.PI * 2 * DT; ev('pointermove', 1, q[0] + 35 * Math.cos(th), q[1] + 35 * Math.sin(th)); }); ev('pointerup', 1, q[0], q[1]); tick(120);
+      return { frames: n, crossFrames: xf, aMin: +aMin.toFixed(3), aMax: +aMax.toFixed(3), endSelfX: selfX() }; };
+    r39.abuse = { clay: abuse('clay'), mochi: abuse('mochi'), jelly: abuse('jelly') };
+    res.T39_v224 = r39; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -694,7 +746,7 @@
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
   const L9 = res.T34_life;
-  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223;
+  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223, Y9 = res.T39_v224;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -703,7 +755,8 @@
     // 2026-11-01 多米真機回報後：黏土留痕放著約 10 秒退掉；輕按 0.1 秒留多少只記錄（T1.after2s.qdev）
     tapMarkGone: res.T1_tap.after12s.qdev < 1,
     holdLeavesMark: res.T2_hold.afterRelease1s.qdev > 3,
-    relaxClearsMark: res.T2_hold.afterRelax1s.qdev < 1,
+    // 門檻 1.5（v2.24）：T2 沒把呼吸相位歸零，掃 24 個相位量到 0.87 到 1.01，1 就壓在雜訊上（每輪長度一變就會掛）；揉回原形壞掉時是 19
+    relaxClearsMark: res.T2_hold.afterRelax1s.qdev < 1.5,
     slowReleaseStillPops: rel(res.T3_pull.sfx) > 0.7,
     flickPops: rel(res.T9_flick.sfx) > 0.9,
     pushMakesPressSound: res.T6_push.sfx.some(e => e[0] === 'press'),
@@ -768,6 +821,14 @@
       && X8.echo.beats === 3 && X8.echo.iv.every(x => x > 0.35 && x < 0.45) && X8.echo.firstAfter > 0.9 && X8.echo.firstAfter < 1.6 && X8.echo.again === 3 && X8.echo.joy && X8.echo.single === 0
       && X8.swim.startOffR > 2 && X8.swim.arriveS > 0 && X8.swim.arriveS < 4.5 && X8.swim.helloS > 0 && X8.swim.camMoved < 5 && X8.swim.end.selfX === 0
       && X8.collect.slimes.every(q => q.mat && q.seed && q.color && q.aMin > 0.97 && q.aMax < 1.03 && q.selfX === 0) && X8.collect.impBack === 0.7 && X8.worstSelfX === 0,
+    // v2.24：見 T39 開頭的 a 到 g
+    v224: Y9.size.rOverW > 0.29 && Y9.size.widthPt > 220 && Y9.size.z > 0.99
+      && Y9.tap.flinchMin < 0.91 && Y9.tap.leanGainR > 0.12 && Y9.nuzzleSwingR > 0.15 && Y9.gazeR > 0.15 && !Y9.dodge.on.l && !Y9.dodge.on.r
+      && [Y9.rub.c1cm, Y9.rub.c5cm, Y9.rub.c12cm, Y9.rub.l5cm, Y9.rub.l7cm, Y9.rub.jelly, Y9.rub.mochi].every(q => q.purr >= 0 && q.purr < 1.7 && q.tickle < 0 && q.free < 0) && Y9.rub.hold.purr > 1.9 && Y9.rub.oldRub.purr < 0
+      && Y9.rub.tickle.tickle >= 0 && Y9.rub.tickle.tickle < 1 && Y9.rub.tickle.free > 5.5 && Y9.rub.tickle.free < 7.5 && Y9.rub.tickle.protest > 0 && Y9.rub.tickle.protest < Y9.rub.tickle.free - 1 && Y9.rub.tickle.kink < 65
+      && Y9.reach.on.edgePinned === 0 && Y9.reach.on.kink < 25 && Y9.reach.off.edgePinned > 0 && Y9.hold.on < 25 && Y9.hold.off > 35 && Y9.pressMemPt > 3 && Y9.reach.right.edgeMovedR > 0.8 && Y9.reach.up.edgeMovedR > 0.8 && Y9.reach.right.selfX === 0 && Y9.reach.up.selfX === 0
+      && Y9.cam.r70.gapPt < 10 && Y9.cam.r70.z > 0.99 && Y9.cam.r90.gapPt < 10 && Y9.cam.d300.gapPt < 20 && Y9.cam.oldR100.gapPt > 40 && Y9.cam.r90.rightAfter < W - 8 && Y9.cam.oldD300.gapPt > 60
+      && Y9.keep.keep2s > 0.75 && ['clay', 'mochi', 'jelly'].every(k => Y9.abuse[k].crossFrames === 0 && Y9.abuse[k].endSelfX === 0),
     lifeV219: L9.idle.restFrac > 0.35 && L9.idle.restFrac < 0.65 && L9.idle.sniffs >= 4 && L9.idle.goes >= 2 && L9.idle.worstSelfX === 0 && L9.idle.areaMin > 0.97 && L9.idle.areaMax < 1.03
       && L9.held.ratio > 0.35 && L9.held.ratioOff < 0.15 && L9.held.qdev1s < L9.held.qdev1sOff + 1
       && Math.abs(L9.flinch.at05 - 1) < 0.015 && L9.flinch.at30 < 0.96 && L9.flinch.fifthOverFirst < 0.3
