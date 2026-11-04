@@ -58,6 +58,13 @@ struct TunePanel: View {
                 .font(.rounded(11, .medium))
                 .foregroundStyle(Palette.inkSoft)
 
+            // v2.25 F5 haptic ladder: tap a number, feel it, note the smallest you can feel
+            Text("觸覺階梯：點一下震一下，記下最小感覺得到哪一格")
+                .font(.rounded(11, .medium))
+                .foregroundStyle(Palette.inkSoft)
+            ladderRow("單下", continuous: false)
+            ladderRow("連續", continuous: true)
+
             Toggle(isOn: $controller.latencyTest) {
                 Text("延遲測試：按下時閃白一幀").font(.rounded(13))
             }
@@ -126,6 +133,19 @@ struct TunePanel: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(.white)
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
         .frame(maxWidth: 460)
+    }
+
+    private static let ladderSteps: [Double] = [0.03, 0.05, 0.08, 0.12, 0.2, 0.3, 0.5, 0.8]
+
+    private func ladderRow(_ label: String, continuous: Bool) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Text(label).font(.rounded(12))
+                ForEach(Self.ladderSteps, id: \.self) { v in
+                    chip(String(format: "%.2f", v)) { controller.hapticTest(v, continuous: continuous) }
+                }
+            }
+        }
     }
 
     private func chip(_ title: String, on: Bool = false, enabled: Bool = true, action: @escaping () -> Void) -> some View {

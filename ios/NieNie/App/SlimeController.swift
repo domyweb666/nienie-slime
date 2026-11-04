@@ -88,7 +88,7 @@ final class SlimeController: ObservableObject {
         case .pull(let gain, let rate):
             _ = rate   // pitch now follows the stretch inside the audio (v2 layered sound)
             sound.strand(gain: gain)
-            haptics.transient(intensity: 0.15 + 0.2 * gain, sharpness: 0.5)
+            if p.tickSpacing <= 0 { haptics.transient(intensity: 0.15 + 0.2 * gain, sharpness: 0.5) }   // v2.25: with grains the stretch is already felt
         case .release(let gain, let rate, let special):
             // special (偶發特別回彈): louder sample, one extra tap
             let g = special ? min(1, gain * 1.3) : gain
@@ -97,10 +97,14 @@ final class SlimeController: ObservableObject {
             _ = rate
             if !viaHaptics { sound.release(gain: g) }
             let s = max(0, min(1, (gain - 0.35) / 0.65))
-            haptics.pop(strength: s, count: Int(p.popCount.rounded()) + (special ? 1 : 0), gap: p.popGap, decay: p.popDecay,
+            // v2.25 F5: a gentle release one tap, a hard one the whole train; with inertia on the taps follow its swing (half a period)
+            let extra: Int = Int((max(0, p.popCount - 1) * s).rounded()), popGap: Double = p.inertiaHz > 0 ? 1 / (2 * p.inertiaHz) : p.popGap
+            haptics.pop(strength: s, count: 1 + extra + (special ? 1 : 0), gap: popGap, decay: p.popDecay,
                         sharpness: p.popSharp, minIntensity: p.popMin, maxIntensity: p.popMax, audioVolume: viaHaptics ? g : nil)
         case .tick(let gain):
-            haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp)
+            haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp + p.hapSharpStretch * rig.stretchLevel)
+        case .grain(let gain):
+            haptics.tick(intensity: p.grainMin + (p.grainMax - p.grainMin) * gain, sharpness: p.grainSharp)   // v2.25 F5
         case .tap:
             sound.press(intensity: 0.5)
             haptics.transient(intensity: 0.45, sharpness: 0.35)
@@ -125,18 +129,26 @@ final class SlimeController: ObservableObject {
         sound.frame(dt: dt, rub: rig.rubLevel() * p.rubMax, stretch: rig.pullStretch, grabbing: rig.isGrabbing)
         // continuous haptic from the deformation and/or its rate of change (提案第 12 條); with the default
         // weights (static 1, rate 0) this is the old intensity = deformation^1.5 × hapMax
-        let deformation = rig.isTouched ? rig.deformation : 0
+        let deformation = (p.hapStatic > 0 || p.hapRate > 0) && rig.isTouched ? rig.deformation : 0
         let rate = abs(deformation - lastDeformation) / max(1e-4, dt)
         lastDeformation = deformation
         rateSmoothed += (rate - rateSmoothed) * (1 - exp(-dt / 0.04))
         let level = p.hapStatic * pow(deformation, 1.5) + p.hapRate * min(1, rateSmoothed / max(0.01, p.hapRateNorm))
         // 提案第 15 條: sharpness rises when stretched, drops a little when squashing
-        haptics.updateContinuous(level: min(1, level) * p.hapMax,
-                                 sharpness: p.hapSharp + p.hapSharpStretch * rig.stretchLevel - p.hapSharpSquash * rig.squashLevel)
+        var contLevel: Double = min(1, level) * p.hapMax
+        var contSharp: Double = p.hapSharp + p.hapSharpStretch * rig.stretchLevel - p.hapSharpSquash * rig.squashLevel
+        let pk = rig.purr * p.purr
+        // v2.25 F5: the purr is the one thing left on the continuous channel: a low rumble swelling 3 times a second
+        if p.purrRoll >= 0.5 && pk > 0.05 {
+            purrPhase = (purrPhase + dt * 3).truncatingRemainder(dividingBy: 1)
+            let am: Double = 0.65 + 0.35 * sin(2 * Double.pi * purrPhase)
+            contLevel = max(contLevel, (0.12 + 0.28 * min(1, pk)) * am)
+            contSharp = 0.05
+        }
+        haptics.updateContinuous(level: contLevel, sharpness: contSharp)
         // v2.18 呼嚕: stroked gently while comfortable, two soft taps every half second, the second weaker (a purr is a slow
         // rumble; the phone can only tap). Strength from the rig's purr level × the panel's purr
-        let pk = rig.purr * p.purr
-        if pk > 0.05 {
+        if p.purrRoll < 0.5 && pk > 0.05 {
             purrClock += dt
             if purrClock >= 0.5 { purrClock = 0; purrSecond = 0.09; haptics.transient(intensity: 0.12 + 0.25 * min(1, pk), sharpness: 0.05) }
             if purrSecond > 0 { purrSecond -= dt; if purrSecond <= 0 { haptics.transient(intensity: 0.07 + 0.15 * min(1, pk), sharpness: 0.05) } }
@@ -148,10 +160,13 @@ final class SlimeController: ObservableObject {
         lastBreathBeat = rig.breathBeat
         haptics.flush()
     }
-    private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0
+    private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0, purrPhase = 0.0
     private var backgroundAt: Date?
 
     func report(_ s: SlimeView.FrameStats) { stats = s }
+
+    /// v2.25 F5 haptic ladder (panel): how faint can this phone still be felt? No public number, only the hand can answer
+    func hapticTest(_ intensity: Double, continuous: Bool) { haptics.test(intensity: intensity, continuous: continuous) }
 
     var audioBufferMs: Double { AVAudioSession.sharedInstance().ioBufferDuration * 1000 }
 

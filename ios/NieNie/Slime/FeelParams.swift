@@ -44,21 +44,28 @@ struct FeelParams: Equatable, Codable {
     var pressRadiusGain: Double = 0   // extra press spread from contact size (UITouch.majorRadius); 0 = off (第 9 條)
     // haptics (第 38 條 on the panel; candidates 12, 13, 14)
     var hapMax: Double = 0.8          // continuous haptic ceiling
-    var hapStatic: Double = 1         // continuous haptic: weight of deformation^1.5
+    var hapStatic: Double = 0         // continuous haptic: weight of deformation^1.5; 1 before v2.25 (a steady hum, stronger with the hand still)
     var hapRate: Double = 0           // continuous haptic: weight of the rate of change (candidate 0.75 with static 0.25)
     var hapRateNorm: Double = 2.5     // rate of change that counts as full, per second
     var hapSharp: Double = 0.25       // continuous haptic sharpness
-    var hapSharpStretch: Double = 0   // extra sharpness when stretched (第三批第 15 條)
+    var hapSharpStretch: Double = 0.15   // extra sharpness when stretched, grains too (第三批第 15 條); 0 before v2.25
     var popMin: Double = 0.3          // release pop intensity at zero strength
     var popMax: Double = 0.7          // release pop intensity at full strength
-    var popSharp: Double = 0.45       // release pop sharpness
-    var popCount: Double = 1          // taps per release (candidate: clay 1, mochi 2, jelly 3)
-    var popGap: Double = 0.09         // seconds between taps
-    var popDecay: Double = 0.5        // each tap is this fraction of the previous
-    var tickSpacing: Double = 0       // texture tick every N points of finger travel; 0 = off (candidate 8)
-    var tickMin: Double = 0.10        // tick intensity when the finger is slow
-    var tickMax: Double = 0.30        // tick intensity at 3 radii per second
-    var tickSharp: Double = 0.4       // tick sharpness
+    var popSharp: Double = 0.3        // release pop sharpness (v2.25: clay 0.3, mochi 0.4, jelly 0.5; 0.45 before)
+    var popCount: Double = 2          // taps per release at full strength, fewer when let go gently (v2.25: clay 2, mochi 3, jelly 4; 1 before)
+    var popGap: Double = 0.09         // seconds between taps (with inertia on they follow its swing instead: half a period)
+    var popDecay: Double = 0.35       // each tap is this fraction of the previous (v2.25: clay 0.35, mochi 0.45, jelly 0.55; 0.5 before)
+    var tickSpacing: Double = 12      // v2.25 F5: a grain every N points of finger travel; 0 = off (v2.24)
+    var tickMin: Double = 0.15        // grain intensity when the finger is slow (0.10 before v2.25)
+    var tickMax: Double = 0.35        // grain intensity at 3 radii per second (0.30 before v2.25)
+    var tickSharp: Double = 0.25      // grain sharpness (v2.25: clay 0.25, mochi 0.3, jelly 0.45; 0.4 before)
+    var tickRate: Double = 20         // v2.25 F5: at most this many grains a second (dozens a second numbs the hand)
+    var tickTense: Double = 0.6       // v2.25 F5: how much closer the grains get at full stretch (2R)
+    var pressGrain: Double = 1        // v2.25 F5: pressing in: fading grains after the landing tap, one more when the contact patch changes. 0: only the tap (v2.24)
+    var grainMin: Double = 0.08       // v2.25 F5: the faintest press grain
+    var grainMax: Double = 0.30       // v2.25 F5: the strongest press grain
+    var grainSharp: Double = 0.12     // v2.25 F5: press grain sharpness (dull, it should feel like sinking)
+    var purrRoll: Double = 1          // v2.25 F5: the purr as a low rolling rumble (continuous, 3 swells a second). 0: two taps every half second (v2.24)
     // 提案第 41 條 (2026-11-01): tentacle rungs. 0 = the v2.4 behaviour, where a tentacle pushed root-to-tip could fold over itself
     var tentRung: Double = 0.5        // the two edges of a tentacle stay on their own sides, at least this fraction of the rest width apart
     var tentAxis: Double = 0.85       // each link of a tentacle's medial axis keeps advancing by at least this fraction of its rest length
@@ -170,6 +177,13 @@ struct FeelParams: Equatable, Codable {
     var sleep: Double = 1             // B2: untouched 40 s (a tap on the empty screen counts) while resting, it falls asleep; a touch startles it awake, a finger beside it 1.2 s wakes it gently
     var echo: Double = 1              // C6: tap the empty screen 2–8 times in a rhythm (0.12–1.2 s apart); it answers with the same count and rhythm; answer it back the same and it is happy
     // v2.24 (多米 11-04: make the feel the best it can be; .uiux/04-手感/手感診斷-暫定.md): the body was 3 cm wide under a 1.6 to 2 cm finger, reactions under 1 mm, ordinary rubbing got no reaction
+    // v2.25 F4: the reference shape with inertia (measured: a release was over in 33 ms and rang 7 times a second, a very small piece of rubber)
+    var inertiaHz: Double = 3         // how many swings a second on a release, a fling, a drag that stops; 3 is about 0.17 s for the first (clay 3, mochi 2.6, jelly 3.2); 0: v2.24
+    var inertiaZ: Double = 0.3        // its damping ratio, smaller swings longer (clay 0.3, mochi 0.26, jelly 0.16); Reduce Motion at least 0.7
+    var inertiaCarry: Double = 0.6    // how much of the body's velocity at the release goes into the swing
+    var inertiaDrag: Double = 3       // a drag's acceleration pushing the reference shape the other way, more the farther from the finger; 0 off
+    var dragSpring: Double = 0.5      // the whole body follows the finger on a spring with this damping ratio (0.5 runs past by about 16%); 0: v2.24 (0.2 s smoothing, it stops dead)
+    var dragHz: Double = 1.4          // that spring's swings a second; 1.4 lags about 0.1 s
     var camGrip: Double = 1           // the picture does not slide under the finger: while grabbed the view only zooms out about the finger; moved back in after the release. 0: v2.23 (centred on the shape from 0.5R)
     var camPad: Double = 0.2          // margin around the framed shape (× radius); 0.35 before
     var pressLocal: Double = 1        // until the finger moves off its spot only the part near it remembers (holding still no longer folds the far edge). 0: the whole body (v2.23)
@@ -231,6 +245,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
                            floppy: 0.5, seed: 7)
             p.pressArea = 0.04; p.pressSpread = 0.06; p.pressSink = 0.2; p.pressBounce = 0.3   // v2.16
             p.slide = 0.6   // v2.21
+            p.inertiaHz = 3.2; p.inertiaZ = 0.16; p.tickSharp = 0.45; p.popCount = 4; p.popDecay = 0.55; p.popSharp = 0.5   // v2.25
         case .mochi:
             p = FeelParams(alpha: 0.28, damp: 0.966, yield: 0.14, creep: 0.9, recover: 0.18, grabR: 0.32, maxPull: 1.8,
                            lag: 0.08, wGlobal: 0.10, cSpace: 0.3, cRad: 0.45, upright: 0.004, anchor: 4,
@@ -238,6 +253,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
                            floppy: 0.55, seed: 7)
             p.pressArea = 0.05; p.pressSpread = 0.08; p.pressSink = 0.45; p.pressBounce = 0.6   // v2.16
             p.slide = 0.9   // v2.21
+            p.inertiaHz = 2.6; p.inertiaZ = 0.26; p.tickSharp = 0.3; p.popCount = 3; p.popDecay = 0.45; p.popSharp = 0.4   // v2.25
         case .clay:
             // clay remembers at once, tentacles too; the mark relaxes slowly: half in about 15 s (v2.14, 多米 build 59: it sprang back
             // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
@@ -355,6 +371,7 @@ struct Candidate: Identifiable {
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.off24(); p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
         Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 224, name: "v2.24 對照（放手一閃就回去、舊觸覺）", hint: "沒有參考形狀的慣性、拖到停不會衝過頭；連續觸覺跟變形量、沒有顆粒、按下去只有一下、呼嚕是兩下輕敲") { p, _ in p.off25() },
         Candidate(id: 223, name: "v2.23 對照（身體小、反應小、揉沒反應）", hint: "身體 0.22、抓著時畫面會滑、縮傾蹭看都小、揉要很慢才有反應、來回揉會逃") { p, _ in p.off24() },
         Candidate(id: 222, name: "v2.22 對照（沒眼睛、舊黏液、不睡、不回節奏、跳過來）", hint: "v2.23 的五樣一起關") { p, _ in p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0 },
         Candidate(id: 221, name: "v2.21 對照（不出聲、沒有黏液）", hint: "沒有 E1 到 E4、沒有黏液") { p, _ in p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
@@ -369,7 +386,13 @@ struct Candidate: Identifiable {
 /// One tunable slider in the hidden panel (prototype's `F`).
 extension FeelParams {
     /// v2.24 off: the body, the camera, the reactions to the finger and the rub thresholds back to v2.23 (the older controls stack on this)
+    /// v2.25 off: no inertia, the old haptics
+    mutating func off25() {
+        inertiaHz = 0; dragSpring = 0; hapStatic = 1; hapSharpStretch = 0; popCount = 1; popDecay = 0.5; popSharp = 0.45
+        tickSpacing = 0; tickMin = 0.1; tickMax = 0.3; tickSharp = 0.4; pressGrain = 0; purrRoll = 0
+    }
     mutating func off24() {
+        off25()
         bodySize = 0.22; followZone = 0.8; flinchAmp = 0.05; camFill = 0.7; camPad = 0.35; camGrip = 0; pressLocal = 0; leanMove = 0; leanAmp = 0.16; nuzAmp = 0.05
         gazeAmp = 0.06; dodge = 0; rubSpeed = 0; tickRev = 4; tickSeg = 0; tickFree = 3; reachV = 0
     }
@@ -480,6 +503,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住", range: 0.5...4, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.pressFlat, name: "一壓就攤平", hint: "1：從上半部往下壓時下面有看不見的桌面，壓多少扁多少；v2.12 起預設關", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.zoomMin, name: "鏡頭最遠", hint: "形狀變大時畫面自動縮小，最小縮到幾倍；0 不限制、也沒有牆（多米：鏡頭無限拉遠），1 關，v2.12 是 0.45", range: 0...1, step: 0.05, section: "按壓與記形"),
+        TuneField(key: \.inertiaHz, name: "回彈每秒幾下", hint: "放手、甩、拖到一半停時整團晃的快慢；3 約 0.17 秒彈完第一下；0 回 v2.24（33 毫秒彈完）", range: 0...6, step: 0.1),
+        TuneField(key: \.inertiaZ, name: "回彈阻尼比", hint: "越小晃越多下（果凍 0.16、麻糬 0.26、黏土 0.3）", range: 0.05...1, step: 0.01),
+        TuneField(key: \.inertiaCarry, name: "放手帶多少速度", hint: "放手那一刻身體相對重心的速度帶進回彈的比例", range: 0...1, step: 0.05),
+        TuneField(key: \.inertiaDrag, name: "拖動的慣性", hint: "抓著拖時整團加速度反過來推參考形狀，離手指越遠推越多；0 關", range: 0...6, step: 0.1),
+        TuneField(key: \.dragSpring, name: "拖到停會衝過頭", hint: "整團跟手指用帶慣性的彈簧（阻尼比，0.5 衝過頭約一成六，越小衝越多）；0 回 v2.24", range: 0...1, step: 0.05),
+        TuneField(key: \.dragHz, name: "整團跟上的快慢", hint: "上面那條彈簧每秒幾下", range: 0.5...4, step: 0.1),
         TuneField(key: \.camGrip, name: "手指底下不滑", hint: "1：抓著時畫面不在手指底下滑（只在拉很長時以手指為中心拉遠，放手才把形狀挪回畫面）；0：v2.23（拉開 0.5R 就對準形狀中心）", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.camPad, name: "鏡頭框形狀的邊（×半徑）", hint: "框形狀時四周多留多少；v2.24 0.2，v2.23 0.35", range: 0.05...0.5, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.pressLocal, name: "只按時手指附近才記形", hint: "1：手指還沒拖開時只有手指附近記形（按久了對面的邊不會折）；0：整團都記（v2.23）", range: 0...1, step: 1, section: "按壓與記形"),
@@ -523,10 +552,17 @@ struct TuneField: Identifiable {
         TuneField(key: \.popMin, name: "啵最輕", hint: "輕輕放手那一下", range: 0...1, step: 0.05, section: "觸覺"),
         TuneField(key: \.popMax, name: "啵最重", hint: "用力甩或拉到底放手那一下", range: 0...1, step: 0.05, section: "觸覺"),
         TuneField(key: \.popSharp, name: "啵銳利度", hint: "候選 14：黏土 0.3", range: 0...1, step: 0.05, section: "觸覺"),
-        TuneField(key: \.popCount, name: "啵幾下", hint: "候選 14：黏土 1、麻糬 2、果凍 3", range: 1...4, step: 1, section: "觸覺"),
+        TuneField(key: \.popCount, name: "啵幾下", hint: "用力放手時幾下（輕輕放手少下）；v2.25 黏土 2、麻糬 3、果凍 4，開慣性時間隔跟晃動同步", range: 1...6, step: 1, section: "觸覺"),
         TuneField(key: \.popGap, name: "啵的間隔", hint: "幾下之間隔幾秒", range: 0.03...0.3, step: 0.01, section: "觸覺"),
         TuneField(key: \.popDecay, name: "啵的衰減", hint: "每下是前一下的幾成", range: 0.1...1, step: 0.05, section: "觸覺"),
-        TuneField(key: \.tickSpacing, name: "質地微震間距", hint: "手指每走幾點一下；0 關，候選 13 是 8", range: 0...30, step: 1, section: "觸覺"),
+        TuneField(key: \.tickSpacing, name: "質地微震間距", hint: "手指每走幾點一下；v2.25 是 12；0 關", range: 0...30, step: 1, section: "觸覺"),
+        TuneField(key: \.tickRate, name: "顆粒每秒最多幾下", hint: "一秒幾十下會手麻", range: 5...40, step: 1, section: "觸覺"),
+        TuneField(key: \.tickTense, name: "拉長時顆粒變密", hint: "拉到 2R 時間距縮幾成", range: 0...0.9, step: 0.05, section: "觸覺"),
+        TuneField(key: \.pressGrain, name: "按下去的漸弱顆粒", hint: "1：第一下之後 0.3 秒內四下漸弱，接觸面積變了再一下（手機沒有力道，用時間和接觸面積代替）；0 回 v2.24", range: 0...1, step: 1, section: "觸覺"),
+        TuneField(key: \.grainMin, name: "漸弱顆粒最輕", hint: "最後一下多輕", range: 0...0.5, step: 0.01, section: "觸覺"),
+        TuneField(key: \.grainMax, name: "漸弱顆粒最重", hint: "第一下多重", range: 0...0.8, step: 0.01, section: "觸覺"),
+        TuneField(key: \.grainSharp, name: "漸弱顆粒銳利度", hint: "偏鈍才像往下陷", range: 0...1, step: 0.01, section: "觸覺"),
+        TuneField(key: \.purrRoll, name: "呼嚕用連續低頻", hint: "1：一陣一陣的低頻震動（一秒三陣）；0 回 v2.24（每 0.5 秒兩下輕敲）", range: 0...1, step: 1, section: "觸覺"),
         TuneField(key: \.tickMin, name: "微震最輕", hint: "手慢時", range: 0...0.6, step: 0.02, section: "觸覺"),
         TuneField(key: \.tickMax, name: "微震最重", hint: "手快時（每秒 3 個半徑）", range: 0...0.8, step: 0.02, section: "觸覺"),
         TuneField(key: \.tickSharp, name: "微震銳利度", hint: "顆粒偏鈍還是偏脆", range: 0...1, step: 0.05, section: "觸覺"),

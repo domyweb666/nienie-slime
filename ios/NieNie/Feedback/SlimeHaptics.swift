@@ -160,6 +160,18 @@ final class SlimeHaptics {
         ], relativeTime: time)
     }
 
+    /// v2.25 F5 haptic ladder: one tap (sharpness 0.25, like a grain) or half a second continuous (sharpness 0.05, like the purr).
+    func test(intensity: Double, continuous isContinuous: Bool) {
+        if isContinuous {
+            play([CHHapticEvent(eventType: .hapticContinuous, parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: clamp01(intensity)),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.05),
+            ], relativeTime: 0, duration: 0.5)])
+        } else {
+            play([tap(intensity: intensity, sharpness: 0.25, at: 0)])
+        }
+    }
+
     /// One-shot tap. `intensity` 0...1.
     func transient(intensity: Double, sharpness: Double) {
         play([tap(intensity: intensity, sharpness: sharpness, at: 0)])

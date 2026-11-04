@@ -7,6 +7,7 @@ enum SlimeEvent {
     case pull(gain: Double, rate: Double)    // stretched past another step
     case release(gain: Double, rate: Double, special: Bool) // let go; gain follows release strength; special = 偶發特別回彈
     case tick(gain: Double)                  // texture tick while kneading (提案第 13 條)
+    case grain(gain: Double)                 // v2.25 F5: a fading grain after pressing down, or the contact patch changing
     case squish(gain: Double)                // two grabbing fingers pinched closer (提案第 24 條)
     case tap                                 // VoiceOver / buttons
     case nudge                               // v2.20 C1: it reached your resting finger (one soft tap); v2.22 E2: it pushed back at your finger
@@ -39,6 +40,9 @@ final class SlimeRig {
     private var X: [Double] = [], Y: [Double] = [], PX: [Double] = [], PY: [Double] = []
     private var Q0X: [Double] = [], Q0Y: [Double] = []   // original rest shape (zero mean)
     private var QX: [Double] = [], QY: [Double] = []     // remembered (plastic) rest shape
+    // v2.25 F4: QD is the reference shape with inertia (the body chases QD, QD chases Q on a spring); QV its velocity; QW how much a drag's acceleration pushes each particle
+    private var QDX: [Double] = [], QDY: [Double] = [], QVX: [Double] = [], QVY: [Double] = [], QW: [Double] = []
+    private var cvX = 0.0, cvY = 0.0, caX = 0.0, caY = 0.0, cpX: Double?, cpY: Double?, tickLastT = -9.0   // centroid velocity, acceleration, last position; v2.25 F5: the last grain
     private var EX: [Double] = [], EY: [Double] = []     // rest shape with idle breathing / wriggle / drift
     private var GX: [Double] = [], GY: [Double] = [], GW: [Double] = []
     private var RX: [Double] = [], RY: [Double] = []
@@ -343,6 +347,7 @@ final class SlimeRig {
     }
     /// Every frame: the mood follows the hand (the most stretched grabbing finger), the purr, home while fleeing.
     private var tickOn: Bool { Double(tkTimes.count) >= params.tickRev }   // v2.24
+    private static let grainTimes: [Double] = [0.06, 0.13, 0.21, 0.30], grainGains: [Double] = [0.8, 0.6, 0.42, 0.28]   // v2.25 F5
     private func moodStep(_ dt: Double) {
         guard params.emo >= 0.5 else { moodStrain = 0; tugX = 0; tugY = 0; purr = 0; escOn = false; return }
         var g: Finger?
@@ -524,6 +529,7 @@ final class SlimeRig {
         var ex = 0.0, ey = 0.0, sb = -1.0            // v2.20: the limited stretch vector; how far the body itself is pulled open (minus what followed), −1 = not yet
         var lure = false, edge = 0.0                 // v2.20 C1 C2: landed on empty space (left to lureStep); distance to the body's edge
         var tkA: Double?, pushed2 = false            // v2.22 E2: last heading (tickle turns), pushed back once
+        var grainI = 0, grR = 0.0, grT = -9.0        // v2.25 F5: press grains played, contact size at the last grain, its time
         var tkP = 0.0, far = false, reachN: Int?     // v2.24: travel since the last turn (tickle or rub); moved off its spot (0.15R, it is no longer just a press); mem count before the reach strip
         var saidProt = false, saidPurr = false       // v2.22 E1: protested / hummed once this grab
         var dragMax = 0.0, dropsMade = 0             // v2.22: how far this grab dragged it (E3); drops it has pulled off
@@ -767,6 +773,7 @@ final class SlimeRig {
         dragOX = 0; dragOY = 0; dragVX = 0; dragVY = 0; dragBX = 0; dragBY = 0; dragGX = 0; dragGY = 0; dragSlipT = 0; lureOn = false; lureSn = -1; askOn = false
         drops = []; mass = 1; massD = 1; lifeDrop = nil; e4On = false; e4Wait = -1   // v2.22
         leanT = -9; leanO = 0; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0; camRSt = 0; camRUntil = -9
+        QDX = QX; QDY = QY; QVX = [Double](repeating: 0, count: N); QVY = QVX; QW = QVX; cvX = 0; cvY = 0; caX = 0; caY = 0; cpX = nil; cpY = nil; tickLastT = -9   // v2.25
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false; dropLast = -99
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
@@ -1146,8 +1153,34 @@ final class SlimeRig {
     }
 
     /// Lets a finger go. `quiet` skips the release pop (cancelled touches, a stuck finger pressed again).
+    /// v2.25 F4: at a release QD catches the body's shape as it is (minus the performance: the breathing and mood scale, the press push), so the next target is on the body
+    /// and nothing jumps; it also takes the body's velocity about its centre (inertiaCarry, at most 6R a second). From here the spring alone decides how it goes back.
+    private func inertiaCatch() {
+        guard params.inertiaHz > 0, QDX.count == N, !clusters.isEmpty else { return }
+        let g = clusters[gi], cs: Double = g.cs, sn: Double = g.sn, qcx: Double = g.qcx, qcy: Double = g.qcy
+        let det0: Double = psm.a * psm.d - psm.b * psm.c, det: Double = det0 != 0 ? det0 : 1
+        let i00: Double = psm.d / det, i01: Double = -psm.b / det, i10: Double = -psm.c / det, i11: Double = psm.a / det
+        let pf = pressField()
+        var mvx = 0.0, mvy = 0.0
+        for i in 0..<N { mvx += X[i] - PX[i]; mvy += Y[i] - PY[i] }
+        mvx /= Double(N); mvy /= Double(N)
+        let kv: Double = 240 * params.inertiaCarry, cap: Double = R * 6
+        for i in 0..<N {
+            var px: Double = X[i] - g.xc, py: Double = Y[i] - g.yc
+            if !pf.isEmpty { let q = pressPush(pf, X[i], Y[i]); px -= q.0; py -= q.1 }
+            let rx: Double = cs * px + sn * py, ry: Double = -sn * px + cs * py
+            QDX[i] = qcx + i00 * rx + i01 * ry; QDY[i] = qcy + i10 * rx + i11 * ry
+            let vx: Double = (X[i] - PX[i] - mvx) * kv, vy: Double = (Y[i] - PY[i] - mvy) * kv
+            var lx: Double = cs * vx + sn * vy, ly: Double = -sn * vx + cs * vy
+            let ms: Double = hypot(lx, ly)
+            if ms > cap { lx *= cap / ms; ly *= cap / ms }
+            QVX[i] = lx; QVY[i] = ly
+        }
+    }
+
     private func release(_ id: ObjectIdentifier, quiet: Bool) {
         guard let f = fingers.removeValue(forKey: id) else { return }
+        if f.mode == .grab { inertiaCatch() }
         for m in f.mem { GRAB[m.i] = false }
         for dn in dentList where dn.finger == id { dn.finger = nil; dn.held = t - f.tDown }   // held: how long it was pressed (D2)
         // v2.19 A4: a finger that never touched the body does not restart the fade-in; v2.20: nor one it reached by itself (lure)
@@ -1279,7 +1312,7 @@ final class SlimeRig {
                     if b >= 0.95 {
                         dn.p *= exp(-dt / 0.25); dn.v = 0
                     } else {
-                        let om = 2 * Double.pi * 5
+                        let om = 2 * Double.pi * (mat.inertiaHz > 0 ? mat.inertiaHz : 5)   // v2.25: the same beat as the release
                         dn.v += (-om * om * dn.p - 2 * b * om * dn.v) * dt; dn.p += dn.v * dt
                     }
                     dn.d *= exp(-(dn.pull ? 8 : t < relaxUntil ? 6 : max(mat.recover, 0.02, dentRate(dn))) * dt)   // v2.20 D2: the dent's own recovery
@@ -1357,15 +1390,26 @@ final class SlimeRig {
                 } else {
                     f.press += (target - f.press) * (1 - exp(-dt / max(0.005, mat.pressRise)))
                 }
-                // 提案第 13 條: texture ticks, one every `tickSpacing` points of real travel (±30%), at most two a frame
+                // v2.25 F5 grains (提案第 13 條): one every `tickSpacing` points of real travel (±30%), closer as it is stretched (tickTense), at most tickRate a second, none while the finger is still
                 if mat.tickSpacing > 0 {
-                    if f.tickNext <= 0 { f.tickNext = mat.tickSpacing; f.tickAt = f.travel }
-                    var ticks = 0
-                    while f.travel - f.tickAt >= f.tickNext && ticks < 2 {
-                        f.tickAt += f.tickNext
-                        f.tickNext = mat.tickSpacing * (0.7 + 0.6 * Double.random(in: 0..<1))
-                        ticks += 1
-                        onEvent?(.tick(gain: min(1, f.speedC / (R * 3))))
+                    let pullK: Double = min(1, f.stretch / 2), tense: Double = 1 - mat.tickTense * pullK
+                    if f.tickNext <= 0 { f.tickNext = mat.tickSpacing * tense; f.tickAt = f.travel }
+                    if f.travel - f.tickAt >= f.tickNext && f.speedC > R * 0.1 && t - tickLastT >= 1 / max(1, mat.tickRate) {
+                        f.tickAt = f.travel   // what was travelled while capped is forgiven: no burst afterwards
+                        f.tickNext = mat.tickSpacing * tense * (0.7 + 0.6 * Double.random(in: 0..<1))
+                        tickLastT = t
+                        onEvent?(.tick(gain: min(1, max(f.speedC / (R * 3), 0.5 * pullK))))
+                    }
+                }
+                // v2.25 F5 pressing in (the 3D-Press idea; a phone has no force, time and contact size stand in): after the landing tap, grains fading over 0.3 s while the finger stays put; the contact patch growing or shrinking adds one
+                // every kind of grain shares the one limit (tickLastT); a contact size that flickers on a still finger must not buzz, so at most 4 of those a second
+                if mat.pressGrain >= 0.5 && !f.far {
+                    let free: Bool = t - tickLastT >= 1 / max(1, mat.tickRate)
+                    if free && f.grainI < Self.grainTimes.count && t - f.tDown >= Self.grainTimes[f.grainI] {
+                        onEvent?(.grain(gain: Self.grainGains[f.grainI])); f.grainI += 1; tickLastT = t
+                    } else if f.radius > 0 {
+                        if f.grR <= 0 { f.grR = f.radius }
+                        if free && abs(f.radius - f.grR) >= 3 && t - f.grT > 0.25 { f.grR = f.radius; f.grT = t; tickLastT = t; onEvent?(.grain(gain: 0.5)) }
                     }
                 }
             }
@@ -1394,6 +1438,7 @@ final class SlimeRig {
                 if raw > mat.maxPull * 1.2 {
                     f.over += dt
                     if f.over >= 0.12 {
+                        inertiaCatch()
                         for m in f.mem { GRAB[m.i] = false }
                         f.mem = []; f.mode = .none; f.over = 0
                         lastTouch = t; lastReleaseStrength = 1
@@ -1649,6 +1694,28 @@ final class SlimeRig {
             ivS += (ts - ivS) * k; ivOX += (tx - ivOX) * k; ivOY += (ty - ivOY) * k
             if !introOn && abs(ivS - 1) < 1e-3 { ivS = 1; ivOX = 0; ivOY = 0 }
         }
+        // v2.25 F4 a drag's inertia: only while grabbed. The centroid's acceleration smoothed over 30 ms, at most 80R a second a second; the weight grows with the distance from the finger, 1 from 2R out
+        do {
+            let gr = fingers.values.filter { $0.mode == .grab }
+            let gx: Double = clusters.isEmpty ? 0 : clusters[gi].xc, gy: Double = clusters.isEmpty ? 0 : clusters[gi].yc
+            if mat.inertiaHz > 0 && mat.inertiaDrag > 0 && !gr.isEmpty && QW.count == N, let px = cpX, let py = cpY {
+                let kA: Double = 1 - exp(-dt / 0.03), vx: Double = (gx - px) / dt, vy: Double = (gy - py) / dt
+                let ax: Double = (vx - cvX) / dt, ay: Double = (vy - cvY) / dt
+                cvX = vx; cvY = vy; caX += (ax - caX) * kA; caY += (ay - caY) * kA
+                let al: Double = hypot(caX, caY), am: Double = R * 80
+                if al > am { caX *= am / al; caY *= am / al }
+                let r2: Double = 1 / (2 * R)
+                for i in 0..<N {
+                    var d = 1e9
+                    for f in gr { d = min(d, hypot(X[i] - f.fx, Y[i] - f.fy)) }
+                    QW[i] = GRAB[i] ? 0 : min(1, d * r2)
+                }
+            } else {
+                caX = 0; caY = 0
+                if let px = cpX, let py = cpY { cvX = (gx - px) / dt; cvY = (gy - py) / dt } else { cvX = 0; cvY = 0 }
+            }
+            cpX = gx; cpY = gy
+        }
         lastSdt = sdt
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         plasticity(dt)
@@ -1735,8 +1802,20 @@ final class SlimeRig {
             tvy = (-sa * wanderVX + ca * wanderVY) * s
         }
         let Rb = R * 0.98
+        // v2.25 F4: the body chases QD, QD chases Q on a spring (semi-implicit Euler); alpha stays, how fast the whole body swings is this spring alone. A drag's acceleration pushes QD the other way, more the farther from the finger
+        let inertiaOn: Bool = mat.inertiaHz > 0 && QDX.count == N && !clusters.isEmpty
+        if inertiaOn {
+            let w: Double = 2 * Double.pi * mat.inertiaHz, w2: Double = w * w, zz: Double = 2 * (reduceMotion ? max(mat.inertiaZ, 0.7) : mat.inertiaZ) * w
+            let g = clusters[gi], kd: Double = mat.inertiaDrag * (reduceMotion ? 0.5 : 1)
+            let fx: Double = -(g.cs * caX + g.sn * caY) * kd, fy: Double = -(-g.sn * caX + g.cs * caY) * kd
+            for i in 0..<N {
+                QVX[i] += (w2 * (QX[i] - QDX[i]) - zz * QVX[i] + fx * QW[i]) * dt
+                QVY[i] += (w2 * (QY[i] - QDY[i]) - zz * QVY[i] + fy * QW[i]) * dt
+                QDX[i] += QVX[i] * dt; QDY[i] += QVY[i] * dt
+            }
+        }
         for i in 0..<N {
-            var ex = QX[i], ey = QY[i]
+            var ex: Double = inertiaOn ? QDX[i] : QX[i], ey: Double = inertiaOn ? QDY[i] : QY[i]
             // pseudopods: a Gaussian along direction a pushes the outer ring out (the inside less, by (r/Rb)², so the whole
             // field is a smooth map), minus podShift all round so the area stays; bend swings the outer part sideways
             if !podE.isEmpty {
@@ -2693,8 +2772,16 @@ final class SlimeRig {
         dragGX = 0; dragGY = 0
         // the body has weight: it catches up in about 0.2 s, so a yank stretches it first
         let g = dragTarget(), e = 1 - exp(-dt / (params.slide > 0 ? 0.2 : 0.25))
-        let nx = dragOX + (g.x + dragBX - dragOX) * e, ny = dragOY + (g.y + dragBY - dragOY) * e
-        dragVX = (nx - dragOX) / dt; dragVY = (ny - dragOY) / dt; dragOX = nx; dragOY = ny
+        // v2.25 F4: a first-order follow stops dead with the finger and never overshoots; on a spring with inertia, drag it and stop and the whole body runs past a little and comes back
+        if params.inertiaHz > 0 && params.dragSpring > 0 {
+            let w: Double = 2 * Double.pi * params.dragHz, zz: Double = 2 * (reduceMotion ? max(params.dragSpring, 0.9) : params.dragSpring) * w
+            dragVX += (w * w * (g.x + dragBX - dragOX) - zz * dragVX) * dt
+            dragVY += (w * w * (g.y + dragBY - dragOY) - zz * dragVY) * dt
+            dragOX += dragVX * dt; dragOY += dragVY * dt
+        } else {
+            let nx = dragOX + (g.x + dragBX - dragOX) * e, ny = dragOY + (g.y + dragBY - dragOY) * e
+            dragVX = (nx - dragOX) / dt; dragVY = (ny - dragOY) / dt; dragOX = nx; dragOY = ny
+        }
         for f in fingers.values where f.mode == .grab { f.dragMax = max(f.dragMax, hypot(dragOX - dragBX, dragOY - dragBY)) }   // v2.22 E3: how far this grab led it
         for f in fingers.values where f.mode == .grab { f.sb = params.slide > 0 ? f.stretch : hypot(f.ex - (dragOX - dragBX), f.ey - (dragOY - dragBY)) / R }   // v2.21: the stretch already counts from where it followed to
         // C3: very wary, pulled open 1R or more for 1.5 s, the patch slips from the finger and it slinks off a little
@@ -2704,6 +2791,7 @@ final class SlimeRig {
             for f in fingers.values where f.mode == .grab && bodyStretch(f) > st { st = bodyStretch(f); g = f }
             dragSlipT = st > 1 ? dragSlipT + dt : 0
             if let g, dragSlipT > 1.5 {
+                inertiaCatch()
                 for m in g.mem { GRAB[m.i] = false }
                 g.mem = []; g.mode = .none; lastTouch = t; lastReleaseStrength = 0.8
                 onEvent?(.release(gain: 0.8, rate: 1.05, special: false))
@@ -2895,6 +2983,7 @@ final class SlimeRig {
             if t >= gigNext { gigNext = t + 0.7; shkAt = -9; shkT0 = t; shkAmp = warn ? 0.8 : 0.45; voice(warn ? "protest" : "giggle") }
             if tkT > params.tickFree {
                 tkT = 0; tkTimes.removeAll()
+                inertiaCatch()
                 for m in g.mem { GRAB[m.i] = false }
                 g.mem = []; g.mode = .none; lastTouch = t; dragRelease(glide: true)
                 voiceLast = -9; voice("protest")   // the giggle just before must not swallow it

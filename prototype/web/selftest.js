@@ -672,7 +672,7 @@
   //   f 留形不動：拉 1.5R 放手 2 秒還留七成五；g 三種材質暴力玩法（拉、甩、兩指擠、兩指拉、揉）零交叉、面積回來
   { const clock = saveClock(); Math.random = seeded(20261104); const r39 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };
+    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], ...OFF25, seed: 7, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };
     const box = () => { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); c = Math.min(c, Y[i]); d = Math.max(d, Y[i]); } return [a, b, c, d]; };
     const kink = () => { const n = bnd.length; let m = 0; for (let k = 0; k < n; k++) { const a = bnd[(k + n - 1) % n], b = bnd[k], c = bnd[(k + 1) % n], u = Math.atan2(Y[b] - Y[a], X[b] - X[a]), w = Math.atan2(Y[c] - Y[b], X[c] - X[b]); m = Math.max(m, Math.abs(Math.atan2(Math.sin(w - u), Math.cos(w - u)))); } return m * 180 / Math.PI; };
     const hidden = (p, fx, fy) => { const qx = p[0] - fx, qy = p[1] - fy, u = qx * .5 + qy * .866, uc = Math.max(0, Math.min(160, u)), rr = 30 + 18 * uc / 160; return Math.hypot(qx - .5 * uc, qy - .866 * uc) < rr; };   // 手指：接觸面半徑 30 點、從右下伸過來、往後變寬到 48 點
@@ -716,6 +716,58 @@
     r39.abuse = { clay: abuse('clay'), mochi: abuse('mochi'), jelly: abuse('jelly') };
     res.T39_v224 = r39; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
 
+  // T40 v2.25 F4（診斷第二節：放手 33 毫秒彈完、每秒晃 7 下）。舊項目與 T39 都關慣性（OFF25），這裡全開。F5 觸覺只在 Swift，這裡測不到。
+  //   a 放手：抓右緣拉 1R 放手，第一下 120 毫秒以上（關掉不到 50）、放手那一幀跳動 8 點內（關掉 16 到 47）、麻糬果凍晃 3 下以上、黏土 1 秒留形不比關掉差；
+  //   b 拖到一半停：整隻衝過頭 8 點以上（關掉 1 點內）、0.15 到 0.6 秒到頂；c 拉力、跟手不變（整團跟隨差 0.05R 內、手指跟被抓那塊差 3 點內）；
+  //   d 猛甩放手、兩指放一指、按住放手、揉回原形：零交叉、不炸（QD 離 Q 不超過 2.5R）、放手跳動小；e 放著：QD 收回 Q、不漂；f 減少動態：不過衝；g 三種材質全開暴力玩法零交叉
+  { const clock = saveClock(); Math.random = seeded(20261225); const r40 = {};
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
+    const L8 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
+    const OFF = { inertiaHz: 0, dragSpring: 0 };
+    const edgeI = (dx, dy) => { let bi = -1, bb = -1e9; for (const i of bnd) { const p = X[i] * dx + Y[i] * dy; if (p > bb) { bb = p; bi = i; } } return bi; };
+    const jumpFrom = (x0, y0) => { let m = 0; for (const i of bnd) m = Math.max(m, Math.hypot(X[i] - x0[i], Y[i] - y0[i])); return m; };
+    // 小步取樣（每秒 240 次）
+    const sub1 = substep; let sample = null; substep = (a, b, c, d) => { sub1(a, b, c, d); if (sample) sample(); };
+    // a 放手
+    const ring = (name, o) => { L8(name, o); const bi = edgeI(1, 0), rest = X[bi] - globalC.xc; let q = sc(X[bi] - R * .1, Y[bi]); ev('pointerdown', 1, q[0], q[1]); steps(6); let x = q[0]; for (let i = 0; i < 15; i++) { x += R / 15; ev('pointermove', 1, x, q[1]); steps(1); } steps(30);
+      const pre = X[bi] - globalC.xc, ser = [], x0 = Float64Array.from(X), y0 = Float64Array.from(Y); sample = () => ser.push(X[bi] - globalC.xc); ev('pointerup', 1, x, q[1]); steps(1); const jump = jumpFrom(x0, y0); steps(59); const at1 = X[bi] - globalC.xc; steps(60); const at2 = X[bi] - globalC.xc; sample = null;
+      let i0 = 0; for (let i = 1; i < ser.length; i++) { if (ser[i] < ser[i0]) i0 = i; if (ser[i] > ser[i0] + .8 && i > 2) break; } const ext = []; for (let i = 2; i < ser.length; i++) { const a = ser[i - 2], b = ser[i - 1], c = ser[i]; if ((b - a) * (c - b) < 0 && Math.abs(b - at2) > 1.5) ext.push(i - 1); } let maxV = 0; for (let i = 1; i < ser.length; i++) maxV = Math.max(maxV, Math.abs(ser[i] - ser[i - 1]) * 240);
+      return { firstMs: +(i0 / .24).toFixed(0), swings: ext.length, maxV: +maxV.toFixed(0), jump: +jump.toFixed(1), keep1s: +((at1 - rest) / (pre - rest)).toFixed(2) }; };
+    r40.ring = { clay: ring('clay', {}), mochi: ring('mochi', {}), jelly: ring('jelly', {}), clayOff: ring('clay', OFF), mochiOff: ring('mochi', OFF), jellyOff: ring('jelly', OFF) };
+    // b 拖到一半停
+    const stop = (name, o) => { L8(name, o); const bi = edgeI(1, 0); let q = sc(X[bi] - R * .2, Y[bi]); ev('pointerdown', 1, q[0], q[1]); steps(6); let x = q[0]; const c0 = globalC.xc, cs = []; let xf = 0; for (let i = 0; i < 99; i++) { if (i < 9) { x += 200 / 9; ev('pointermove', 1, x, q[1]); } steps(1); cs.push(globalC.xc - c0); if (selfX()) xf++; } ev('pointerup', 1, x, q[1]); steps(4); const fin = cs[cs.length - 1], pk = Math.max(...cs); return { overPt: +(pk - fin).toFixed(1), atS: +((cs.indexOf(pk) - 9) / 60).toFixed(2), crossFrames: xf }; };
+    r40.stop = { clay: stop('clay', {}), mochi: stop('mochi', {}), jelly: stop('jelly', {}), clayOff: stop('clay', OFF), jellyOff: stop('jelly', OFF) };
+    // c 拉力、跟手
+    const pull = (name, o, rr, frames) => { L8(name, o); const bi = edgeI(.707, .707); let q = sc(X[bi] - R * .1, Y[bi] - R * .1); const c0x = globalC.xc, c0y = globalC.yc; ev('pointerdown', 1, q[0], q[1]); steps(6); const f = fingers.get(1), mem = f.mem; let x = q[0], y = q[1]; const dd = rr * R * .707 / frames; for (let i = 0; i < frames; i++) { x += dd; y += dd; ev('pointermove', 1, x, y); steps(1); } steps(40); const move = Math.hypot(globalC.xc - c0x, globalC.yc - c0y) / R; let px = 0, py = 0, w = 0; for (const m of mem) { const a = m[3]; px += (X[m[0]] - m[1]) * a; py += (Y[m[0]] - m[2]) * a; w += a; } const s1 = sc(px / w, py / w); const gap = Math.hypot(x - s1[0], y - s1[1]); ev('pointerup', 1, x, y); steps(4); return { moveR: +move.toFixed(2), gap: +gap.toFixed(1) }; };
+    r40.pull = { jelly: pull('jelly', {}, 2.5, 30), jellyOff: pull('jelly', OFF, 2.5, 30), clay: pull('clay', {}, 2, 60), clayOff: pull('clay', OFF, 2, 60), mochi: pull('mochi', {}, 2, 30), mochiOff: pull('mochi', OFF, 2, 30) };
+    // d 邊緣情況
+    const qdMax = () => { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.hypot(QDX[i] - QX[i], QDY[i] - QY[i])); return m / R; };
+    const fling = name => { L8(name, {}); const bi = edgeI(-1, 0); let q = sc(X[bi] + R * .2, Y[bi]); ev('pointerdown', 1, q[0], q[1]); steps(4); let x = q[0], y = q[1]; for (let i = 0; i < 5; i++) { x -= 60; y += 30; ev('pointermove', 1, x, y); steps(1); } ev('pointerup', 1, x, y); let xf = 0, qm = 0; for (let i = 0; i < 180; i++) { steps(1); if (selfX()) xf++; qm = Math.max(qm, qdMax()); } return { crossFrames: xf, qdMaxR: +qm.toFixed(2), endSelfX: selfX() }; };
+    r40.fling = { clay: fling('clay'), mochi: fling('mochi'), jelly: fling('jelly') };
+    const twoOne = name => { L8(name, {}); let a = sc(globalC.xc - R * .7, globalC.yc), b = sc(globalC.xc + R * .7, globalC.yc); ev('pointerdown', 1, a[0], a[1]); ev('pointerdown', 2, b[0], b[1]); steps(4); let ax = a[0], bx = b[0]; for (let i = 0; i < 30; i++) { ax -= R * .8 / 30; bx += R * .8 / 30; ev('pointermove', 1, ax, a[1]); ev('pointermove', 2, bx, b[1]); steps(1); } steps(20); const x0 = Float64Array.from(X), y0 = Float64Array.from(Y); ev('pointerup', 2, bx, b[1]); steps(1); const jump = jumpFrom(x0, y0); let xf = 0; for (let i = 0; i < 90; i++) { steps(1); if (selfX()) xf++; } ev('pointerup', 1, ax, a[1]); for (let i = 0; i < 90; i++) { steps(1); if (selfX()) xf++; } return { jump: +jump.toFixed(1), crossFrames: xf }; };
+    r40.twoOne = { clay: twoOne('clay'), jelly: twoOne('jelly') };
+    const pressUp = name => { L8(name, {}); const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(60); const x0 = Float64Array.from(X), y0 = Float64Array.from(Y); ev('pointerup', 1, q[0], q[1]); steps(1); const jump = jumpFrom(x0, y0); let xf = 0; for (let i = 0; i < 120; i++) { steps(1); if (selfX()) xf++; } return { jump: +jump.toFixed(1), crossFrames: xf }; };
+    r40.press = { clay: pressUp('clay'), mochi: pressUp('mochi'), jelly: pressUp('jelly') };
+    L8('clay', {}); { const bi = edgeI(1, 0); let q = sc(X[bi] - R * .1, Y[bi]); ev('pointerdown', 1, q[0], q[1]); steps(4); let x = q[0]; for (let i = 0; i < 30; i++) { x += R * 2 / 30; ev('pointermove', 1, x, q[1]); steps(1); } ev('pointerup', 1, x, q[1]); steps(30); relax(); let xf = 0; for (let i = 0; i < 120; i++) { steps(1); if (selfX()) xf++; } r40.relax = { crossFrames: xf, qdevPt: +qdev().toFixed(1) }; }
+    // e 放著
+    L8('clay', {}); { steps(180); const q1 = qdMax(); r40.idleQdPt = +(q1 * R).toFixed(2); }
+    // f 減少動態：阻尼比至少 0.7，不過衝
+    r40.reduced = ring('jelly', { inertiaZ: .7 });
+    sample = null; substep = sub1;
+    // g 全開暴力玩法
+    const abuse = name => { L8(name, { drops: 0, dropsV: 0 }, true); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / (A0 * MASSD); aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
+      const c = () => sc(globalC.xc, globalC.yc); let q = c(); ev('pointerdown', 1, q[0] + R * .7, q[1]); let x = q[0] + R * .7, y = q[1]; tick(25, () => { x += R * 2.5 / 25; ev('pointermove', 1, x, y); }); tick(30); ev('pointerup', 1, x, y); tick(60);
+      q = c(); x = q[0] - R * .6; y = q[1]; ev('pointerdown', 1, x, y); tick(6, () => { x -= R * .35; y += R * .2; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(90);
+      q = c(); let a = q[0] - R * .7, b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a += R * .55 / 30; b -= R * .55 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(30); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(60);
+      q = c(); a = q[0] - R * .7; b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a -= R * 1.2 / 30; b += R * 1.2 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(20); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(90);
+      q = c(); ev('pointerdown', 1, q[0], q[1]); let th = 0; tick(240, () => { th += 2 * Math.PI * 2 * DT; ev('pointermove', 1, q[0] + 35 * Math.cos(th), q[1] + 35 * Math.sin(th)); }); ev('pointerup', 1, q[0], q[1]); tick(120);
+      return { frames: n, crossFrames: xf, aMin: +aMin.toFixed(3), aMax: +aMax.toFixed(3), endSelfX: selfX() }; };
+    r40.abuse = { clay: abuse('clay'), mochi: abuse('mochi'), jelly: abuse('jelly') };
+    // 放著走路 30 秒：走路是整團平移，參考形狀不該被帶歪
+    L8('jelly', { sleep: 0 }, true); LIFE.until = t + .5; { let xf = 0, qm = 0; for (let i = 0; i < 1800; i++) { steps(1); if (selfX()) xf++; qm = Math.max(qm, qdMax()); } r40.walk = { crossFrames: xf, qdMaxR: +qm.toFixed(3) }; }
+    res.T40_v225 = r40; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
+
   // T27 從身體中間往外拉（v2.14，多米 build 59：只有從邊緣才拖得動，從中間往外拉沒反應；量過右邊緣反而退 0.08R）：
   //     從重心往右、往上各拉 2R 花 1 秒、停 1 秒，量那一側外圈跟出去多少；零自交、面積回來
   { const clock = saveClock(); Math.random = seeded(20261114); const r27 = {};
@@ -746,7 +798,7 @@
   // T3 的對折幀數留著只記錄；交疊（跨群）是設計允許的，永遠只記錄
   res.KNOWN_ISSUES = { T3_compressionFoldFrames: res.T3_pull.foldFrames, T3_foldStillHeld: res.T3_pull.during.fold, T4_foldFrames: res.T4_twoFinger.foldFrames, T4_foldStillHeld: res.T4_twoFinger.during.fold, T5_foldFrames: res.T5_flail.foldFrames, T13_pinchFoldFrames: res.T13_pinch.foldFrames, T26_holdCrossFrames: res.T26_zoomUnlimited.holdCrossFrames };
   const L9 = res.T34_life;
-  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223, Y9 = res.T39_v224;
+  const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223, Y9 = res.T39_v224, Z0 = res.T40_v225;
   res.PASS = {
     // folds must be gone once the finger is off (a fold the clay remembers would be a real bug)
     noFoldAfterRelease: [res.T1_tap.after2s, res.T2_hold.afterRelease1s, res.T3_pull.after3s, res.T4_twoFinger.after3s, res.T5_flail.after3s, res.T6_push.after2s].every(s => s.fold === 0) && res.T7_idle.worstSelfX === 0,
@@ -821,6 +873,12 @@
       && X8.echo.beats === 3 && X8.echo.iv.every(x => x > 0.35 && x < 0.45) && X8.echo.firstAfter > 0.9 && X8.echo.firstAfter < 1.6 && X8.echo.again === 3 && X8.echo.joy && X8.echo.single === 0
       && X8.swim.startOffR > 2 && X8.swim.arriveS > 0 && X8.swim.arriveS < 4.5 && X8.swim.helloS > 0 && X8.swim.camMoved < 5 && X8.swim.end.selfX === 0
       && X8.collect.slimes.every(q => q.mat && q.seed && q.color && q.aMin > 0.97 && q.aMax < 1.03 && q.selfX === 0) && X8.collect.impBack === 0.7 && X8.worstSelfX === 0,
+    // v2.25：見 T40 開頭的 a 到 g
+    v225: ['clay', 'mochi', 'jelly'].every(k => Z0.ring[k].firstMs > 120 && Z0.ring[k + 'Off'].firstMs < 50 && Z0.ring[k].jump < 8 && Z0.ring[k].maxV < Z0.ring[k + 'Off'].maxV / 2) && Z0.ring.mochi.swings >= 3 && Z0.ring.jelly.swings >= 3 && Z0.ring.clay.keep1s >= Z0.ring.clayOff.keep1s - .02 && Z0.ring.jellyOff.jump > 20
+      && ['clay', 'mochi', 'jelly'].every(k => Z0.stop[k].overPt > 8 && Z0.stop[k].atS > .15 && Z0.stop[k].atS < .6 && Z0.stop[k].crossFrames === 0) && Z0.stop.clayOff.overPt < 1 && Z0.stop.jellyOff.overPt < 1
+      && ['clay', 'mochi', 'jelly'].every(k => Math.abs(Z0.pull[k].moveR - Z0.pull[k + 'Off'].moveR) < .05 && Math.abs(Z0.pull[k].gap - Z0.pull[k + 'Off'].gap) < 3)
+      && ['clay', 'mochi', 'jelly'].every(k => Z0.fling[k].crossFrames === 0 && Z0.fling[k].qdMaxR < 2.5 && Z0.fling[k].endSelfX === 0 && Z0.press[k].jump < 8 && Z0.press[k].crossFrames === 0) && Z0.twoOne.clay.crossFrames === 0 && Z0.twoOne.jelly.crossFrames === 0 && Z0.twoOne.jelly.jump < 20 && Z0.relax.crossFrames === 0 && Z0.relax.qdevPt < 5
+      && Z0.idleQdPt < .5 && Z0.reduced.swings <= 1 && ['clay', 'mochi', 'jelly'].every(k => Z0.abuse[k].crossFrames === 0 && Z0.abuse[k].endSelfX === 0) && Z0.walk.crossFrames === 0 && Z0.walk.qdMaxR < .2,
     // v2.24：見 T39 開頭的 a 到 g
     v224: Y9.size.rOverW > 0.29 && Y9.size.widthPt > 220 && Y9.size.z > 0.99
       && Y9.tap.flinchMin < 0.91 && Y9.tap.leanGainR > 0.12 && Y9.nuzzleSwingR > 0.15 && Y9.gazeR > 0.15 && !Y9.dodge.on.l && !Y9.dodge.on.r
