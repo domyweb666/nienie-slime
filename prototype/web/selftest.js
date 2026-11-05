@@ -11,6 +11,7 @@
    用 PointerEvent 模擬手指。分頁在背景時 rAF 會被節流，所以不能靠動畫迴圈。 */
 (async () => {
   const realRAF = window.requestAnimationFrame;
+  const VIEW0 = { ...VIEW }; Object.assign(VIEW, { skin: 'flat', body: 'tent', face: 0, bg: 'blue' });   // v2.28 預覽：舊項目量的是 v2.27 的畫面與外形，跑完還原
   window.requestAnimationFrame = () => 0;
   await new Promise(r => setTimeout(r, 80));
   const log = [];
@@ -1010,9 +1011,18 @@
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
     batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
   };
+  // T43 v2.28 預覽：切換列只換畫面。三種皮畫得出來、切來切去物理不變、平塗和 v2.27 同一條路徑
+  { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup(); WANDER.moving = false; WANDER.next = t + 999; steps(30);
+    const cx = globalC.xc, cy = globalC.yc, r43 = { skins: {} }, pix = () => { draw(); const d = ctx.getImageData(Math.round(cx * DPR), Math.round(cy * DPR), 1, 1).data; return [d[0], d[1], d[2]]; }, X0 = Float64Array.from(X), bg0 = (VIEW.skin = 'flat', pix());
+    for (const k of ['A', 'B', 'C', 'flat']) { VIEW.skin = k; let threw = null; try { r43.skins[k] = pix(); } catch (e) { threw = e.message; } if (threw) r43.skins[k] = threw; }
+    let dx = 0; for (let i = 0; i < N; i++) dx = Math.max(dx, Math.abs(X[i] - X0[i]));
+    r43.moved = +dx.toFixed(6); r43.flatSame = r43.skins.flat.join() === bg0.join(); r43.jelFail = JEL.fail;
+    VIEW.skin = 'flat'; res.T43_v228 = r43;
+    res.PASS.v228 = !r43.jelFail && r43.moved === 0 && r43.flatSame && ['A', 'B', 'C'].every(k => Array.isArray(r43.skins[k]) && r43.skins[k].join() !== bg0.join()); }
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
   draw();
+  Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
   if (SFX) SFX.frame = sfxFrame0;
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
