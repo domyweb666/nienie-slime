@@ -146,5 +146,19 @@
       "voice-hello-02.wav",
       "voice-hello-03.wav"
     ]
+  },
+  "prop": {
+    "pot": [
+      "prop-pot-01.wav",
+      "prop-pot-02.wav",
+      "prop-pot-03.wav",
+      "prop-pot-04.wav"
+    ],
+    "dish": [
+      "prop-dish-01.wav",
+      "prop-dish-02.wav",
+      "prop-dish-03.wav",
+      "prop-dish-04.wav"
+    ]
   }
 }

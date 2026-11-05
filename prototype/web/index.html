@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.29</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.30</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -63,7 +63,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>v2.29 <i id="v-fps" style="font-style:normal"></i></span></div>
+  <div class="brand" id="brand">捏捏<span>v2.30 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
 </div>
 
@@ -158,9 +158,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  mochi:{noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  clay: {noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  jelly:{envRoam:1,catPush:1,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  mochi:{envRoam:1,catPush:1,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  clay: {envRoam:1,catPush:1,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -172,6 +172,8 @@ const F=[
   ['grabR','抓取範圍（×半徑）','一指抓到多大一塊',.2,.8,.01],
   ['dent','點一下留凹痕','1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）',0,1,1],
   ['dentSize','凹痕大小（×半徑）','凹痕最大半徑；v2.26 0.5，手指接觸面的 1.5 到 2 倍，手指外面看得到一圈（v2.25 0.3，整個在手指底下）',.1,.9,.01],
+  ['envRoam','牠自己出門','窗台上牠自己爬出碗、爬窗框、跨出窗外的機率倍數（v2.30）；0 就一直待在原地',0,2,.1],
+  ['catPush','牠自己推擺飾','像貓一樣伸偽足慢慢推擺飾、邊推邊看你的機率倍數（v2.30）；0 關',0,2,.1],
   ['noFlip','防打結（三角形不翻面）','身體裡每個小三角形的面積不能小於靜止的這麼多倍，記住的形狀也一樣（v2.29，多米：拉扯常常打結）；0 關（v2.28）',0,.5,.01],
   ['gripUp','抓著時回正的上限','抓著時每小步最多轉回頭朝上多少；太大的話身體轉不動，被拉過去的那條只能纏在身上（v2.29 0.004；v2.28 窗台上是 0.2）',0,.2,.001],
   ['homeCap','整團跟手指的速度上限（×格距／小步）','整團被拖著走時，每小步最多移這麼多；太快的話手指附近那圈會一下被剪開、整片翻面（v2.29 0.5；0 不限，v2.28 量到一小步 24 點）',0,3,.1],
@@ -354,16 +356,22 @@ const FLAT={on:false,floor:0,qb:0};
 // 形狀變大時畫面自動縮小、平移，把整隻裝進來，最小 zoomMin；世界座標的牆放在最遠鏡頭看得到的邊。螢幕 = (世界 − 鏡頭) × z + V
 // zoomMin 0（v2.13，多米：鏡頭無限拉遠、不要限制）：鏡頭沒有下限，牆在無限遠（等於沒有牆）
 // v2.28 窗台（多米 11-06）：有重力、站在窗台上、坐得進碗。背景選藍就回懸空，舊的東西一條都不動
-const SILL={on:false,g:null,air:false,c:0,inBowl:false,want:false,hop:null,glass:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:-99,y1:0};
+const SILL={on:false,g:null,air:false,c:0,cb:0,cj:0,ct:0,inBowl:false,want:false,hop:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:-99,y1:0,y0:0,x0:0,x1:0,relX:0,relY:0,
+  plane:'room',surf:null,tanV:false,lift:false,gvx:0,gvy:1,gtx:0,gty:1,route:null,zoom:1,ztg:1,zpx:0,zpy:0,outT:0,stickT:-1};   // v2.30 plane 哪一層、surf 貼在哪個面、tanV 沿直的方向走、lift 重力關掉自己抬、gv 現在的重力方向（gt 目標）、route 正在走的路線、zoom 窗外用的鏡頭縮放
 const SILLG=14;   // 重力：每秒每秒幾個半徑
-function sillGeo(){const s=Math.min(W/860,H/1130),U=s*860/393,off=H*.72-1177*s,ox=(W-992*s)/2,fl=off+1228*s,bw=205*U,bh=bw*298/420,by=fl-bh;
-  return{s,U,off,ox,fl,bw,bh,bx:W/2,by,gx:ox+156*s,gy:off+304*s,gw:680*s,gh:828*s,rim:by+bh*.5,cav:bw*.40,outer:bw*.5,bf:by+bh*.86,l:Math.max(0,ox+40*s)+4,r:Math.min(W,ox+950*s)-4}}
+function sillGeo(){const s=Math.min(W/860,H/1130),U=s*860/393,off=H*.72-1177*s,ox=(W-992*s)/2,fl=off+1228*s,bw=205*U,bh=bw*298/420,by=fl-bh,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s;   // v2.30 碗移到左邊（多米 11-06 同意）：放中間時窗框下緣左右只剩 53 點，身體 180 點放不下
+  return{s,U,off,ox,fl,bw,bh,bx:bw/2+6*U,by,gx,gy,gw,gh,jr:gx+gw,bt:gy+gh,oy:gy+gh+22*U,rim:by+bh*.5,lip:by+bh*.568,back:by+bh*.05,cav:bw*.40,outer:bw*.5,bf:by+bh*.86,l:Math.max(0,ox+40*s)+4,r:Math.min(W,ox+950*s)-4,sl:ox+40*s,sr:ox+950*s}}   // bt 窗框下緣、jr 右窗框、oy 窗外台階、lip 碗前緣最低點（bowlFront 挖掉的橢圓下緣）、back 碗後緣、sl sr 窗台兩端
 const CAM={z:1,x:0,y:0};
 function viewV(){return{x:W/2,y:(90+H-120)/2}}
 function toWorld(sx,sy){const v=viewV();return{x:(sx-v.x)/CAM.z+CAM.x,y:(sy-v.y)/CAM.z+CAM.y}}
 function camMin(){return mat.zoomMin>0?Math.min(1,mat.zoomMin):1e-4}
-function worldWalls(){if(SILL.on&&SILL.g)return{l:SILL.g.l,r:SILL.g.r,t:4,b:SILL.g.fl};if(!(mat.zoomMin>0))return{l:-Infinity,r:Infinity,t:-Infinity,b:Infinity};const v=viewV(),zm=camMin(),ax=(W-16)/2/zm,ay=(H-210)/2/zm;return{l:v.x-ax,r:v.x+ax,t:v.y-ay,b:v.y+ay}}
-function updateCam(dt){if(SILL.on){const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;return}const v=viewV(),pad=R*(mat.camPad||.35);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+function worldWalls(){if(SILL.on&&SILL.g){if(SILL.plane!=='room')return{l:-1e5,r:1e5,t:-1e5,b:1e5};return{l:SILL.g.l,r:SILL.g.r,t:4,b:SILL.g.fl}}if(!(mat.zoomMin>0))return{l:-Infinity,r:Infinity,t:-Infinity,b:Infinity};const v=viewV(),zm=camMin(),ax=(W-16)/2/zm,ay=(H-210)/2/zm;return{l:v.x-ax,r:v.x+ax,t:v.y-ay,b:v.y+ay}}
+function updateCam(dt){if(SILL.on){const S=SILL,q=viewV();   // v2.30 窗外：鏡頭縮小，樞紐放在窗外台階的高度，地板的螢幕位置不動
+    if(S.zoom!==S.ztg){S.zoom+=(S.ztg-S.zoom)*(1-Math.exp(-dt/(S.grab?.1:.4)));if(Math.abs(S.zoom-S.ztg)<.002)S.zoom=S.ztg;
+      CAM.z=S.zoom;CAM.x=S.zpx-(S.zpx-q.x)/S.zoom;CAM.y=S.zpy-(S.zpy-q.y)/S.zoom;
+      for(const f of fingers.values()){if(f.mode!=='grab')continue;const p=toWorld(f.sx,f.sy),dx=p.x-f.x,dy=p.y-f.y;f.x=p.x;f.y=p.y;f.ax+=dx;f.ay+=dy;f.fx+=dx;f.fy+=dy;f.lx+=dx;f.ly+=dy}}   // 舉起來的那 0.2 秒，手指底下那塊跟著手指
+    else{CAM.z=S.zoom;CAM.x=S.zpx-(S.zpx-q.x)/S.zoom;CAM.y=S.zpy-(S.zpy-q.y)/S.zoom}
+    return}const v=viewV(),pad=R*(mat.camPad||.35);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(const i of bnd){x0=Math.min(x0,X[i]);x1=Math.max(x1,X[i]);y0=Math.min(y0,Y[i]);y1=Math.max(y1,Y[i])}
   const ax=(W-16)/2,ay=(H-210)/2,zm=camMin();
   // v2.24 camGrip：沒抓著時鏡頭只看記住的形狀（Q），不看表演：放手後的偽足探會把形狀撐大，身體變大之後鏡頭會跟著偽足一下拉遠一下拉近（量過拉 70 點放手，z 掉到 0.95 以下、外緣來回跳 40 點）
@@ -610,7 +618,7 @@ const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lof
 let sfxRubLevel=0;
 function sfxInit(){if(SFX)SFX.init()} // iOS 規定：要在第一次觸碰裡建立音訊
 function sfxPlay(kind,gain=1,rate=1){if(!SFX)return;if(kind==='press')SFX.press(gain);else if(kind==='release')SFX.release(gain);else if(kind==='pull')SFX.strand(gain);
-  else if(kind.startsWith('voice.'))SFX.voice(kind.slice(6),gain,rate)}   // v2.22：它的聲音
+  else if(kind.startsWith('voice.'))SFX.voice(kind.slice(6),gain,rate);else if(kind.startsWith('knock.')&&SFX.knock)SFX.knock(kind.slice(6),gain,rate)}   // v2.22：它的聲音
 function sfxRub(level){sfxRubLevel=level} // 真正的播放在每幀的 SFX.frame
 // v2.21：喇叭按鈕三段：音樂和音效 → 只有捏的聲音 → 全部靜音
 let SND=0;const SND_ICON=['🎵','🔈','🔇'],SND_NAME=['音樂和音效','只有捏的聲音','全部靜音'];
@@ -650,10 +658,12 @@ function down(e){
   if(INTRO.on){const mini=INTRO.mini;endIntro();if(!mini)return}   // v2.17 開場途中碰一下：直接到家（0.25 秒收回），這一下不算抓；開心小跳中碰它照常抓
   {const old=fingers.get(e.pointerId);if(old)releaseFinger(old,true)}   // 候選 26 黏連中同一指又按下：先安靜放掉
   const p=pos(e);SLP.lastAny=t;   // v2.23 B2：點空白處也算有人在
-  const grab=insideBody(p.x,p.y)||nearBody(p.x,p.y,R*.22);
+  let grab=insideBody(p.x,p.y)||nearBody(p.x,p.y,R*.22),prop=null;
   const ps=posScreen(e);
+  if(SILL.on&&SILL.g){const q=sillTouch(ps.x,ps.y,grab);grab=q.grab;prop=q.prop}   // v2.30 窗框層、窗外：碗、擺飾、牆擋在前面的地方抓不到牠；手指落在擺飾上就抓擺飾
   const f={id:e.pointerId,sx:ps.x,sy:ps.y,ax:p.x,ay:p.y,x:p.x,y:p.y,fx:p.x,fy:p.y,lx:p.x,ly:p.y,vx:0,vy:0,vxS:0,vyS:0,peak:0,stretch:0,
-    tDown:t,press:0,pressOn:false,hold:0,pushed:false,step:0,over:0,sticking:false,releaseAt:0,mode:grab?'grab':'push',mem:[],hitT:-9};
+    tDown:t,press:0,pressOn:false,hold:0,pushed:false,step:0,over:0,sticking:false,releaseAt:0,mode:grab?'grab':prop?'prop':'push',mem:[],hitT:-9};
+  if(prop){sfxInit();f.prop=prop;prop.held={id:e.pointerId,ox:prop.x-p.x,oy:prop.y-p.y};prop.lastHit=t;prop.fade=0;prop.alpha=1;fingers.set(e.pointerId,f);try{cv.setPointerCapture(e.pointerId)}catch(_){}$('hint').classList.add('off');return}
   sfxInit();if(grab)sfxPlay('press',.7)
   if(grab)fingerGrab(f,p);
   // 一壓就攤平（2026-11-01 多米想看看）：從身體上半部按下去才算「壓」，記下當時的高度與底部（看不見的桌面就在底部）
@@ -758,7 +768,7 @@ function inertiaCatch(){if(!(mat.inertiaHz>0)||!QDX||QDX.length!==N)return;const
   let mvx=0,mvy=0;for(let i=0;i<N;i++){mvx+=X[i]-PX[i];mvy+=Y[i]-PY[i]}mvx/=N;mvy/=N;const kv=SUB*60*mat.inertiaCarry,cap=R*6;
   for(let i=0;i<N;i++){let px=X[i]-g.xc,py=Y[i]-g.yc;if(PF){const q=pressPush(PF,X[i],Y[i]);px-=q[0];py-=q[1]}const rx=cs*px+sn*py,ry=-sn*px+cs*py;QDX[i]=qcx+i00*rx+i01*ry;QDY[i]=qcy+i10*rx+i11*ry;
     const vx=(X[i]-PX[i]-mvx)*kv,vy=(Y[i]-PY[i]-mvy)*kv;let lx=cs*vx+sn*vy,ly=-sn*vx+cs*vy;const ms=Math.hypot(lx,ly);if(ms>cap){lx*=cap/ms;ly*=cap/ms}QVX[i]=lx;QVY[i]=ly}}
-function releaseFinger(f,quiet){if(f.mode==='grab')inertiaCatch();for(const m of f.mem)GRAB[m[0]]=0;fingers.delete(f.id);if(!LV('lifeHeld')||f.mode==='grab'||f.hitT>-9&&!f.lure)lastTouch=t;for(const dn of DENTS)if(dn.f===f.id){dn.f=null;dn.held=t-f.tDown}   // v2.19 A4：沒碰到身體的手指放開，活物感不用重新淡入；v2.20：它自己游過來碰到的手指（lure）也不算；held：按了多久（D2）
+function releaseFinger(f,quiet){if(f.mode==='prop'&&f.prop)propRelease(f);if(f.mode==='grab')inertiaCatch();for(const m of f.mem)GRAB[m[0]]=0;fingers.delete(f.id);if(!LV('lifeHeld')||f.mode==='grab'||f.hitT>-9&&!f.lure)lastTouch=t;for(const dn of DENTS)if(dn.f===f.id){dn.f=null;dn.held=t-f.tDown}   // v2.19 A4：沒碰到身體的手指放開，活物感不用重新淡入；v2.20：它自己游過來碰到的手指（lure）也不算；held：按了多久（D2）
   if(f.mode==='grab')dragRelease(!quiet);
   if(f.mode==='grab'&&!quiet)impRelease(f);
   if(f.mode==='grab'&&!quiet)moodRelease(f);
@@ -788,7 +798,8 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   if(mat.afterglow>0&&!fingers.size){const since=t-lastTouch;if(since<mat.afterglow)damp=Math.max(damp,.975-(.975-mat.damp)*since/mat.afterglow)}
   damp=Math.min(.995,damp);if(INTRO.on&&INTRO.ph==='air')damp=1;const alpha=mat.alpha*(special?1.25:1),beta=mat.beta;   // v2.17 開場在空中不加阻尼（黏土 0.94 每小步扣 6%，跳不起來）
   if(SILL.on&&SILL.air)damp=1;   // 空中不加阻尼（同開場）：黏土 0.94 每小步扣 6%，掉不下來
-  const G=SILL.on?(INTRO.on?R*INTRO.g:SILL.glass?0:R*SILLG):FLOAT?(INTRO.on?R*INTRO.g:0):R*7;   // v2.17 開場：跳的那幾秒才有重力
+  const G=SILL.on?(INTRO.on?R*INTRO.g:R*SILLG*SILL.gvy):FLOAT?(INTRO.on?R*INTRO.g:0):R*7,Gh=SILL.on&&!INTRO.on?R*SILLG*SILL.gvx:0;   // v2.30 重力方向可以轉：貼在窗框上時重力指向窗框，身體就壓扁在上面，跟坐在地上同一套物理
+    // v2.17 開場：跳的那幾秒才有重力
   // v2.18 姿勢：舒服攤軟（寬一點矮一點）、開心挺高（2 秒）、縮著小一圈；發抖：參考形狀上很快的小抖（拉扯、被戳）
   let POSX=1,POSY=1,TRM=0;if(mat.emo>=.5){const cp=Math.max(0,MOOD.c),hp=Math.max(0,1-(t-MOOD.happyT)/2)*(t>=MOOD.happyT?1:0),cw=t<MOOD.cowerUntil?1:Math.max(0,1-(t-MOOD.cowerUntil)/.6);
     POSX=(1+.05*cp)*(1-.04*hp)*(1-.06*cw);POSY=(1-.06*cp)*(1+.07*hp)*(1-.06*cw);TRM=R*.016*Math.min(1,MOOD.strain+MOOD.scare)*(REDUCED?.5:1)}
@@ -796,7 +807,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   if(SLP.k>0){POSX*=1+.05*SLP.k;POSY*=1-.07*SLP.k}   // v2.23 B2：睡著攤軟一點
   if(SHK.t0>0&&t>=SHK.t0&&t<SHK.t0+.6)TRM+=R*.025*SHK.amp*Math.exp(-(t-SHK.t0)/.2)*(REDUCED?.5:1);   // v2.19 甩一甩時輪廓也抖
   // 1 積分（Verlet）
-  for(let i=0;i<N;i++){const vx=(X[i]-PX[i])*damp,vy=(Y[i]-PY[i])*damp;PX[i]=X[i];PY[i]=Y[i];X[i]+=vx;Y[i]+=vy+G*dt*dt}
+  for(let i=0;i<N;i++){const vx=(X[i]-PX[i])*damp,vy=(Y[i]-PY[i])*damp;PX[i]=X[i];PY[i]=Y[i];X[i]+=vx+Gh*dt*dt;Y[i]+=vy+G*dt*dt}
   // 2 手指（GWT：這一小步每顆粒子被抓的權重，給形狀匹配用）
   GWT.fill(0);
   for(const f of fingers.values()){
@@ -964,9 +975,9 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   const hx=HOMEX+MOOD.tugX+DRAG.ox+Lamp*mat.life*R*.035*Math.sin(tl*2*Math.PI/7.3),hy=HOMEY+MOOD.tugY+DRAG.oy-BR.lift+(FLOAT&&mat.jelly<.5?Lamp*mat.life*R*.05*Math.sin(tl*2*Math.PI/4.7):0);   // 水母模式不再另外上下飄，上下只跟呼吸
   const hyF=FLAT.on?FLAT.floor-FLAT.qb:hy;   // 壓著：家移到底部貼桌面
   const kh=FLOAT?(grabbing?.02*mat.anchor:mat.homeK):.006*(grabbing?mat.anchor:1),dx0=hx-cx,dy0=hyF-cy,hcp=mat.homeCap>0?mat.homeCap*h/Math.max(mat.homeCap*h,Math.hypot(dx0,dy0)*kh):1,dx=dx0*hcp,dy=dy0*hcp;   // v2.29 homeCap：整團被拖時每小步最多移半格，手指附近那圈才不會被一下剪開   // 候選 21：不抓時的回家彈簧 homeK（0.003 約半秒飄回、不過衝）；抓著時照舊 0.02×anchor
-  SILL.c=0;const WL=worldWalls(),padT=WL.t,padB=WL.b,padL=WL.l,padR=WL.r,soft=SILL.on&&mat.softWall>=.5;   // 牆：最遠鏡頭看得到的邊（世界座標）
+  SILL.c=SILL.cb=SILL.cj=SILL.ct=0;const hxOn=!(SILL.on&&(SILL.air||(SILL.tanV&&!SILL.lift&&!SILL.grab))),hyOn=!INTRO.on&&!(SILL.on&&!SILL.grab&&!SILL.tanV);const WL=worldWalls(),padT=WL.t,padB=WL.b,padL=WL.l,padR=WL.r,soft=SILL.on&&mat.softWall>=.5;   // 牆：最遠鏡頭看得到的邊（世界座標）
   for(let i=0;i<N;i++){
-    if(!GRAB[i]){if(!(SILL.on&&(SILL.air||SILL.glass)))X[i]+=dx*kh;if(!INTRO.on&&!(SILL.on&&!SILL.grab))Y[i]+=dy*kh}   // 開場跳的時候上下交給重力與地板
+    if(!GRAB[i]){if(hxOn)X[i]+=dx*kh;if(hyOn)Y[i]+=dy*kh}   // 開場跳的時候上下交給重力與地板
     if(SILL.on)sillHit(i);
     if(!FLOAT&&Y[i]>GROUND){Y[i]=GROUND;PX[i]+=(X[i]-PX[i])*.45}
     if(INTRO.on&&Y[i]>INTRO.floor){Y[i]=INTRO.floor;PX[i]+=(X[i]-PX[i])*.45}   // 開場看不見的地板：落地真的撞上去、壓扁、晃
@@ -974,6 +985,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
     if(soft){const wk=grabbing?.04:.25;if(Y[i]<padT)Y[i]+=(padT-Y[i])*wk;if(X[i]<padL)X[i]+=(padL-X[i])*wk;if(X[i]>padR)X[i]+=(padR-X[i])*wk;if(Y[i]>padB)Y[i]=padB}   // v2.29：左右上是軟的，只有地板硬；手指抓著時更軟，放開就很快推回來
     else{if(Y[i]<padT)Y[i]=padT;if(Y[i]>padB)Y[i]=padB;if(X[i]<padL)X[i]=padL;if(X[i]>padR)X[i]=padR}
   }
+  if(SILL.on&&SILL.g&&PROPS.length){propsHitBody(dt);propsStep(dt)}   // v2.30 擺飾
   if(mat.ringGuard>0){ringGuard();ringUnkink()}   // 邊不能穿邊、局部小結拉直，放在牆之後（見 ringGuard、ringUnkink）
 }
 // 蠕動不重複（2026-11-01 多米真機回報：一直是同一個樣子在晃）：輪廓的 2 到 5 階變形，每階兩個係數各跟一條平滑亂數走
@@ -1151,7 +1163,7 @@ function moodRelease(f){if(!(mat.emo>=.5))return;
 function flee(ux,uy,dist){if(!(dist>0))return;const l=Math.hypot(ux,uy)||1;ux/=l;uy/=l;
   Object.assign(ESC,{on:true,t0:t,T:Math.max(.6,dist/(R*2.4)),sx:HOMEX,sy:HOMEY,dx:HOMEX+ux*dist,dy:HOMEY+uy*dist*.8});WANDER.moving=false;MOOD.scare=Math.min(1,MOOD.scare+.5)}
 // 開心小跳：開場的跳只跳一下、不走遠（mini：碰它照常抓）
-function hop(){if(INTRO.on)return;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
+function hop(){if(INTRO.on||(SILL.on&&(SILL.route||SILL.tanV||SILL.air)))return;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
   Object.assign(INTRO,{on:true,mini:true,ph:'crouch',k:0,n:1,pt:0,sq:0,floor:y1,u:1,s0:1,ox0:0,oy0:0,px:HOMEX,py:y1})}
 // 每幀：心情跟著手上的動作走（只看抓得最長的那根）；呼嚕；逃跑中的家
 function moodStep(dt){
@@ -1175,7 +1187,7 @@ function moodStep(dt){
     if(LV('lifeGait')){STR.k=1+.15*(1-p)**2*(REDUCED?.5:1);STR.h=Math.atan2(ESC.dy-ESC.sy,ESC.dx-ESC.sx)}   // v2.19：衝出去時沿方向拉長
     if(p>=1){ESC.on=false;MOOD.cowerUntil=t+1.2+Math.random()*.8;WANDER.next=Math.max(WANDER.next,t+2+Math.random()*1.5);
       if(mat.life2>=.5){if(LV('lifeBreath'))BRX.exert=Math.max(BRX.exert,.8);LIFE.st='rest';LIFE.until=MOOD.cowerUntil+1+Math.random()}}}}   // v2.19 A6：逃完會喘
-function relax(){relaxUntil=t+.5;for(const dn of DENTS){dn.p=0;dn.v=0;dn.p0=0}}   // 「揉回原形」按鈕：半秒內記憶淡回 Q0，換種子才重建
+function relax(){relaxUntil=t+.5;for(const dn of DENTS){dn.p=0;dn.v=0;dn.p0=0}for(const p of PROPS){if(p.gone)p.backAt=t;else p.lastHit=-1e3}}   // 「揉回原形」按鈕：半秒內記憶淡回 Q0，換種子才重建
 function twitch(L){
   // 偶爾抖一下：隨機一個區塊得到一個小衝量；偶爾整團輕晃
   if(t<nextTwitch)return;
@@ -1206,12 +1218,12 @@ function goStart(dir){if(SILL.on){sillGo();return}const far=Math.random()<mat.da
   if(a==null){a=Math.random()*2*Math.PI;ys=.8}
   if(Math.hypot(HOMEX-CX,HOMEY-CY)>W*3)a=Math.atan2(CY-HOMEY,CX-HOMEX)+(Math.random()-.5);
   LIFE.st='go';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=HOMEX+Math.cos(a)*dist;WANDER.dy=HOMEY+Math.sin(a)*dist*ys;WANDER.moving=true;
-  if(LV('lifeGait'))Object.assign(GAIT,{on:true,tx:WANDER.dx,ty:WANDER.dy,dash:far,ph:-1,prep:0,v:0,h:Math.atan2(WANDER.dy-HOMEY,WANDER.dx-HOMEX),k:1,str:1,last:false,off:0});
+  if(LV('lifeGait'))Object.assign(GAIT,{on:true,tx:WANDER.dx,ty:WANDER.dy,dash:far,climb:false,ph:-1,prep:0,v:0,h:Math.atan2(WANDER.dy-HOMEY,WANDER.dx-HOMEX),k:1,str:1,last:false,off:0});
   else{WANDER.T=Math.max(.5,dist/(mat.wander*(far?2.5:1)*R*(REDUCED?.25:1)));WANDER.p=0}}
 // 一縮一衝的常數：一下 P 秒（快跑 0.62），前 c 秒收縮（速度 50 毫秒追上峰值），之後放鬆滑停（tau 秒時間常數）；一下前進 sd；沿前進方向最多拉長 kA。
 // 減少動態：節奏慢一倍、一下走一半（速度 ×0.25）、拉長減半
-function gaitConst(G){const rm=REDUCED;return{P:(G.dash?.62:1.1)*(rm?2:1),c:(G.dash?.15:.25)*(rm?2:1),tau:(G.dash?.24:.35)*(rm?2:1),sd:(G.dash?.8:.5)*R*(rm?.5:1),kA:(G.dash?.17:.12)*(rm?.5:1)}}
-function strokeStart(G,K){if(SILL.on){G.ty=HOMEY;G.tx=sillClampX(G.tx)}const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
+function gaitConst(G){const rm=REDUCED;if(G.climb)return{P:1.15*(rm?2:1),c:.32*(rm?2:1),tau:.36*(rm?2:1),sd:.34*R*(rm?.5:1),kA:.15*(rm?.5:1)};return{P:(G.dash?.62:1.1)*(rm?2:1),c:(G.dash?.15:.25)*(rm?2:1),tau:(G.dash?.24:.35)*(rm?2:1),sd:(G.dash?.8:.5)*R*(rm?.5:1),kA:(G.dash?.17:.12)*(rm?.5:1)}}
+function strokeStart(G,K){if(SILL.on){if(SILL.tanV)G.tx=HOMEX;else{G.ty=HOMEY;if(!SILL.route)G.tx=sillClampX(G.tx)}}const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
   G.h=Math.atan2(dy,dx)+(Math.random()-.5)*.42;   // 每一下方向偏一點（±12 度），路線是彎的；速度跟方向在同一刻變
   const per=K.c/2+K.tau*(1-Math.exp(-(K.P-K.c)/K.tau));   // 這個速度剖面，每單位峰值速度走多遠
   if(rem<K.sd*1.4){G.last=true;G.str=Math.max(.35,Math.min(1,rem/K.sd))}else G.str=1;   // 最後一下比較小
@@ -1230,7 +1242,7 @@ function gaitStep(dt){const G=GAIT,K=gaitConst(G),rm=REDUCED?.5:1;let off=0,mv=0
 function gaitArrive(G){G.on=false;WANDER.moving=false;Object.assign(LIFE,{st:'arrive',arrT:t,arrH:G.h,arrK0:G.k,arrA:G.v/(2*Math.PI/.6),arrOff:0,arrK:(G.dash?.12:.08)*(REDUCED?.5:1)});G.k=1;
   if(G.dash&&LV('lifeBreath'))BRX.exert=Math.max(BRX.exert,.6)}   // 快跑完會喘
 // 整團連同上一幀一起平移（表演，不留速度）：身體跟著收縮的節奏一頓一頓往前，不是被回家彈簧拖過去
-function moveHome(dx,dy,dt){if(SILL.on)dy=0;if(dx===0&&dy===0)return;HOMEX+=dx;HOMEY+=dy;WANDER.vx=dx/dt;WANDER.vy=dy/dt;
+function moveHome(dx,dy,dt){if(SILL.on){if(SILL.tanV)dx=0;else dy=0}if(dx===0&&dy===0)return;HOMEX+=dx;HOMEY+=dy;WANDER.vx=dx/dt;WANDER.vy=dy/dt;
   for(let i=0;i<N;i++){if(GRAB[i])continue;X[i]+=dx;Y[i]+=dy;PX[i]+=dx;PY[i]+=dy}}
 // 放手：大力拉過甩一甩（A5）、拉很長會喘（A6）、0.5 秒後往你手指離開的地方探一下（A7；逃跑、開心小跳時不探）
 function lifeRelease(f){const st=SB(f);   // v2.20：拖著走時用身體真的被拉開的量（拖它走一大段不算大力拉）
@@ -1251,6 +1263,7 @@ function lifeStep(dt,idle,engaged){
     if(d!==0){const cx=globalC.xc,cy=globalC.yc,c=Math.cos(d),s=Math.sin(d);
       for(let i=0;i<N;i++){if(GRAB[i])continue;let dx=X[i]-cx,dy=Y[i]-cy;X[i]=cx+dx*c-dy*s;Y[i]=cy+dx*s+dy*c;dx=PX[i]-cx;dy=PY[i]-cy;PX[i]=cx+dx*c-dy*s;PY[i]=cy+dx*s+dy*c}}}
   // A7 探：排好的點時間到了，往那邊伸一條偽足（這一版只探，不走過去：探完回去休息）
+  if(SILL.on&&SILL.route){LIFE.att=null;return}   // v2.30 正在走路線：路線自己管（sillStep），不張望、不決定別的
   if(LIFE.att&&t>=LIFE.att.at){const a=LIFE.att;LIFE.att=null;
     if(!engaged&&!ESC.on&&!INTRO.on&&LV('lifeAttend')){const dx=a.x-globalC.xc,dy=a.y-globalC.yc,d=Math.hypot(dx,dy),ang=Math.atan2(dy,dx);
       startSniff(ang,Math.max(.3,Math.min(mat.podLen*1.1,d/R-.6)),.5,.7+.4*Math.random(),.6);GAIT.on=false;WANDER.moving=false;
@@ -1520,8 +1533,8 @@ function impStep(dt){if(!(mat.imp>=.5))return;
   IMP.tr=Math.max(0,Math.min(1,IMP.tr));IMP.w=Math.max(0,Math.min(1,IMP.w));
   {const k=1-Math.exp(-dt/1);IMPD.tr+=(IMP.tr-IMPD.tr)*k;IMPD.w+=(IMP.w-IMPD.w)*k}}
 // 往某一點走（C1 游過去、退開，C4 挪過去）：跟 goStart 同一套走法（一縮一衝；關掉就照 v2.18 滑過去）
-function gaitTo(x,y,dash){if(SILL.on){x=sillClampX(x);y=HOMEY;if(SILL.inBowl||SILL.air||SILL.glass||SILL.hop){if(!SILL.hop&&!SILL.air&&Math.abs(x-globalC.xc)>R*.5)sillHop(x,false);return}}LIFE.st='go';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=x;WANDER.dy=y;WANDER.moving=true;
-  if(LV('lifeGait'))Object.assign(GAIT,{on:true,tx:x,ty:y,dash,ph:-1,prep:0,v:0,h:Math.atan2(y-HOMEY,x-HOMEX),k:1,str:1,last:false,off:0});
+function gaitTo(x,y,dash){if(SILL.on){const S=SILL;if(S.route||S.air||S.hop||S.tanV)return;x=sillClampX(x);y=HOMEY;if(S.inBowl){if(Math.abs(x-globalC.xc)>R*.5)routeStart(rtOutFront(x));return}}LIFE.st='go';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=x;WANDER.dy=y;WANDER.moving=true;
+  if(LV('lifeGait'))Object.assign(GAIT,{on:true,tx:x,ty:y,dash,climb:false,ph:-1,prep:0,v:0,h:Math.atan2(y-HOMEY,x-HOMEX),k:1,str:1,last:false,off:0});
   else{WANDER.T=Math.max(.5,Math.hypot(x-HOMEX,y-HOMEY)/(mat.wander*(dash?2.5:1)*R*(REDUCED?.25:1)));WANDER.p=0}}
 // C1 C2：按在空白處的手指，離身體 3.5R 內最近的那根
 function lureFinger(){let best=null,bd=1e9;for(const f of fingers.values()){if(!f.lure||f.mode!=='push')continue;let d=1e9;for(const i of bnd)d=Math.min(d,Math.hypot(X[i]-f.fx,Y[i]-f.fy));if(d<R*3.5&&d<bd){bd=d;best=f}}
@@ -1802,57 +1815,177 @@ function drawTrail(col){const sh=col('--shade'),hi=col('--hi'),g=globalC,cs=g.cs
 function drawDents(col){const sh=col('--shade'),hi=col('--hi');
   for(const dn of DENTS){if(dn.d<.02||dn.i>=N)continue;const r=R*mat.dentSize*(.65+.35*dn.w),a=dn.d*(1-.35*dn.w),[ma,mb,mc,md]=dentFrame(dn);
     ctx.save();ctx.transform(ma,mb,mc,md,X[dn.i],Y[dn.i]);pitAt(r,a,sh,hi);ctx.restore()}}
-/* ---------- v2.28 窗台：重力、窗台、碗、跳、黏窗。全部掛在 SILL.on 底下，背景選藍就整段不跑 ---------- */
 // 空中不加阻尼、靠真的重力掉；碰到東西才恢復阻尼，所以落地時上半身還帶著速度，會真的壓扁再彈回來（果凍晃多、黏土晃少，照材質）
-function sillClampX(x){const g=SILL.g,m=R*.9;return Math.max(g.l+m,Math.min(g.r-m,x))}
-function sillInit(){const S=SILL;S.g=null;if(!S.on)return;const g=S.g=sillGeo();let y1=-1e9,mx=0;for(let i=0;i<N;i++)mx+=X[i];mx/=N;for(const i of bnd)y1=Math.max(y1,Y[i]);
+/* ---------- v2.30 環境互動（多米 11-06：跨出窗外、爬窗邊、打翻擺飾、爬出爬進碗）。窗台拆成前中後三層，各有地板和牆；換層的那一刻身體不跟任何東西重疊，畫面看不出跳了一下 ---------- */
+// room 窗台：地板是木頭窗台，撞擺飾、畫面左右；畫在碗和擺飾前面（在碗裡時碗前緣再蓋回來）
+// frame 窗框：地板是窗框下緣，撞左右和上窗框；畫在窗框上面、碗和擺飾後面
+// out 窗外：地板是窗框後面的台階，只撞地板；畫在牆和窗框後面，鏡頭縮小兩成
+function sillClampX(x){const S=SILL,g=S.g;if(S.plane==='frame'){const m=R*.72;return Math.max(g.gx+m,Math.min(g.jr-m,x))}
+  if(S.plane==='out'){const z=.8,sx=q=>W/2+(q-W/2)/z;return Math.max(sx(g.bx+g.bw*.5+R*.1),Math.min(sx(g.jr+R*.15),x))}   // 窗外：左邊到碗旁邊，右邊走到牆後面只露半邊（換算回世界座標）
+  const m=R*.9;return Math.max(g.l+m,Math.min(g.r-m,x))}
+function planeSet(p){const S=SILL;if(S.plane===p)return;S.plane=p;if(p==='out'){S.ztg=.8;S.zpx=W/2;S.zpy=S.g.oy;S.outT=t}else S.ztg=1;if(p==='room')propsMarkOverlap()}
+// 貼著哪個面：重力方向、沿哪個方向走。窗框上的重力比地上小（0.6），壓得扁但不會太重
+const SURF={floor:[0,1,false],bowl:[0,1,false],bar:[0,1,false],ledge:[0,1,false],rjamb:[.6,0,true],ljamb:[-.6,0,true],ceil:[0,-.6,false]};
+function surfSet(s){const S=SILL,q=SURF[s];S.surf=s;S.gtx=q[0];S.gty=q[1];S.tanV=q[2];S.lift=false;HOMEX=globalC.xc;HOMEY=globalC.yc}
+function sillInit(){const S=SILL;S.g=null;if(!S.on){PROPS.length=0;S.plane='room';S.zoom=1;S.ztg=1;S.route=null;S.gtx=S.gvx=0;S.gty=S.gvy=1;S.tanV=false;S.lift=false;return}const g=S.g=sillGeo();let y1=-1e9,mx=0;for(let i=0;i<N;i++)mx+=X[i];mx/=N;for(const i of bnd)y1=Math.max(y1,Y[i]);
   const dx=g.bx-mx,dy=g.rim-R*.9-y1;for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}   // 從碗的正上方掉進碗裡
-  CX=g.bx;HOMEX=g.bx;CY=H*.5;HOMEY=CY;Object.assign(S,{air:true,c:0,inBowl:false,want:true,hop:null,glass:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:t});
-  const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;INTRO.sq=0}
-function sillHit(i){const S=SILL,g=S.g;if(S.glass)return;
+  CX=g.bx;HOMEX=g.bx;CY=H*.5;HOMEY=CY;Object.assign(S,{air:true,c:0,cb:0,cj:0,ct:0,inBowl:false,want:true,hop:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:t,plane:'room',surf:null,tanV:false,lift:false,gvx:0,gvy:1,gtx:0,gty:1,route:null,zoom:1,ztg:1,zpx:W/2,zpy:g.oy,outT:0,stickT:-1});
+  const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;INTRO.sq=0;propsInit()}
+function sillHit(i){const S=SILL,g=S.g,P=S.plane;
+  if(P==='frame'){   // 窗框的牆是軟著陸：放手時身體可能疊在窗框上，一次全推回來會炸
+    if(Y[i]>g.bt){Y[i]=g.bt;PY[i]=g.bt;PX[i]+=(X[i]-PX[i])*.45;S.c++;S.cb++}
+    if(X[i]<g.gx){const d=g.gx-X[i];X[i]+=Math.min(d,Math.max(1.5,d*.35));PX[i]=X[i];PY[i]+=(Y[i]-PY[i])*.45;S.c++;S.cj++}
+    else if(X[i]>g.jr){const d=X[i]-g.jr;X[i]-=Math.min(d,Math.max(1.5,d*.35));PX[i]=X[i];PY[i]+=(Y[i]-PY[i])*.45;S.c++;S.cj++}
+    if(Y[i]<g.gy){const d=g.gy-Y[i];Y[i]+=Math.min(d,Math.max(1.5,d*.35));PY[i]=Y[i];PX[i]+=(X[i]-PX[i])*.45;S.c++;S.ct++}
+    return}
+  if(P==='out'){if(Y[i]>g.oy){Y[i]=g.oy;PY[i]=g.oy;PX[i]+=(X[i]-PX[i])*.45;S.c++;S.cb++}return}
   if(S.inBowl&&!GRAB[i]){const dx=X[i]-g.bx,ad=Math.abs(dx);
     if(ad<g.cav){if(Y[i]>g.rim){const dp=Math.min(1,(Y[i]-g.rim)/(g.bf-g.rim)),hw=g.cav*(1-.22*dp*dp);if(ad>hw){X[i]=g.bx+Math.sign(dx)*hw;PX[i]=X[i]}}
-      const u=dx/g.cav,fl=g.bf-(g.bf-g.rim)*.3*u*u*u*u;if(Y[i]>fl){Y[i]=fl;PY[i]=fl;PX[i]+=(X[i]-PX[i])*.45;S.c++}}
+      const u=dx/g.cav,fl=g.bf-(g.bf-g.rim)*.3*u*u*u*u;if(Y[i]>fl){Y[i]=fl;PY[i]=fl;PX[i]+=(X[i]-PX[i])*.45;S.c++;S.cb++}}
     else if(ad<g.outer+R*.3&&Y[i]>g.rim-2&&Y[i]<g.rim+R*.6){Y[i]=g.rim-2;PY[i]=Y[i];PX[i]+=(X[i]-PX[i])*.3;S.c++}}
-  if(Y[i]>g.fl){Y[i]=g.fl;PY[i]=g.fl;PX[i]+=(X[i]-PX[i])*.45;S.c++}}
-// 跳：蹲 0.12 秒再起跳。toBowl 要越過碗口；toGlass 跳到窗戶上黏住
-function sillHop(tx,toBowl,toGlass){const S=SILL;if(S.hop||S.grab)return;GAIT.on=false;WANDER.moving=false;S.hop={ph:'crouch',t:0,tx:toBowl?S.g.bx:sillClampX(tx),toBowl:!!toBowl,toGlass:toGlass==null?null:toGlass};LIFE.st='rest';LIFE.until=t+3}
+  if(Y[i]>g.fl){Y[i]=g.fl;PY[i]=g.fl;PX[i]+=(X[i]-PX[i])*.45;S.c++;S.cb++}}
+// 手指落在哪：窗台層牠在最前面，其他情況碗、擺飾擋在牠前面；窗外還有牆和窗框擋著。手指落在擺飾上（牠不在前面）就抓擺飾
+function sillTouch(sx,sy,grab){const S=SILL,g=S.g,pr=propAt(sx,sy);if(S.plane==='room')return{grab,prop:grab?null:pr};
+  if(pr)return{grab:false,prop:pr};if(sx>g.bx-g.bw/2&&sx<g.bx+g.bw/2&&sy>g.by+g.bh*.1&&sy<g.fl)return{grab:false,prop:null};
+  if(S.plane==='out'&&!(sx>g.gx&&sx<g.jr&&sy>g.gy&&sy<g.bt))return{grab:false,prop:null};return{grab,prop:null}}
+// 跳：只留給被嚇到的時候（蹲 0.12 秒再起跳）。平常進出碗用爬的
+function sillHop(tx,toBowl){const S=SILL;if(S.hop||S.grab)return;GAIT.on=false;WANDER.moving=false;if(S.route)routeEnd(true);S.hop={ph:'crouch',t:0,tx:toBowl?S.g.bx:sillClampX(tx),toBowl:!!toBowl};LIFE.st='rest';LIFE.until=t+3}
 function sillLaunch(){const S=SILL,g=S.g,H0=S.hop,gc=globalC,g0=R*SILLG,hs=1/60/SUB;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
-  let hh=R*(.55+.25*Math.random());if(H0.toBowl)hh=Math.max(y1-g.rim,0)+R*.45;else if(S.inBowl)hh=Math.max(hh,y1-g.rim+R*.5);if(H0.toGlass!=null)hh=Math.max(R*.6,gc.yc-H0.toGlass);
+  let hh=R*(.55+.25*Math.random());if(H0.toBowl)hh=Math.max(y1-g.rim,0)+R*.45;else if(S.inBowl)hh=Math.max(hh,y1-g.rim+R*.5);
   const vy=Math.sqrt(2*g0*hh),land=H0.toBowl?g.rim:g.fl,T=vy/g0+Math.sqrt(2*Math.max(R*.1,hh+land-y1)/g0),vx=Math.max(-W*1.6,Math.min(W*1.6,(H0.tx-gc.xc)/T));
   for(let i=0;i<N;i++){PY[i]=Y[i]+vy*hs;PX[i]=X[i]-vx*hs}
-  S.inBowl=false;S.want=H0.toBowl;S.air=true;S.c=0;S.fall=0;H0.ph='air';H0.t=0;sfxPlay('press',.22)}
-// 自己想出門：碗裡跳到旁邊；窗台上走一段，或跳回碗裡，偶爾跳到窗戶上
-function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random();LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.hop||S.air||S.glass)return;
-  if(r<.12&&!REDUCED){const side=Math.random()<.5?-1:1,x=sillClampX(cx+side*R*(.8+Math.random()));if(x>g.gx+R*.7&&x<g.gx+g.gw-R*.7){sillHop(x,false,g.gy+g.gh*(.35+.25*Math.random()));return}}
-  if(S.inBowl){if(r<.55){const side=Math.random()<.5?-1:1;sillHop(sillClampX(g.bx+side*(g.bw*.5+R*(1+.5*Math.random()))),false)}return}
-  if(r<.45){sillHop(g.bx,true);return}
-  const far=Math.random()<mat.dash,d=(far?1.8:1)*R*(1+Math.random()),x=sillClampX(cx+(Math.random()<.5?-1:1)*d);if(Math.abs(x-cx)>R*.4)gaitTo(x,HOMEY,far)}
-function sillStepPre(){let g=false;for(const f of fingers.values())if(f.mode==='grab'){g=true;SILL.relX=f.fx}SILL.grab=g}
-function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==null)return;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);S.y1=y1;
+  S.want=H0.toBowl;S.air=true;S.c=0;S.fall=0;H0.ph='air';H0.t=0;sfxPlay('press',.22)}
+
+/* 路線：一串步驟照順序走。sniff 伸偽足、move 重力關掉自己抬到底部在 y（一縮一衝）、plane 換層、drop 重力打開往下掉、walk 貼著某個面走到某個座標、turn 轉到另一個面、surf 直接貼上、wait、fn */
+const RT={sniff:(a,L,T)=>({k:'sniff',a,L,T}),move:y=>({k:'move',y}),plane:(p,ib)=>({k:'plane',p,ib}),drop:g=>({k:'drop',g}),walk:(s,to)=>({k:'walk',s,to}),turn:s=>({k:'turn',s}),surf:s=>({k:'surf',s}),wait:T=>({k:'wait',T}),fn:f=>({k:'fn',f})};
+function gaitGo(tx,ty,climb){LIFE.st='route';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=tx;WANDER.dy=ty;WANDER.moving=true;Object.assign(GAIT,{on:true,tx,ty,dash:false,climb:!!climb,ph:-1,prep:0,v:0,h:Math.atan2(ty-HOMEY,tx-HOMEX),k:1,str:1,last:false,off:0})}
+function routeStart(steps){const S=SILL;if(!steps)return;if(S.route)routeEnd(true);S.stickT=-1;cutSniffs();GAIT.on=false;WANDER.moving=false;S.route={steps,i:-1,st0:t};LIFE.st='route';routeNext()}
+function routeEnd(abort){const S=SILL;if(!S.route)return;S.route=null;GAIT.on=false;GAIT.k=1;WANDER.moving=false;S.lift=false;if(abort){S.tanV=false;S.gtx=0;S.gty=1;S.surf=null}
+  if(LIFE.st==='route'||LIFE.st==='go'||LIFE.st==='arrive'){LIFE.st='rest';LIFE.until=t+restDur()}}
+function routeNext(){const S=SILL,Q=S.route;if(!Q)return;
+  for(;;){Q.i++;Q.st0=t;const q=Q.steps[Q.i];if(!q){routeEnd(false);return}
+    if(q.k==='plane'){planeSet(q.p);if(q.ib!=null){S.inBowl=q.ib;if(q.ib)S.want=false}continue}
+    if(q.k==='fn'){q.f();if(!S.route)return;continue}
+    if(q.k==='surf'){surfSet(q.s);continue}
+    if(q.k==='sniff'){startSniff(q.a,q.L,.4,Math.max(.15,q.T-.5),.5);return}
+    if(q.k==='move'){S.lift=true;S.tanV=true;S.surf=null;S.gtx=0;S.gty=0;HOMEX=globalC.xc;HOMEY=globalC.yc;const dy=q.y-S.y1;if(Math.abs(dy)<2)continue;gaitGo(HOMEX,HOMEY+dy,true);return}
+    if(q.k==='drop'){S.lift=false;S.tanV=false;S.surf=null;S.gtx=0;S.gty=q.g||1;return}
+    if(q.k==='walk'){surfSet(q.s);const v=S.tanV,d=q.to-(v?globalC.yc:globalC.xc);if(Math.abs(d)<R*.06)continue;gaitGo(v?HOMEX:q.to,v?q.to:HOMEY,v);return}
+    if(q.k==='turn'){surfSet(q.s);return}
+    return}}
+function routeStep(dt){const S=SILL,Q=S.route,q=Q.steps[Q.i];if(!q){routeEnd(false);return}const u=t-Q.st0;if(ESC.on){routeEnd(true);return}
+  if(q.k==='sniff'||q.k==='wait'){if(u>=q.T)routeNext();return}
+  if(q.k==='move'||q.k==='walk'){if(GAIT.on)gaitStep(dt);if(LIFE.st==='arrive')LIFE.st='route';
+    const hit=q.k==='move'&&(q.y<Q.y0?S.y1<=q.y:S.y1>=q.y);if(Q.y0==null||Q.i0!==Q.i){Q.y0=S.y1;Q.i0=Q.i}
+    if(!GAIT.on||hit){GAIT.on=false;GAIT.k=1;WANDER.moving=false;routeNext();return}
+    if(u>(q.k==='move'?8:40))routeEnd(true);return}
+  if(q.k==='drop'){if((S.c>0&&u>.08)||u>2.5){S.gty=1;routeNext()}return}
+  if(q.k==='turn'){const c=q.s==='ceil'?S.ct:q.s==='rjamb'||q.s==='ljamb'?S.cj:S.cb;if(c>0||u>1.2)routeNext();return}}
+// 從碗裡爬出來：偽足先搭上去，身體抬到前緣之上，換到碗前面，再流到窗台上
+function rtOutFront(x){const g=SILL.g,a=-Math.PI/2+(Math.random()<.5?-.3:.3);return[RT.sniff(a,.5,.7),RT.move(g.lip-6),RT.plane('room',false),RT.move(g.fl-2),RT.surf('floor')].concat(x!=null?[RT.walk('floor',x)]:[])}
+// 從窗台爬回碗：走到碗前面，抬到前緣之上，換進碗裡，流下去
+function rtIntoFront(){const g=SILL.g;return[RT.walk('floor',sillClampX(g.bx)),RT.sniff(-Math.PI/2,.5,.7),RT.move(g.lip-6),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
+// 翻過碗後緣到窗框下緣：抬到整個高過碗，換到碗後面，落下去
+function rtOverBack(x){const g=SILL.g;return[RT.sniff(-Math.PI/2,.6,.8),RT.move(g.back-3),RT.plane('frame',false),RT.drop(.6),RT.surf('bar')].concat(x!=null?[RT.walk('bar',x)]:[])}
+function rtBackIn(){const g=SILL.g,x=Math.max(g.gx+R*.72,g.bx);return[RT.walk('bar',x),RT.sniff(-Math.PI/2,.5,.7),RT.move(g.back-3),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
+// 繞窗框一圈：貼右窗框爬上去、倒掛走到左邊、貼左窗框下來，掉回碗裡（左窗框正好在碗上面）
+function rtFrameLoop(){const g=SILL.g,xr=g.jr-R*.72,xl=g.gx+R*.72;return[RT.walk('bar',xr),RT.turn('rjamb'),RT.walk('rjamb',g.gy+R*.82),RT.turn('ceil'),RT.walk('ceil',xl),RT.turn('ljamb'),RT.walk('ljamb',g.by-R*.98),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
+function rtClimbDrop(){const g=SILL.g,xr=g.jr-R*.72,y=g.gy+R*(1+1.6*Math.random());return[RT.walk('bar',xr),RT.turn('rjamb'),RT.walk('rjamb',y),RT.wait(.6+Math.random()),RT.drop(1),RT.surf('bar')]}
+// 翻到窗外：坐在窗框下緣時身體不碰牆，換層看不出來；往後掉到台階上，鏡頭縮小
+function rtGoOut(){const g=SILL.g,x=sillClampX(g.jr-R*(.8+.5*Math.random()));return[RT.walk('bar',x),RT.sniff(-Math.PI/2+.2,.4,.6),RT.plane('out'),RT.drop(.55),RT.surf('ledge')]}
+function rtComeBack(){const S=SILL,g=S.g,x=Math.max(g.gx+R*.8,Math.min(g.jr-R*.8,globalC.xc));return[RT.walk('ledge',x),RT.fn(()=>{S.ztg=1}),RT.move(g.bt-3),RT.plane('frame'),RT.drop(.6),RT.surf('bar')]}
+function rtHome(){const S=SILL;if(S.inBowl)return null;if(S.plane==='out')return rtComeBack().concat(rtBackIn());if(S.plane==='frame')return S.tanV||S.surf==='ceil'?rtFromWall().concat(rtBackIn()):rtBackIn();return rtIntoFront()}
+function rtFromWall(){const S=SILL,g=S.g;if(S.surf==='ceil')return[RT.wait(.2),RT.drop(.8),RT.surf('bar')];return[RT.walk(S.surf,g.bt-R*.85),RT.turn('bar')]}
+// 像貓一樣推擺飾：走到旁邊，看著你，伸偽足慢慢推
+function catPick(){const cx=globalC.xc;let best=null,bd=R*3;for(const p of PROPS){if(p.gone||p.fade||p.held||Math.abs(p.a)>.4)continue;const d=Math.abs(p.x-cx);if(d<bd){bd=d;best=p}}return best}
+function rtPoke(p){const side=p.x>globalC.xc?1:-1,a=side>0?-.1:Math.PI+.1,tx=sillClampX(p.x-side*(p.hw+R*.9));const look=T=>RT.fn(()=>{EYE.user=t+T});
+  return[RT.walk('floor',tx),look(2.6),RT.wait(.5),RT.sniff(a,1,1.8),look(2.2),RT.sniff(a,1.25,1.8),RT.fn(()=>{if(Math.abs(p.a)>.5||Math.abs(p.x-p.hx)>R*.25){MOOD.happyT=t;voice('happy',.6)}EYE.user=t+1.2})]}
+function floorWalkX(cx){const g=SILL.g,lo=g.l+R*.9;let hi=g.r-R*.9;for(const p of PROPS)if(!p.gone&&p.x>cx)hi=Math.min(hi,p.x-p.hw-R*.95);if(hi-lo<R*.3)return null;return lo+(hi-lo)*Math.random()}
+// 牠自己想出門：看現在在哪一層，從能做的事裡挑。大半時間還是待著（v2.19：大半時間在休息）
+function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random()/Math.max(.01,mat.envRoam||0);LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.route||S.hop||S.air||!(mat.envRoam>0))return;
+  if(S.inBowl){if(r<.16)routeStart(rtOutFront(null));else if(r<.38)routeStart(rtOverBack(Math.random()<.75?g.jr-R*(.8+.5*Math.random()):null));return}
+  if(S.plane==='room'){const p=catPick();if(p&&Math.random()<(mat.catPush||0)*(.35+.4*IMP.tr)){routeStart(rtPoke(p));return}
+    if(r<.6){routeStart(rtIntoFront());return}const x=floorWalkX(cx);if(x!=null&&Math.abs(x-cx)>R*.3)gaitTo(x,HOMEY,false);return}
+  if(S.plane==='frame'){if(S.tanV||S.surf==='ceil'){routeStart(rtFromWall());return}if(r<.22)routeStart(rtFrameLoop());else if(r<.4)routeStart(rtClimbDrop());else if(r<.62)routeStart(rtGoOut());else if(r<.82)routeStart(rtBackIn());else{const x=sillClampX(cx+(Math.random()<.5?-1:1)*R*(.5+Math.random()));gaitTo(x,HOMEY,false)}return}
+  if(S.plane==='out'){if(t-S.outT>10||r<.35)routeStart(rtComeBack());else{const x=sillClampX(cx+(Math.random()<.5?-1:1)*R*(.6+Math.random()));gaitTo(x,HOMEY,false)}}}
+function sillStepPre(){let g=false;for(const f of fingers.values())if(f.mode==='grab'){g=true;SILL.relX=f.fx;SILL.relY=f.fy}SILL.grab=g}
+// 放手時身體有沒有跟碗或擺飾重疊：重疊就只能留在窗台層（換到後面會看到牠突然被蓋住）
+function sillOverlapFront(x0,x1,y0,y1){const g=SILL.g;if(x0<g.bx+g.bw/2&&x1>g.bx-g.bw/2&&y1>g.by)return true;for(const p of PROPS){if(p.gone)continue;if(x0<p.x+p.r&&x1>p.x-p.r&&y1>p.y-p.r)return true}return false}
+function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==null)return;let y1=-1e9,y0=1e9,x0=1e9,x1=-1e9;for(const i of bnd){if(Y[i]>y1)y1=Y[i];if(Y[i]<y0)y0=Y[i];if(X[i]<x0)x0=X[i];if(X[i]>x1)x1=X[i]}S.y1=y1;S.y0=y0;S.x0=x0;S.x1=x1;
   S.vx=S.px?(cx-S.px)/dt:0;S.vy=S.py?(cy-S.py)/dt:0;S.px=cx;S.py=cy;
-  const wasAir=S.air;S.air=S.c===0&&!S.grab&&!INTRO.on&&!S.glass&&!(S.hop&&S.hop.ph==='crouch');
+  {const k=1-Math.exp(-dt/.12);S.gvx+=(S.gtx-S.gvx)*k;S.gvy+=(S.gty-S.gvy)*k}   // 重力方向慢慢轉，轉角才不會一下甩出去
+  const wasAir=S.air;S.air=S.c===0&&!S.grab&&!INTRO.on&&!S.lift&&!(S.hop&&S.hop.ph==='crouch');
   if(S.air){S.fall=Math.max(S.fall,S.vy);for(let i=0;i<N;i++){const lim=R*30*dt/SUB,v=Y[i]-PY[i];if(v>lim)PY[i]=Y[i]-lim;else if(v<-lim)PY[i]=Y[i]+lim}}
-  if(wasAir&&!S.air&&!S.grab){if(S.fall>R*2.5)sfxPlay('press',Math.min(.9,.2+S.fall/(R*16)));if(S.hop&&S.hop.ph==='air')S.hop=null;S.want=false;S.fall=0;S.lastHome=Math.max(S.lastHome,t-8);LIFE.st='rest';LIFE.until=t+1+Math.random()}
-  // 放手：慢慢放在窗戶上（不在碗的正上方）會黏住；用力甩或放在碗上面就掉下去
-  if(S.held&&!S.grab){const sp=Math.hypot(S.vx,S.vy),over=cx>g.gx+R*.5&&cx<g.gx+g.gw-R*.5&&cy>g.gy+R*.3&&y1<g.fl-R*.5&&y1<g.rim+R*.2;if(over&&!S.inBowl&&sp<R*2.5&&Math.abs(S.relX-g.bx)>g.cav*.9){S.glass={t0:t};for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3)}else S.want=Math.abs(S.relX-g.bx)<g.cav*.9}
+  if(wasAir&&!S.air&&!S.grab){if(S.fall>R*2.5)sfxPlay('press',Math.min(.9,.2+S.fall/(R*16)));if(S.hop&&S.hop.ph==='air')S.hop=null;S.want=false;S.fall=0;S.lastHome=Math.max(S.lastHome,t-8);if(!S.route){LIFE.st='rest';LIFE.until=t+1+Math.random();if(!S.surf)S.surf=S.plane==='frame'?'bar':S.plane==='out'?'ledge':S.inBowl?'bowl':'floor'}}
+  // 被抓：路線取消，回到窗台層（舉起來，畫在最前面）
+  if(S.grab&&!S.held){if(S.route)routeEnd(true);if(S.hop)S.hop=null;S.stickT=-1;S.surf=null;S.tanV=false;S.lift=false;S.gtx=0;S.gty=1;planeSet('room')}
+  // 放手：碗正上方掉進碗；窗戶範圍內、身體不跟碗或擺飾重疊就落到窗框層；慢慢放在窗框旁邊會黏住；其他落在窗台
+  if(S.held&&!S.grab&&!S.inBowl){const sp=Math.hypot(S.vx,S.vy);S.want=Math.abs(S.relX-g.bx)<g.cav*.9;
+    if(!S.want&&cx>g.gx&&cx<g.jr&&y1<g.bt-1&&!sillOverlapFront(x0,x1,y0,y1)){planeSet('frame');
+      if(sp<R*2.5&&y1<g.bt-R*.4){const sd=x1>g.jr-R*.3?'rjamb':x0<g.gx+R*.3?'ljamb':y0<g.gy+R*.3?'ceil':null;if(sd){surfSet(sd);S.stickT=t;for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3)}}}}
   S.held=S.grab;
-  if(S.grab){if(S.hop)S.hop=null;if(S.glass)S.glass=null}
-  // 黏在窗戶上慢慢滑下來，滑到窗戶下緣就掉
-  if(S.glass){const v=R*(.22+.2*Math.min(1,(t-S.glass.t0)/6))*(REDUCED?.5:1)*dt;for(let i=0;i<N;i++){Y[i]+=v;PY[i]+=v}INTRO.sq+=(.07-INTRO.sq)*(1-Math.exp(-dt/.12));if(y1>g.gy+g.gh+R*.05||y1>g.fl-R*.1){S.glass=null;S.air=true;S.c=0;S.want=false}}
-  // 家：放開時上下交給重力，家跟著身體；碗裡慢慢回碗中間
-  if(!S.grab){HOMEY=cy;if(S.air||S.glass)HOMEX=cx;else if(S.inBowl&&!ESC.on)HOMEX+=(g.bx-HOMEX)*(1-Math.exp(-dt/.3));HOMEX=sillClampX(HOMEX)}
-  // 進碗、出碗
-  if(S.inBowl){let out=y1<g.rim-R*.3;if(S.grab)for(const f of fingers.values())if(f.mode==='grab'&&Math.abs(f.fx-g.bx)>g.cav+R*.4)out=true;if(out)S.inBowl=false}
-  else if(!S.grab&&S.air&&S.want&&S.vy>0&&Math.abs(cx-g.bx)<g.cav*.9&&y1>g.rim-R*.2&&y1<g.rim+R*.3){S.inBowl=true;S.want=false}
-  // 跳
-  if(S.hop){const q=S.hop;q.t+=dt;if(q.ph==='crouch'){INTRO.sq=.14*Math.sin(Math.min(1,q.t/.12)*Math.PI/2);if(q.t>=.12)sillLaunch()}
-    else{INTRO.sq+=(-.06-INTRO.sq)*(1-Math.exp(-dt/.08));if(q.toGlass!=null&&S.vy>=-R*.5&&q.t>.05){S.glass={t0:t};S.air=false;S.hop=null;for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3)}}}
-  else if(!INTRO.on&&!S.glass)INTRO.sq*=Math.exp(-dt/.08);
-  // 被嚇跑時先跳出碗
+  if(S.stickT>=0&&mat.life2>=.5&&!S.route&&!fingers.size&&t-S.stickT>1.6+Math.random()*.02){S.stickT=-1;routeStart(rtFromWall())}
+  // 家：抓著時不管；在空中跟著身體；沿著走的方向由步態決定，另一個方向跟著身體
+  if(!S.grab){if(S.air){HOMEX=cx;HOMEY=cy}else if(S.tanV){if(!S.lift)HOMEX=cx}else{HOMEY=cy;if(S.inBowl&&!ESC.on&&!S.route)HOMEX+=(g.bx-HOMEX)*(1-Math.exp(-dt/.3))}if(!S.route&&!S.tanV)HOMEX=sillClampX(HOMEX)}
+  // 進碗、出碗（路線自己管換層）
+  if(!S.route){if(S.inBowl){let out=y1<g.rim-R*.3;if(S.grab)for(const f of fingers.values())if(f.mode==='grab'&&Math.abs(f.fx-g.bx)>g.cav+R*.4)out=true;if(out)S.inBowl=false}
+    else if(!S.grab&&S.air&&S.want&&S.plane==='room'&&S.vy>0&&Math.abs(cx-g.bx)<g.cav*.9&&y1>g.rim-R*.2&&y1<g.rim+R*.3){S.inBowl=true;S.want=false;S.surf='bowl'}}
+  if(S.hop){const q=S.hop;q.t+=dt;if(q.ph==='crouch'){INTRO.sq=.14*Math.sin(Math.min(1,q.t/.12)*Math.PI/2);if(q.t>=.12)sillLaunch()}else INTRO.sq+=(-.06-INTRO.sq)*(1-Math.exp(-dt/.08))}
+  else if(!INTRO.on)INTRO.sq*=Math.exp(-dt/.08);
+  // 被嚇跑：貼在牆上就掉下來，在碗裡就跳出去
+  if(ESC.on&&S.tanV&&!S.grab){S.tanV=false;S.surf=null;S.gtx=0;S.gty=1;S.stickT=-1}
   if(ESC.on&&S.inBowl&&!S.grab&&!S.hop)sillHop(ESC.dx,false);
-  // 在窗台上閒一陣子就回碗
-  if(!S.grab&&!S.inBowl&&!S.air&&!S.glass&&!S.hop&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&t-lastTouch>12&&t-S.lastHome>10){S.lastHome=t;sillHop(g.bx,true)}}
+  if(S.route&&!S.grab)routeStep(dt);
+  // 在外面閒一陣子就回碗
+  if(!S.grab&&!S.inBowl&&!S.air&&!S.hop&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&S.stickT<0&&t-lastTouch>25&&t-S.lastHome>10&&mat.envRoam>0){S.lastHome=t;routeStart(rtHome())}}
+
+/* 擺飾：凸多邊形的剛體。粒子碰到被推出去，反過來推擺飾；擺飾有重量、會倒、會滾，手指抓得起來。超出窗台兩端就掉下去，約 20 秒後回來；倒著放 25 秒也回原位 */
+const PROPS=[],PROP_MU=.55,PROP_PUSH=1,PROPDEF={
+  succ:{kind:'pot',asp:300/220,wd:70,hx:352/393,com:.70,m:190,poly:[[.16,.995],[.84,.995],[.985,.72],[.975,.40],[.72,.02],[.36,0],[.03,.40],[.01,.72]]},
+  peb:{kind:'dish',asp:159/240,wd:76,hx:268/393,com:.62,m:110,poly:[[.30,.995],[.70,.995],[1,.50],[.97,.33],[.72,.02],[.50,0],[.2,.17],[.02,.33],[0,.5]]}};
+function propsInit(){PROPS.length=0;const g=SILL.g,U=g.U;for(const im of ['peb','succ']){const d=PROPDEF[im],wd=d.wd*U,hg=wd*d.asp;let P=d.poly.map(q=>[(q[0]-.5)*wd,(q[1]-d.com)*hg]);
+    let A=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];A+=a[0]*b[1]-b[0]*a[1]}if(A<0)P=P.reverse();
+    const Nn=P.map((a,i)=>{const b=P[(i+1)%P.length],ex=b[0]-a[0],ey=b[1]-a[1],l=Math.hypot(ex,ey)||1;return[ey/l,-ex/l]});let r=0,base=-1e9,hw=0;for(const q of P){r=Math.max(r,Math.hypot(q[0],q[1]));base=Math.max(base,q[1]);hw=Math.max(hw,Math.abs(q[0]))}
+    const x=W*d.hx,y=g.fl-base,m=d.m;PROPS.push({im,kind:d.kind,w:wd,h:hg,ox:wd*.5,oy:hg*d.com,P,N:Nn,r,hw,base,m,I:m*(wd*wd+hg*hg)/12,x,y,a:0,vx:0,vy:0,va:0,hx:x,hy:y,alpha:1,fade:0,gone:false,fell:false,skip:false,lastHit:t,held:null,backAt:0,knockT:-9})}}
+function propIn(p,x,y,pad){const c=Math.cos(p.a),s=Math.sin(p.a),dx=x-p.x,dy=y-p.y,lx=c*dx+s*dy,ly=-s*dx+c*dy;for(let k=0;k<p.P.length;k++){const q=p.P[k],n=p.N[k];if((lx-q[0])*n[0]+(ly-q[1])*n[1]>pad)return false}return true}
+function propAt(x,y){for(let k=PROPS.length-1;k>=0;k--){const p=PROPS[k];if(!p.gone&&p.alpha>.5&&propIn(p,x,y,R*.08))return p}return null}
+function propHome(p){Object.assign(p,{x:p.hx,y:p.hy,a:0,vx:0,vy:0,va:0,gone:false,fell:false,fade:1,alpha:0,skip:false,lastHit:t})}
+function propSlotFree(p){const S=SILL;if(S.plane!=='room'||S.inBowl)return true;return !(S.x0<p.hx+p.r&&S.x1>p.hx-p.r&&S.y1>p.hy-p.r)}
+function propsMarkOverlap(){for(const p of PROPS){if(p.gone){continue}let o=false;for(let i=0;i<N&&!o;i++)if(propIn(p,X[i],Y[i],0))o=true;p.skip=o}}   // 換回窗台層時已經疊著的擺飾先不撞，分開了才開始（不然一抓就把盆栽踢飛）
+function propKnock(p,g,far){if(t-p.knockT<.14)return;p.knockT=t;sfxPlay('knock.'+p.kind,Math.max(.05,Math.min(1,g)),far?.8:1)}
+function propRelease(f){const p=f.prop;if(!p)return;p.held=null;p.lastHit=t;if(t-f.tDown<.25&&Math.hypot(f.x-f.ax,f.y-f.ay)<R*.12){p.va+=(f.ax<p.x?1:-1)*1.7;propKnock(p,.22)}}
+function propsHitBody(dt){const S=SILL;if(S.plane!=='room'||S.inBowl)return;const capP=h*.6;
+  for(const p of PROPS){if(p.gone||p.alpha<.6)continue;const c=Math.cos(p.a),s=Math.sin(p.a),P=p.P,Nn=p.N,M=P.length,r2=p.r*p.r;let over=false;
+    for(let i=0;i<N;i++){const dx=X[i]-p.x,dy=Y[i]-p.y;if(dx*dx+dy*dy>r2)continue;const lx=c*dx+s*dy,ly=-s*dx+c*dy;let best=-1e9,bk=-1;
+      for(let k=0;k<M;k++){const d=(lx-P[k][0])*Nn[k][0]+(ly-P[k][1])*Nn[k][1];if(d>0){bk=-2;break}if(d>best){best=d;bk=k}}
+      if(bk<0)continue;over=true;if(p.skip)continue;
+      const nx=c*Nn[bk][0]-s*Nn[bk][1],ny=s*Nn[bk][0]+c*Nn[bk][1],pc=Math.min(-best,capP),vx=X[i]-PX[i],vy=Y[i]-PY[i],vn=vx*nx+vy*ny,kn=vn<0?vn:0;
+      X[i]+=nx*pc;Y[i]+=ny*pc;PX[i]=X[i]-(vx-nx*kn);PY[i]=Y[i]-(vy-ny*kn);
+      const imp=Math.min(pc,1.5)/dt*PROP_PUSH,rx=X[i]-p.x,ry=Y[i]-p.y;p.vx-=nx*imp/p.m;p.vy-=ny*imp/p.m;p.va-=(rx*ny-ry*nx)*imp/p.I;p.lastHit=t}
+    if(p.skip&&!over)p.skip=false}}
+function propPair(A,B){const ca=Math.cos(A.a),sa=Math.sin(A.a),cb=Math.cos(B.a),sb=Math.sin(B.a),wa=1/A.m,wb=1/B.m;
+  for(const q of A.P){const wx=A.x+ca*q[0]-sa*q[1],wy=A.y+sa*q[0]+ca*q[1],dx=wx-B.x,dy=wy-B.y,lx=cb*dx+sb*dy,ly=-sb*dx+cb*dy;let best=-1e9,bk=-1;
+    for(let k=0;k<B.P.length;k++){const d=(lx-B.P[k][0])*B.N[k][0]+(ly-B.P[k][1])*B.N[k][1];if(d>0){bk=-2;break}if(d>best){best=d;bk=k}}
+    if(bk<0)continue;const nx=cb*B.N[bk][0]-sb*B.N[bk][1],ny=sb*B.N[bk][0]+cb*B.N[bk][1],pen=-best,sum=wa+wb;
+    A.x+=nx*pen*.6*wa/sum;A.y+=ny*pen*.6*wa/sum;B.x-=nx*pen*.6*wb/sum;B.y-=ny*pen*.6*wb/sum;
+    const rax=wx-A.x,ray=wy-A.y,rbx=wx-B.x,rby=wy-B.y,vn=(A.vx-A.va*ray-B.vx+B.va*rby)*nx+(A.vy+A.va*rax-B.vy-B.va*rbx)*ny;if(vn>=0)continue;
+    const ra=rax*ny-ray*nx,rb=rbx*ny-rby*nx,j=-1.1*vn/(wa+wb+ra*ra/A.I+rb*rb/B.I);A.vx+=nx*j*wa;A.vy+=ny*j*wa;A.va+=ra*j/A.I;B.vx-=nx*j*wb;B.vy-=ny*j*wb;B.va-=rb*j/B.I;A.lastHit=t;B.lastHit=t;if(-vn>R*1.2){propKnock(A,Math.min(1,-vn/(R*9)));propKnock(B,Math.min(1,-vn/(R*9)))}}}
+function propsStep(dt){const S=SILL,g=S.g,G0=R*SILLG,bwr=g.bx+g.bw*.48,bwy=g.by+g.bh*.3;
+  for(const p of PROPS){
+    if(p.gone){if(t>=p.backAt&&propSlotFree(p))propHome(p);continue}
+    if(p.fade){p.alpha=Math.max(0,Math.min(1,p.alpha+p.fade*dt/.4));if(p.fade<0&&p.alpha<=0)propHome(p);else if(p.fade>0&&p.alpha>=1)p.fade=0}
+    const hd=p.held?fingers.get(p.held.id):null;if(p.held&&(!hd||hd.mode!=='prop'))p.held=null;
+    if(p.held){const tx=hd.x+p.held.ox,ty=hd.y+p.held.oy,w=Math.atan2(Math.sin(p.a),Math.cos(p.a));p.vx+=((tx-p.x)/.05-p.vx)*.25;p.vy+=((ty-p.y)/.05-p.vy)*.25;p.va+=(-w*10-p.va)*.2;p.lastHit=t}else p.vy+=G0*dt;
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.a+=p.va*dt;const c=Math.cos(p.a),s=Math.sin(p.a);let touch=0;
+    for(const q of p.P){const rx=c*q[0]-s*q[1],ry=s*q[0]+c*q[1],wx=p.x+rx,wy=p.y+ry;
+      if(wy>g.fl&&wy<g.fl+R*.5&&wx>g.sl&&wx<g.sr){p.y-=(wy-g.fl)*.7;touch++;const vn=p.vy+p.va*rx;if(vn>0){const e=vn>R*1.5?.15:0,j=-(1+e)*vn/(1/p.m+rx*rx/p.I);p.vy+=j/p.m;p.va+=j*rx/p.I;
+          const vt=p.vx-p.va*ry,lim=PROP_MU*Math.abs(j),jt=Math.max(-lim,Math.min(lim,-vt/(1/p.m+ry*ry/p.I)));p.vx+=jt/p.m;p.va-=ry*jt/p.I;if(vn>R*1.2)propKnock(p,vn/(R*9))}}
+      if(wx<bwr&&wy>bwy&&wy<g.fl+1){p.x+=(bwr-wx)*.7;const vn=p.vx-p.va*ry;if(vn<0){const j=-1.1*vn/(1/p.m+ry*ry/p.I);p.vx+=j/p.m;p.va-=ry*j/p.I;if(-vn>R*1.2)propKnock(p,-vn/(R*9))}}}
+    if(touch){p.vx*=.9985;p.va*=.994;if(!p.held&&Math.abs(p.vx)+Math.abs(p.vy)<7&&Math.abs(p.va)<.22){p.vx=0;p.vy=0;p.va=0}}
+    if(p.y>g.fl+R*.9&&!p.fell){p.fell=true;propKnock(p,.55,true)}   // 掉到窗台下面：看不到了，聽得到一聲
+    if(p.y>g.fl+R*2.5||p.x>W+R*2||p.x<-R*2){p.gone=true;p.alpha=0;p.backAt=t+20;p.vx=0;p.vy=0;p.va=0;p.fade=0;p.held=null}}
+  if(PROPS.length>1&&!PROPS[0].gone&&!PROPS[1].gone&&PROPS[0].alpha>.6&&PROPS[1].alpha>.6){propPair(PROPS[0],PROPS[1]);propPair(PROPS[1],PROPS[0])}
+  for(const p of PROPS){if(p.gone||p.held||p.fade||t-p.lastHit<25)continue;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a));if((Math.abs(w)>.08||Math.hypot(p.x-p.hx,p.y-p.hy)>2)&&propSlotFree(p))p.fade=-1;else p.lastHit=t}}
 
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
@@ -1948,6 +2081,12 @@ function bowlFront(kind){const a=SCENE.img;if(!a.bowl)return null;const key='fro
   c.globalCompositeOperation='destination-out';const ey=b.height*.308,rx=b.width*.424,ry=b.height*.26;c.beginPath();c.ellipse(b.width/2,ey,rx,ry,0,0,Math.PI*2);c.fill();c.fillRect(0,0,b.width,ey);
   if(kind==='night'){c.globalCompositeOperation='source-atop';c.fillStyle='rgba(38,42,92,.62)';c.fillRect(0,0,k.width,k.height)}c.globalCompositeOperation='source-over';SCENE.cache[key]=k;return k}
 function drawBowlFront(){if(!(SILL.on&&SILL.inBowl&&SILL.g))return;const k=bowlFront(VIEW.bg);if(!k)return;const g=SILL.g;ctx.drawImage(k,g.bx-g.bw/2,g.by,g.bw,g.bh)}
+function propImg(name){const a=SCENE.img[name];if(!a)return null;if(VIEW.bg!=='night')return a;const key='n|'+name;if(SCENE.cache[key])return SCENE.cache[key];const k=document.createElement('canvas');k.width=a.width;k.height=a.height;const c=k.getContext('2d');c.drawImage(a,0,0);c.globalCompositeOperation='source-atop';c.fillStyle='rgba(38,42,92,.62)';c.fillRect(0,0,k.width,k.height);SCENE.cache[key]=k;return k}
+function propShadow(x,y,rx,ry,a){ctx.save();ctx.translate(x,y);ctx.scale(rx,ry);const sg=ctx.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,`rgba(120,70,40,${(.28*a).toFixed(3)})`);sg.addColorStop(1,'rgba(120,70,40,0)');ctx.fillStyle=sg;ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();ctx.restore()}
+function drawProps(){const S=SILL,g=S.g;if(!g)return;for(const p of PROPS){if(p.gone||p.alpha<=.01)continue;const im=propImg(p.im);if(!im)continue;const near=Math.max(0,1-Math.abs(g.fl-(p.y+p.base))/(R*.8));if(near>0&&p.x>g.sl&&p.x<g.sr)propShadow(p.x,g.fl-2,p.w*.52*(1+.3*Math.abs(Math.sin(p.a))),11*g.U,near*p.alpha);
+    ctx.save();ctx.globalAlpha=p.alpha;ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.drawImage(im,-p.ox,-p.oy,p.w,p.h);ctx.restore()}
+  const b=propImg('bowl');if(b){propShadow(g.bx,g.fl-2,g.bw*.52,11*g.U,1);ctx.drawImage(b,g.bx-g.bw/2,g.by,g.bw,g.bh)}}
+function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl==='out')ctx.drawImage(sc.wall,0,0,W,H);if(pl!=='room')drawProps();else drawBowlFront()}}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外的碗和擺飾；碗裡的碗前緣
 function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
   const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
   const s=Math.min(W/860,H/1130)*DPR,sillTop=h*.72,off=sillTop-1177*s,ox=(w-992*s)/2,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
@@ -1956,10 +2095,8 @@ function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.su
   else{c.fillStyle='rgba(255,255,255,.92)';for(const [cx,cy,r] of [[.26,.24,1],[.72,.14,.8],[.82,.5,1.15],[.3,.62,.7]]){const u=gw*.1*r,X0=gx+gw*cx,Y0=gy+gh*cy;for(const [dx,dy,rr] of [[-1.1,.2,.62],[-.3,-.25,.9],[.6,-.05,.75],[1.3,.25,.5]]){c.beginPath();c.arc(X0+dx*u,Y0+dy*u,rr*u,0,Math.PI*2);c.fill()}c.fillRect(X0-u*1.6,Y0+u*.1,u*3.3,u*.62)}}
   c.fillStyle=night?'rgba(30,40,80,.9)':'rgba(120,165,150,.45)';c.beginPath();c.moveTo(gx,gy+gh);for(let i=0;i<=40;i++){const q=i/40;c.lineTo(gx+gw*q,gy+gh*(.9-.035*Math.sin(q*9)-.02*Math.sin(q*21)))}c.lineTo(gx+gw,gy+gh);c.fill();
   const room=document.createElement('canvas');room.width=w;room.height=h;const r=room.getContext('2d');r.fillStyle='#F2E7DC';r.fillRect(0,0,w,h);r.clearRect(gx,gy,gw,gh);r.drawImage(a.plate,ox,off,992*s,1586*s);
-  const sillY=off+1228*s,U=W*DPR/393,place=(im,cx,wd)=>{const hd=im.height*wd/im.width;r.save();r.translate(cx,sillY-2);r.scale(wd*.52,11*U);const sg=r.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,'rgba(120,70,40,.28)');sg.addColorStop(1,'rgba(120,70,40,0)');r.fillStyle=sg;r.beginPath();r.arc(0,0,1,0,Math.PI*2);r.fill();r.restore();r.drawImage(im,cx-wd/2,sillY-hd,wd,hd)};
-  place(a.succ,w/2-146.5*U,70*U);place(a.peb,w/2+146.5*U,76*U);place(a.bowl,w/2,205*U);
   if(night){r.globalCompositeOperation='source-atop';r.fillStyle='rgba(38,42,92,.62)';r.fillRect(0,0,w,h);r.globalCompositeOperation='source-over'}
-  c.drawImage(room,0,0);SCENE.cache[key]=sky;return sky}
+  const base=document.createElement('canvas');base.width=w;base.height=h;const bc=base.getContext('2d');bc.drawImage(sky,0,0);bc.drawImage(room,0,0);return SCENE.cache[key]={base,sky,wall:room}}   // v2.30 拆層：牠在窗外時要畫在天空和牆中間；碗和擺飾每幀畫
 let fpsAcc=0,fpsN=0;function viewFps(dt){fpsAcc+=dt;fpsN++;if(fpsAcc>=.5){const el=document.getElementById('v-fps');if(el)el.textContent='· 每幀 '+(fpsAcc/fpsN*1000).toFixed(1)+' ms';fpsAcc=0;fpsN=0}}
 function viewSync(){const root=document.getElementById('view');root.classList.toggle('shut',!!VIEW.shut);document.getElementById('v-toggle').textContent=VIEW.shut?'切換':'收起';
   root.querySelectorAll('.seg').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(VIEW[k])===b.dataset.v)))});
@@ -1973,12 +2110,13 @@ function draw(){
   const css=getComputedStyle(document.documentElement),col=n=>css.getPropertyValue(n).trim();
   ctx.clearRect(0,0,W,H);
   // 背景
-  const sc=VIEW.bg==='blue'?null:sceneFor(VIEW.bg);
-  if(sc)ctx.drawImage(sc,0,0,W,H);
+  const sc=VIEW.bg==='blue'?null:sceneFor(VIEW.bg),env=sc&&SILL.on&&SILL.g,pl=env?SILL.plane:'room';
+  if(sc)ctx.drawImage(pl==='out'?sc.sky:sc.base,0,0,W,H);
   else{const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,col('--sky'));g.addColorStop(1,col('--sky2'));
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
   if(!FLOAT){ctx.fillStyle=col('--grass');ctx.fillRect(0,GROUND,W,H-GROUND);ctx.fillStyle=col('--grass-line');ctx.fillRect(0,GROUND,W,3)}
   if(FLOAT&&mat.specks>=.5&&!sc)drawSpecks(col);
+  if(env&&pl==='room')drawProps();
   // 鏡頭：之後畫的都在世界座標；描邊粗細除以 z，畫面上看起來一樣粗
   {const v=viewV();ctx.setTransform(DPR*CAM.z,0,0,DPR*CAM.z,DPR*(v.x-CAM.z*CAM.x),DPR*(v.y-CAM.z*CAM.y))}
   if(IV.s!==1||IV.ox||IV.oy){ctx.translate(INTRO.px+IV.ox,INTRO.py+IV.oy);ctx.scale(IV.s,IV.s);ctx.translate(-INTRO.px,-INTRO.py)}   // v2.17 開場的遠近
@@ -1993,7 +2131,7 @@ function draw(){
   ctx.fillStyle=`rgba(60,90,40,${(FLOAT?.10+.08*(1-lift):.16)+.04*pz})`;
   ctx.beginPath();ctx.ellipse((minX+maxX)/2,sy,sw*(FLOAT?.7+.3*(1-lift):1.05)*(1+.08*pz),   // 影子跟整體寬度置中（拉長時跟重心會偏一邊）
     R*.11*(FLOAT?.8:1),0,0,Math.PI*2);ctx.fill()}
-  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBlush(P);drawEyes(col);drawBowlFront();ctx.setTransform(DPR,0,0,DPR,0,0);return}   // v2.28 預覽：果凍皮畫身體
+  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBlush(P);drawEyes(col);drawFront(sc,env,pl);return}   // v2.28 預覽：果凍皮畫身體
   ctx.save();
   if(!FLOAT){ctx.beginPath();ctx.rect(0,0,W,GROUND+2);ctx.clip()}
   // 身體：陰影色打底，再用往左上偏移的底色蓋住
@@ -2024,8 +2162,7 @@ function draw(){
   if(mat.inkVar>0){ctx.fillStyle=col('--line');inkBand(P,Math.max(4,R*.034)/CAM.z);ctx.fill()}   // 候選 34：描邊粗細隨壓縮
   else{bodyPath(P);ctx.lineWidth=Math.max(4,R*.034)/CAM.z;ctx.lineJoin='round';ctx.strokeStyle=col('--line');ctx.stroke()}
   ctx.restore();
-  drawBowlFront();
-  ctx.setTransform(DPR,0,0,DPR,0,0);
+  drawFront(sc,env,pl);
 }
 
 /* ---------- 主迴圈 ---------- */
