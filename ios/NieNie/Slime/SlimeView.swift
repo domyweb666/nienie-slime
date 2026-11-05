@@ -179,11 +179,20 @@ final class SlimeView: UIView {
     }
 
     /// v2.22 E3: trusting leans warm, wary leans pale, inside the same two flat colours (the style stays).
-    private func tinted(_ c: UIColor, _ tr: Double, _ w: Double) -> UIColor {
+    private func tinted(_ c: UIColor, _ tr: Double, _ w: Double, shade: Bool = false) -> UIColor {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         c.getRed(&r, green: &g, blue: &b, alpha: &a)
         var rr = min(255, Double(r) * 255 + 22 * tr), gg = min(255, Double(g) * 255 + 4 * tr), bb = max(0, Double(b) * 255 - 18 * tr)
         rr += (255 - rr) * 0.22 * w; gg += (255 - gg) * 0.22 * w; bb += (255 - bb) * 0.22 * w
+        // v2.27 mood colour: towards the mood's colour, by the same share for every slime
+        let mC: Double = rig.mcC, mS: Double = rig.mcS, mW: Double = rig.mcW, mZ: Double = rig.mcZ, sum: Double = mC + mS + mW + mZ, A: Double = rig.params.moodColor
+        if A > 0 && sum > 0.002 {
+            let k: Double = A * sum / max(1, sum), sh: Double = shade ? 0.82 : 1
+            let mr: Double = (mC * 255 + mS * 240 + mW * 141 + mZ * 108) / sum * sh
+            let mg: Double = (mC * 154 + mS * 68 + mW * 166 + mZ * 120) / sum * sh
+            let mb: Double = (mC * 139 + mS * 79 + mW * 217 + mZ * 184) / sum * sh
+            rr += (mr - rr) * k; gg += (mg - gg) * k; bb += (mb - bb) * k
+        }
         return UIColor(red: CGFloat(rr / 255), green: CGFloat(gg / 255), blue: CGFloat(bb / 255), alpha: a)
     }
 
@@ -602,11 +611,15 @@ final class SlimeView: UIView {
         }
 
         // v2.22 E3: the body colour leans with the impression (only re-set when it moved by a visible step)
-        let tk = rig.showsImpression ? Int((rig.impShownTrust * 40).rounded()) * 100 + Int((rig.impShownWary * 40).rounded()) : -1
+        let moodOn: Bool = rig.params.moodColor > 0 && rig.mcC + rig.mcS + rig.mcW + rig.mcZ > 0.002
+        func q40(_ v: Double) -> Int { Int((v * 40).rounded()) }
+        let tkImp: Int = rig.showsImpression ? q40(rig.impShownTrust) * 100 + q40(rig.impShownWary) : -1
+        let tkMood: Int = moodOn ? (q40(rig.mcC) + q40(rig.mcS) * 41 + q40(rig.mcW) * 1681 + q40(rig.mcZ) * 68921 + 1) * 10000 : 0
+        let tk: Int = tkImp + tkMood
         if tk != tintKey {
             tintKey = tk
             let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
-            let sh = tinted(colors.shade, tr, w).cgColor, ba = tinted(colors.base, tr, w).cgColor
+            let sh = tinted(colors.shade, tr, w, shade: true).cgColor, ba = tinted(colors.base, tr, w).cgColor
             shadeLayer.fillColor = sh; baseLayer.fillColor = ba; dropShadeLayer.fillColor = sh; dropBaseLayer.fillColor = ba; strandLayer.fillColor = ba
         }
         // v2.22 drops: an ellipse stretched along its speed; the base colour shifted up-left inside it, a small highlight, the outline

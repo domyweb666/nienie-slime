@@ -70,6 +70,8 @@ final class SlimeRig {
     private struct Tentacle {
         var a, ux, uy, L, w, curl, droop: Double
         var uExit = 0.0
+        var root: [Int] = [], edge: [Int] = [], all: [Int] = []   // v2.27: particles at the root, the outline away from the root, all of them
+        var s = 1.0, bumpT = -9.0   // v2.27: remembered stretch; last time it was bumped
     }
     private var tent: [Tentacle] = []
     private var ph: [Double] = [0, 0, 0, 0]
@@ -217,6 +219,7 @@ final class SlimeRig {
         }
     }
     private var drops: [Drop] = [], mass = 1.0, massD = 1.0, lifeDrop: Drop?, lifeDropPush = false
+    private(set) var mcC = 0.0, mcS = 0.0, mcW = 0.0, mcZ = 0.0   // v2.27 mood colour shown: comfort, strain, wary, asleep
     private(set) var impShownTrust = 0.0, impShownWary = 0.0
     /// v2.22: the drops as drawn (world points; a drop flowing back in shrinks). v2.23: pts = the teardrop outline (empty: v2.22's ellipse).
     struct DropView { let x, y, r, vx, vy: Double; let pts: [(x: Double, y: Double)] }
@@ -587,14 +590,17 @@ final class SlimeRig {
         ph = [r.next() * 6.28, r.next() * 6.28, r.next() * 6.28, (-72 + (r.next() - 0.5) * 30) * .pi / 180]
         // screen coords, y down: 90° is straight down. Most hang below or sideways.
         // v2.9: limbs 0 by default, no fixed tentacles (多米: not a starfish); what reaches out are the pseudopods
-        let base: [(Double, Double, Double)] = Array([(100, 2.1, 0.17), (55, 1.8, 0.15), (140, 1.65, 0.14), (8, 1.5, 0.14), (198, 1.35, 0.13)]
-            .prefix(max(0, min(5, Int(params.limbs.rounded())))))
+        // v2.27 (多米 11-05: many tentacles): more than 5 ring the body evenly; the old 5 stay for the starfish control
+        let nLimb: Int = max(0, Int(params.limbs.rounded())), ring: Bool = nLimb > 5
+        var base: [(Double, Double, Double)] = Array([(100, 2.1, 0.17), (55, 1.8, 0.15), (140, 1.65, 0.14), (8, 1.5, 0.14), (198, 1.35, 0.13)].prefix(min(5, nLimb)))
+        if ring { base = (0..<nLimb).map { i -> (Double, Double, Double) in (360.0 * Double(i) / Double(nLimb) - 90.0, 1.32, 0.11) } }
         tent = base.map { item -> Tentacle in
             let (deg, L, w) = item
             let a = (deg + (r.next() - 0.5) * 22) * .pi / 180
             let curl = (r.next() - 0.5) * 0.6
-            let droop = 0.15 + 0.3 * max(0, -sin(a))
-            return Tentacle(a: a, ux: cos(a), uy: sin(a), L: L * (0.85 + r.next() * 0.3), w: w * (0.85 + r.next() * 0.3),
+            let droop: Double = ring ? 0.08 : 0.15 + 0.3 * max(0, -sin(a))
+            let lScale: Double = ring ? 0.88 + r.next() * 0.22 : 0.85 + r.next() * 0.3
+            return Tentacle(a: a, ux: cos(a), uy: sin(a), L: L * lScale, w: w * (0.85 + r.next() * 0.3),
                             curl: curl, droop: droop)
         }
         for k in tent.indices {
@@ -607,6 +613,7 @@ final class SlimeRig {
     private func blobR(_ a: Double) -> Double {
         // no tentacles: one lump, no head bump, a little bigger to keep the tentacles' mass
         if tent.isEmpty { return 0.98 + 0.07 * sin(2 * a + ph[0]) + 0.05 * sin(3 * a + ph[1]) + 0.03 * sin(5 * a + ph[2]) }
+        if tent.count > 5 { return 0.72 + 0.05 * sin(2 * a + ph[0]) + 0.03 * sin(3 * a + ph[1]) + 0.02 * sin(5 * a + ph[2]) }   // v2.27 ringed tentacles: no head bump
         var d = a - ph[3]
         d = atan2(sin(d), cos(d))
         return 0.78 + 0.10 * sin(2 * a + ph[0]) + 0.07 * sin(3 * a + ph[1]) + 0.04 * sin(5 * a + ph[2]) + 0.24 * exp(-pow(d / 0.38, 2))
@@ -621,7 +628,7 @@ final class SlimeRig {
             let dx = ex - sx, dy = ey - sy, len2 = dx * dx + dy * dy
             var u = ((x - sx) * dx + (y - sy) * dy) / len2
             u = max(0, min(1, u))
-            let px = sx + dx * u, py = sy + dy * u, d = hypot(x - px, y - py), w = tt.w * R * (1 - 0.12 * u)
+            let px = sx + dx * u, py = sy + dy * u, d = hypot(x - px, y - py), w = tt.w * R * (tent.count > 5 ? 1.7 - 0.85 * u : 1 - 0.12 * u)
             if d < w && (best == nil || d / w < best!.q) { best = (k, u, d / w) }
         }
         return best
@@ -742,6 +749,12 @@ final class SlimeRig {
             Q0X[i] -= mx; Q0Y[i] -= my
             QX[i] = Q0X[i]; QY[i] = Q0Y[i]
             X[i] = cx + Q0X[i]; Y[i] = cy + Q0Y[i]; PX[i] = X[i]; PY[i] = Y[i]
+        }
+        for k in tent.indices {   // v2.27 tentSlip, tentBump, tentRest
+            tent[k].all = (0..<N).filter { TID[$0] == k }
+            tent[k].root = tent[k].all.filter { TUB[$0] < 0.08 }
+            tent[k].edge = bnd.filter { TID[$0] == k && TUB[$0] > 0.15 }
+            tent[k].s = 1; tent[k].bumpT = -9
         }
         buildClusters()
         bndL = []
@@ -1026,7 +1039,9 @@ final class SlimeRig {
         let rx = cx - clusters[gi].xc, ry = cy - clusters[gi].yc, rl = hypot(rx, ry)
         if rl > R * 0.3 && (rx * ux + ry * uy) / rl < 0 { return }
         var bi = -1, bs = 1e9
+        let noTent: Bool = tent.count > 5
         for i in bnd {
+            if noTent && TID[i] >= 0 && TU[i] >= 0.35 { continue }
             let dx = X[i] - cx, dy = Y[i] - cy
             if dx * ux + dy * uy <= 0 { continue }
             let pr = abs(dx * uy - dy * ux)
@@ -1034,7 +1049,7 @@ final class SlimeRig {
         }
         guard bi >= 0 else { return }
         let ex = X[bi] - cx, ey = Y[bi] - cy, l2 = max(1e-9, ex * ex + ey * ey), gr = params.grabR * R
-        for i in 0..<N where !GRAB[i] {
+        for i in 0..<N where !GRAB[i] && !(noTent && TID[i] >= 0 && TU[i] >= 0.35) {
             let dx = X[i] - cx, dy = Y[i] - cy, tt = max(0, min(1, (dx * ex + dy * ey) / l2))
             let d = hypot(dx - ex * tt, dy - ey * tt)
             if d < gr {
@@ -1074,6 +1089,14 @@ final class SlimeRig {
                 let u = d / gr, wp = (1 - u * u) * (1 - u * u), inv = d > 1e-6 ? wp / d : 0
                 f.mem.append((i, ox, oy, exp(-u * u * 2.5) * (1 - u * u), ox * inv, oy * inv))
                 GRAB[i] = true
+            }
+        }
+        // v2.27: not landing on a tentacle, hold none of its particles: a grab on the body holds only the body (a few caught along twist the root as clay remembers, 30 pt a frame of shaking)
+        if tent.count > 5 && gripTent(f) < 0 {
+            let keep = f.mem.filter { !(TID[$0.i] >= 0 && TU[$0.i] >= 0.35) }
+            if !keep.isEmpty && keep.count < f.mem.count {
+                for m in f.mem where TID[m.i] >= 0 && TU[m.i] >= 0.35 { GRAB[m.i] = false }
+                f.mem = keep
             }
         }
         // grabReach (v2.14, 多米 build 59: pulling from the middle did nothing; measured: the right edge went back 0.08R): only the
@@ -1215,13 +1238,152 @@ final class SlimeRig {
         if rl < R * 0.35 || (rx * dx + ry * dy) / (rl * dl) > 0.5 { return }
         let held: Double = t - f.tDown
         if dl * camZ < params.rubSpeed * 60 * max(held, 1.0 / 240.0) { stkG = min(3, stkG + 2 * held) }   // v2.26.1: the finger was already stroking while this was judged; without it three strokes no longer soothe at the higher threshold
+        letGo(f, id: id)
+        if flAt > t && !(impWary > 0.4) { flAt = -9 }   // a stroke does not startle it; wary, it still flinches
+    }
+
+    private func letGo(_ f: Finger, id: ObjectIdentifier) {
         f.mode = .stroke
         inertiaCatch()
         for m in f.mem { GRAB[m.i] = false }
         f.mem = []; f.reach = false; f.reachN = nil; f.slowT = 0; f.stretch = 0; f.ex = 0; f.ey = 0; f.sb = 0; f.press = 0; f.pressOn = false; f.flatOn = false; f.on = true; f.hitT = t
         for dn in dentList where dn.finger == id { dn.finger = nil; dn.pull = true; dn.held = 0 }
         dragRelease(glide: false)
-        if flAt > t && !(impWary > 0.4) { flAt = -9 }   // a stroke does not startle it; wary, it still flinches
+    }
+
+    /// Which tentacle a finger holds: more than half of what it holds must be on it. Pulling the body outward also grabs a line to the rim (v2.14), which can catch a few tentacle particles; that is not holding the tentacle, or a pull from the middle toward one would slip at once.
+    private func gripTent(_ f: Finger) -> Int {
+        if tent.count <= 5 || f.mem.isEmpty { return -1 }
+        var c = [Int](repeating: 0, count: tent.count)
+        for m in f.mem where TID[m.i] >= 0 && TU[m.i] >= 0.35 { c[TID[m.i]] += 1 }
+        var k = -1, b = 0
+        for j in c.indices where c[j] > b { b = c[j]; k = j }
+        return b * 2 >= f.mem.count ? k : -1
+    }
+
+    private func tentGrip(_ f: Finger) -> Bool { gripTent(f) >= 0 }
+
+    private func rootCentre(_ T: Tentacle) -> (x: Double, y: Double, qx: Double, qy: Double, q0x: Double, q0y: Double) {
+        var x = 0.0, y = 0.0, qx = 0.0, qy = 0.0, q0x = 0.0, q0y = 0.0
+        for i in T.root { x += X[i]; y += Y[i]; qx += QX[i]; qy += QY[i]; q0x += Q0X[i]; q0y += Q0Y[i] }
+        let n = Double(T.root.count)
+        return (x / n, y / n, qx / n, qy / n, q0x / n, q0y / n)
+    }
+
+    /// v2.27: pushing a tentacle toward its own root folds it; the rungs and the axis forbid folding while the finger insists, and it shakes (measured 60 pt a frame, the v2.8 tangle).
+    /// Pushed to tentSlip of its rest length, or round the back of the body, it slides out of the finger.
+    private func tentSlip(_ f: Finger, id: ObjectIdentifier) -> Bool {
+        if !(params.tentSlip > 0) { return false }
+        let k: Int = gripTent(f)
+        if k < 0 || tent[k].root.isEmpty || clusters.isEmpty { return false }
+        let c = rootCentre(tent[k])
+        var rest = 0.0
+        for m in f.mem where TID[m.i] == k { rest = max(rest, hypot(Q0X[m.i] - c.q0x, Q0Y[m.i] - c.q0y)) }
+        let ox: Double = c.x - clusters[gi].xc, oy: Double = c.y - clusters[gi].yc, ol: Double = max(hypot(ox, oy), 1e-9)
+        let fx: Double = f.rawX - c.x, fy: Double = f.rawY - c.y, fl: Double = max(hypot(fx, fy), 1e-9)
+        let back: Bool = (ox * fx + oy * fy) / (ol * fl) < 0.2
+        if !back && fl >= params.tentSlip * rest { return false }
+        letGo(f, id: id)
+        return true
+    }
+
+    /// v2.27 ringed tentacles remember their length, never a bend: the remembered shape stays straight, so it cannot fold or sink into the body. Stretch stays per the material; the root follows the body's remembered shape.
+    private func tentRest(_ dt: Double, _ mat: FeelParams) {
+        if tent.count <= 5 { return }
+        let grabbing = fingers.values.filter { $0.mode == .grab }
+        for k in tent.indices {
+            if tent[k].root.isEmpty { continue }
+            let c = rootCentre(tent[k])
+            var tgt = 0.0, g = 0.0
+            for f in grabbing where gripTent(f) == k {
+                for m in f.mem where TID[m.i] == k && TUB[m.i] >= 0.35 {
+                    let rest: Double = hypot(Q0X[m.i] - c.q0x, Q0Y[m.i] - c.q0y)
+                    if rest <= 1 { continue }
+                    let a: Double = hypot(X[m.i] - c.x, Y[m.i] - c.y) / rest
+                    if a > tgt {
+                        tgt = a
+                        let x: Double = max(0, min(1, (t - f.tDown - mat.dwellLo) / max(0.001, mat.dwellHi - mat.dwellLo)))
+                        g = x * x * (3 - 2 * x)
+                    }
+                }
+            }
+            var s: Double = tent[k].s
+            if t < relaxUntil { s += (1 - s) * min(1, 6 * dt) }
+            else if tgt > s { s += (min(tgt, 2.2) - s) * min(1, mat.creep * dt * g) }
+            else if tgt == 0 { s += (1 - s) * min(1, mat.recover * dt) }
+            tent[k].s = s
+            var tx = 0.0, ty = 0.0, tl = 0.0
+            for i in tent[k].all {
+                let dx: Double = Q0X[i] - c.q0x, dy: Double = Q0Y[i] - c.q0y, d: Double = hypot(dx, dy)
+                if d > tl { tl = d; tx = dx; ty = dy }
+            }
+            if tl < 1 { continue }
+            tx /= tl; ty /= tl
+            let sw: Double = 1 / s.squareRoot()
+            for i in tent[k].all where TUB[i] >= 0.08 {
+                let dx: Double = Q0X[i] - c.q0x, dy: Double = Q0Y[i] - c.q0y
+                let au: Double = (dx * tx + dy * ty) * s, pu: Double = (-dx * ty + dy * tx) * sw
+                QX[i] = c.qx + au * tx - pu * ty; QY[i] = c.qy + au * ty + pu * tx
+            }
+        }
+    }
+
+    /// v2.27 tentacles bump (多米 11-05). Only closing speed counts, so pressing still adds no force and cannot shake. The other tentacle's rest shape gets a velocity (the spring behind the release wobble;
+    /// pushing particles directly is undone by shape matching within a few substeps, measured 2 pt), more toward the tip, once in 0.2 s per pair. Not a hard constraint: pressed hard they still overlap. Held particles stay put.
+    private func tentBump() {
+        if !(params.tentBump > 0) || tent.count <= 5 || clusters.isEmpty { return }
+        let D: Double = R * 0.16, D2: Double = D * D, cap: Double = R * 0.012, n: Int = tent.count
+        let g = clusters[gi]
+        for a in 0..<n {
+            for b in (a + 1)..<max(a + 1, n) {
+                var best = 0.0, nx = 0.0, ny = 0.0, ia = -1, ib = -1
+                for i in tent[a].edge {
+                    for j in tent[b].edge {
+                        let dx: Double = X[i] - X[j], dy: Double = Y[i] - Y[j], d2: Double = dx * dx + dy * dy
+                        if d2 >= D2 || d2 < 1e-6 { continue }
+                        let d: Double = d2.squareRoot(), ux: Double = dx / d, uy: Double = dy / d
+                        let cl: Double = -((X[i] - PX[i] - X[j] + PX[j]) * ux + (Y[i] - PY[i] - Y[j] + PY[j]) * uy)
+                        if cl > best { best = cl; nx = ux; ny = uy; ia = i; ib = j }
+                    }
+                }
+                if best <= 0.02 || (t - tent[a].bumpT < 0.2 && t - tent[b].bumpT < 0.2) { continue }
+                tent[a].bumpT = t; tent[b].bumpT = t
+                let imp: Double = R * 10 * params.tentBump * (0.5 + 0.5 * min(1, best / cap))
+                let heldA: Bool = tent[a].all.contains { GRAB[$0] }, heldB: Bool = tent[b].all.contains { GRAB[$0] }
+                if heldA && heldB { continue }
+                let sa: Double = heldA ? 0 : (heldB ? 1 : 0.5), sb: Double = heldB ? 0 : (heldA ? 1 : 0.5)
+                let lx: Double = g.cs * nx + g.sn * ny, ly: Double = -g.sn * nx + g.cs * ny
+                if sa > 0 { kick(a, ia, imp * sa, lx, ly) }
+                if sb > 0 { kick(b, ib, -imp * sb, lx, ly) }
+            }
+        }
+    }
+
+    private func kick(_ k: Int, _ contact: Int, _ v: Double, _ lx: Double, _ ly: Double) {
+        let u0: Double = max(0.2, TU[contact])
+        for i in tent[k].all where !GRAB[i] {
+            let w: Double = min(1, TU[i] / u0), q: Double = w * w * v
+            QVX[i] += lx * q; QVY[i] += ly * q
+        }
+    }
+
+    /// v2.27 mood colour (多米 11-05): its own colour normally, tinted when a mood comes. These are what shows; 0.4 s to catch up so the colour flows.
+    private func moodColorStep(_ dt: Double) {
+        if !(params.moodColor > 0) { mcC = 0; mcS = 0; mcW = 0; mcZ = 0; return }
+        let q: Double = 1 - exp(-dt / 0.4)
+        func cl(_ v: Double) -> Double { max(0, min(1, v)) }
+        let tgtC: Double = max(cl((moodC - 0.1) / 0.45), t - happyT < 2 ? 1 : 0, !fingers.isEmpty && tickOn ? 0.7 : 0)
+        mcC += (tgtC - mcC) * q
+        var st = 0.0, yk = 0.0
+        for f in fingers.values where f.mode == .grab {
+            st = max(st, bodyStretch(f))
+            yk = max(yk, hypot(f.vxS, f.vyS) / R)
+        }
+        // the body follows the finger (the pull), so it rarely strains long enough to want out: red reads the stretch and the yank, quick to come, slow to go
+        let tgS: Double = max(moodStrain, escOn ? 1 : 0, cl((st - 0.6) / 0.5), !fingers.isEmpty && tickOn ? 0 : cl((yk - 5) / 3))
+        mcS += (tgS - mcS) * (tgS > mcS ? 1 - exp(-dt / 0.12) : q)
+        mcW += (max(cl(moodScare), cl(impShownWary / 0.6)) - mcW) * q
+        mcZ += (slpK - mcZ) * q
     }
 
     /// A stroke stops on the body (or the contact patch grows): the skin under the finger is held from here
@@ -1254,6 +1416,7 @@ final class SlimeRig {
                 f.mode = .stroke; f.lure = false; f.slowT = 0; f.on = true; f.hitT = t; f.pushed = true
                 onEvent?(.nudge)
             }
+            if f.mode == .grab && tentSlip(f, id: id) { continue }
             if f.mode == .grab {
                 grab = true
                 if mat.dentTrail > 0 && f.stretch < 0.6 && sp > R * 0.3 {
@@ -1813,6 +1976,7 @@ final class SlimeRig {
         // Reduce Motion halves the speed again (×0.25 together with L)
         wanderVX = 0; wanderVY = 0; strK = 1
         moodStep(dt)
+        moodColorStep(dt)
         impStep(dt)   // v2.20
         e1Step(); e2Step(dt); dropsSpawnStep(); dropsStep(dt)   // v2.22
         sleepStep(dt); echoStep(dt)   // v2.23 B2, C6
@@ -1889,6 +2053,7 @@ final class SlimeRig {
         }
         lastSdt = sdt
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
+        tentBump()
         plasticity(dt)
         twitch(L)
         eyeStep(dt)   // v2.23
@@ -2356,7 +2521,7 @@ final class SlimeRig {
                 }
             }
         }
-        let touched = fingers.values.contains { $0.mode == .grab }
+        let touched = fingers.values.contains { $0.mode == .grab && !tentGrip($0) }   // v2.27: holding only a tentacle, the body does not remember (tentRest keeps its length); clay's crossings and shaking came from here
         if t < relaxUntil {
             // 揉回原形: the remembered shape eases back to the original over half a second; positions follow
             // through shape matching, so nothing jumps (手感精修提案 第 28 條)
@@ -2416,6 +2581,7 @@ final class SlimeRig {
             }
         }
         if mat.tentMem > 0 { restFix(mat) }
+        tentRest(dt, mat)
         var mx = 0.0, my = 0.0
         for i in 0..<N { mx += QX[i]; my += QY[i] }
         mx /= Double(N); my /= Double(N)
