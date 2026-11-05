@@ -37,7 +37,8 @@
 - 多米沒有 Mac。編譯走 GitHub Actions，裝機走 TestFlight；build 號＝run number；只有動到 `ios/` 或 workflow 的 push 才會編譯
 - `swiftui-port` 有 Swift＋web＋docs；`main` 只放 web＋docs（Pages 自動發布）。推 main：
   `git worktree add <scratchpad>/wt-main origin/main -B main-sync` → `git cherry-pick -n <hash>` → `git checkout HEAD -- ios`（cherry-pick 在 ios 衝突時這步也會解掉）→ `git diff --cached --name-only --diff-filter=A -- ios | xargs -r git rm -q --cached` → 確認 `git diff --cached --quiet <hash> -- prototype .uiux CLAUDE.md` → `git commit -C <hash>` → 確認 `git diff --stat HEAD~1 HEAD -- ios` 是空的、ios 檔維持 18 個 → `git push origin main-sync:main` → 移除 worktree 與分支
-- 發 TestFlight：等 push 觸發的編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，上傳完才能再推同一條分支；等編譯用 `gh run watch <id> --exit-status`，放背景跑
+- 多米 11-05：不要每個小功能就發 TestFlight，功能累積一批，他開口才發。commit、push、同步 main 照常。動到 `ios/` 的 push 會自動跑一次只編譯的檢查，不會上傳，也不會出現在 TestFlight，只是用掉一個 run number
+- 多米要發 TestFlight 時：等 push 觸發的編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`，上傳完才能再推同一條分支；等編譯用 `gh run watch <id> --exit-status`，放背景跑
 - limrun 的 `launch-app` 不會返回，要放背景再 kill。用 `timeout` 包 lim 又搭 `read < <(...)` 的腳本會一路失敗（node 報 UV_HANDLE_CLOSING），原因沒查清；不包 `timeout`、ID 用 `$(python ... | tr -d '\r')` 取就正常，兩次失敗都沒刪到模擬器，所以測完要再 `list` 確認。
 - limrun：`npx -y lim@0.51.0`，這台電腦的登入是所有專案共用的。`lim xcode create --ios` 開機器（加 `--label project=nienie-slime`、`--inactivity-timeout 10m`），`lim xcode build ./ios --id <sandbox> --xcodegen-spec project.yml --scheme NieNieSlime --configuration Release --sdk iphonesimulator` 約 1 分鐘編好並裝進模擬器。測完 `ios delete`、`xcode delete`。手勢腳本沒進專案，校正數字在記憶 `reference_limrun_gestures`：`wait` 3 約 18 毫秒、雙指用 `x2`、`y2`、手勢前截圖定位要算進身體會走開
 - 本機預覽：`preview_start` 名稱 `web-proto`，網址 `http://localhost:8765/`，viewport 設 393×852
@@ -74,8 +75,8 @@
    - 手機感覺不到震：tickMin、grainMin 不能低於階梯量到的最小格。手麻：面板「顆粒每秒最多幾下」往下調。
    - 閃退、東西不動：雲端和 limrun 都跑得起來，先比對 `SlimeRig.swift` 與網頁同名函式。
    - 要回舊外形比較：面板候選「v2.26 對照」回 build 99。
-   - 多米說做新東西（F8 肌肉、F9 自己收回形狀、F10 手指下的呼吸順延成 v2.28）：先把標準加進 `.vibe/標準清單.md`，照這次的順序：網頁、selftest 加 T43 連跑 3 輪、limrun 實測後刪實例、Swift、紀錄與參數表、CLAUDE 草稿、推 `swiftui-port`、推 main、發 TestFlight、補 build 號與交接檔。
-4. 這份交接的 commit 只在本機 `swiftui-port`，沒有推。下次推 main 時要連同它一起 cherry-pick。
+   - 多米說做新東西（F8 肌肉、F9 自己收回形狀、F10 手指下的呼吸順延成 v2.28）：先把標準加進 `.vibe/標準清單.md`，照這次的順序：網頁、selftest 加 T43 連跑 3 輪、limrun 實測後刪實例、Swift、紀錄與參數表、CLAUDE 草稿、推 `swiftui-port`、推 main、更新交接檔。TestFlight 等多米開口。
+4. 要改完直接請多米試的東西先放網頁版；要真機才驗得到的（觸覺、效能）累積起來，跟多米說一聲目前攢了哪些，他說發再發。
 
 ## 🗑️ 這次會話的雜訊（下次別重新討論）
 
