@@ -30,7 +30,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .mats button{border:0;background:transparent;border-radius:999px;padding:8px 9px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--ink)}
 .mats button i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .mats button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
-.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 186px);
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 146px);
   padding:8px 16px;border-radius:999px;background:#fff;border:2.5px solid var(--chip-line);font-size:14px;font-weight:700;
   transition:opacity .6s;pointer-events:none}
 .hint.off{opacity:0}
@@ -68,9 +68,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 </div>
 
 <div class="view" id="view">
-  <div class="vrow"><b>皮</b><span class="seg" data-k="skin"><button data-v="flat">平塗</button><button data-v="A">A 清透</button><button data-v="B">B 奶凍</button><button data-v="C">C 霧面</button></span></div>
-  <div class="vrow"><b>身體</b><span class="seg" data-k="body"><button data-v="round">圓</button><button data-v="tent">8 條</button></span><b>臉</b><span class="seg" data-k="face"><button data-v="1">有</button><button data-v="0">沒有</button></span></div>
-  <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-old">v2.27 原樣</button><button class="plain" id="v-toggle">收起</button></div>
+  <div class="vrow"><b>皮</b><span class="seg" data-k="skin"><button data-v="A">A 清透</button><button data-v="B">B 奶凍</button></span></div>
+  <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-toggle">收起</button></div>
 </div>
 
 <div class="hint" id="hint">捏它、拉它、揉它。放著不管它也會自己動</div>
@@ -1845,7 +1844,7 @@ function drawDents(col){const sh=col('--shade'),hi=col('--hi');
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框（加上黏液和絲）畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
 const VIEW={skin:'B',body:'round',face:1,bg:'day',shut:0};
-try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o)Object.assign(VIEW,o)}catch(_){}
+try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(o.skin==='A'||o.skin==='B')VIEW.skin=o.skin;if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉，不再是選項；皮在 A、B 之間
 function viewOver(){const o={};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;return o}
 const JSKINS={
   A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92},
@@ -1952,7 +1951,7 @@ function viewSync(){const root=document.getElementById('view');root.classList.to
   try{localStorage.setItem('nienie.view',JSON.stringify(VIEW))}catch(_){}}
 function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face);Object.assign(VIEW,o);viewSync();if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
   if(VIEW.skin!=='flat'&&JEL.fail)hint('這支手機不支援果凍皮，先用平塗')}
-document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-old'){viewSet({skin:'flat',body:'tent',face:0,bg:'blue'});return}if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;const k=g.dataset.k,v=b.dataset.v;viewSet({[k]:k==='face'?+v:v})});
+document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;viewSet({[g.dataset.k]:b.dataset.v})});
 document.getElementById('view').addEventListener('pointerdown',e=>e.stopPropagation());
 
 function draw(){

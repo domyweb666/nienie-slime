@@ -68,7 +68,7 @@ struct FeelParams: Equatable, Codable {
     var purrRoll: Double = 1          // v2.25 F5: the purr as a low rolling rumble (continuous, 3 swells a second). 0: two taps every half second (v2.24)
     // 提案第 41 條 (2026-11-01): tentacle rungs. 0 = the v2.4 behaviour, where a tentacle pushed root-to-tip could fold over itself
     var tentRung: Double = 0.5        // the two edges of a tentacle stay on their own sides, at least this fraction of the rest width apart
-    var tentAxis: Double = 0       // each link of a tentacle's medial axis keeps advancing by at least this fraction of its rest length
+    var tentAxis: Double = 0.85       // each link of a tentacle's medial axis keeps advancing by at least this fraction of its rest length
     // 提案第 20 條 (2026-11-01): while wandering the tentacles trail the motion
     var tail: Double = 0.12           // tentacle tail while wandering, in radii at the nominal wander speed (tips most); 0 = off
     // 第三批其餘 (2026-11-01): all defaults are the control values
@@ -91,9 +91,9 @@ struct FeelParams: Equatable, Codable {
     var tentMem: Double = 0           // tentacles remember like the body and relax at `recover`; 0 = v2.7 (tips barely remember, spring back in ~1 s)
     // v2.9 (多米 second device report, build 48): not a starfish. No fixed tentacles; pseudopods grow, hold and retract anywhere
     // (the top too); a regular jellyfish pulse; free sculpting, pulled long and spread flat like dough
-    var limbs: Double = 8             // fixed tentacles (v2.27 8 ringing the body, each grabbable; 0 none; 5 = the old starfish shape; changing it rebuilds the body)
-    var tentSlip: Double = 0.6        // v2.27: pushed toward its own root to this share of its rest length, or round the back of the body, a tentacle slides out of the finger; 0 = off (it tangles and shakes)
-    var tentBump: Double = 0.8        // v2.27: how hard a tentacle knocks another it runs into (多米 11-05); 0 = they pass through
+    var limbs: Double = 0             // fixed tentacles (v2.27 8 ringing the body, each grabbable; 0 none; 5 = the old starfish shape; changing it rebuilds the body)
+    var tentSlip: Double = 0        // v2.27: pushed toward its own root to this share of its rest length, or round the back of the body, a tentacle slides out of the finger; 0 = off (it tangles and shakes)
+    var tentBump: Double = 0        // v2.27: how hard a tentacle knocks another it runs into (多米 11-05); 0 = they pass through
     var moodColor: Double = 0.8       // v2.27: how far a mood tints the body (comfort peach, strained red, scared or wary blue-grey, asleep indigo); 0 = off
     var pods: Double = 2              // pseudopods growing at once while untouched; 0 = off
     var podLen: Double = 0.6          // pseudopod length at full extension, in radii (each one 0.7 to 1.2× of it; 1.1 in v2.10)
@@ -176,7 +176,7 @@ struct FeelParams: Equatable, Codable {
     // v2.23 (多米 build 86: the drops look wrong and come off too easily, too many; still no feeling it reacts to you; try a face, eyes only;
     // sleep, rhythm, swim-in and the collection all at once). All but eyes only count while life2 is 1
     var dropsV: Double = 1            // drops v2.23: only a yank or a hard fling drops one (one a grab, 4 s apart, 2 on screen, body at least 0.9); a strand pulls out, thins and snaps; a teardrop that wobbles round. 0: v2.22
-    var eyes: Double = 0              // v2.27 off (多米 11-05: remove the eyes). 1: two small eyes: look at your finger, blink; squint held, > < pulled, ∩ purring or happy, ∪ asleep, wide when wary. 0: no face
+    var eyes: Double = 1              // v2.27 off (多米 11-05: remove the eyes). 1: two small eyes: look at your finger, blink; squint held, > < pulled, ∩ purring or happy, ∪ asleep, wide when wary. 0: no face
     var sleep: Double = 1             // B2: untouched 40 s (a tap on the empty screen counts) while resting, it falls asleep; a touch startles it awake, a finger beside it 1.2 s wakes it gently
     var echo: Double = 1              // C6: tap the empty screen 2–8 times in a rhythm (0.12–1.2 s apart); it answers with the same count and rhythm; answer it back the same and it is happy
     // v2.24 (多米 11-04: make the feel the best it can be; .uiux/04-手感/手感診斷-暫定.md): the body was 3 cm wide under a 1.6 to 2 cm finger, reactions under 1 mm, ordinary rubbing got no reaction
@@ -611,7 +611,7 @@ struct TuneField: Identifiable {
 
         TuneField(key: \.seed, name: "外形亂數種子", hint: "換一個數字就換一個形狀（會重置）", range: 1...30, step: 1, section: "外形"),
         TuneField(key: \.bodySize, name: "身體大小", hint: "半徑是畫面寬的幾成（會重置）；0.30 是 v2.24（寬約 4 公分），0.22 是 v2.10 到 v2.23，0.26 是 v2.9 以前", range: 0.15...0.4, step: 0.01, section: "外形"),
-        TuneField(key: \.limbs, name: "固定觸手數", hint: "v2.27 預設 8：環繞身體、每條抓得住；0：沒有固定觸手的一團；5：以前的海星外形（會重置）", range: 0...12, step: 1, section: "外形"),
+        TuneField(key: \.limbs, name: "固定觸手數", hint: "預設 0：沒有固定觸手的一團（多米 11-06）；8：v2.27 環繞身體、每條抓得住；5：以前的海星外形（會重置）", range: 0...12, step: 1, section: "外形"),
         TuneField(key: \.tentSlip, name: "觸手滑開", hint: "把觸手往自己的根推，推到剩靜止長度的幾倍就從手指滑開，不對折；越大越早滑開；0 關（會纏住抖）", range: 0...1, step: 0.05, section: "外形"),
         TuneField(key: \.tentBump, name: "觸手互撞", hint: "一條觸手撞到別條，對方被彈開的力道；手指抓著的那條不受影響；0 關，互相穿過去", range: 0...2, step: 0.05, section: "外形"),
         TuneField(key: \.moodColor, name: "心情變色", hint: "舒服偏粉橘、被扯偏紅、害怕或戒備偏藍灰、睡著偏深藍；數字是最多染幾成；0 不變色", range: 0...1, step: 0.05, section: "外形"),
