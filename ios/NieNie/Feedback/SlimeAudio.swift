@@ -42,7 +42,7 @@ final class SlimeAudio: SlimeSoundSource {
     var rubMax = 0.7
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
-    /// v2.21 background lofi (多米 build 77: put lofi behind it), `bgm-lofi.m4a` from `prototype/sfx-design/design_lofi.py`: a 126 s loop.
+    /// v2.21 background lofi (多米 build 77: put lofi behind it), `bgm-lofi.caf` (ALAC: AAC pads silence, and AVAudioPlayer loops the whole file, so an m4a has a gap) from `prototype/sfx-design/design_lofi.py`: a 126 s loop.
     /// Streamed by AVAudioPlayer (decoded whole it would be about 44 MB of stereo floats), outside the effects' engine, so "sounds only"
     /// and the effects' volume do not touch it. Ducks to 0.6 while a finger holds the body (0.4 s down, 1.2 s back), paused in the background.
     var music = 0.0 { didSet { bgmTarget = -1 } }
@@ -126,7 +126,7 @@ final class SlimeAudio: SlimeSoundSource {
         engine.prepare()
         loadBank()
         startEngine()
-        if let url = Bundle.main.url(forResource: "bgm-lofi", withExtension: "m4a"), let p = try? AVAudioPlayer(contentsOf: url) {
+        if let url = Bundle.main.url(forResource: "bgm-lofi", withExtension: "caf"), let p = try? AVAudioPlayer(contentsOf: url) {
             p.numberOfLoops = -1; p.volume = 0; p.prepareToPlay(); bgm = p
         }
 

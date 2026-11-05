@@ -134,7 +134,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
      印象 imp（熟、戒，這一次打開 app 的期間累積，背景 10 分鐘歸零）＋C1 手指放旁邊、C2 逗它、C3 跟手看印象、C4 討摸、C5 被粗暴之後（提案 .uiux/04-手感/互動與拖拉提案-暫定.md）。量法在 selftest T35
    - v2.21（多米 build 77 錄影：往右下拉，史萊姆也要一併往右下靠；配音刺耳要 ASMR 紓壓型；背景放 lofi）：D1' 拉力 slide（拉長到這附近再拉就整團被拖著走，果凍 0.6、麻糬 0.9、黏土 1.5；
      拉伸上限從身體跟過去的位置量起；兩指往兩邊拉不會被拖走；整團 0.2 秒跟上；甩出去最多約 1.5R；slide 0 回 v2.20）。聲音 v3 ASMR 版（sfx/，舊的 v2 在 sfx/v2/）、
-     背景音樂 sfx/bgm-lofi.m4a（design_lofi.py），喇叭按鈕三段。提案 .uiux/04-手感/拉力互動聲音黏液提案-暫定.md，量法在 selftest T36
+     背景音樂 sfx/bgm-lofi-loop.m4a（design_lofi.py），喇叭按鈕三段。提案 .uiux/04-手感/拉力互動聲音黏液提案-暫定.md，量法在 selftest T36
    - v2.22（多米 build 77：還是沒有互動的感覺；繼續做黏液）：E1 它會出聲（sfx/voice-*.wav）、E2 點、按、蹭、搔癢、被拖都有它的回應、E3 熟得快、姿勢顏色看得出印象、
      E4 熟的時候一陣子沒碰游到前面打招呼、黏液（掉、飄、被吸回去、你可以拖、它推給你、它搶回去，身體最多小一成五）。面板 e1 到 drops 各自 0 回 v2.21，量法在 selftest T37
    - v2.23（多米 build 86：黏液不自然、形狀不自然、太容易掉、太多；還是沒有互動感；加表情看看，只要眼睛；睡著、節奏、游過來、收集四個一起做）：黏液 dropsV（只有猛扯、用力甩才掉、拉出絲再斷、水滴形晃幾下變圓、最多 2 滴）、
@@ -350,12 +350,17 @@ const FLAT={on:false,floor:0,qb:0};
 // 鏡頭（2026-11-01 多米：稍微拉大一點就拉不動。量過物理跟得上手指，卡的是畫面邊：往右 1.1R、往上 1.8R 就到邊）。
 // 形狀變大時畫面自動縮小、平移，把整隻裝進來，最小 zoomMin；世界座標的牆放在最遠鏡頭看得到的邊。螢幕 = (世界 − 鏡頭) × z + V
 // zoomMin 0（v2.13，多米：鏡頭無限拉遠、不要限制）：鏡頭沒有下限，牆在無限遠（等於沒有牆）
+// v2.28 窗台（多米 11-06）：有重力、站在窗台上、坐得進碗。背景選藍就回懸空，舊的東西一條都不動
+const SILL={on:false,g:null,air:false,c:0,inBowl:false,want:false,hop:null,glass:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:-99,y1:0};
+const SILLG=14;   // 重力：每秒每秒幾個半徑
+function sillGeo(){const s=Math.min(W/860,H/1130),U=s*860/393,off=H*.72-1177*s,ox=(W-992*s)/2,fl=off+1228*s,bw=205*U,bh=bw*298/420,by=fl-bh;
+  return{s,U,off,ox,fl,bw,bh,bx:W/2,by,gx:ox+156*s,gy:off+304*s,gw:680*s,gh:828*s,rim:by+bh*.5,cav:bw*.40,outer:bw*.5,bf:by+bh*.86,l:Math.max(0,ox+40*s)+4,r:Math.min(W,ox+950*s)-4}}
 const CAM={z:1,x:0,y:0};
 function viewV(){return{x:W/2,y:(90+H-120)/2}}
 function toWorld(sx,sy){const v=viewV();return{x:(sx-v.x)/CAM.z+CAM.x,y:(sy-v.y)/CAM.z+CAM.y}}
 function camMin(){return mat.zoomMin>0?Math.min(1,mat.zoomMin):1e-4}
-function worldWalls(){if(!(mat.zoomMin>0))return{l:-Infinity,r:Infinity,t:-Infinity,b:Infinity};const v=viewV(),zm=camMin(),ax=(W-16)/2/zm,ay=(H-210)/2/zm;return{l:v.x-ax,r:v.x+ax,t:v.y-ay,b:v.y+ay}}
-function updateCam(dt){const v=viewV(),pad=R*(mat.camPad||.35);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+function worldWalls(){if(SILL.on&&SILL.g)return{l:SILL.g.l,r:SILL.g.r,t:4,b:SILL.g.fl};if(!(mat.zoomMin>0))return{l:-Infinity,r:Infinity,t:-Infinity,b:Infinity};const v=viewV(),zm=camMin(),ax=(W-16)/2/zm,ay=(H-210)/2/zm;return{l:v.x-ax,r:v.x+ax,t:v.y-ay,b:v.y+ay}}
+function updateCam(dt){if(SILL.on){const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;return}const v=viewV(),pad=R*(mat.camPad||.35);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(const i of bnd){x0=Math.min(x0,X[i]);x1=Math.max(x1,X[i]);y0=Math.min(y0,Y[i]);y1=Math.max(y1,Y[i])}
   const ax=(W-16)/2,ay=(H-210)/2,zm=camMin();
   // v2.24 camGrip：沒抓著時鏡頭只看記住的形狀（Q），不看表演：放手後的偽足探會把形狀撐大，身體變大之後鏡頭會跟著偽足一下拉遠一下拉近（量過拉 70 點放手，z 掉到 0.95 以下、外緣來回跳 40 點）
@@ -480,6 +485,7 @@ function restR(a){const c=Math.cos(a),s=Math.sin(a),step=R/150;let last=0;
 
 function setup(){
   DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+  SILL.on=mat.sill>=.5;if(SILL.on){mat.maxPull=Math.min(mat.maxPull,3.2);mat.memMax=Math.min(mat.memMax,2.6);mat.jellyLift=0;mat.upright=Math.max(mat.upright,.03)}   // 房間固定，拉太長放不下；窗台上不靠收縮往上浮
   cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);
   R=Math.max(60,Math.min(W*mat.bodySize,H*.18,160));GROUND=Math.min(H*.64,H-140);CX=W/2;   // bodySize：0.26 是 v2.9 以前；縮小一點留空間給拉長、攤平（多米：自由塑形）
   defineShape();
@@ -532,6 +538,7 @@ function setup(){
   Object.assign(DRAG,{ox:0,oy:0,vx:0,vy:0,bx:0,by:0,gx:0,gy:0,slipT:0});LURE.on=false;LURE.sn=null;LIFE.ask=null;DROPS.length=0;MASS=1;MASSD=1;LIFE.drop=null;E4.on=false;E4.wait=-1;Object.assign(E2,{leanT:-9,nuzT0:-1,nuzO:0,nuzSaid:false,tkT:0,gigNext:0,nudgeT:-9});E2.tk.length=0;   // v2.22（E2、E4 的計時也歸零：時鐘倒回去時，留著的 gigNext 會讓它一直等不到下一次咯咯笑）：INTRO.sq 也要歸零：開心小跳跳到一半被 setup 打斷，壓扁量會一直留著，參考形狀永遠被撐開（量過 −0.053，T28 放手 2 秒剩 0.76，原本 0.89）   // v2.20：重建時手指直接清掉、不經過放手，偏移不歸零的話家會一直歪（量過：舊測試跟著歪，T31 按住 3 秒移 61 點，原本 30）
   CAMR.st=0;CAMR.until=-9;E2.leanO=0;eyeSetup();Object.assign(SLP,{on:false,k:0,askAt:-9,nearT:0});Object.assign(ECHO,{st:'idle',i:0,joyUntil:-9});ECHO.taps.length=0;SWIM.on=false;DROPV.last=-99;   // v2.23
   {let A=0;const n=bnd.length;for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];A+=X[a]*Y[b]-X[b]*Y[a]}A0=Math.abs(A)/2}
+  sillInit();
 }
 
 function buildRungs(){
@@ -577,7 +584,7 @@ function buildClusters(){
 }
 
 /* ---------- 聲音：分層音效（sfx/engine.js，v2 2026-11-01），物理參數決定每層多大聲、多高、多亮；沒有檔案就安靜 ---------- */
-const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lofi.m4a'}   // v2.21：sfx/ 是 ASMR 版（v3），舊的 v2 在 sfx/v2/（試聽頁對照）
+const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lofi-loop.m4a'}   // v2.21：sfx/ 是 ASMR 版（v3），舊的 v2 在 sfx/v2/（試聽頁對照）
 let sfxRubLevel=0;
 function sfxInit(){if(SFX)SFX.init()} // iOS 規定：要在第一次觸碰裡建立音訊
 function sfxPlay(kind,gain=1,rate=1){if(!SFX)return;if(kind==='press')SFX.press(gain);else if(kind==='release')SFX.release(gain);else if(kind==='pull')SFX.strand(gain);
@@ -763,7 +770,8 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   // 候選 22 放手餘韻：放手後 afterglow 秒內阻尼從 0.975 線性回到設定值，多晃一下
   if(mat.afterglow>0&&!fingers.size){const since=t-lastTouch;if(since<mat.afterglow)damp=Math.max(damp,.975-(.975-mat.damp)*since/mat.afterglow)}
   damp=Math.min(.995,damp);if(INTRO.on&&INTRO.ph==='air')damp=1;const alpha=mat.alpha*(special?1.25:1),beta=mat.beta;   // v2.17 開場在空中不加阻尼（黏土 0.94 每小步扣 6%，跳不起來）
-  const G=FLOAT?(INTRO.on?R*INTRO.g:0):R*7;   // v2.17 開場：跳的那幾秒才有重力
+  if(SILL.on&&SILL.air)damp=1;   // 空中不加阻尼（同開場）：黏土 0.94 每小步扣 6%，掉不下來
+  const G=SILL.on?(INTRO.on?R*INTRO.g:SILL.glass?0:R*SILLG):FLOAT?(INTRO.on?R*INTRO.g:0):R*7;   // v2.17 開場：跳的那幾秒才有重力
   // v2.18 姿勢：舒服攤軟（寬一點矮一點）、開心挺高（2 秒）、縮著小一圈；發抖：參考形狀上很快的小抖（拉扯、被戳）
   let POSX=1,POSY=1,TRM=0;if(mat.emo>=.5){const cp=Math.max(0,MOOD.c),hp=Math.max(0,1-(t-MOOD.happyT)/2)*(t>=MOOD.happyT?1:0),cw=t<MOOD.cowerUntil?1:Math.max(0,1-(t-MOOD.cowerUntil)/.6);
     POSX=(1+.05*cp)*(1-.04*hp)*(1-.06*cw);POSY=(1-.06*cp)*(1+.07*hp)*(1-.06*cw);TRM=R*.016*Math.min(1,MOOD.strain+MOOD.scare)*(REDUCED?.5:1)}
@@ -937,9 +945,10 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
   const hx=HOMEX+MOOD.tugX+DRAG.ox+Lamp*mat.life*R*.035*Math.sin(tl*2*Math.PI/7.3),hy=HOMEY+MOOD.tugY+DRAG.oy-BR.lift+(FLOAT&&mat.jelly<.5?Lamp*mat.life*R*.05*Math.sin(tl*2*Math.PI/4.7):0);   // 水母模式不再另外上下飄，上下只跟呼吸
   const hyF=FLAT.on?FLAT.floor-FLAT.qb:hy;   // 壓著：家移到底部貼桌面
   const kh=FLOAT?(grabbing?.02*mat.anchor:mat.homeK):.006*(grabbing?mat.anchor:1),dx=hx-cx,dy=hyF-cy;   // 候選 21：不抓時的回家彈簧 homeK（0.003 約半秒飄回、不過衝）；抓著時照舊 0.02×anchor
-  const WL=worldWalls(),padT=WL.t,padB=WL.b,padL=WL.l,padR=WL.r;   // 牆：最遠鏡頭看得到的邊（世界座標）
+  SILL.c=0;const WL=worldWalls(),padT=WL.t,padB=WL.b,padL=WL.l,padR=WL.r;   // 牆：最遠鏡頭看得到的邊（世界座標）
   for(let i=0;i<N;i++){
-    if(!GRAB[i]){X[i]+=dx*kh;if(!INTRO.on)Y[i]+=dy*kh}   // 開場跳的時候上下交給重力與地板
+    if(!GRAB[i]){if(!(SILL.on&&(SILL.air||SILL.glass)))X[i]+=dx*kh;if(!INTRO.on&&!(SILL.on&&!SILL.grab))Y[i]+=dy*kh}   // 開場跳的時候上下交給重力與地板
+    if(SILL.on)sillHit(i);
     if(!FLOAT&&Y[i]>GROUND){Y[i]=GROUND;PX[i]+=(X[i]-PX[i])*.45}
     if(INTRO.on&&Y[i]>INTRO.floor){Y[i]=INTRO.floor;PX[i]+=(X[i]-PX[i])*.45}   // 開場看不見的地板：落地真的撞上去、壓扁、晃
     if(FLAT.on&&Y[i]>FLAT.floor){Y[i]=FLAT.floor;PY[i]=Y[i]}   // 看不見的桌面：不往下穿、不反彈，可以往兩邊滑
@@ -1172,7 +1181,7 @@ function pickDir(){if(Math.hypot(HOMEX-CX,HOMEY-CY)>W*2.5)return Math.atan2(CY-H
     if(d>R*1.5&&r<.6*IMP.tr)return ta+(Math.random()-.5)*.6;if(d<R*3&&r<.6*IMP.w)return ta+Math.PI+(Math.random()-.5)*.8}
   return Math.random()*2*Math.PI}
 // 出發：dir 有給就往那邊（剛剛探的方向），沒給就隨機（上下走八成）；dash 的機率走遠走快
-function goStart(dir){const far=Math.random()<mat.dash,dist=W*(far?.5+.4*Math.random():.2+.3*Math.random());let a=dir,ys=1;
+function goStart(dir){if(SILL.on){sillGo();return}const far=Math.random()<mat.dash,dist=W*(far?.5+.4*Math.random():.2+.3*Math.random());let a=dir,ys=1;
   if(a==null){a=Math.random()*2*Math.PI;ys=.8}
   if(Math.hypot(HOMEX-CX,HOMEY-CY)>W*3)a=Math.atan2(CY-HOMEY,CX-HOMEX)+(Math.random()-.5);
   LIFE.st='go';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=HOMEX+Math.cos(a)*dist;WANDER.dy=HOMEY+Math.sin(a)*dist*ys;WANDER.moving=true;
@@ -1181,7 +1190,7 @@ function goStart(dir){const far=Math.random()<mat.dash,dist=W*(far?.5+.4*Math.ra
 // 一縮一衝的常數：一下 P 秒（快跑 0.62），前 c 秒收縮（速度 50 毫秒追上峰值），之後放鬆滑停（tau 秒時間常數）；一下前進 sd；沿前進方向最多拉長 kA。
 // 減少動態：節奏慢一倍、一下走一半（速度 ×0.25）、拉長減半
 function gaitConst(G){const rm=REDUCED;return{P:(G.dash?.62:1.1)*(rm?2:1),c:(G.dash?.15:.25)*(rm?2:1),tau:(G.dash?.24:.35)*(rm?2:1),sd:(G.dash?.8:.5)*R*(rm?.5:1),kA:(G.dash?.17:.12)*(rm?.5:1)}}
-function strokeStart(G,K){const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
+function strokeStart(G,K){if(SILL.on){G.ty=HOMEY;G.tx=sillClampX(G.tx)}const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
   G.h=Math.atan2(dy,dx)+(Math.random()-.5)*.42;   // 每一下方向偏一點（±12 度），路線是彎的；速度跟方向在同一刻變
   const per=K.c/2+K.tau*(1-Math.exp(-(K.P-K.c)/K.tau));   // 這個速度剖面，每單位峰值速度走多遠
   if(rem<K.sd*1.4){G.last=true;G.str=Math.max(.35,Math.min(1,rem/K.sd))}else G.str=1;   // 最後一下比較小
@@ -1200,7 +1209,7 @@ function gaitStep(dt){const G=GAIT,K=gaitConst(G),rm=REDUCED?.5:1;let off=0,mv=0
 function gaitArrive(G){G.on=false;WANDER.moving=false;Object.assign(LIFE,{st:'arrive',arrT:t,arrH:G.h,arrK0:G.k,arrA:G.v/(2*Math.PI/.6),arrOff:0,arrK:(G.dash?.12:.08)*(REDUCED?.5:1)});G.k=1;
   if(G.dash&&LV('lifeBreath'))BRX.exert=Math.max(BRX.exert,.6)}   // 快跑完會喘
 // 整團連同上一幀一起平移（表演，不留速度）：身體跟著收縮的節奏一頓一頓往前，不是被回家彈簧拖過去
-function moveHome(dx,dy,dt){if(dx===0&&dy===0)return;HOMEX+=dx;HOMEY+=dy;WANDER.vx=dx/dt;WANDER.vy=dy/dt;
+function moveHome(dx,dy,dt){if(SILL.on)dy=0;if(dx===0&&dy===0)return;HOMEX+=dx;HOMEY+=dy;WANDER.vx=dx/dt;WANDER.vy=dy/dt;
   for(let i=0;i<N;i++){if(GRAB[i])continue;X[i]+=dx;Y[i]+=dy;PX[i]+=dx;PY[i]+=dy}}
 // 放手：大力拉過甩一甩（A5）、拉很長會喘（A6）、0.5 秒後往你手指離開的地方探一下（A7；逃跑、開心小跳時不探）
 function lifeRelease(f){const st=SB(f);   // v2.20：拖著走時用身體真的被拉開的量（拖它走一大段不算大力拉）
@@ -1338,7 +1347,8 @@ function dropsStep(dt){
         if(d.neck>=1){d.snapT=t;sfxPlay('drip',.5)}}   // v2.23：絲斷開那一下才「滴」
       if(d.st==='held'){const f=fingers.get(d.hid);if(!f||f.mode!=='drop')d.st='float';else{d.vx=(f.x-d.x)/dt;d.vy=(f.y-d.y)/dt;d.x=f.x;d.y=f.y}}
       if(d.st==='float'){const k1=Math.exp(-dt/(mat.dropsV>=.5&&t-d.born<.8?1:.6));   // v2.23：剛甩出去的 0.8 秒滑遠一點，不然身體跟過來又碰到
-        d.vx*=k1;d.vy*=k1;d.x+=d.vx*dt;d.y+=(d.vy+Math.sin(t*1.3+d.ph)*R*.06)*dt}
+        if(SILL.on){d.vx*=k1;d.vy+=R*SILLG*dt;d.x+=d.vx*dt;d.y+=d.vy*dt;const fy=SILL.g.fl-d.r*.85;if(d.y>fy){d.y=fy;d.vy=0;d.vx*=.8}}
+        else{d.vx*=k1;d.vy*=k1;d.x+=d.vx*dt;d.y+=(d.vy+Math.sin(t*1.3+d.ph)*R*.06)*dt}}
       if(d.st==='eat'){const u=Math.min(1,(t-d.eatT0)/.3),kk=Math.min(1,dt/.1);d.x+=(gc.xc-d.x)*kk;d.y+=(gc.yc-d.y)*kk;d.k=1-u;
         if(u>=1){DROPS.splice(k,1);MASS=Math.min(1,MASS+d.m);voice('gulp',.8);if(LIFE.drop===d)LIFE.drop=null;FLN.amp=-.04*(REDUCED?.5:1);FLN.t0=t}
         continue}
@@ -1561,7 +1571,7 @@ function impStep(dt){if(!(mat.imp>=.5))return;
   IMP.tr=Math.max(0,Math.min(1,IMP.tr));IMP.w=Math.max(0,Math.min(1,IMP.w));
   {const k=1-Math.exp(-dt/1);IMPD.tr+=(IMP.tr-IMPD.tr)*k;IMPD.w+=(IMP.w-IMPD.w)*k}}
 // 往某一點走（C1 游過去、退開，C4 挪過去）：跟 goStart 同一套走法（一縮一衝；關掉就照 v2.18 滑過去）
-function gaitTo(x,y,dash){LIFE.st='go';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=x;WANDER.dy=y;WANDER.moving=true;
+function gaitTo(x,y,dash){if(SILL.on){x=sillClampX(x);y=HOMEY;if(SILL.inBowl||SILL.air||SILL.glass||SILL.hop){if(!SILL.hop&&!SILL.air&&Math.abs(x-globalC.xc)>R*.5)sillHop(x,false);return}}LIFE.st='go';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=x;WANDER.dy=y;WANDER.moving=true;
   if(LV('lifeGait'))Object.assign(GAIT,{on:true,tx:x,ty:y,dash,ph:-1,prep:0,v:0,h:Math.atan2(y-HOMEY,x-HOMEX),k:1,str:1,last:false,off:0});
   else{WANDER.T=Math.max(.5,Math.hypot(x-HOMEX,y-HOMEY)/(mat.wander*(dash?2.5:1)*R*(REDUCED?.25:1)));WANDER.p=0}}
 // C1 C2：按在空白處的手指，離身體 3.5R 內最近的那根
@@ -1747,6 +1757,7 @@ function update(dt){
   impStep(dt);   // v2.20 印象
   e1Step();e2Step(dt);dropsSpawnStep();dropsStep(dt);   // v2.22
   sleepStep(dt);echoStep(dt);   // v2.23 B2 睡著、C6 節奏
+  if(SILL.on)sillStepPre();
   if(mat.life2>=.5)lifeStep(dt,idle,engaged);   // v2.19：休息／張望／出發／到了＋一縮一衝＋縮一下、甩一甩＋探（lifeRest、lifeGait 都關時照 v2.18 的走走停停）
   else if(L>.5&&mat.wander>0&&!INTRO.on&&!ESC.on&&t>MOOD.cowerUntil){
     if(!WANDER.moving&&t>WANDER.next){WANDER.sx=HOMEX;WANDER.sy=HOMEY;let sp=1;
@@ -1762,6 +1773,7 @@ function update(dt){
       if(p>=1){WANDER.moving=false;WANDER.next=t+(mat.camFollow>=.5?.8+Math.random()*2.2:1.5+Math.random()*5)}}   // v2.18：停短一點
   }else if(fingers.size){WANDER.moving=false;WANDER.next=t+2+Math.random()*3}
   if(mat.morph>=.5)morphCoef(tl*mat.idlePace);   // idlePace：自己動的快慢（2026-11-01 多米：蠕動別那麼快）
+  if(SILL.on)sillStep(dt);
   if(INTRO.on)introStep(dt,dt/SUB);
   {const on=INTRO.on,u=INTRO.u,ts=on?INTRO.s0+(1-INTRO.s0)*u**1.5:1,f=(1-u)**1.2,tx=on?INTRO.ox0*f:0,ty=on?INTRO.oy0*f:0,k=on?1:1-Math.exp(-dt/.08);
     IV.s+=(ts-IV.s)*k;IV.ox+=(tx-IV.ox)*k;IV.oy+=(ty-IV.oy)*k;if(!on&&Math.abs(IV.s-1)<1e-3){IV.s=1;IV.ox=0;IV.oy=0}}
@@ -1841,11 +1853,63 @@ function drawTrail(col){const sh=col('--shade'),hi=col('--hi'),g=globalC,cs=g.cs
 function drawDents(col){const sh=col('--shade'),hi=col('--hi');
   for(const dn of DENTS){if(dn.d<.02||dn.i>=N)continue;const r=R*mat.dentSize*(.65+.35*dn.w),a=dn.d*(1-.35*dn.w),[ma,mb,mc,md]=dentFrame(dn);
     ctx.save();ctx.transform(ma,mb,mc,md,X[dn.i],Y[dn.i]);pitAt(r,a,sh,hi);ctx.restore()}}
+/* ---------- v2.28 窗台：重力、窗台、碗、跳、黏窗。全部掛在 SILL.on 底下，背景選藍就整段不跑 ---------- */
+// 空中不加阻尼、靠真的重力掉；碰到東西才恢復阻尼，所以落地時上半身還帶著速度，會真的壓扁再彈回來（果凍晃多、黏土晃少，照材質）
+function sillClampX(x){const g=SILL.g,m=R*.9;return Math.max(g.l+m,Math.min(g.r-m,x))}
+function sillInit(){const S=SILL;S.g=null;if(!S.on)return;const g=S.g=sillGeo();let y1=-1e9,mx=0;for(let i=0;i<N;i++)mx+=X[i];mx/=N;for(const i of bnd)y1=Math.max(y1,Y[i]);
+  const dx=g.bx-mx,dy=g.rim-R*.9-y1;for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}   // 從碗的正上方掉進碗裡
+  CX=g.bx;HOMEX=g.bx;CY=H*.5;HOMEY=CY;Object.assign(S,{air:true,c:0,inBowl:false,want:true,hop:null,glass:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:t});
+  const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;INTRO.sq=0}
+function sillHit(i){const S=SILL,g=S.g;if(S.glass)return;
+  if(S.inBowl&&!GRAB[i]){const dx=X[i]-g.bx,ad=Math.abs(dx);
+    if(ad<g.cav){if(Y[i]>g.rim){const dp=Math.min(1,(Y[i]-g.rim)/(g.bf-g.rim)),hw=g.cav*(1-.22*dp*dp);if(ad>hw){X[i]=g.bx+Math.sign(dx)*hw;PX[i]=X[i]}}
+      const u=dx/g.cav,fl=g.bf-(g.bf-g.rim)*.3*u*u*u*u;if(Y[i]>fl){Y[i]=fl;PY[i]=fl;PX[i]+=(X[i]-PX[i])*.45;S.c++}}
+    else if(ad<g.outer+R*.3&&Y[i]>g.rim-2&&Y[i]<g.rim+R*.6){Y[i]=g.rim-2;PY[i]=Y[i];PX[i]+=(X[i]-PX[i])*.3;S.c++}}
+  if(Y[i]>g.fl){Y[i]=g.fl;PY[i]=g.fl;PX[i]+=(X[i]-PX[i])*.45;S.c++}}
+// 跳：蹲 0.12 秒再起跳。toBowl 要越過碗口；toGlass 跳到窗戶上黏住
+function sillHop(tx,toBowl,toGlass){const S=SILL;if(S.hop||S.grab)return;GAIT.on=false;WANDER.moving=false;S.hop={ph:'crouch',t:0,tx:toBowl?S.g.bx:sillClampX(tx),toBowl:!!toBowl,toGlass:toGlass==null?null:toGlass};LIFE.st='rest';LIFE.until=t+3}
+function sillLaunch(){const S=SILL,g=S.g,H0=S.hop,gc=globalC,g0=R*SILLG,hs=1/60/SUB;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
+  let hh=R*(.55+.25*Math.random());if(H0.toBowl)hh=Math.max(y1-g.rim,0)+R*.45;else if(S.inBowl)hh=Math.max(hh,y1-g.rim+R*.5);if(H0.toGlass!=null)hh=Math.max(R*.6,gc.yc-H0.toGlass);
+  const vy=Math.sqrt(2*g0*hh),land=H0.toBowl?g.rim:g.fl,T=vy/g0+Math.sqrt(2*Math.max(R*.1,hh+land-y1)/g0),vx=Math.max(-W*1.6,Math.min(W*1.6,(H0.tx-gc.xc)/T));
+  for(let i=0;i<N;i++){PY[i]=Y[i]+vy*hs;PX[i]=X[i]-vx*hs}
+  S.inBowl=false;S.want=H0.toBowl;S.air=true;S.c=0;S.fall=0;H0.ph='air';H0.t=0;sfxPlay('press',.22)}
+// 自己想出門：碗裡跳到旁邊；窗台上走一段，或跳回碗裡，偶爾跳到窗戶上
+function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random();LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.hop||S.air||S.glass)return;
+  if(r<.12&&!REDUCED){const side=Math.random()<.5?-1:1,x=sillClampX(cx+side*R*(.8+Math.random()));if(x>g.gx+R*.7&&x<g.gx+g.gw-R*.7){sillHop(x,false,g.gy+g.gh*(.35+.25*Math.random()));return}}
+  if(S.inBowl){if(r<.55){const side=Math.random()<.5?-1:1;sillHop(sillClampX(g.bx+side*(g.bw*.5+R*(1+.5*Math.random()))),false)}return}
+  if(r<.45){sillHop(g.bx,true);return}
+  const far=Math.random()<mat.dash,d=(far?1.8:1)*R*(1+Math.random()),x=sillClampX(cx+(Math.random()<.5?-1:1)*d);if(Math.abs(x-cx)>R*.4)gaitTo(x,HOMEY,far)}
+function sillStepPre(){let g=false;for(const f of fingers.values())if(f.mode==='grab'){g=true;SILL.relX=f.fx}SILL.grab=g}
+function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==null)return;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);S.y1=y1;
+  S.vx=S.px?(cx-S.px)/dt:0;S.vy=S.py?(cy-S.py)/dt:0;S.px=cx;S.py=cy;
+  const wasAir=S.air;S.air=S.c===0&&!S.grab&&!INTRO.on&&!S.glass&&!(S.hop&&S.hop.ph==='crouch');
+  if(S.air){S.fall=Math.max(S.fall,S.vy);for(let i=0;i<N;i++){const lim=R*30*dt/SUB,v=Y[i]-PY[i];if(v>lim)PY[i]=Y[i]-lim;else if(v<-lim)PY[i]=Y[i]+lim}}
+  if(wasAir&&!S.air&&!S.grab){if(S.fall>R*2.5)sfxPlay('press',Math.min(.9,.2+S.fall/(R*16)));if(S.hop&&S.hop.ph==='air')S.hop=null;S.want=false;S.fall=0;S.lastHome=Math.max(S.lastHome,t-8);LIFE.st='rest';LIFE.until=t+1+Math.random()}
+  // 放手：慢慢放在窗戶上（不在碗的正上方）會黏住；用力甩或放在碗上面就掉下去
+  if(S.held&&!S.grab){const sp=Math.hypot(S.vx,S.vy),over=cx>g.gx+R*.5&&cx<g.gx+g.gw-R*.5&&cy>g.gy+R*.3&&y1<g.fl-R*.5&&y1<g.rim+R*.2;if(over&&!S.inBowl&&sp<R*2.5&&Math.abs(S.relX-g.bx)>g.cav*.9){S.glass={t0:t};for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3)}else S.want=Math.abs(S.relX-g.bx)<g.cav*.9}
+  S.held=S.grab;
+  if(S.grab){if(S.hop)S.hop=null;if(S.glass)S.glass=null}
+  // 黏在窗戶上慢慢滑下來，滑到窗戶下緣就掉
+  if(S.glass){const v=R*(.22+.2*Math.min(1,(t-S.glass.t0)/6))*(REDUCED?.5:1)*dt;for(let i=0;i<N;i++){Y[i]+=v;PY[i]+=v}INTRO.sq+=(.07-INTRO.sq)*(1-Math.exp(-dt/.12));if(y1>g.gy+g.gh+R*.05||y1>g.fl-R*.1){S.glass=null;S.air=true;S.c=0;S.want=false}}
+  // 家：放開時上下交給重力，家跟著身體；碗裡慢慢回碗中間
+  if(!S.grab){HOMEY=cy;if(S.air||S.glass)HOMEX=cx;else if(S.inBowl&&!ESC.on)HOMEX+=(g.bx-HOMEX)*(1-Math.exp(-dt/.3));HOMEX=sillClampX(HOMEX)}
+  // 進碗、出碗
+  if(S.inBowl){let out=y1<g.rim-R*.3;if(S.grab)for(const f of fingers.values())if(f.mode==='grab'&&Math.abs(f.fx-g.bx)>g.cav+R*.4)out=true;if(out)S.inBowl=false}
+  else if(!S.grab&&S.air&&S.want&&S.vy>0&&Math.abs(cx-g.bx)<g.cav*.9&&y1>g.rim-R*.2&&y1<g.rim+R*.3){S.inBowl=true;S.want=false}
+  // 跳
+  if(S.hop){const q=S.hop;q.t+=dt;if(q.ph==='crouch'){INTRO.sq=.14*Math.sin(Math.min(1,q.t/.12)*Math.PI/2);if(q.t>=.12)sillLaunch()}
+    else{INTRO.sq+=(-.06-INTRO.sq)*(1-Math.exp(-dt/.08));if(q.toGlass!=null&&S.vy>=-R*.5&&q.t>.05){S.glass={t0:t};S.air=false;S.hop=null;for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3)}}}
+  else if(!INTRO.on&&!S.glass)INTRO.sq*=Math.exp(-dt/.08);
+  // 被嚇跑時先跳出碗
+  if(ESC.on&&S.inBowl&&!S.grab&&!S.hop)sillHop(ESC.dx,false);
+  // 在窗台上閒一陣子就回碗
+  if(!S.grab&&!S.inBowl&&!S.air&&!S.glass&&!S.hop&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&t-lastTouch>12&&t-S.lastHome>10){S.lastHome=t;sillHop(g.bx,true)}}
+
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框（加上黏液和絲）畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
 const VIEW={skin:'B',body:'round',face:1,bg:'day',shut:0};
 try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(o.skin==='A'||o.skin==='B')VIEW.skin=o.skin;if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉，不再是選項；皮在 A、B 之間
-function viewOver(){const o={};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;return o}
+function viewOver(){const o={};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});return o}
 const JSKINS={
   A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92},
   B:{kEdge:.50,kCore:.16,aEdge:.86,aCore:.97,amb:.88,dif:.20,glow:.46,line:.26,nk:.90,shin:320,s0:.42,s1:.68,spec:.80,sheen:.10,arc:.88},
@@ -1933,23 +1997,27 @@ function drawBlush(){if(!VIEW.face||!EYE.L.length)return;const [lx,ly]=eyeAt(EYE
 // 窗台背景：先畫好整張存起來，每幀只貼一次。牠還是懸空的，重力和碗是下一片
 const SCENE={img:{},cache:{},loading:false};
 function sceneLoad(){if(SCENE.loading)return;SCENE.loading=true;for(const n of ['plate','bowl','succ','peb']){const i=new Image();i.onload=()=>{SCENE.img[n]=i};i.src='scene/'+n+'.webp'}}
+function bowlFront(kind){const a=SCENE.img;if(!a.bowl)return null;const key='front|'+kind;if(SCENE.cache[key])return SCENE.cache[key];const b=a.bowl,k=document.createElement('canvas');k.width=b.width;k.height=b.height;const c=k.getContext('2d');c.drawImage(b,0,0);
+  c.globalCompositeOperation='destination-out';const ey=b.height*.308,rx=b.width*.424,ry=b.height*.26;c.beginPath();c.ellipse(b.width/2,ey,rx,ry,0,0,Math.PI*2);c.fill();c.fillRect(0,0,b.width,ey);
+  if(kind==='night'){c.globalCompositeOperation='source-atop';c.fillStyle='rgba(38,42,92,.62)';c.fillRect(0,0,k.width,k.height)}c.globalCompositeOperation='source-over';SCENE.cache[key]=k;return k}
+function drawBowlFront(){if(!(SILL.on&&SILL.inBowl&&SILL.g))return;const k=bowlFront(VIEW.bg);if(!k)return;const g=SILL.g;ctx.drawImage(k,g.bx-g.bw/2,g.by,g.bw,g.bh)}
 function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
   const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
-  const s=w/860,sillTop=h*.72,off=sillTop-1177*s,ox=-66*s,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
+  const s=Math.min(W/860,H/1130)*DPR,sillTop=h*.72,off=sillTop-1177*s,ox=(w-992*s)/2,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
   const g=c.createLinearGradient(0,gy,0,gy+gh);g.addColorStop(0,night?'#141B3D':'#9CCBF0');g.addColorStop(1,night?'#2F3A6B':'#DCEEF8');c.fillStyle=g;c.fillRect(gx,gy,gw,gh);
   if(night){c.fillStyle='rgba(255,255,255,.85)';let q=7;const rnd=()=>(q=(q*16807)%2147483647)/2147483647;for(let i=0;i<46;i++){c.beginPath();c.arc(gx+rnd()*gw,gy+rnd()*gh*.8,(.5+rnd()*1.1)*DPR,0,Math.PI*2);c.fill()}c.fillStyle='#F6EFC8';c.beginPath();c.arc(gx+gw*.74,gy+gh*.2,gw*.075,0,Math.PI*2);c.fill();c.fillStyle='#141B3D';c.beginPath();c.arc(gx+gw*.70,gy+gh*.185,gw*.068,0,Math.PI*2);c.fill()}
   else{c.fillStyle='rgba(255,255,255,.92)';for(const [cx,cy,r] of [[.26,.24,1],[.72,.14,.8],[.82,.5,1.15],[.3,.62,.7]]){const u=gw*.1*r,X0=gx+gw*cx,Y0=gy+gh*cy;for(const [dx,dy,rr] of [[-1.1,.2,.62],[-.3,-.25,.9],[.6,-.05,.75],[1.3,.25,.5]]){c.beginPath();c.arc(X0+dx*u,Y0+dy*u,rr*u,0,Math.PI*2);c.fill()}c.fillRect(X0-u*1.6,Y0+u*.1,u*3.3,u*.62)}}
   c.fillStyle=night?'rgba(30,40,80,.9)':'rgba(120,165,150,.45)';c.beginPath();c.moveTo(gx,gy+gh);for(let i=0;i<=40;i++){const q=i/40;c.lineTo(gx+gw*q,gy+gh*(.9-.035*Math.sin(q*9)-.02*Math.sin(q*21)))}c.lineTo(gx+gw,gy+gh);c.fill();
   const room=document.createElement('canvas');room.width=w;room.height=h;const r=room.getContext('2d');r.fillStyle='#F2E7DC';r.fillRect(0,0,w,h);r.clearRect(gx,gy,gw,gh);r.drawImage(a.plate,ox,off,992*s,1586*s);
   const sillY=off+1228*s,U=W*DPR/393,place=(im,cx,wd)=>{const hd=im.height*wd/im.width;r.save();r.translate(cx,sillY-2);r.scale(wd*.52,11*U);const sg=r.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,'rgba(120,70,40,.28)');sg.addColorStop(1,'rgba(120,70,40,0)');r.fillStyle=sg;r.beginPath();r.arc(0,0,1,0,Math.PI*2);r.fill();r.restore();r.drawImage(im,cx-wd/2,sillY-hd,wd,hd)};
-  place(a.succ,50*U,70*U);place(a.peb,343*U,76*U);place(a.bowl,196.5*U,165*U);
+  place(a.succ,w/2-146.5*U,70*U);place(a.peb,w/2+146.5*U,76*U);place(a.bowl,w/2,205*U);
   if(night){r.globalCompositeOperation='source-atop';r.fillStyle='rgba(38,42,92,.62)';r.fillRect(0,0,w,h);r.globalCompositeOperation='source-over'}
   c.drawImage(room,0,0);SCENE.cache[key]=sky;return sky}
 let fpsAcc=0,fpsN=0;function viewFps(dt){fpsAcc+=dt;fpsN++;if(fpsAcc>=.5){const el=document.getElementById('v-fps');if(el)el.textContent='· 每幀 '+(fpsAcc/fpsN*1000).toFixed(1)+' ms';fpsAcc=0;fpsN=0}}
 function viewSync(){const root=document.getElementById('view');root.classList.toggle('shut',!!VIEW.shut);document.getElementById('v-toggle').textContent=VIEW.shut?'切換':'收起';
   root.querySelectorAll('.seg').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(VIEW[k])===b.dataset.v)))});
   try{localStorage.setItem('nienie.view',JSON.stringify(VIEW))}catch(_){}}
-function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face);Object.assign(VIEW,o);viewSync();if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
+function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face)||('bg' in o&&(o.bg==='blue')!==(VIEW.bg==='blue'));Object.assign(VIEW,o);viewSync();if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
   if(VIEW.skin!=='flat'&&JEL.fail)hint('這支手機不支援果凍皮，先用平塗')}
 document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;viewSet({[g.dataset.k]:b.dataset.v})});
 document.getElementById('view').addEventListener('pointerdown',e=>e.stopPropagation());
@@ -1978,7 +2046,7 @@ function draw(){
   ctx.fillStyle=`rgba(60,90,40,${(FLOAT?.10+.08*(1-lift):.16)+.04*pz})`;
   ctx.beginPath();ctx.ellipse((minX+maxX)/2,sy,sw*(FLOAT?.7+.3*(1-lift):1.05)*(1+.08*pz),   // 影子跟整體寬度置中（拉長時跟重心會偏一邊）
     R*.11*(FLOAT?.8:1),0,0,Math.PI*2);ctx.fill()}
-  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBlush();drawEyes(col);ctx.setTransform(DPR,0,0,DPR,0,0);return}   // v2.28 預覽：果凍皮把身體、黏液、絲一起畫
+  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBowlFront();drawBlush();drawEyes(col);ctx.setTransform(DPR,0,0,DPR,0,0);return}   // v2.28 預覽：果凍皮把身體、黏液、絲一起畫
   drawStrands(col);   // v2.23 黏液的絲：根部讓身體蓋住
   ctx.save();
   if(!FLOAT){ctx.beginPath();ctx.rect(0,0,W,GROUND+2);ctx.clip()}
@@ -2010,6 +2078,7 @@ function draw(){
   if(mat.inkVar>0){ctx.fillStyle=col('--line');inkBand(P,Math.max(4,R*.034)/CAM.z);ctx.fill()}   // 候選 34：描邊粗細隨壓縮
   else{bodyPath(P);ctx.lineWidth=Math.max(4,R*.034)/CAM.z;ctx.lineJoin='round';ctx.strokeStyle=col('--line');ctx.stroke()}
   ctx.restore();
+  drawBowlFront();
   drawDrops(col);   // v2.22 黏液畫在身體前面
   ctx.setTransform(DPR,0,0,DPR,0,0);
 }

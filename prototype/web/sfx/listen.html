@@ -100,7 +100,7 @@ summary{cursor:pointer;color:var(--sub);font-size:14px}
 const S = window.SlimeSfx, $ = id => document.getElementById(id);
 // v2.21：?set=v2 聽舊的那組（刺耳的 v2），預設是 ASMR 版（v3）；背景音樂兩組共用
 const SET = new URLSearchParams(location.search).get('set') === 'v2' ? 'v2' : 'v3';
-const ready = S.load(SET === 'v2' ? './v2/' : './'); S.bgmUrl = './bgm-lofi.m4a'; S.mode = 1;
+const ready = S.load(SET === 'v2' ? './v2/' : './'); S.bgmUrl = './bgm-lofi-loop.m4a'; S.mode = 1;
 let state = { rub: 0, stretch: 0, grabbing: false }, last = performance.now();
 function tick(now) { const dt = Math.min(0.1, (now - last) / 1000); last = now; S.frame(dt, state); requestAnimationFrame(tick); }
 async function go() { await ready; S.init(); }

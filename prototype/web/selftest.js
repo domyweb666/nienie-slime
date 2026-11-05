@@ -1019,6 +1019,41 @@
     r43.moved = +dx.toFixed(6); r43.flatSame = r43.skins.flat.join() === bg0.join(); r43.jelFail = JEL.fail;
     VIEW.skin = 'flat'; res.T43_v228 = r43;
     res.PASS.v228 = !r43.jelFail && r43.moved === 0 && r43.flatSame && ['A', 'B', 'C'].every(k => Array.isArray(r43.skins[k]) && r43.skins[k].join() !== bg0.join()); }
+  // T44 v2.28 窗台：有重力、坐得進碗、不飄走、不穿地板。背景藍的舊項目完全不受影響（SILL.on 關）
+  { const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, emo: 0, life2: 0, seed: 12, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, sleep: 0, echo: 0 };
+    const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; }, top = () => { let m = 1e9; for (const i of bnd) m = Math.min(m, Y[i]); return m; };
+    const fresh = () => { mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; };
+    const worst = n => { let lo = 1e9, hi = -1e9, x0 = 1e9, x1 = -1e9, sx = 0, ar0 = 9, ar1 = 0, maxFold = 0; for (let k = 0; k < n; k++) { steps(1); lastTouch = t; const b = bottom(); lo = Math.min(lo, b); hi = Math.max(hi, b); for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } const a = area() / A0; ar0 = Math.min(ar0, a); ar1 = Math.max(ar1, a); } return { lo, hi, x0, x1, ar0, ar1 }; };
+    // a 掉進碗裡停住
+    fresh(); const g = SILL.g, y0 = bottom(); const a1 = worst(240); const b1 = bottom(), cy1 = globalC.yc; const a2 = worst(120);
+    r.bowl = { on: SILL.on, inBowl: SILL.inBowl, startedAbove: y0 < g.rim, drift: +Math.abs(globalC.yc - cy1).toFixed(2), x: +(globalC.xc - g.bx).toFixed(1), range: +(a2.hi - a2.lo).toFixed(2), belowFloor: +(a1.hi - g.fl).toFixed(2), area: [+a1.ar0.toFixed(3), +a1.ar1.toFixed(3)], selfX: snap().selfX, air: SILL.air };
+    // b 往上拉會拉高，放手掉回碗裡；拉的時候手指底下那塊跟手
+    { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy - R * .4); steps(4); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, cx, cy - R * .4 - k * R * 2.2 / 40); steps(1); } steps(20); const lift = cy - globalC.yc, outB = !SILL.inBowl; ev('pointerup', 1, cx, cy - R * 2.6); const a3 = worst(30), mid = SILL.air; const a4 = worst(240); r.pull = { liftR: +(lift / R).toFixed(2), leftBowl: outB, airAfter: mid, backInBowl: SILL.inBowl, belowFloor: +(a4.hi - g.fl).toFixed(2), selfX: snap().selfX, area: +(area() / A0).toFixed(3) }; }
+    // c 甩到旁邊：掉到窗台上，不在碗裡，停得住
+    fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 16; k++) { ev('pointermove', 1, cx + k * (W * .44) / 16, cy - k * R * .4 / 16); steps(1); } steps(14); ev('pointerup', 1, cx + W * .44, cy - R * .4); const a5 = worst(60); const a6 = worst(300); r.side = { inBowl: SILL.inBowl, onSill: Math.abs(a6.hi - g.fl) < 2, belowFloor: +(Math.max(a5.hi, a6.hi) - g.fl).toFixed(2), x: +globalC.xc.toFixed(0), inFrame: a6.x0 >= g.l - .5 && a6.x1 <= g.r + .5, selfX: snap().selfX, area: +(area() / A0).toFixed(3) }; }
+    // d 走路：高度不變，往目標走
+    { const x0 = globalC.xc, tx = sillClampX(x0 + (x0 < W / 2 ? 1 : -1) * R * 1.3); mat.life2 = 1; mat.lifeGait = 1; gaitTo(tx, 0, false); const dir = Math.sign(tx - x0); let lo = 1e9, hi = -1e9, n = 0; while (GAIT.on && n < 600) { lastTouch = t - 3; steps(1); const b = bottom(); lo = Math.min(lo, b); hi = Math.max(hi, b); n++; } r.walk = { frames: n, moved: +((globalC.xc - x0) * dir / R).toFixed(2), footRange: +(hi - lo).toFixed(2), selfX: snap().selfX }; mat.life2 = 0; }
+    // e 閒著就跳回碗
+    { lastTouch = t - 20; SILL.lastHome = t - 20; LIFE.st = 'rest'; let n = 0; let peak = 1e9; while (!SILL.inBowl && n < 400) { steps(1); peak = Math.min(peak, bottom()); n++; } const a7 = (lastTouch = t, worst(180)); r.home = { frames: n, inBowl: SILL.inBowl, clearedRim: peak < g.rim, belowFloor: +(a7.hi - g.fl).toFixed(2), selfX: snap().selfX }; }
+    // f 跳出碗
+    { sillHop(sillClampX(g.bx + g.bw * .5 + R * 1.2), false); const a8 = worst(180); r.hopOut = { inBowl: SILL.inBowl, onSill: Math.abs(bottom() - g.fl) < 2, x: +((globalC.xc - g.bx) / R).toFixed(2), selfX: snap().selfX, belowFloor: +(a8.hi - g.fl).toFixed(2) }; }
+    // g 慢慢放在窗戶上：黏住、滑下來、掉回窗台
+    fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc, tx = g.gx + g.gw * .85, ty = g.gy + g.gh * .18; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 70; k++) { ev('pointermove', 1, cx + (tx - cx) * k / 70, cy + (ty - cy) * k / 70); steps(1); } steps(50); ev('pointerup', 1, tx, ty); steps(3); const stuck = !!SILL.glass, y0g = globalC.yc; steps(60); lastTouch = t; const slid = globalC.yc - y0g; let n = 0; while (SILL.glass && n < 1800) { steps(1); lastTouch = t; n++; } const a9 = worst(120); r.glass = { stuck, slidR: +(slid / R).toFixed(2), framesOnGlass: n, off: !SILL.glass, onSill: Math.abs(bottom() - g.fl) < 2, selfX: snap().selfX }; }
+    // h 拉不出房間：往下壓不穿地板、拉到上面不出畫面
+    fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx, cy + k * H * .5 / 30); steps(1); } const a10 = worst(30); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, cx, cy + H * .5 - k * H * 1.1 / 40); steps(1); } steps(20); const tp = top(); ev('pointercancel', 1, 0, 0); r.bounds = { belowFloor: +(a10.hi - g.fl).toFixed(2), top: +tp.toFixed(1), selfX: snap().selfX }; }
+    // 全程開：活物、情緒都開，放 25 秒不碰，不飛走不穿牆
+    mat = { ...SP, emo: 1, life2: 1, lifeGait: 1 }; setup(); { let hi = -1e9, x0 = 1e9, x1 = -1e9, m = 0; for (let k = 0; k < 1500; k++) { steps(1); hi = Math.max(hi, bottom()); for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } m = Math.max(m, Math.abs(globalC.yc - SILL.g.fl)); } r.alive = { belowFloor: +(hi - SILL.g.fl).toFixed(2), x0: +x0.toFixed(0), x1: +x1.toFixed(0), inFrame: x0 >= SILL.g.l - 1 && x1 <= SILL.g.r + 1, maxFromFloorR: +(m / R).toFixed(2), selfX: snap().selfX, area: +(area() / A0).toFixed(3) }; }
+    mat = { ...PRESETS.clay }; setup();
+    r.offInBlue = SILL.on === false;
+    res.T44_sill = r;
+    res.PASS.sill = r.bowl.on && r.bowl.inBowl && r.bowl.startedAbove && !r.bowl.air && r.bowl.drift < 1.5 && Math.abs(r.bowl.x) < 6 && r.bowl.belowFloor <= .01 && r.bowl.area[0] > .9 && r.bowl.area[1] < 1.1 && r.bowl.selfX === 0
+      && r.pull.liftR > .6 && r.pull.leftBowl && r.pull.backInBowl && r.pull.belowFloor <= .01 && r.pull.selfX === 0 && Math.abs(r.pull.area - 1) < .06
+      && !r.side.inBowl && r.side.onSill && r.side.belowFloor <= .01 && r.side.inFrame && r.side.selfX === 0
+      && r.walk.moved > .5 && r.walk.footRange < 6 && r.walk.selfX === 0
+      && r.home.inBowl && r.home.clearedRim && r.home.belowFloor <= .01 && r.home.selfX === 0
+      && !r.hopOut.inBowl && r.hopOut.onSill && r.hopOut.selfX === 0
+      && r.glass.stuck && r.glass.slidR > .05 && r.glass.off && r.glass.onSill && r.glass.selfX === 0
+      && r.bounds.belowFloor <= 6 && r.bounds.top >= 3.9 && r.alive.belowFloor <= .01 && r.alive.inFrame && r.alive.maxFromFloorR < 6 && r.alive.selfX === 0 && Math.abs(r.alive.area - 1) < .1 && r.offInBlue; }
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
   draw();

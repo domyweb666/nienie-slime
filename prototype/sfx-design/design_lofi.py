@@ -10,7 +10,7 @@
   黑膠：很小的沙沙聲與偶爾一顆喀；磁帶：0.4 Hz 的慢晃（音高 ±4 cents 左右）
   為手機喇叭：貝斯和大鼓的基音手機放不出來，用飽和帶出 2、3 倍諧波；整首壓在 6 kHz 以下，不跟捏的聲音搶 1 到 3 kHz
 
-用法：python design_lofi.py   寫 prototype/web/sfx/bgm-lofi.m4a（需要 ffmpeg）；加 --ios 也寫一份到 ios/NieNie/Resources/
+用法：python design_lofi.py   寫 prototype/web/sfx/bgm-lofi-loop.m4a（需要 ffmpeg）；加 --ios 也寫 ios/NieNie/Resources/bgm-lofi.caf
 每次結果都一樣（固定亂數種子）。
 """
 import os
@@ -196,7 +196,7 @@ def main():
 
     # 黑膠：沙沙聲與偶爾一顆喀（整條都有，開頭結尾一樣密）
     n = loop.shape[1]
-    hiss = lp(hp(rng.standard_normal(n), 800), 6000) * 0.006
+    hiss = lp(hp(np.tile(rng.standard_normal(n), 2), 800), 6000)[n:] * 0.006   # 濾波要繞一圈：直接濾的話開頭有一段濾波器還沒進入狀況，接縫處會斷一下
     cr = np.zeros(n)
     for i in rng.integers(0, n - 200, size=int(n / SR * 5)):
         cr[i:i + 120] += rng.uniform(0.01, 0.04) * np.hanning(120) * rng.choice([-1, 1])
@@ -207,22 +207,31 @@ def main():
     ph = 2 * np.pi * cycles * np.arange(n) / n
     dl = (2.0 + 1.2 * np.sin(ph)) * SR / 1000
     idx = np.arange(n) - dl
-    loop = np.stack([np.interp(idx % n, np.arange(n), ch) for ch in loop])
+    loop = np.stack([np.interp(idx % n, np.arange(n), ch, period=n) for ch in loop])
 
     # 主控：整首低通 6 kHz、軟壓縮、峰值 −3 dB
-    loop = np.stack([lp(ch, 6000) for ch in loop])
+    loop = np.stack([lp(np.tile(ch, 2), 6000)[n:] for ch in loop])   # 同上，繞一圈
     loop = np.tanh(1.6 * loop / (np.max(np.abs(loop)) or 1)) / np.tanh(1.6)
     loop *= 10 ** (-3 / 20)
 
-    outs = [os.path.join(ROOT, 'prototype', 'web', 'sfx', 'bgm-lofi.m4a')]
-    if '--ios' in sys.argv:
-        outs.append(os.path.join(ROOT, 'ios', 'NieNie', 'Resources', 'bgm-lofi.m4a'))
+    # 2026-11-06 多米：循環接縫有斷掉的聲音。內容接得起來，斷的是 AAC：編碼器前面墊一段靜音、後面補一段空白，整個檔案循環就會聽到縫。
+    # 網頁：頭尾各多寫 1 秒（尾巴接開頭、開頭接尾巴），只循環中間那段。整段是週期的，解碼器不管墊多少，跳回去都接得上。
+    # iPhone：AVAudioPlayer 只能整個檔案循環，所以用 ALAC 無損（沒有墊靜音），低通 6 kHz 之後 22.05 kHz 就夠，檔案才不會太大。
+    pad = SR
+    web = np.concatenate([loop[:, -pad:], loop, loop[:, :pad]], axis=1)
+    web_out = os.path.join(ROOT, 'prototype', 'web', 'sfx', 'bgm-lofi-loop.m4a')
+    ios_out = os.path.join(ROOT, 'ios', 'NieNie', 'Resources', 'bgm-lofi.caf')
     with tempfile.TemporaryDirectory() as td:
-        wav = os.path.join(td, 'bgm.wav')
-        wavfile.write(wav, SR, (np.clip(loop.T, -1, 1) * 32767).astype(np.int16))
-        for o in outs:
-            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '128k', o], check=True)
-            print('wrote', o, f'{n / SR:.1f}s', f'{os.path.getsize(o) / 1e6:.1f} MB')
+        w1, w2 = os.path.join(td, 'web.wav'), os.path.join(td, 'ios.wav')
+        wavfile.write(w1, SR, (np.clip(web.T, -1, 1) * 32767).astype(np.int16))
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', w1, '-c:a', 'aac', '-b:a', '128k', web_out], check=True)
+        print('wrote', web_out, f'{n} frames', f'{os.path.getsize(web_out) / 1e6:.1f} MB')
+        if '--ios' in sys.argv:
+            k = int(round(n / 2 / 4096)) * 4096   # ALAC 一包 4096 格，長度剛好整除才不會被切掉尾巴（差幾十格，速度差不到萬分之一，聽不出來）
+            low = np.stack([np.fft.irfft(np.fft.rfft(ch)[:k // 2 + 1] * (k / n), k) for ch in loop])
+            wavfile.write(w2, SR // 2, (np.clip(low.T, -1, 1) * 32767).astype(np.int16))
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', w2, '-c:a', 'alac', '-f', 'caf', ios_out], check=True)
+            print('wrote', ios_out, f'{k} frames', f'{os.path.getsize(ios_out) / 1e6:.1f} MB')
 
 
 if __name__ == '__main__':
