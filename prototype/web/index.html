@@ -1226,7 +1226,7 @@ function gaitConst(G){const rm=REDUCED;if(G.climb)return{P:1.15*(rm?2:1),c:.32*(
 function strokeStart(G,K){if(SILL.on){if(SILL.tanV)G.tx=HOMEX;else{G.ty=HOMEY;if(!SILL.route)G.tx=sillClampX(G.tx)}}const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
   G.h=Math.atan2(dy,dx)+(Math.random()-.5)*.42;   // 每一下方向偏一點（±12 度），路線是彎的；速度跟方向在同一刻變
   const per=K.c/2+K.tau*(1-Math.exp(-(K.P-K.c)/K.tau));   // 這個速度剖面，每單位峰值速度走多遠
-  if(rem<K.sd*1.4){G.last=true;G.str=Math.max(.35,Math.min(1,rem/K.sd))}else G.str=1;   // 最後一下比較小
+  if(rem<K.sd*1.4&&!SILL.lift){G.last=true;G.str=Math.max(.35,Math.min(1,rem/K.sd))}else G.str=1;   // 最後一下比較小
   G.vp=G.str*K.sd/per}
 function gaitStep(dt){const G=GAIT,K=gaitConst(G),rm=REDUCED?.5:1;let off=0,mv=0;
   if(G.ph<0){G.prep+=dt;const p=Math.min(1,G.prep/.3);off=-.05*R*Math.sin(Math.PI*p)*rm;G.k=1-.05*Math.sin(Math.PI*p)*rm;   // 出發前 0.3 秒蓄力：往後縮一下、沿前進方向壓扁
@@ -1851,7 +1851,7 @@ function sillTouch(sx,sy,grab){const S=SILL,g=S.g,pr=propAt(sx,sy);if(S.plane===
 // 跳：只留給被嚇到的時候（蹲 0.12 秒再起跳）。平常進出碗用爬的
 function sillHop(tx,toBowl){const S=SILL;if(S.hop||S.grab)return;GAIT.on=false;WANDER.moving=false;if(S.route)routeEnd(true);S.hop={ph:'crouch',t:0,tx:toBowl?S.g.bx:sillClampX(tx),toBowl:!!toBowl};LIFE.st='rest';LIFE.until=t+3}
 function sillLaunch(){const S=SILL,g=S.g,H0=S.hop,gc=globalC,g0=R*SILLG,hs=1/60/SUB;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
-  let hh=R*(.55+.25*Math.random());if(H0.toBowl)hh=Math.max(y1-g.rim,0)+R*.45;else if(S.inBowl)hh=Math.max(hh,y1-g.rim+R*.5);
+  let hh=R*(.55+.25*Math.random());if(H0.toBowl)hh=Math.max(y1-g.rim,0)+R*.45;else if(S.inBowl)hh=Math.max(hh,y1-g.rim+R*.85);
   const vy=Math.sqrt(2*g0*hh),land=H0.toBowl?g.rim:g.fl,T=vy/g0+Math.sqrt(2*Math.max(R*.1,hh+land-y1)/g0),vx=Math.max(-W*1.6,Math.min(W*1.6,(H0.tx-gc.xc)/T));
   for(let i=0;i<N;i++){PY[i]=Y[i]+vy*hs;PX[i]=X[i]-vx*hs}
   S.want=H0.toBowl;S.air=true;S.c=0;S.fall=0;H0.ph='air';H0.t=0;sfxPlay('press',.22)}
@@ -1868,7 +1868,7 @@ function routeNext(){const S=SILL,Q=S.route;if(!Q)return;
     if(q.k==='fn'){q.f();if(!S.route)return;continue}
     if(q.k==='surf'){surfSet(q.s);continue}
     if(q.k==='sniff'){startSniff(q.a,q.L,.4,Math.max(.15,q.T-.5),.5);return}
-    if(q.k==='move'){S.lift=true;S.tanV=true;S.surf=null;S.gtx=0;S.gty=0;HOMEX=globalC.xc;HOMEY=globalC.yc;const dy=q.y-S.y1;if(Math.abs(dy)<2)continue;gaitGo(HOMEX,HOMEY+dy,true);return}
+    if(q.k==='move'){S.lift=true;S.tanV=true;S.surf=null;S.gtx=0;S.gty=0;HOMEX=globalC.xc;HOMEY=globalC.yc;const dy=q.y-S.y1;if(Math.abs(dy)<2)continue;gaitGo(HOMEX,HOMEY+Math.sign(dy)*H*2,true);return}   // 目標放很遠：身體底部還在地上時重心先走，一直爬到底部真的到 q.y（routeStep 判定）才停
     if(q.k==='drop'){S.lift=false;S.tanV=false;S.surf=null;S.gtx=0;S.gty=q.g||1;return}
     if(q.k==='walk'){surfSet(q.s);const v=S.tanV,d=q.to-(v?globalC.yc:globalC.xc);if(Math.abs(d)<R*.06)continue;gaitGo(v?HOMEX:q.to,v?q.to:HOMEY,v);return}
     if(q.k==='turn'){surfSet(q.s);return}
@@ -1876,10 +1876,10 @@ function routeNext(){const S=SILL,Q=S.route;if(!Q)return;
 function routeStep(dt){const S=SILL,Q=S.route,q=Q.steps[Q.i];if(!q){routeEnd(false);return}const u=t-Q.st0;if(ESC.on){routeEnd(true);return}
   if(q.k==='sniff'||q.k==='wait'){if(u>=q.T)routeNext();return}
   if(q.k==='move'||q.k==='walk'){if(GAIT.on)gaitStep(dt);if(LIFE.st==='arrive')LIFE.st='route';
-    const hit=q.k==='move'&&(q.y<Q.y0?S.y1<=q.y:S.y1>=q.y);if(Q.y0==null||Q.i0!==Q.i){Q.y0=S.y1;Q.i0=Q.i}
+    if(Q.y0==null||Q.i0!==Q.i){Q.y0=S.y1;Q.i0=Q.i}const hit=q.k==='move'&&(q.y<Q.y0?S.y1<=q.y:S.y1>=q.y);
     if(!GAIT.on||hit){GAIT.on=false;GAIT.k=1;WANDER.moving=false;routeNext();return}
     if(u>(q.k==='move'?8:40))routeEnd(true);return}
-  if(q.k==='drop'){if((S.c>0&&u>.08)||u>2.5){S.gty=1;routeNext()}return}
+  if(q.k==='drop'){if(((S.plane==='room'?S.c:S.cb)>0&&u>.08)||u>2.5){S.gty=1;routeNext()}return}   // 窗框層、窗外只算地板：貼著牆往下掉不算落地
   if(q.k==='turn'){const c=q.s==='ceil'?S.ct:q.s==='rjamb'||q.s==='ljamb'?S.cj:S.cb;if(c>0||u>1.2)routeNext();return}}
 // 從碗裡爬出來：偽足先搭上去，身體抬到前緣之上，換到碗前面，再流到窗台上
 function rtOutFront(x){const g=SILL.g,a=-Math.PI/2+(Math.random()<.5?-.3:.3);return[RT.sniff(a,.5,.7),RT.move(g.lip-6),RT.plane('room',false),RT.move(g.fl-2),RT.surf('floor')].concat(x!=null?[RT.walk('floor',x)]:[])}
@@ -1898,7 +1898,7 @@ function rtHome(){const S=SILL;if(S.inBowl)return null;if(S.plane==='out')return
 function rtFromWall(){const S=SILL,g=S.g;if(S.surf==='ceil')return[RT.wait(.2),RT.drop(.8),RT.surf('bar')];return[RT.walk(S.surf,g.bt-R*.85),RT.turn('bar')]}
 // 像貓一樣推擺飾：走到旁邊，看著你，伸偽足慢慢推
 function catPick(){const cx=globalC.xc;let best=null,bd=R*3;for(const p of PROPS){if(p.gone||p.fade||p.held||Math.abs(p.a)>.4)continue;const d=Math.abs(p.x-cx);if(d<bd){bd=d;best=p}}return best}
-function rtPoke(p){const side=p.x>globalC.xc?1:-1,a=side>0?-.1:Math.PI+.1,tx=sillClampX(p.x-side*(p.hw+R*.9));const look=T=>RT.fn(()=>{EYE.user=t+T});
+function rtPoke(p){const side=p.x>globalC.xc?1:-1,tx=sillClampX(p.x-side*(p.hw+R*.9)),a=Math.atan2(p.y-(SILL.g.fl-R*.9),p.x-tx);const look=T=>RT.fn(()=>{EYE.user=t+T});
   return[RT.walk('floor',tx),look(2.6),RT.wait(.5),RT.sniff(a,1,1.8),look(2.2),RT.sniff(a,1.25,1.8),RT.fn(()=>{if(Math.abs(p.a)>.5||Math.abs(p.x-p.hx)>R*.25){MOOD.happyT=t;voice('happy',.6)}EYE.user=t+1.2})]}
 function floorWalkX(cx){const g=SILL.g,lo=g.l+R*.9;let hi=g.r-R*.9;for(const p of PROPS)if(!p.gone&&p.x>cx)hi=Math.min(hi,p.x-p.hw-R*.95);if(hi-lo<R*.3)return null;return lo+(hi-lo)*Math.random()}
 // 牠自己想出門：看現在在哪一層，從能做的事裡挑。大半時間還是待著（v2.19：大半時間在休息）
@@ -1910,7 +1910,7 @@ function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random()/Math.max(.01,
   if(S.plane==='out'){if(t-S.outT>10||r<.35)routeStart(rtComeBack());else{const x=sillClampX(cx+(Math.random()<.5?-1:1)*R*(.6+Math.random()));gaitTo(x,HOMEY,false)}}}
 function sillStepPre(){let g=false;for(const f of fingers.values())if(f.mode==='grab'){g=true;SILL.relX=f.fx;SILL.relY=f.fy}SILL.grab=g}
 // 放手時身體有沒有跟碗或擺飾重疊：重疊就只能留在窗台層（換到後面會看到牠突然被蓋住）
-function sillOverlapFront(x0,x1,y0,y1){const g=SILL.g;if(x0<g.bx+g.bw/2&&x1>g.bx-g.bw/2&&y1>g.by)return true;for(const p of PROPS){if(p.gone)continue;if(x0<p.x+p.r&&x1>p.x-p.r&&y1>p.y-p.r)return true}return false}
+function sillOverlapFront(x0,x1,y0,y1){const g=SILL.g;if(x0<g.bx+g.bw/2&&x1>g.bx-g.bw/2&&y1>g.back+R*.5)return true;for(const p of PROPS){if(p.gone)continue;if(x0<p.x+p.r&&x1>p.x-p.r&&y1>p.y-p.r)return true}return false}
 function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==null)return;let y1=-1e9,y0=1e9,x0=1e9,x1=-1e9;for(const i of bnd){if(Y[i]>y1)y1=Y[i];if(Y[i]<y0)y0=Y[i];if(X[i]<x0)x0=X[i];if(X[i]>x1)x1=X[i]}S.y1=y1;S.y0=y0;S.x0=x0;S.x1=x1;
   S.vx=S.px?(cx-S.px)/dt:0;S.vy=S.py?(cy-S.py)/dt:0;S.px=cx;S.py=cy;
   {const k=1-Math.exp(-dt/.12);S.gvx+=(S.gtx-S.gvx)*k;S.gvy+=(S.gty-S.gvy)*k}   // 重力方向慢慢轉，轉角才不會一下甩出去
@@ -1940,7 +1940,7 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   if(!S.grab&&!S.inBowl&&!S.air&&!S.hop&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&S.stickT<0&&t-lastTouch>25&&t-S.lastHome>10&&mat.envRoam>0){S.lastHome=t;routeStart(rtHome())}}
 
 /* 擺飾：凸多邊形的剛體。粒子碰到被推出去，反過來推擺飾；擺飾有重量、會倒、會滾，手指抓得起來。超出窗台兩端就掉下去，約 20 秒後回來；倒著放 25 秒也回原位 */
-const PROPS=[],PROP_MU=.55,PROP_PUSH=1,PROPDEF={
+const PROPS=[],PROP_MU=.55,PROP_PUSH=1.3,PROPDEF={
   succ:{kind:'pot',asp:300/220,wd:70,hx:352/393,com:.70,m:190,poly:[[.16,.995],[.84,.995],[.985,.72],[.975,.40],[.72,.02],[.36,0],[.03,.40],[.01,.72]]},
   peb:{kind:'dish',asp:159/240,wd:76,hx:268/393,com:.62,m:110,poly:[[.30,.995],[.70,.995],[1,.50],[.97,.33],[.72,.02],[.50,0],[.2,.17],[.02,.33],[0,.5]]}};
 function propsInit(){PROPS.length=0;const g=SILL.g,U=g.U;for(const im of ['peb','succ']){const d=PROPDEF[im],wd=d.wd*U,hg=wd*d.asp;let P=d.poly.map(q=>[(q[0]-.5)*wd,(q[1]-d.com)*hg]);
@@ -1953,7 +1953,7 @@ function propHome(p){Object.assign(p,{x:p.hx,y:p.hy,a:0,vx:0,vy:0,va:0,gone:fals
 function propSlotFree(p){const S=SILL;if(S.plane!=='room'||S.inBowl)return true;return !(S.x0<p.hx+p.r&&S.x1>p.hx-p.r&&S.y1>p.hy-p.r)}
 function propsMarkOverlap(){for(const p of PROPS){if(p.gone){continue}let o=false;for(let i=0;i<N&&!o;i++)if(propIn(p,X[i],Y[i],0))o=true;p.skip=o}}   // 換回窗台層時已經疊著的擺飾先不撞，分開了才開始（不然一抓就把盆栽踢飛）
 function propKnock(p,g,far){if(t-p.knockT<.14)return;p.knockT=t;sfxPlay('knock.'+p.kind,Math.max(.05,Math.min(1,g)),far?.8:1)}
-function propRelease(f){const p=f.prop;if(!p)return;p.held=null;p.lastHit=t;if(t-f.tDown<.25&&Math.hypot(f.x-f.ax,f.y-f.ay)<R*.12){p.va+=(f.ax<p.x?1:-1)*1.7;propKnock(p,.22)}}
+function propRelease(f){const p=f.prop;if(!p)return;p.held=null;p.lastHit=t;if(t-f.tDown<.25&&Math.hypot(f.x-f.ax,f.y-f.ay)<R*.12){p.va+=(f.ax<p.x?1:-1)*3.2;propKnock(p,.22)}}
 function propsHitBody(dt){const S=SILL;if(S.plane!=='room'||S.inBowl)return;const capP=h*.6;
   for(const p of PROPS){if(p.gone||p.alpha<.6)continue;const c=Math.cos(p.a),s=Math.sin(p.a),P=p.P,Nn=p.N,M=P.length,r2=p.r*p.r;let over=false;
     for(let i=0;i<N;i++){const dx=X[i]-p.x,dy=Y[i]-p.y;if(dx*dx+dy*dy>r2)continue;const lx=c*dx+s*dy,ly=-s*dx+c*dy;let best=-1e9,bk=-1;
@@ -1961,7 +1961,7 @@ function propsHitBody(dt){const S=SILL;if(S.plane!=='room'||S.inBowl)return;cons
       if(bk<0)continue;over=true;if(p.skip)continue;
       const nx=c*Nn[bk][0]-s*Nn[bk][1],ny=s*Nn[bk][0]+c*Nn[bk][1],pc=Math.min(-best,capP),vx=X[i]-PX[i],vy=Y[i]-PY[i],vn=vx*nx+vy*ny,kn=vn<0?vn:0;
       X[i]+=nx*pc;Y[i]+=ny*pc;PX[i]=X[i]-(vx-nx*kn);PY[i]=Y[i]-(vy-ny*kn);
-      const imp=Math.min(pc,1.5)/dt*PROP_PUSH,rx=X[i]-p.x,ry=Y[i]-p.y;p.vx-=nx*imp/p.m;p.vy-=ny*imp/p.m;p.va-=(rx*ny-ry*nx)*imp/p.I;p.lastHit=t}
+      const imp=Math.min(pc,Math.max(1.5,-kn))/dt*PROP_PUSH,rx=X[i]-p.x,ry=Y[i]-p.y;p.vx-=nx*imp/p.m;p.vy-=ny*imp/p.m;p.va-=(rx*ny-ry*nx)*imp/p.I;p.lastHit=t}
     if(p.skip&&!over)p.skip=false}}
 function propPair(A,B){const ca=Math.cos(A.a),sa=Math.sin(A.a),cb=Math.cos(B.a),sb=Math.sin(B.a),wa=1/A.m,wb=1/B.m;
   for(const q of A.P){const wx=A.x+ca*q[0]-sa*q[1],wy=A.y+sa*q[0]+ca*q[1],dx=wx-B.x,dy=wy-B.y,lx=cb*dx+sb*dy,ly=-sb*dx+cb*dy;let best=-1e9,bk=-1;
@@ -1981,7 +1981,7 @@ function propsStep(dt){const S=SILL,g=S.g,G0=R*SILLG,bwr=g.bx+g.bw*.48,bwy=g.by+
       if(wy>g.fl&&wy<g.fl+R*.5&&wx>g.sl&&wx<g.sr){p.y-=(wy-g.fl)*.7;touch++;const vn=p.vy+p.va*rx;if(vn>0){const e=vn>R*1.5?.15:0,j=-(1+e)*vn/(1/p.m+rx*rx/p.I);p.vy+=j/p.m;p.va+=j*rx/p.I;
           const vt=p.vx-p.va*ry,lim=PROP_MU*Math.abs(j),jt=Math.max(-lim,Math.min(lim,-vt/(1/p.m+ry*ry/p.I)));p.vx+=jt/p.m;p.va-=ry*jt/p.I;if(vn>R*1.2)propKnock(p,vn/(R*9))}}
       if(wx<bwr&&wy>bwy&&wy<g.fl+1){p.x+=(bwr-wx)*.7;const vn=p.vx-p.va*ry;if(vn<0){const j=-1.1*vn/(1/p.m+ry*ry/p.I);p.vx+=j/p.m;p.va-=ry*j/p.I;if(-vn>R*1.2)propKnock(p,-vn/(R*9))}}}
-    if(touch){p.vx*=.9985;p.va*=.994;if(!p.held&&Math.abs(p.vx)+Math.abs(p.vy)<7&&Math.abs(p.va)<.22){p.vx=0;p.vy=0;p.va=0}}
+    if(touch){p.vx*=.9985;p.va*=.994;if(!p.held&&touch>=2&&Math.abs(p.vx)+Math.abs(p.vy)<7&&Math.abs(p.va)<.22){p.vx=0;p.vy=0;p.va=0;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a));if(Math.abs(w)<.08)p.a-=w*.2}}   // 兩個點著地才算停；只差一點點就慢慢躺平，不留歪的
     if(p.y>g.fl+R*.9&&!p.fell){p.fell=true;propKnock(p,.55,true)}   // 掉到窗台下面：看不到了，聽得到一聲
     if(p.y>g.fl+R*2.5||p.x>W+R*2||p.x<-R*2){p.gone=true;p.alpha=0;p.backAt=t+20;p.vx=0;p.vy=0;p.va=0;p.fade=0;p.held=null}}
   if(PROPS.length>1&&!PROPS[0].gone&&!PROPS[1].gone&&PROPS[0].alpha>.6&&PROPS[1].alpha>.6){propPair(PROPS[0],PROPS[1]);propPair(PROPS[1],PROPS[0])}
