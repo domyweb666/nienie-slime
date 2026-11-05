@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.27</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.28 預覽</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -30,10 +30,19 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .mats button{border:0;background:transparent;border-radius:999px;padding:8px 9px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--ink)}
 .mats button i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .mats button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
-.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 186px);
   padding:8px 16px;border-radius:999px;background:#fff;border:2.5px solid var(--chip-line);font-size:14px;font-weight:700;
   transition:opacity .6s;pointer-events:none}
 .hint.off{opacity:0}
+.view{position:fixed;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 68px);display:grid;gap:4px;justify-items:start;z-index:3;pointer-events:none}
+.view .vrow{display:flex;align-items:center;gap:5px;pointer-events:auto;max-width:100%}
+.view b{font-size:12px;font-weight:800;color:var(--ink);background:rgba(255,255,255,.72);border-radius:8px;padding:2px 5px}
+.view .seg{display:flex;gap:1px;padding:2px;border-radius:999px;background:rgba(255,255,255,.86);border:1.5px solid var(--chip-line)}
+.view button{border:0;background:transparent;border-radius:999px;padding:5px 8px;font-size:12.5px;font-weight:700;white-space:nowrap;color:var(--ink)}
+.view button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+.view .plain{background:rgba(255,255,255,.86);border:1.5px solid var(--chip-line)}
+.view.shut .vrow:not(.vkeep){display:none}
+.view.shut .vkeep>:not(#v-toggle){display:none}
 .tune{max-height:calc(100vh - 210px);overflow:auto;position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
   bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:#fff;border:2.5px solid var(--chip-line);border-radius:22px;
   padding:14px 16px 12px;display:grid;gap:10px;z-index:5}
@@ -54,8 +63,14 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>SHAPE MATCH v2.27</span></div>
+  <div class="brand" id="brand">捏捏<span>v2.28 預覽 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
+</div>
+
+<div class="view" id="view">
+  <div class="vrow"><b>皮</b><span class="seg" data-k="skin"><button data-v="flat">平塗</button><button data-v="A">A 清透</button><button data-v="B">B 奶凍</button><button data-v="C">C 霧面</button></span></div>
+  <div class="vrow"><b>身體</b><span class="seg" data-k="body"><button data-v="round">圓</button><button data-v="tent">8 條</button></span><b>臉</b><span class="seg" data-k="face"><button data-v="1">有</button><button data-v="0">沒有</button></span></div>
+  <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-old">v2.27 原樣</button><button class="plain" id="v-toggle">收起</button></div>
 </div>
 
 <div class="hint" id="hint">捏它、拉它、揉它。放著不管它也會自己動</div>
@@ -1360,12 +1375,13 @@ function dropPts(d,r){const u=t-d.snapT,tl=d.neck<1?.5+.7*d.neck:.9*Math.exp(-Ma
     {const a=x*cv2+y*sv2,b=-x*sv2+y*cv2;x=a*sv*cv2-b/sv*sv2;y=a*sv*sv2+b/sv*cv2}   // 沿速度拉長
     P.push([d.x+x,d.y+y])}return P}
 // v2.23 絲：從外圈點到那滴的尾巴，兩頭粗中間細（越拉越細），斷開後身體那半截 0.15 秒縮回去。畫在身體之前，根部被身體蓋住
-function drawStrands(col){if(!DROPS.length||mat.dropsV<.5)return;const body=tint(col('--body')),line=col('--line');
+function drawStrands(col,into){if(!DROPS.length||mat.dropsV<.5)return;const body=tint(col('--body')),line=col('--line');
   for(const d of DROPS){if(d.ai<0)continue;const u=t-d.snapT,on=d.neck<1;if(!on&&!(u>=0&&u<.15))continue;
     const r=d.r,bx=d.bx,by=d.by,ex=d.x+Math.cos(d.ta)*r*1.4,ey=d.y+Math.sin(d.ta)*r*1.4,len=on?1:.5*(1-u/.15);
     const dx=(ex-bx)*len,dy=(ey-by)*len,l=Math.hypot(dx,dy)||1,nx=-dy/l,ny=dx/l,n=on?d.neck:1;
     const wb=r*(.95-.4*n),wm=on?r*(.55*(1-n)**1.5+.05):0,wd=on?r*(.4-.15*n):0,L=[],Rr=[];
     for(let s=0;s<=10;s++){const q=s/10,w=wb*(1-q)**2+wm*2*q*(1-q)+wd*q*q,cx=bx+dx*q,cy=by+dy*q;L.push([cx+nx*w,cy+ny*w]);Rr.push([cx-nx*w,cy-ny*w])}
+    if(into){into.beginPath();into.moveTo(L[0][0],L[0][1]);for(const p of L)into.lineTo(p[0],p[1]);for(let s=Rr.length-1;s>=0;s--)into.lineTo(Rr[s][0],Rr[s][1]);into.closePath();into.fill();continue}
     ctx.beginPath();ctx.moveTo(L[0][0],L[0][1]);for(const p of L)ctx.lineTo(p[0],p[1]);for(let s=Rr.length-1;s>=0;s--)ctx.lineTo(Rr[s][0],Rr[s][1]);ctx.closePath();
     ctx.fillStyle=body;ctx.fill();ctx.lineWidth=Math.max(2.5,R*.024)/CAM.z;ctx.lineJoin='round';ctx.strokeStyle=line;ctx.stroke()}}
 function drawDrops(col){if(!DROPS.length)return;const body=tint(col('--body')),shade=tint(col('--shade'),true),hi=col('--hi'),line=col('--line');
@@ -1426,7 +1442,7 @@ function eyeStep(dt){if(!(mat.eyes>=.5)||!EYE.L.length)return;
     const k=1-Math.exp(-dt/.05);EYE.openD+=(open-EYE.openD)*k;EYE.wideD+=(wide-EYE.wideD)*k;EYE.blink=b}}
 function drawEyes(col){if(!(mat.eyes>=.5)||!EYE.L.length)return;
   const [lx,ly]=eyeAt(EYE.L),[rx,ry]=eyeAt(EYE.R),sx=Math.max(.8,Math.min(1.3,Math.hypot(rx-lx,ry-ly)/EYE.d0)),S=R*(mat.eyeSize||1)*Math.sqrt(MASSD),
-    ew=S*.082*Math.sqrt(sx),eh=S*.118,ink=col('--eye')||col('--line'),ga=(mat.gazeAmp||.06)*(1-.8*EYE.dk),ox=(EYE.gx*ga+EYE.dx)*S,oy=(EYE.gy*ga*.75+EYE.dy)*S,lw=Math.max(2.5,S*.034);
+    js=VIEW.skin==='flat'?1:.68,ew=S*.082*js*Math.sqrt(sx),eh=S*.118*js,ink=col('--eye')||col('--line'),ga=(mat.gazeAmp||.06)*(1-.8*EYE.dk),ox=(EYE.gx*ga+EYE.dx)*S,oy=(EYE.gy*ga*.75+EYE.dy)*S,lw=Math.max(2.5,S*.034);
   ctx.lineCap='round';ctx.lineJoin='round';
   for(const [x0,y0,sd] of [[lx,ly,-1],[rx,ry,1]]){const x=x0+ox,y=y0+oy;
     ctx.strokeStyle=ink;ctx.fillStyle=ink;ctx.lineWidth=lw;
@@ -1826,14 +1842,129 @@ function drawTrail(col){const sh=col('--shade'),hi=col('--hi'),g=globalC,cs=g.cs
 function drawDents(col){const sh=col('--shade'),hi=col('--hi');
   for(const dn of DENTS){if(dn.d<.02||dn.i>=N)continue;const r=R*mat.dentSize*(.65+.35*dn.w),a=dn.d*(1-.35*dn.w),[ma,mb,mc,md]=dentFrame(dn);
     ctx.save();ctx.transform(ma,mb,mc,md,X[dn.i],Y[dn.i]);pitAt(r,a,sh,hi);ctx.restore()}}
+/* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
+// 做法：外框（加上黏液和絲）畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
+const VIEW={skin:'B',body:'round',face:1,bg:'day',shut:0};
+try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o)Object.assign(VIEW,o)}catch(_){}
+function viewOver(){const o={};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;return o}
+const JSKINS={
+  A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92},
+  B:{kEdge:.50,kCore:.16,aEdge:.86,aCore:.97,amb:.88,dif:.20,glow:.46,line:.26,nk:.90,shin:320,s0:.42,s1:.68,spec:.80,sheen:.10,arc:.88},
+  C:{kEdge:.22,kCore:.10,aEdge:1,aCore:1,amb:.76,dif:.38,glow:.16,line:.10,nk:.72,shin:9,s0:.35,s1:1.15,spec:.34,sheen:.05,arc:0}};
+const JEL={gl:null,c:null,m:null,mc:null,fail:false,w:0,h:0,dpr:0};
+function jelInit(){if(JEL.fail)return false;const c=document.createElement('canvas'),gl=c.getContext('webgl2',{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false});
+  if(!gl){JEL.fail=true;return false}
+  const VS=`#version 300 es
+in vec2 p;out vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`,
+  FB=`#version 300 es
+precision highp float;in vec2 v;out vec4 o;uniform sampler2D t;uniform vec2 d;uniform float s;
+void main(){float sum=0.,w=0.;int N=int(ceil(s*2.6));for(int i=-N;i<=N;i++){float g=exp(-.5*float(i*i)/(s*s));sum+=texture(t,v+d*float(i)).r*g;w+=g;}o=vec4(sum/w,0.,0.,1.);}`,
+  FS=`#version 300 es
+precision highp float;in vec2 v;out vec4 o;
+uniform sampler2D M,B1,B2;uniform vec2 res;uniform float rpx;uniform vec4 uD[6];uniform int nD;
+uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc;
+float H1(vec2 uv){float h=.45*smoothstep(0.,1.,texture(B1,uv).r);vec2 px=uv*res;for(int i=0;i<nD;i++){vec2 q=(px-uD[i].xy)/uD[i].z;h-=uD[i].w*.24*exp(-dot(q,q)*1.6);}return h;}
+void main(){float m=texture(M,v).r,cov=smoothstep(.18,.82,m);if(cov<=0.){o=vec4(0.);return;}
+  vec2 e=2./res,E=8./res;float gx=(H1(v+vec2(e.x,0.))-H1(v-vec2(e.x,0.)))/4.+.55*(texture(B2,v+vec2(E.x,0.)).r-texture(B2,v-vec2(E.x,0.)).r)/16.,gy=(H1(v+vec2(0.,e.y))-H1(v-vec2(0.,e.y)))/4.+.55*(texture(B2,v+vec2(0.,E.y)).r-texture(B2,v-vec2(0.,E.y)).r)/16.;
+  vec3 n=normalize(vec3(-gx*rpx*nk,-gy*rpx*nk,1.)),L=normalize(vec3(-.5,.72,.9)),Hv=normalize(L+vec3(0.,0.,1.));
+  float b1=texture(B1,v).r,b2=texture(B2,v).r,thick=smoothstep(.08,.8,b2),fres=pow(1.-n.z,2.);
+  vec3 col=mix(cEdge,cCore,thick);col*=amb+dif*clamp(dot(n,L),0.,1.);
+  float tr=clamp(dot(n.xy,normalize(vec2(.35,-.94))),0.,1.);col+=cGlow*smoothstep(0.,.7,tr)*(.25+.75*fres)*glow;
+  float a=mix(aEdge,aCore,thick);vec4 c=vec4(col*a,a);
+  c=mix(c,vec4(cLine,1.),(1.-smoothstep(.5,.66,b1))*line);
+  float nh=max(dot(n,Hv),0.);c.rgb+=vec3(pow(nh,shin*.22)*sheen*(1.-thick*.4))*c.a;
+  c=mix(c,vec4(1.),smoothstep(s0,s1,pow(nh,shin))*spec);
+  /* 亮弧：沿著外框內側的等高線走，只留朝光那一段；拉長、壓扁時自己跟著變形，細的地方自動沒有 */
+  vec2 g2=vec2(texture(B1,v+vec2(e.x,0.)).r-texture(B1,v-vec2(e.x,0.)).r,texture(B1,v+vec2(0.,e.y)).r-texture(B1,v-vec2(0.,e.y)).r);float gl2=length(g2);
+  if(gl2>1e-5&&arc>0.){float wd=.05*smoothstep(.70,.97,dot(-g2/gl2,normalize(vec2(-.62,.78))));if(wd>.002)c=mix(c,vec4(1.),(1.-smoothstep(wd*.55,wd,abs(b1-.90)))*arc);}
+  o=c*cov;}`;
+  const prog=(vs,fs)=>{const p=gl.createProgram();for(const [ty,src] of [[gl.VERTEX_SHADER,vs],[gl.FRAGMENT_SHADER,fs]]){const h=gl.createShader(ty);gl.shaderSource(h,src);gl.compileShader(h);if(!gl.getShaderParameter(h,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(h));gl.attachShader(p,h)}gl.bindAttribLocation(p,0,'p');gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p};
+  try{JEL.pB=prog(VS,FB);JEL.pF=prog(VS,FS)}catch(err){console.warn(err);JEL.fail=true;return false}
+  const q=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  JEL.float=!!(gl.getExtension('EXT_color_buffer_float')||gl.getExtension('EXT_color_buffer_half_float'));gl.disable(gl.BLEND);
+  JEL.uB={};for(const n of ['t','d','s'])JEL.uB[n]=gl.getUniformLocation(JEL.pB,n);
+  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
+  JEL.tM=gl.createTexture();JEL.params(gl,JEL.tM);
+  JEL.gl=gl;JEL.c=c;JEL.mc=document.createElement('canvas');JEL.m=JEL.mc.getContext('2d',{willReadFrequently:false});JEL.w=0;
+  c.addEventListener('webglcontextlost',e=>{e.preventDefault();JEL.gl=null});
+  c.addEventListener('webglcontextrestored',()=>{jelInit()});
+  return true}
+JEL.params=(gl,tx)=>{gl.bindTexture(gl.TEXTURE_2D,tx);for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,k,v)};
+function jelFbo(w,h){const gl=JEL.gl,tx=gl.createTexture();JEL.params(gl,tx);const f=gl.createFramebuffer();
+  const make=(hi)=>{if(hi)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);gl.bindFramebuffer(gl.FRAMEBUFFER,f);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tx,0);return gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE};
+  if(!(JEL.float&&make(true)))make(false);return{f,tx,w,h}}
+function jelReady(){if(!JEL.gl&&!jelInit())return false;const gl=JEL.gl;if(gl.isContextLost())return false;
+  if(JEL.w!==W||JEL.h!==H||JEL.dpr!==DPR){JEL.w=W;JEL.h=H;JEL.dpr=DPR;JEL.c.width=Math.round(W*DPR);JEL.c.height=Math.round(H*DPR);JEL.mc.width=W;JEL.mc.height=H;
+    for(const k of ['h1','h2','q1','q2'])if(JEL[k]){gl.deleteFramebuffer(JEL[k].f);gl.deleteTexture(JEL[k].tx)}
+    const hw=Math.max(2,W>>1),hh=Math.max(2,H>>1),qw=Math.max(2,W>>3),qh=Math.max(2,H>>3);JEL.h1=jelFbo(hw,hh);JEL.h2=jelFbo(hw,hh);JEL.q1=jelFbo(qw,qh);JEL.q2=jelFbo(qw,qh)}
+  return true}
+function jelPath(m,P){const n=P.length;m.beginPath();for(let i=0;i<n;i++){const p0=P[(i+n-1)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];if(i===0)m.moveTo(p1[0],p1[1]);m.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6,p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6,p2[0],p2[1])}m.closePath()}
+function jelColor(c){if(c[0]==='#'){const n=parseInt(c.slice(1,7),16);return[(n>>16)/255,(n>>8&255)/255,(n&255)/255]}const a=c.match(/[\d.]+/g).map(Number);return[a[0]/255,a[1]/255,a[2]/255]}
+const jelMix=(a,b,k)=>[a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k,a[2]+(b[2]-a[2])*k];
+function jelRender(P,tr,col){const gl=JEL.gl,m=JEL.m,sk=JSKINS[VIEW.skin]||JSKINS.B,k=1/DPR,zoom=Math.sqrt(Math.abs(tr.a*tr.d-tr.b*tr.c))*k,rpx=R*zoom;
+  // 1. 遮罩（一倍解析度就夠，放大時靠 smoothstep 收邊）
+  m.setTransform(1,0,0,1,0,0);m.fillStyle='#000';m.fillRect(0,0,W,H);m.setTransform(tr.a*k,tr.b*k,tr.c*k,tr.d*k,tr.e*k,tr.f*k);m.fillStyle='#fff';
+  jelPath(m,P);m.fill();
+  let ax=1e9,ay=1e9,bx=-1e9,by=-1e9;const grow=(x,y,r)=>{if(x-r<ax)ax=x-r;if(x+r>bx)bx=x+r;if(y-r<ay)ay=y-r;if(y+r>by)by=y+r};
+  for(const q of P)grow(q[0],q[1],0);
+  drawStrands(col,m);
+  for(const d of DROPS){const r=d.r*(d.st==='eat'?Math.max(0,d.k):1);if(r<.5)continue;grow(d.x,d.y,r*2.5);if(d.bx!=null&&d.ai>=0)grow(d.bx,d.by,r*2);if(mat.dropsV>=.5){jelPath(m,dropPts(d,r));m.fill()}else{m.beginPath();m.arc(d.x,d.y,r,0,Math.PI*2);m.fill()}}
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,JEL.tM);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,JEL.mc);
+  // 2. 只算身體附近（螢幕座標）
+  const toX=(x,y)=>(tr.a*x+tr.c*y+tr.e)*k,toY=(x,y)=>(tr.b*x+tr.d*y+tr.f)*k,cs=[[ax,ay],[bx,ay],[ax,by],[bx,by]],pad=rpx*1.4+6;
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const c of cs){const X0=toX(c[0],c[1]),Y0=toY(c[0],c[1]);x0=Math.min(x0,X0);x1=Math.max(x1,X0);y0=Math.min(y0,Y0);y1=Math.max(y1,Y0)}
+  x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(W,x1+pad);y1=Math.min(H,y1+pad);
+  const area=(w,h)=>{const sx=w/W,sy=h/H,X1=Math.floor(x0*sx),Y1=Math.floor((H-y1)*sy);gl.scissor(X1,Y1,Math.ceil(x1*sx)-X1+1,Math.ceil((H-y0)*sy)-Y1+1)};
+  gl.enable(gl.SCISSOR_TEST);
+  const blur=(src,dst,dx,dy,sg)=>{gl.bindFramebuffer(gl.FRAMEBUFFER,dst.f);gl.viewport(0,0,dst.w,dst.h);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);area(dst.w,dst.h);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(JEL.uB.t,0);gl.uniform2f(JEL.uB.d,dx,dy);gl.uniform1f(JEL.uB.s,sg);gl.drawArrays(gl.TRIANGLES,0,3)};
+  gl.useProgram(JEL.pB);const s1=Math.max(.6,rpx*.07/2),s2=Math.max(.6,rpx*.42/8);
+  blur(JEL.tM,JEL.h1,1/JEL.h1.w,0,s1);blur(JEL.h1.tx,JEL.h2,0,1/JEL.h2.h,s1);blur(JEL.tM,JEL.q1,1/JEL.q1.w,0,s2);blur(JEL.q1.tx,JEL.q2,0,1/JEL.q2.h,s2);
+  // 3. 打光
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,JEL.c.width,JEL.c.height);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);area(JEL.c.width,JEL.c.height);
+  gl.useProgram(JEL.pF);const U=JEL.uF;[[JEL.tM,U.M],[JEL.h2.tx,U.B1],[JEL.q2.tx,U.B2]].forEach(([tx,u],i)=>{gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,tx);gl.uniform1i(u,i)});
+  gl.uniform2f(U.res,W,H);gl.uniform1f(U.rpx,rpx);
+  const ds=new Float32Array(24);let nd=0;for(const d of DENTS){const r=R*mat.dentSize*d.d;if(r<.5||nd>=6)continue;const x=X[d.i],y=Y[d.i];ds[nd*4]=toX(x,y);ds[nd*4+1]=H-toY(x,y);ds[nd*4+2]=r*zoom*1.2;ds[nd*4+3]=Math.min(1,d.d);nd++}
+  gl.uniform4fv(U.uD,ds);gl.uniform1i(U.nD,nd);
+  const b=jelColor(tint(col('--body'))),sh=jelColor(tint(col('--shade'),true)),ln=jelColor(col('--line'));
+  gl.uniform3fv(U.cEdge,jelMix(b,[1,1,1],sk.kEdge));gl.uniform3fv(U.cCore,jelMix(b,sh,sk.kCore));gl.uniform3fv(U.cLine,jelMix(sh,ln,.35));gl.uniform3fv(U.cGlow,jelMix(b,[1,1,1],.3));
+  for(const n of ['aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc'])gl.uniform1f(U[n],sk[n]);
+  gl.drawArrays(gl.TRIANGLES,0,3);gl.disable(gl.SCISSOR_TEST)}
+function drawBlush(){if(!VIEW.face||!EYE.L.length)return;const [lx,ly]=eyeAt(EYE.L),[rx,ry]=eyeAt(EYE.R),a=Math.atan2(ry-ly,rx-lx),S=R*(mat.eyeSize||1)*Math.sqrt(MASSD);
+  for(const [x0,y0,sd] of [[lx,ly,-1],[rx,ry,1]]){const x=x0+Math.cos(a)*sd*S*.23,y=y0+Math.sin(a)*sd*S*.23+S*.11;ctx.save();ctx.translate(x,y);ctx.scale(S*.13,S*.08);const g=ctx.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,'rgba(255,132,150,.72)');g.addColorStop(.55,'rgba(255,132,150,.42)');g.addColorStop(1,'rgba(255,132,150,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();ctx.restore()}}
+// 窗台背景：先畫好整張存起來，每幀只貼一次。牠還是懸空的，重力和碗是下一片
+const SCENE={img:{},cache:{},loading:false};
+function sceneLoad(){if(SCENE.loading)return;SCENE.loading=true;for(const n of ['plate','bowl','succ','peb']){const i=new Image();i.onload=()=>{SCENE.img[n]=i};i.src='scene/'+n+'.webp'}}
+function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
+  const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
+  const s=w/860,sillTop=h*.72,off=sillTop-1177*s,ox=-66*s,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
+  const g=c.createLinearGradient(0,gy,0,gy+gh);g.addColorStop(0,night?'#141B3D':'#9CCBF0');g.addColorStop(1,night?'#2F3A6B':'#DCEEF8');c.fillStyle=g;c.fillRect(gx,gy,gw,gh);
+  if(night){c.fillStyle='rgba(255,255,255,.85)';let q=7;const rnd=()=>(q=(q*16807)%2147483647)/2147483647;for(let i=0;i<46;i++){c.beginPath();c.arc(gx+rnd()*gw,gy+rnd()*gh*.8,(.5+rnd()*1.1)*DPR,0,Math.PI*2);c.fill()}c.fillStyle='#F6EFC8';c.beginPath();c.arc(gx+gw*.74,gy+gh*.2,gw*.075,0,Math.PI*2);c.fill();c.fillStyle='#141B3D';c.beginPath();c.arc(gx+gw*.70,gy+gh*.185,gw*.068,0,Math.PI*2);c.fill()}
+  else{c.fillStyle='rgba(255,255,255,.92)';for(const [cx,cy,r] of [[.26,.24,1],[.72,.14,.8],[.82,.5,1.15],[.3,.62,.7]]){const u=gw*.1*r,X0=gx+gw*cx,Y0=gy+gh*cy;for(const [dx,dy,rr] of [[-1.1,.2,.62],[-.3,-.25,.9],[.6,-.05,.75],[1.3,.25,.5]]){c.beginPath();c.arc(X0+dx*u,Y0+dy*u,rr*u,0,Math.PI*2);c.fill()}c.fillRect(X0-u*1.6,Y0+u*.1,u*3.3,u*.62)}}
+  c.fillStyle=night?'rgba(30,40,80,.9)':'rgba(120,165,150,.45)';c.beginPath();c.moveTo(gx,gy+gh);for(let i=0;i<=40;i++){const q=i/40;c.lineTo(gx+gw*q,gy+gh*(.9-.035*Math.sin(q*9)-.02*Math.sin(q*21)))}c.lineTo(gx+gw,gy+gh);c.fill();
+  const room=document.createElement('canvas');room.width=w;room.height=h;const r=room.getContext('2d');r.fillStyle='#F2E7DC';r.fillRect(0,0,w,h);r.clearRect(gx,gy,gw,gh);r.drawImage(a.plate,ox,off,992*s,1586*s);
+  const sillY=off+1228*s,U=W*DPR/393,place=(im,cx,wd)=>{const hd=im.height*wd/im.width;r.save();r.translate(cx,sillY-2);r.scale(wd*.52,11*U);const sg=r.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,'rgba(120,70,40,.28)');sg.addColorStop(1,'rgba(120,70,40,0)');r.fillStyle=sg;r.beginPath();r.arc(0,0,1,0,Math.PI*2);r.fill();r.restore();r.drawImage(im,cx-wd/2,sillY-hd,wd,hd)};
+  place(a.succ,50*U,70*U);place(a.peb,343*U,76*U);place(a.bowl,196.5*U,165*U);
+  if(night){r.globalCompositeOperation='source-atop';r.fillStyle='rgba(38,42,92,.62)';r.fillRect(0,0,w,h);r.globalCompositeOperation='source-over'}
+  c.drawImage(room,0,0);SCENE.cache[key]=sky;return sky}
+let fpsAcc=0,fpsN=0;function viewFps(dt){fpsAcc+=dt;fpsN++;if(fpsAcc>=.5){const el=document.getElementById('v-fps');if(el)el.textContent='· 每幀 '+(fpsAcc/fpsN*1000).toFixed(1)+' ms';fpsAcc=0;fpsN=0}}
+function viewSync(){const root=document.getElementById('view');root.classList.toggle('shut',!!VIEW.shut);document.getElementById('v-toggle').textContent=VIEW.shut?'切換':'收起';
+  root.querySelectorAll('.seg').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(VIEW[k])===b.dataset.v)))});
+  try{localStorage.setItem('nienie.view',JSON.stringify(VIEW))}catch(_){}}
+function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face);Object.assign(VIEW,o);viewSync();if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
+  if(VIEW.skin!=='flat'&&JEL.fail)hint('這支手機不支援果凍皮，先用平塗')}
+document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-old'){viewSet({skin:'flat',body:'tent',face:0,bg:'blue'});return}if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;const k=g.dataset.k,v=b.dataset.v;viewSet({[k]:k==='face'?+v:v})});
+document.getElementById('view').addEventListener('pointerdown',e=>e.stopPropagation());
+
 function draw(){
   const css=getComputedStyle(document.documentElement),col=n=>css.getPropertyValue(n).trim();
   ctx.clearRect(0,0,W,H);
   // 背景
-  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,col('--sky'));g.addColorStop(1,col('--sky2'));
-  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const sc=VIEW.bg==='blue'?null:sceneFor(VIEW.bg);
+  if(sc)ctx.drawImage(sc,0,0,W,H);
+  else{const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,col('--sky'));g.addColorStop(1,col('--sky2'));
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
   if(!FLOAT){ctx.fillStyle=col('--grass');ctx.fillRect(0,GROUND,W,H-GROUND);ctx.fillStyle=col('--grass-line');ctx.fillRect(0,GROUND,W,3)}
-  if(FLOAT&&mat.specks>=.5)drawSpecks(col);
+  if(FLOAT&&mat.specks>=.5&&!sc)drawSpecks(col);
   // 鏡頭：之後畫的都在世界座標；描邊粗細除以 z，畫面上看起來一樣粗
   {const v=viewV();ctx.setTransform(DPR*CAM.z,0,0,DPR*CAM.z,DPR*(v.x-CAM.z*CAM.x),DPR*(v.y-CAM.z*CAM.y))}
   if(IV.s!==1||IV.ox||IV.oy){ctx.translate(INTRO.px+IV.ox,INTRO.py+IV.oy);ctx.scale(IV.s,IV.s);ctx.translate(-INTRO.px,-INTRO.py)}   // v2.17 開場的遠近
@@ -1848,6 +1979,7 @@ function draw(){
   ctx.fillStyle=`rgba(60,90,40,${(FLOAT?.10+.08*(1-lift):.16)+.04*pz})`;
   ctx.beginPath();ctx.ellipse((minX+maxX)/2,sy,sw*(FLOAT?.7+.3*(1-lift):1.05)*(1+.08*pz),   // 影子跟整體寬度置中（拉長時跟重心會偏一邊）
     R*.11*(FLOAT?.8:1),0,0,Math.PI*2);ctx.fill()}
+  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBlush();drawEyes(col);ctx.setTransform(DPR,0,0,DPR,0,0);return}   // v2.28 預覽：果凍皮把身體、黏液、絲一起畫
   drawStrands(col);   // v2.23 黏液的絲：根部讓身體蓋住
   ctx.save();
   if(!FLOAT){ctx.beginPath();ctx.rect(0,0,W,GROUND+2);ctx.clip()}
@@ -1886,7 +2018,7 @@ function draw(){
 /* ---------- 主迴圈 ---------- */
 function frame(now){
   const dt=Math.min(1/30,Math.max(1/240,(now-last)/1000||1/60));last=now;
-  update(dt);draw();requestAnimationFrame(frame);
+  update(dt);draw();viewFps(dt);requestAnimationFrame(frame);
 }
 
 /* ---------- UI ---------- */
@@ -1895,13 +2027,13 @@ function applySlimeColors(s){const st=document.documentElement.style;['--body','
 let hintT=null;function hint(s){const h=$('hint');h.textContent=s;h.classList.remove('off');clearTimeout(hintT);hintT=setTimeout(()=>h.classList.add('off'),2600)}
 function chooseSlime(i,intro,say){if(mat.imp>=.5)IMPS[SLIMES[SLIME].id]={tr:IMP.tr,w:IMP.w};
   const s=SLIMES[i];SLIME=i;try{localStorage.setItem('nienie.slime',s.id)}catch(_){}
-  mat={...PRESETS[s.mat],seed:s.seed,...s.p};curMat=s.mat;applySlimeColors(s);
+  mat={...PRESETS[s.mat],seed:s.seed,...s.p,...viewOver()};curMat=s.mat;applySlimeColors(s);
   for(let k=0;k<SLIMES.length;k++)$('s-'+k).setAttribute('aria-pressed',String(k===i));
   setup();impReset();const o=IMPS[s.id];if(o){IMP.tr=o.tr;IMP.w=o.w}IMPD.tr=IMP.tr;IMPD.w=IMP.w;
   syncSliders();if(intro)startIntro();if(say)hint(s.name+'：'+s.desc)}
 SLIMES.forEach((s,k)=>{const b=document.createElement('button');b.id='s-'+k;b.setAttribute('aria-pressed','false');b.innerHTML=`<i style="background:${s.c[0]}"></i>${s.name}`;
   b.addEventListener('click',()=>{if(k!==SLIME)chooseSlime(k,true,true)});$('slimes').appendChild(b)});
-function setMat(name){const s=SLIMES[SLIME];mat={...PRESETS[name],seed:s.seed,...s.p};curMat=name;syncSliders()}
+function setMat(name){const s=SLIMES[SLIME];mat={...PRESETS[name],seed:s.seed,...s.p,...viewOver()};curMat=name;syncSliders()}
 for(const k of ['jelly','mochi','clay'])$('tm-'+k).addEventListener('click',()=>setMat(k));
 $('b-reset').addEventListener('click',()=>{relax()});   // 揉回原形：用動畫不瞬移（換種子才走 setup）
 $('b-float').addEventListener('click',()=>{FLOAT=!FLOAT;$('b-float').setAttribute('aria-pressed',String(FLOAT));$('b-float').textContent=FLOAT?'懸空（多米定案）':'地面（對照用）';setup();dump()});
@@ -1928,6 +2060,7 @@ const sl={};
 function syncSliders(){for(const k in sl){sl[k].inp.value=mat[k];sl[k].out.textContent=String(mat[k])}dump()}
 function dump(){$('t-out').value=JSON.stringify({...mat,float:FLOAT})}
 
+viewSync();sceneLoad();hintT=setTimeout(()=>$('hint').classList.add('off'),5000);
 addEventListener('resize',()=>{setup()});
 {let i=0;try{const k=SLIMES.findIndex(s=>s.id===localStorage.getItem('nienie.slime'));if(k>=0)i=k}catch(_){}chooseSlime(i,true,false)}   // v2.23：上次選的那隻
 requestAnimationFrame(frame);
