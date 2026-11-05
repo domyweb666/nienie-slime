@@ -39,7 +39,7 @@
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
-  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { dropsV: 0, eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, PSAVE = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, ...OFF23 };
+  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { dropsV: 0, eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, ...OFF23 };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -847,6 +847,47 @@
     r41.pull.dragSide = pair('clay', -.5, 0, 0, 1, 1100, .2, .4);   // v2.26.1
     res.T41_v226 = r41; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
 
+
+  // T42 v2.27（多米 11-05：去眼睛、8 條真觸手、心情變色、觸手互撞）。舊項目都關（OFF27），這裡全開。
+  //   a 外形：8 條、整隻在畫面裡、沒有眼睛；b 每條都抓得住、拉得長、抓著不抖（v2.8 真機就是這裡纏住抖）；c 黏土拉長留著、果凍彈回；
+  //   d 往根推、繞到身體後面：滑開不對折；e 亂玩 3 種材質 2 組亂數：沒有留下對折或互疊、停得下來；f 撞到別條會彈開；g 心情染色、平常原色、不跳
+  { const clock = saveClock(); Math.random = seeded(20261105); const r42 = {};
+    const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
+    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
+    const L = (name, o) => { resetAligned(1e9, { ...P27[name], seed: 7, ...QUIET, ...(o || {}) }); impReset(); IMPD.tr = 0; IMPD.w = 0; CAM.x = viewV().x; MC.c = MC.s = MC.w = MC.z = 0; };
+    const tip = k => { let b = -1; for (const i of bnd) if (TID[i] === k && (b < 0 || TU[i] > TU[b])) b = i; return b; };
+    const rootOf = k => { let x = 0, y = 0; for (const i of TENT[k].root) { x += X[i]; y += Y[i]; } const n = TENT[k].root.length; return [x / n, y / n]; };
+    const jit = (m, on) => { let jm = 0, xf = 0, ax = Float64Array.from(X), ay = Float64Array.from(Y); for (let i = 0; i < m; i++) { if (on) on(i); steps(1); let d = 0; for (let j = 0; j < N; j++) d = Math.max(d, Math.hypot(X[j] - ax[j], Y[j] - ay[j])); ax = Float64Array.from(X); ay = Float64Array.from(Y); if (i > m * .4) jm = Math.max(jm, d); if (classify()[0]) xf++; } return { jm: +jm.toFixed(1), xf }; };
+    // a 外形
+    L('clay'); { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const i of bnd) { const p = sc(X[i], Y[i]); a = Math.min(a, p[0]); b = Math.max(b, p[0]); c = Math.min(c, p[1]); d = Math.max(d, p[1]); } r42.shape = { tents: TENT.length, N, x0: a | 0, x1: b | 0, y0: c | 0, y1: d | 0, W, H, z: +CAM.z.toFixed(2), selfX: selfX(), eyes: ['clay', 'mochi', 'jelly'].map(k => P27[k].eyes) }; }
+    // b 每條都抓得住
+    r42.pulls = {}; for (const name of ['clay', 'mochi', 'jelly']) { L(name); let held = 9e9, gap = 0, hj = 0, xf = 0, grab = 0; for (let k = 0; k < TENT.length; k++) { const b = tip(k), c = globalC, ux = X[b] - c.xc, uy = Y[b] - c.yc, ul = Math.hypot(ux, uy) || 1, p = sc(X[b], Y[b]); let x = p[0], y = p[1]; ev('pointerdown', 1, x, y); const f = fingers.get(1); held = Math.min(held, f.mem.length); const mv = jit(24, () => { x += ux / ul * R * 1.2 / 24; y += uy / ul * R * 1.2 / 24; ev('pointermove', 1, x, y); }); steps(40); const hold = jit(30); const g = sc(X[b], Y[b]); gap = Math.max(gap, Math.hypot(g[0] - x, g[1] - y)); hj = Math.max(hj, hold.jm); xf += mv.xf + hold.xf; if (f.mode === 'grab') grab++; ev('pointerup', 1, x, y); xf += jit(90).xf; } r42.pulls[name] = { minHeld: held, grabbed: grab, maxGap: +gap.toFixed(1), holdJ: hj, foldFrames: xf, end: selfX() }; }
+    // b2 從身體中間往觸手的方向拉，要抓得住（一度會馬上滑開：補抓帶到觸手的粒子就被當成抓觸手）
+    r42.bodyPull = {}; for (const name of ['clay', 'jelly']) { let lost = 0, mv = 0; for (let k = 0; k < TENT.length; k++) { L(name); const b = tip(k), c = globalC, ux = X[b] - c.xc, uy = Y[b] - c.yc, ul = Math.hypot(ux, uy), p = sc(c.xc + ux / ul * R * .3, c.yc + uy / ul * R * .3); let x = p[0], y = p[1]; const c0x = c.xc, c0y = c.yc; ev('pointerdown', 1, x, y); steps(8); const f = fingers.get(1); for (let i = 0; i < 16; i++) { x += ux / ul * R * 1.6 / 16; y += uy / ul * R * 1.6 / 16; ev('pointermove', 1, x, y); steps(1); } if (f.mode !== 'grab') lost++; mv = Math.max(mv, Math.hypot(globalC.xc - c0x, globalC.yc - c0y)); ev('pointerup', 1, x, y); steps(20); } r42.bodyPull[name] = { lost, moved: +mv.toFixed(1) }; }
+    // c 長度留著
+    const keep = name => { L(name); const b = tip(2), c = globalC, ux = X[b] - c.xc, uy = Y[b] - c.yc, ul = Math.hypot(ux, uy), p = sc(X[b], Y[b]); let x = p[0], y = p[1]; ev('pointerdown', 1, x, y); jit(24, () => { x += ux / ul * R * 1.2 / 24; y += uy / ul * R * 1.2 / 24; ev('pointermove', 1, x, y); }); jit(60); const held = Math.hypot(X[b] - globalC.xc, Y[b] - globalC.yc); ev('pointerup', 1, x, y); jit(120); const a2 = Math.hypot(X[b] - globalC.xc, Y[b] - globalC.yc); return { rest: +ul.toFixed(1), held: +held.toFixed(1), after2s: +a2.toFixed(1), keep: +((a2 - ul) / (held - ul)).toFixed(2) }; };
+    r42.keep = { clay: keep('clay'), jelly: keep('jelly') };
+    // d 往根推、繞到身體後面
+    const cross = name => { L(name); let hj = 0, xf = 0, end = 0; for (let k = 0; k < TENT.length; k += 2) { const b = tip(k), c = globalC, p = sc(X[b], Y[b]), q = sc(c.xc - (X[b] - c.xc), c.yc - (Y[b] - c.yc)); let x = p[0], y = p[1]; ev('pointerdown', 1, x, y); const dx = (q[0] - x) / 50, dy = (q[1] - y) / 50; const a = jit(50, () => { x += dx; y += dy; ev('pointermove', 1, x, y); }); const h = jit(40); hj = Math.max(hj, h.jm); xf += a.xf + h.xf; ev('pointerup', 1, x, y); xf += jit(120).xf; end += selfX(); } return { holdJ: hj, foldFrames: xf, end }; };
+    const around = name => { L(name); let hj = 0, xf = 0, end = 0; for (let k = 0; k < TENT.length; k += 3) { const b = tip(k), c = globalC, a0 = Math.atan2(Y[b] - c.yc, X[b] - c.xc), rr = Math.hypot(X[b] - c.xc, Y[b] - c.yc) * 1.05, p = sc(X[b], Y[b]); let x = p[0], y = p[1]; ev('pointerdown', 1, x, y); const a = jit(70, i => { const an = a0 + (i + 1) / 70 * 2.4, q = sc(c.xc + Math.cos(an) * rr, c.yc + Math.sin(an) * rr); x = q[0]; y = q[1]; ev('pointermove', 1, x, y); }); const h = jit(40); hj = Math.max(hj, h.jm); xf += a.xf + h.xf; ev('pointerup', 1, x, y); xf += jit(120).xf; end += selfX(); } return { holdJ: hj, foldFrames: xf, end }; };
+    r42.cross = {}; r42.around = {}; for (const name of ['clay', 'mochi', 'jelly']) { r42.cross[name] = cross(name); r42.around[name] = around(name); }
+    // e 亂玩
+    const abuse = (name, seed) => { Math.random = seeded(seed); L(name); let same = 0, n = 0; const cnt = () => { if (classify()[0]) same++; n++; }; for (let s = 0; s < 24; s++) { const c = globalC, a0 = Math.random() * 6.28, rr = R * (.3 + Math.random() * 1.3), p = sc(c.xc + Math.cos(a0) * rr, c.yc + Math.sin(a0) * rr); let x = p[0], y = p[1]; const a1 = Math.random() * 6.28, sp = R * (1 + Math.random() * 6) / 60, two = s % 5 === 4, x2 = x + R * .9, y2 = y; ev('pointerdown', 1, x, y); if (two) ev('pointerdown', 2, x2, y2); const m = 20 + Math.random() * 50 | 0; for (let i = 0; i < m; i++) { x += Math.cos(a1) * sp; y += Math.sin(a1) * sp; ev('pointermove', 1, x, y); if (two) ev('pointermove', 2, x2 + Math.cos(a1) * sp * i, y2 - Math.sin(a1) * sp * i); steps(1); cnt(); } for (let i = 0; i < 40; i++) { steps(1); cnt(); } ev('pointerup', 1, x, y); if (two) ev('pointerup', 2, x2, y2); for (let i = 0; i < 30; i++) { steps(1); cnt(); } } const last = jit(240), e = classify(); return { n, foldFrames: same, endJ: last.jm, endFold: e[0], endOverlap: e[1] }; };
+    r42.abuse = {}; for (const name of ['clay', 'mochi', 'jelly']) r42.abuse[name] = [abuse(name, 11), abuse(name, 22)];
+    // f 撞到別條會彈開：固定一條，拿另一條去撞
+    const hit = (name, o, m) => { Math.random = seeded(5); L(name, o); const a = tip(0), b = tip(1), d = tip(3), dp = sc(X[d], Y[d]); ev('pointerdown', 2, dp[0], dp[1]); let p = sc(X[a], Y[a]), x = p[0], y = p[1]; const q = sc(X[b] + (X[b] - X[a]) * .9, Y[b] + (Y[b] - Y[a]) * .9); TBUMP.n = 0; ev('pointerdown', 1, x, y); const tr = [], rec = () => { const r = rootOf(1); tr.push([X[b] - r[0], Y[b] - r[1]]); }; const dx = (q[0] - x) / m, dy = (q[1] - y) / m; jit(m, () => { x += dx; y += dy; ev('pointermove', 1, x, y); rec(); }); jit(30, rec); ev('pointerup', 1, x, y); ev('pointerup', 2, dp[0], dp[1]); jit(60, rec); return { tr, kicks: TBUMP.n, end: selfX() }; };
+    r42.bump = {}; for (const name of ['clay', 'jelly']) { const A = hit(name, {}, 40), B = hit(name, { tentBump: 0 }, 40); let dm = 0; for (let i = 0; i < Math.min(A.tr.length, B.tr.length); i++) dm = Math.max(dm, Math.hypot(A.tr[i][0] - B.tr[i][0], A.tr[i][1] - B.tr[i][1])); r42.bump[name] = { kicks: A.kicks, kicksOff: B.kicks, tipDiff: +dm.toFixed(1), end: A.end }; }
+    // g 心情染色
+    const near = (a, b) => { const p = s => s[0] === '#' ? [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)] : s.match(/\d+/g).map(Number), u = p(a), w = p(b); return Math.max(Math.abs(u[0] - w[0]), Math.abs(u[1] - w[1]), Math.abs(u[2] - w[2])); };
+    { const O = { emo: 1, moodColor: .8 }, base = '#FFD96B'; L('clay', O); steps(180); r42.mood = { calmOff: near(tint(base), base), calm: { ...MC } };
+      let c0 = globalC, p = sc(c0.xc, c0.yc), th = 0, maxStep = 0, prev = tint(base); ev('pointerdown', 1, p[0] + 30, p[1]); for (let i = 0; i < 240; i++) { th += .12; ev('pointermove', 1, p[0] + 30 * Math.cos(th), p[1] + 30 * Math.sin(th)); steps(1); const q = tint(base); maxStep = Math.max(maxStep, near(q, prev)); prev = q; } r42.mood.comfy = +MC.c.toFixed(2); r42.mood.comfyOff = near(tint(base), base); r42.mood.purr = +PURR.toFixed(2); ev('pointerup', 1, p[0], p[1]); steps(30);
+      L('clay', O); prev = tint(base); c0 = globalC; p = sc(c0.xc + R * .3, c0.yc); let x = p[0]; ev('pointerdown', 1, x, p[1]); steps(8); let spk = 0; for (let i = 0; i < 16; i++) { x += R * 2.6 / 16; ev('pointermove', 1, x, p[1]); steps(1); spk = Math.max(spk, MC.s); const q = tint(base); maxStep = Math.max(maxStep, near(q, prev)); prev = q; } for (let i = 0; i < 40; i++) { steps(1); spk = Math.max(spk, MC.s); const q = tint(base); maxStep = Math.max(maxStep, near(q, prev)); prev = q; } r42.mood.strain = +spk.toFixed(2); r42.mood.strainMax = +MOOD.strainMax.toFixed(2); ev('pointerup', 1, x, p[1]); steps(10);
+      L('clay', { ...O, sleep: 1, life2: 1 }); prev = tint(base); SLP.lastAny = t; LIFE.st = 'sleep'; LIFE.until = 1e9; SLP.on = true; for (let i = 0; i < 300; i++) { steps(1); const q = tint(base); maxStep = Math.max(maxStep, near(q, prev)); prev = q; } r42.mood.sleep = +MC.z.toFixed(2); SLP.on = false; steps(5);
+      L('clay', { ...O, imp: 1 }); IMP.w = .9; IMPD.w = .9; for (let i = 0; i < 90; i++) { IMP.w = .9; IMPD.w = .9; steps(1); } r42.mood.wary = +MC.w.toFixed(2); impReset(); IMPD.w = 0;
+      r42.mood.maxStep = maxStep; mat = { ...mat, moodColor: 0 }; MC.c = MC.s = MC.w = MC.z = 0; r42.mood.offEqualsBase = near(tint(base), base); }
+    { const cost = o => { L('clay', o); const c = globalC, p = sc(c.xc + R * .4, c.yc); ev('pointerdown', 1, p[0], p[1]); const t0 = performance.now(); for (let i = 0; i < 200; i++) { ev('pointermove', 1, p[0] + 40 * Math.cos(i / 10), p[1] + 40 * Math.sin(i / 10)); steps(1); } const ms = (performance.now() - t0) / 200; ev('pointerup', 1, p[0], p[1]); return +ms.toFixed(2); }; r42.msPerFrame = { off: cost({ limbs: 0 }), on: cost({}) }; }
+    res.T42_v227 = r42; log.splice(0); restoreClock(clock); CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; mat = { ...PRESETS.clay }; }
+
   const L9 = res.T34_life;
   const V5 = res.T35_v220, P6 = res.T36_pull, V7 = res.T37_v222, X8 = res.T38_v223, Y9 = res.T39_v224, Z0 = res.T40_v225, A1 = res.T41_v226;
   res.PASS = {
@@ -924,6 +965,12 @@
       && X8.swim.startOffR > 2 && X8.swim.arriveS > 0 && X8.swim.arriveS < 4.5 && X8.swim.helloS > 0 && X8.swim.camMoved < 5 && X8.swim.end.selfX === 0
       && X8.collect.slimes.every(q => q.mat && q.seed && q.color && q.aMin > 0.97 && q.aMax < 1.03 && q.selfX === 0) && X8.collect.impBack === 0.7 && X8.worstSelfX === 0,
     // v2.26：見 T41 開頭的 a 到 h
+    v227: (() => { const A = res.T42_v227, s = A.shape, ok3 = f => ['clay', 'mochi', 'jelly'].every(f); return s.tents === 8 && s.selfX === 0 && s.x0 >= 0 && s.x1 <= s.W && s.y0 >= 0 && s.y1 <= s.H && s.z >= .85 && s.eyes.every(e => e === 0)
+      && ok3(k => { const p = A.pulls[k]; return p.grabbed === 8 && p.minHeld >= 5 && p.maxGap < 25 && p.holdJ < 6 && p.foldFrames === 0 && p.end === 0; }) && A.bodyPull.clay.lost === 0 && A.bodyPull.jelly.lost === 0 && A.keep.clay.keep > .6 && A.keep.jelly.keep < .4
+      && ok3(k => A.cross[k].holdJ < 15 && A.cross[k].foldFrames === 0 && A.cross[k].end === 0 && A.around[k].holdJ < 15 && A.around[k].end === 0)
+      && ok3(k => A.abuse[k].every(r => r.foldFrames < r.n * .05 && r.endFold === 0 && r.endJ < 12))
+      && A.bump.clay.kicks >= 1 && A.bump.clay.tipDiff > 5 && A.bump.clay.kicksOff === 0 && A.bump.clay.end === 0
+      && A.mood.calmOff <= 1 && A.mood.comfy > .5 && A.mood.comfyOff > 20 && A.mood.purr > .1 && A.mood.strain > .4 && A.mood.sleep > .5 && A.mood.wary > .5 && A.mood.maxStep < 25 && A.mood.offEqualsBase === 0; })(),
     v226: ['clay', 'mochi', 'jelly'].every(k => { const a = A1.swipe[k], q = A1.swipe[k + 'Fast'], o = A1.swipe[k + 'Off']; return a.first === 'stroke' && a.end === 'stroke' && a.peakR < .3 && a.backPt < 2 && a.crossFrames === 0 && a.qdev < 1 && q.first === 'stroke' && q.peakR < .3 && q.crossFrames === 0 && o.first === 'grab' && o.peakR > .5; })
       && ['edge', 'rb', 'center', 'dragSlow', 'dragSide', 'yank', 'press'].every(k => { const p = A1.pull[k]; return p.on.first === 'grab' && p.on.end === 'grab' && Math.abs(p.on.moveR - p.off.moveR) < .05 && p.on.crossFrames === 0; })
       && A1.twoFinger.m1 === 'grab' && A1.twoFinger.m2 === 'grab' && A1.twoFinger.widthR > 3.2 && A1.secondFinger.before === 'stroke' && A1.secondFinger.after === 'grab' && A1.secondFinger.m2 === 'grab'
@@ -966,7 +1013,7 @@
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
   draw();
-  Object.assign(PRESETS, PSAVE); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
+  Object.assign(PRESETS, P27); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
   if (SFX) SFX.frame = sfxFrame0;
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
   console.log(JSON.stringify(res, null, 1));
