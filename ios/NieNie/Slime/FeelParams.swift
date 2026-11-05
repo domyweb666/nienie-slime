@@ -172,7 +172,7 @@ struct FeelParams: Equatable, Codable {
     var e2: Double = 1                // E2: every action answered: a tap → it leans toward your finger; held still → it pushes once, then nuzzles; tickled → it squirms, too long → slips free; wary and dragged → it claws away
     var e3: Double = 1                // E3: the impression shows: trust 3–4× faster; trusting rounder, taller, warmer, slower breath; wary flatter, paler
     var e4: Double = 1                // E4: trusting and left alone 10–20 s, it swims to the front, waves a pseudopod, hums, goes back (3 times a run at most)
-    var drops: Double = 1             // drops: long pulls, yanks, flings, pinches, slow lifts drop bits (body at most 15% smaller); they float, it swims over and takes them back; you can drag them; trusting it pushes one to you; hold one and it comes to snatch it
+    var drops: Double = 0             // v2.29 (多米 11-06: 取消這項設計，手機版的程式等移植時一起拿掉) drops: long pulls, yanks, flings, pinches, slow lifts drop bits (body at most 15% smaller); they float, it swims over and takes them back; you can drag them; trusting it pushes one to you; hold one and it comes to snatch it
     // v2.23 (多米 build 86: the drops look wrong and come off too easily, too many; still no feeling it reacts to you; try a face, eyes only;
     // sleep, rhythm, swim-in and the collection all at once). All but eyes only count while life2 is 1
     var dropsV: Double = 1            // drops v2.23: only a yank or a hard fling drops one (one a grab, 4 s apart, 2 on screen, body at least 0.9); a strand pulls out, thins and snaps; a teardrop that wobbles round. 0: v2.22

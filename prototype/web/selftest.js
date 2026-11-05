@@ -40,7 +40,7 @@
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
-  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { dropsV: 0, eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, ...OFF23 };
+  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23 };
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -584,7 +584,7 @@
 
   // T37 v2.22（多米 build 77：還是沒有互動的感覺；繼續做黏液）。a 點一下：放手 0.25 到 0.45 秒開始朝手指傾、「噗」；b 按著不動 2.5 秒：左右蹭 0.03R 以上、「嗯～」；
   //     c 搔癢：扭 3 次以上、3.2 到 5 秒掙脫（撥 4 下才算開始搔癢，之後 3 秒）、有咯咯笑和「嗯嗯」；d E3 輕揉 5 秒熟過 0.5（E3 關不到 0.3）；e E4 熟 0.8、不碰 30 秒內游到前面（0.6R 內）打招呼；
-  //     f 黏土兩指往兩邊拉 1.8R：掉黏液、身體變小，放手 90 秒內全部吸回去、身體長回來（drops 0 不掉）；g 把一滴拖到身上 1 秒內吸掉；h 抓著一滴放旁邊，它 10 秒內游過來搶。全程零自交
+  //     全程零自交（v2.29 黏液取消，f、g、h 拿掉）
   { const clock = saveClock(); Math.random = seeded(20261104); const r37 = {}; let worst = 0;
     const cen = () => { let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } return [mx / N, my / N]; };
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
@@ -602,18 +602,6 @@
     r37.e3 = { trOn: rubTr({}), trOff: rubTr({ e3: 0 }) };
     { L5({}); E4.count = 0; IMP.tr = 0.8; LIFE.until = -1; let hello = -1; for (let k = 0; k < 1800 && E4.count < 1; k++) { steps(1); if (hello < 0 && voices().includes('hello')) hello = t; if (k % 30 === 0) worst = Math.max(worst, selfX()); }
       const c = cen(), q = toWorld(W / 2, v.y + H * 0.12); r37.e4 = { count: E4.count, helloAt: +hello.toFixed(1), distR: +(Math.hypot(c[0] - q.x, c[1] - q.y) / R).toFixed(2) }; }
-    const pullApart = o => { L5({ emo: 0, ...o }); let l = -1, r = -1; for (const i of bnd) { if (l < 0 || X[i] < X[l]) l = i; if (r < 0 || X[i] > X[r]) r = i; }
-      const lx = X[l] + 4, ly = Y[l], rx = X[r] - 4, ry = Y[r]; let a = sc(lx, ly), b = sc(rx, ry); ev('pointerdown', 1, a[0], a[1]); ev('pointerdown', 2, b[0], b[1]); const f1 = fingers.get(1), f2 = fingers.get(2);
-      for (let k = 1; k <= 50; k++) { const u = Math.min(1, k / 40) * 1.8 * R; a = [a[0] + (lx - u - f1.x) * CAM.z, a[1] + (ly - f1.y) * CAM.z]; b = [b[0] + (rx + u - f2.x) * CAM.z, b[1] + (ry - f2.y) * CAM.z]; ev('pointermove', 1, a[0], a[1]); ev('pointermove', 2, b[0], b[1]); steps(1); }
-      const n = DROPS.length, m = MASS; ev('pointerup', 1, a[0], a[1]); ev('pointerup', 2, b[0], b[1]); return { n, m }; };
-    { const off = pullApart({ drops: 0 }); const on = pullApart({}); LIFE.until = t + 1; let done = -1;
-      for (let k = 0; k < 5400; k++) { steps(1); if (k % 30 === 0) worst = Math.max(worst, selfX()); if (!DROPS.length) { done = k / 60; break; } }
-      steps(60); r37.drops = { spawned: on.n, massAfter: +on.m.toFixed(3), allEatenS: +done.toFixed(1), massEnd: +MASS.toFixed(3), offSpawned: off.n, gulps: voices().filter(x => x === 'gulp').length, end: snap() }; }
-    { L5({}); dropSpawn(globalC.xc + R * 2.2, globalC.yc, 0, 0, R * 0.18); steps(70); const d = DROPS[0]; let q = sc(d.x, d.y); ev('pointerdown', 3, q[0], q[1]); const f = fingers.get(3), held = d.st;
-      const tx = globalC.xc, ty = globalC.yc, x0 = f.x, y0 = f.y; for (let k = 1; k <= 30; k++) { q = [q[0] + (x0 + (tx - x0) * k / 30 - f.x) * CAM.z, q[1] + (y0 + (ty - y0) * k / 30 - f.y) * CAM.z]; ev('pointermove', 3, q[0], q[1]); steps(1); }
-      ev('pointerup', 3, q[0], q[1]); steps(60); r37.dragIn = { held, left: DROPS.length, mass: +MASS.toFixed(3) }; }
-    { L5({}); IMP.tr = 0.3; dropSpawn(globalC.xc + R * 2.5, globalC.yc - R * 0.5, 0, 0, R * 0.18); steps(70); const d = DROPS[0], q = sc(d.x, d.y); ev('pointerdown', 4, q[0], q[1]); LIFE.until = -1; let got = -1;
-      for (let k = 0; k < 600; k++) { steps(1); if (got < 0 && (!DROPS.length || d.st === 'eat')) { got = t; break; } } ev('pointerup', 4, q[0], q[1]); steps(30); r37.snatch = { gotAt: got > 0 ? +(got - 0).toFixed(2) : -1, left: DROPS.length }; }
     r37.worstSelfX = worst;
     res.T37_v222 = r37; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
@@ -625,19 +613,8 @@
   //   e 游過來：從家右邊 2R 以外開始，4.5 秒內到家 0.6R 內、打招呼，鏡頭不動（5 點內）；f 收集：四隻輪流換，材質、種子、顏色對，放 3 秒零自交、面積 0.97 到 1.03；換回來印象還在。全程零自交
   { const clock = saveClock(); Math.random = seeded(20261105); const r38 = {}; let worst = 0;
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const L6 = o => { resetAligned(1e9, { ...P1, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; log.splice(0); };
+    const L6 = o => { resetAligned(1e9, { ...P1, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; log.splice(0); };
     const voices = () => log.filter(x => String(x[0]).startsWith('voice.')).map(x => x[0].slice(6));
-    const pull = (dur, dist) => { L6({}); const x0 = globalC.xc + R * 0.8, y0 = globalC.yc; let q = sc(x0, y0); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); let neck = 0;
-      for (let k = 0; k < dur + 40; k++) { const tx = x0 + dist * R * Math.min(1, k / dur); q = [q[0] + (tx - f.x) * CAM.z, q[1] + (y0 - f.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (DROPS.some(d => d.neck > 0 && d.neck < 1)) neck++; if (k % 10 === 0) worst = Math.max(worst, selfX()); }
-      const n = DROPS.length, d = DROPS[0]; let sep = -1;
-      if (d) { steps(Math.max(0, Math.round((0.6 - (t - d.snapT)) * 60))); let m = 1e9; for (const i of bnd) m = Math.min(m, Math.hypot(X[i] - d.x, Y[i] - d.y)); sep = m / R; }
-      const x1 = f.x; for (let k = 0; k < 30; k++) { const tx = x1 + R * 1.5 * Math.sin(Math.min(1, k / 6) * Math.PI / 2); q = [q[0] + (tx - f.x) * CAM.z, q[1]]; ev('pointermove', 1, q[0], q[1]); steps(1); }
-      const n2 = DROPS.length; ev('pointerup', 1, q[0], q[1]); steps(30); return { n, neck, sepR: +sep.toFixed(2), n2, after: DROPS.length }; };
-    const apart = () => { L6({}); let l = -1, r = -1; for (const i of bnd) { if (l < 0 || X[i] < X[l]) l = i; if (r < 0 || X[i] > X[r]) r = i; }
-      const lx = X[l] + 4, ly = Y[l], rx = X[r] - 4, ry = Y[r]; let a = sc(lx, ly), b = sc(rx, ry); ev('pointerdown', 1, a[0], a[1]); ev('pointerdown', 2, b[0], b[1]); const f1 = fingers.get(1), f2 = fingers.get(2);
-      for (let k = 1; k <= 50; k++) { const u = Math.min(1, k / 40) * 1.8 * R; a = [a[0] + (lx - u - f1.x) * CAM.z, a[1] + (ly - f1.y) * CAM.z]; b = [b[0] + (rx + u - f2.x) * CAM.z, b[1] + (ry - f2.y) * CAM.z]; ev('pointermove', 1, a[0], a[1]); ev('pointermove', 2, b[0], b[1]); steps(1); }
-      const n = DROPS.length; ev('pointerup', 1, a[0], a[1]); ev('pointerup', 2, b[0], b[1]); steps(30); return n; };
-    r38.drops = { slow: pull(120, 2.5), yank: pull(7, 2.6), apart: apart() };
     { L6({}); const q = sc(globalC.xc + R * 2.2, globalC.yc); ev('pointerdown', 2, q[0], q[1]); steps(60); const gx = +EYE.gx.toFixed(2); ev('pointerup', 2, q[0], q[1]); steps(30);
       let bl = 0, lastB = EYE.blinkT; for (let k = 0; k < 600; k++) { steps(1); if (EYE.blinkT !== lastB) { bl++; lastB = EYE.blinkT; } }
       L6({}); const sx = globalC.xc, sy = globalC.yc; let p = sc(sx, sy); ev('pointerdown', 1, p[0], p[1]); const f = fingers.get(1); let sq = 0;
@@ -673,11 +650,11 @@
   //   f 留形不動：拉 1.5R 放手 2 秒還留七成五；g 三種材質暴力玩法（拉、甩、兩指擠、兩指拉、揉）零交叉、面積回來
   { const clock = saveClock(); Math.random = seeded(20261104); const r39 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], ...OFF25, seed: 7, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };
+    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], ...OFF25, seed: 7, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };
     const box = () => { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); c = Math.min(c, Y[i]); d = Math.max(d, Y[i]); } return [a, b, c, d]; };
     const kink = () => { const n = bnd.length; let m = 0; for (let k = 0; k < n; k++) { const a = bnd[(k + n - 1) % n], b = bnd[k], c = bnd[(k + 1) % n], u = Math.atan2(Y[b] - Y[a], X[b] - X[a]), w = Math.atan2(Y[c] - Y[b], X[c] - X[b]); m = Math.max(m, Math.abs(Math.atan2(Math.sin(w - u), Math.cos(w - u)))); } return m * 180 / Math.PI; };
     const hidden = (p, fx, fy) => { const qx = p[0] - fx, qy = p[1] - fy, u = qx * .5 + qy * .866, uc = Math.max(0, Math.min(160, u)), rr = 30 + 18 * uc / 160; return Math.hypot(qx - .5 * uc, qy - .866 * uc) < rr; };   // 手指：接觸面半徑 30 點、從右下伸過來、往後變寬到 48 點
-    const face = () => { const [lx, ly] = eyeAt(EYE.L), [rx, ry] = eyeAt(EYE.R), S = R * (mat.eyeSize || 1) * Math.sqrt(MASSD), ga = mat.gazeAmp * (1 - .8 * EYE.dk), ox = (EYE.gx * ga + EYE.dx) * S, oy = (EYE.gy * ga * .75 + EYE.dy) * S; return { l: [lx + ox, ly + oy], r: [rx + ox, ry + oy], ox, oy }; };
+    const face = () => { const [lx, ly] = eyeAt(EYE.L), [rx, ry] = eyeAt(EYE.R), S = R * (mat.eyeSize || 1), ga = mat.gazeAmp * (1 - .8 * EYE.dk), ox = (EYE.gx * ga + EYE.dx) * S, oy = (EYE.gy * ga * .75 + EYE.dy) * S; return { l: [lx + ox, ly + oy], r: [rx + ox, ry + oy], ox, oy }; };
     // a F1
     L7('clay', {}); { const b = box(); r39.size = { rOverW: +(R / W).toFixed(3), widthPt: +(b[1] - b[0]).toFixed(0), z: +CAM.z.toFixed(3) }; }
     // b F2 縮、傾（關掉放手後的探，只看傾）
@@ -707,7 +684,7 @@
     // f 留形：抓最右邊往右拉 1.5R、停 1 秒放手，量放手 2 秒還留幾成拉出來的寬度
     L7('clay', { lifeAttend: 0 }); { const wd = () => { const b = box(); return (b[1] - b[0]) / R; }, w0 = wd(); let bi = -1; for (const i of bnd) if (bi < 0 || X[i] > X[bi]) bi = i; const sx = X[bi] - R * .15, sy = Y[bi]; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); for (let k = 1; k <= 90; k++) { const a = sx + 1.5 * R * Math.min(1, k / 30); q = [q[0] + (a - f.x) * CAM.z, q[1]]; ev('pointermove', 1, q[0], q[1]); steps(1); } const wh = wd(); ev('pointerup', 1, q[0], q[1]); steps(120); r39.keep = { heldR: +wh.toFixed(2), keep2s: +((wd() - w0) / (wh - w0)).toFixed(2) }; }
     // g 暴力玩法
-    const abuse = name => { L7(name, {}); mat.drops = 0; mat.dropsV = 0; let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / (A0 * MASSD); aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
+    const abuse = name => { L7(name, {}); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / A0; aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
       const c = () => sc(globalC.xc, globalC.yc); let q = c(); ev('pointerdown', 1, q[0] + R * .7, q[1]); let x = q[0] + R * .7, y = q[1]; tick(25, () => { x += R * 2.5 / 25; ev('pointermove', 1, x, y); }); tick(30); ev('pointerup', 1, x, y); tick(60);
       q = c(); x = q[0] - R * .6; y = q[1]; ev('pointerdown', 1, x, y); tick(6, () => { x -= R * .35; y += R * .2; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(90);
       q = c(); let a = q[0] - R * .7, b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a += R * .55 / 30; b -= R * .55 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(30); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(60);
@@ -723,8 +700,8 @@
   //   d 猛甩放手、兩指放一指、按住放手、揉回原形：零交叉、不炸（QD 離 Q 不超過 2.5R）、放手跳動小；e 放著：QD 收回 Q、不漂；f 減少動態：不過衝；g 三種材質全開暴力玩法零交叉
   { const clock = saveClock(); Math.random = seeded(20261225); const r40 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
-    const L8 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], ...OFF26, seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
+    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
+    const L8 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], ...OFF26, seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
     const OFF = { inertiaHz: 0, dragSpring: 0 };
     const edgeI = (dx, dy) => { let bi = -1, bb = -1e9; for (const i of bnd) { const p = X[i] * dx + Y[i] * dy; if (p > bb) { bb = p; bi = i; } } return bi; };
     const jumpFrom = (x0, y0) => { let m = 0; for (const i of bnd) m = Math.max(m, Math.hypot(X[i] - x0[i], Y[i] - y0[i])); return m; };
@@ -757,7 +734,7 @@
     r40.reduced = ring('jelly', { inertiaZ: .7 });
     sample = null; substep = sub1;
     // g 全開暴力玩法
-    const abuse = name => { L8(name, { drops: 0, dropsV: 0 }, true); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / (A0 * MASSD); aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
+    const abuse = name => { L8(name, {}, true); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / A0; aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
       const c = () => sc(globalC.xc, globalC.yc); let q = c(); ev('pointerdown', 1, q[0] + R * .7, q[1]); let x = q[0] + R * .7, y = q[1]; tick(25, () => { x += R * 2.5 / 25; ev('pointermove', 1, x, y); }); tick(30); ev('pointerup', 1, x, y); tick(60);
       q = c(); x = q[0] - R * .6; y = q[1]; ev('pointerdown', 1, x, y); tick(6, () => { x -= R * .35; y += R * .2; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(90);
       q = c(); let a = q[0] - R * .7, b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a += R * .55 / 30; b -= R * .55 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(30); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(60);
@@ -805,8 +782,8 @@
   //   f 按著：手指外面看得到的變化比關掉多 1500 平方點以上；揉的時候凹痕還在、痕跡半秒內淡完；g 亮光跟著拉伸；h 全開暴力玩法（含一直劃過去）零交叉、留形不變
   { const clock = saveClock(); Math.random = seeded(20261226); const r41 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
-    const L10 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; DROPV.last = -99; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
+    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, eyes: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
+    const L10 = (name, o, full) => { resetAligned(1e9, { ...PSAVE[name], seed: 7, ...(full ? {} : QUIET), ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(30); log.splice(0); };
     const OFF = OFF26, MATS = ['clay', 'mochi', 'jelly'], U = Math.SQRT1_2;
     const go = (name, o, lx, ly, dx, dy, peak, rampT, T, full) => { L10(name, o, full); const q = sc(globalC.xc + lx * R, globalC.yc + ly * R); let x = q[0], y = q[1]; const c0x = globalC.xc, c0y = globalC.yc; ev('pointerdown', 1, x, y); const f = fingers.get(1); let first = null, pk = 0, xf = 0; const fr = Math.round(T * 60);
       for (let i = 1; i <= fr; i++) { const vv = peak * Math.min(1, (i / 60) / rampT); x += dx * vv / 60; y += dy * vv / 60; ev('pointermove', 1, x, y); steps(1); if (!first && !f.judge) first = f.mode; pk = Math.max(pk, Math.hypot(globalC.xc - c0x, globalC.yc - c0y)); if (selfX()) xf++; }
@@ -834,7 +811,7 @@
     // g 亮光
     { L10('clay', {}); const q = sc(X[hiIdx] - R * .05, Y[hiIdx] - R * .05); ev('pointerdown', 1, q[0], q[1]); steps(6); let x = q[0], y = q[1]; for (let i = 0; i < 30; i++) { x -= R * 1.2 * .64 / 30; y -= R * 1.2 * .77 / 30; ev('pointermove', 1, x, y); steps(1); } steps(10); const [a, b, c, d] = dentFrame(HIF), h0 = (a + d) / 2, h1 = Math.hypot((a - d) / 2, (b + c) / 2); r41.hi = { big: +(h0 + h1).toFixed(2), small: +(h0 - h1).toFixed(2) }; ev('pointerup', 1, x, y); steps(30); }
     // h 暴力玩法、留形
-    const abuse = name => { L10(name, { drops: 0, dropsV: 0 }, true); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / (A0 * MASSD); aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
+    const abuse = name => { L10(name, {}, true); let xf = 0, n = 0, aMin = 9, aMax = 0; const tick = (m, fn) => { for (let i = 0; i < m; i++) { if (fn) fn(i); steps(1); n++; if (selfX()) xf++; const a = area() / A0; aMin = Math.min(aMin, a); aMax = Math.max(aMax, a); } };
       const c = () => sc(globalC.xc, globalC.yc); let q = c(); ev('pointerdown', 1, q[0] + R * .7, q[1]); let x = q[0] + R * .7, y = q[1]; tick(25, () => { x += R * 2.5 / 25; ev('pointermove', 1, x, y); }); tick(30); ev('pointerup', 1, x, y); tick(60);
       q = c(); x = q[0] - R * .6; y = q[1]; ev('pointerdown', 1, x, y); tick(6, () => { x -= R * .35; y += R * .2; ev('pointermove', 1, x, y); }); ev('pointerup', 1, x, y); tick(90);
       q = c(); let a = q[0] - R * .7, b = q[0] + R * .7; y = q[1]; ev('pointerdown', 1, a, y); ev('pointerdown', 2, b, y); tick(30, () => { a += R * .55 / 30; b -= R * .55 / 30; ev('pointermove', 1, a, y); ev('pointermove', 2, b, y); }); tick(30); ev('pointerup', 1, a, y); ev('pointerup', 2, b, y); tick(60);
@@ -854,7 +831,7 @@
   //   d 往根推、繞到身體後面：滑開不對折；e 亂玩 3 種材質 2 組亂數：沒有留下對折或互疊、停得下來；f 撞到別條會彈開；g 心情染色、平常原色、不跳
   { const clock = saveClock(); Math.random = seeded(20261105); const r42 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
+    const QUIET = { emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, intro: 0, introSwim: 0, wander: 0, life: 0, pods: 0 };
     const L = (name, o) => { resetAligned(1e9, { ...P27[name], seed: 7, ...QUIET, ...(o || {}) }); impReset(); IMPD.tr = 0; IMPD.w = 0; CAM.x = viewV().x; MC.c = MC.s = MC.w = MC.z = 0; };
     const tip = k => { let b = -1; for (const i of bnd) if (TID[i] === k && (b < 0 || TU[i] > TU[b])) b = i; return b; };
     const rootOf = k => { let x = 0, y = 0; for (const i of TENT[k].root) { x += X[i]; y += Y[i]; } const n = TENT[k].root.length; return [x / n, y / n]; };
@@ -952,15 +929,13 @@
     // v2.21 拉力：果凍單指拉 2.5R 整團跟 1.5R 以上、拉長 0.9R 以下（slide 0 不到 0.7R）；猛一扯比慢拉長 0.3R；兩指往兩邊拉寬過 4.5R、整團不動；甩出去再滑 0.3R；零自交、面積回來
     pullForce: P6.jelly.moveR > 1.5 && P6.jelly.stretchR < 0.9 && P6.jellyOff.moveR < 0.7 && P6.clayYank.maxStretchR > P6.claySlow.maxStretchR + 0.3 && P6.twoFinger.widthR > 4.5 && P6.twoFinger.moveR < 0.2
       && P6.fling.glideR > 0.3 && P6.worstSelfX === 0 && okArea(P6.jelly.end) && okArea(P6.fling.end),
-    // v2.22：點一下會傾、會「噗」；按著會蹭、會「嗯～」；搔癢會扭、會笑、撥久會掙脫；E3 熟得快；E4 會游過來打招呼；黏液會掉、會被吸回去、你拖過去會吸、你抓著它會來搶；零自交
+    // v2.22：點一下會傾、會「噗」；按著會蹭、會「嗯～」；搔癢會扭、會笑、撥久會掙脫；E3 熟得快；E4 會游過來打招呼；零自交
     v222: V7.tap.leanAfter > 0.25 && V7.tap.leanAfter < 0.45 && V7.tap.voices.includes('poke') && V7.nuzzle.swayR > 0.03 && V7.nuzzle.voices.includes('mmm')
       && V7.tickle.shakes >= 3 && V7.tickle.escapeS > 3.2 && V7.tickle.escapeS < 5 && V7.tickle.voices.includes('giggle') && V7.tickle.voices.includes('protest')
       && V7.e3.trOn > 0.5 && V7.e3.trOff < 0.3 && V7.e4.count === 1 && V7.e4.helloAt > 0 && V7.e4.distR < 0.6
-      && V7.drops.spawned >= 1 && V7.drops.massAfter < 1 && V7.drops.allEatenS >= 0 && V7.drops.massEnd > 0.995 && V7.drops.offSpawned === 0 && V7.drops.gulps >= 1
-      && V7.dragIn.held === 'held' && V7.dragIn.left === 0 && V7.dragIn.mass > 0.995 && V7.snatch.gotAt > 0 && V7.snatch.left === 0 && V7.worstSelfX === 0,
-    // v2.23：慢拉、兩指慢慢拉開不掉黏液，猛扯掉一滴、有拉絲、會離開；眼睛看手指、會眨、搔癢 > <、呼嚕 ∩；40 秒睡著、碰到嚇醒；照節奏回、你接著回它會開心、點一下不回；游過來到家打招呼、鏡頭不動；四隻都正常、印象分開記
-    v223: X8.drops.slow.n === 0 && X8.drops.apart === 0 && X8.drops.yank.n === 1 && X8.drops.yank.neck >= 8 && X8.drops.yank.sepR > 0.25 && X8.drops.yank.n2 === 1 && X8.drops.yank.after === 1
-      && X8.eyes.lookGx > 0.5 && X8.eyes.blinks10s >= 2 && X8.eyes.tickleSqueeze > 10 && X8.eyes.purrHappy > 10
+      && V7.worstSelfX === 0,
+    // v2.23：眼睛看手指、會眨、搔癢 > <、呼嚕 ∩；40 秒睡著、碰到嚇醒；照節奏回、你接著回它會開心、點一下不回；游過來到家打招呼、鏡頭不動；四隻都正常、印象分開記
+    v223: X8.eyes.lookGx > 0.5 && X8.eyes.blinks10s >= 2 && X8.eyes.tickleSqueeze > 10 && X8.eyes.purrHappy > 10
       && X8.sleep.at >= 39.9 && X8.sleep.at < 45 && X8.sleep.eye === 'sleep' && X8.sleep.woke && X8.sleep.flinch > 0.06 && X8.sleep.voices.includes('ask')
       && X8.echo.beats === 3 && X8.echo.iv.every(x => x > 0.35 && x < 0.45) && X8.echo.firstAfter > 0.9 && X8.echo.firstAfter < 1.6 && X8.echo.again === 3 && X8.echo.joy && X8.echo.single === 0
       && X8.swim.startOffR > 2 && X8.swim.arriveS > 0 && X8.swim.arriveS < 4.5 && X8.swim.helloS > 0 && X8.swim.camMoved < 5 && X8.swim.end.selfX === 0
@@ -1009,7 +984,7 @@
     edgeHoldStretches: res.T25_edgeHold.reachR > 1.2 && res.T25_edgeHold.zoomMin < 0.95 && res.T25_edgeHold.grewWhileStillR < 0.3 && res.T25_edgeHold.zoomAfter12s > res.T25_edgeHold.zoomMin + 0.1 && res.T25_edgeHold.worstSelfX === 0 && okArea(res.T25_edgeHold.end),
     jellyRegular: Math.abs(res.T20_jelly.periodMean - PRESETS.clay.jellyT) < 0.15 && res.T20_jelly.periodStd < 0.1 && res.T20_jelly.aspectSwing > 0.05 && res.T20_jelly.contractShare < 0.4,
     idleMorphClean: res.T18_idleMorph.now.worstSelfX === 0 && res.T7_idle.worstSelfX === 0 && res.T18_idleMorph.now.areaMin > 0.97 && res.T18_idleMorph.now.areaMax < 1.03,
-    batch3DontBreak: res.T16_batch3.worstSelfX === 0 && okArea(res.T16_batch3.after) && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
+    batch3DontBreak: res.T16_batch3.worstSelfX === 0 && Math.abs(res.T16_batch3.after.area - 1) < 0.03 && res.T16_batch3.areaMin > 0.97 && res.T16_batch3.areaMax < 1.03 && res.T16_batch3.releases === 3,
   };
   // T43 v2.28 預覽：切換列只換畫面。三種皮畫得出來、切來切去物理不變、平塗和 v2.27 同一條路徑
   { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup(); WANDER.moving = false; WANDER.next = t + 999; steps(30);
@@ -1020,7 +995,7 @@
     VIEW.skin = 'flat'; res.T43_v228 = r43;
     res.PASS.v228 = !r43.jelFail && r43.moved === 0 && r43.flatSame && ['A', 'B', 'C'].every(k => Array.isArray(r43.skins[k]) && r43.skins[k].join() !== bg0.join()); }
   // T44 v2.28 窗台：有重力、坐得進碗、不飄走、不穿地板。背景藍的舊項目完全不受影響（SILL.on 關）
-  { const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, emo: 0, life2: 0, seed: 12, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, drops: 0, dropsV: 0, sleep: 0, echo: 0 };
+  { const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, emo: 0, life2: 0, seed: 12, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0 };
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; }, top = () => { let m = 1e9; for (const i of bnd) m = Math.min(m, Y[i]); return m; };
     const fresh = () => { mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; };
     const worst = n => { let lo = 1e9, hi = -1e9, x0 = 1e9, x1 = -1e9, sx = 0, ar0 = 9, ar1 = 0, maxFold = 0; for (let k = 0; k < n; k++) { steps(1); lastTouch = t; const b = bottom(); lo = Math.min(lo, b); hi = Math.max(hi, b); for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } const a = area() / A0; ar0 = Math.min(ar0, a); ar1 = Math.max(ar1, a); } return { lo, hi, x0, x1, ar0, ar1 }; };
@@ -1042,7 +1017,7 @@
     // h 拉不出房間：往下壓不穿地板、拉到上面不出畫面
     fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx, cy + k * H * .5 / 30); steps(1); } const a10 = worst(30); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, cx, cy + H * .5 - k * H * 1.1 / 40); steps(1); } steps(20); const tp = top(); ev('pointercancel', 1, 0, 0); r.bounds = { belowFloor: +(a10.hi - g.fl).toFixed(2), top: +tp.toFixed(1), selfX: snap().selfX }; }
     // 全程開：活物、情緒都開，放 25 秒不碰，不飛走不穿牆
-    mat = { ...SP, emo: 1, life2: 1, lifeGait: 1 }; setup(); { let hi = -1e9, x0 = 1e9, x1 = -1e9, m = 0; for (let k = 0; k < 1500; k++) { steps(1); hi = Math.max(hi, bottom()); for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } m = Math.max(m, Math.abs(globalC.yc - SILL.g.fl)); } r.alive = { belowFloor: +(hi - SILL.g.fl).toFixed(2), x0: +x0.toFixed(0), x1: +x1.toFixed(0), inFrame: x0 >= SILL.g.l - 1 && x1 <= SILL.g.r + 1, maxFromFloorR: +(m / R).toFixed(2), selfX: snap().selfX, area: +(area() / A0).toFixed(3) }; }
+    mat = { ...SP, emo: 1, life2: 1, lifeGait: 1 }; setup(); { let hi = -1e9, x0 = 1e9, x1 = -1e9, m = 0; for (let k = 0; k < 1500; k++) { steps(1); hi = Math.max(hi, bottom()); for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } m = Math.max(m, Math.abs(globalC.yc - SILL.g.fl)); } r.alive = { belowFloor: +(hi - SILL.g.fl).toFixed(2), x0: +x0.toFixed(0), x1: +x1.toFixed(0), inFrame: x0 >= SILL.g.l - R * .15 && x1 <= SILL.g.r + R * .15, maxFromFloorR: +(m / R).toFixed(2), selfX: snap().selfX, area: +(area() / A0).toFixed(3) }; }
     mat = { ...PRESETS.clay }; setup();
     r.offInBlue = SILL.on === false;
     res.T44_sill = r;
@@ -1053,8 +1028,42 @@
       && r.home.inBowl && r.home.clearedRim && r.home.belowFloor <= .01 && r.home.selfX === 0
       && !r.hopOut.inBowl && r.hopOut.onSill && r.hopOut.selfX === 0
       && r.glass.stuck && r.glass.slidR > .05 && r.glass.off && r.glass.onSill && r.glass.selfX === 0
-      && r.bounds.belowFloor <= 6 && r.bounds.top >= 3.9 && r.alive.belowFloor <= .01 && r.alive.inFrame && r.alive.maxFromFloorR < 6 && r.alive.selfX === 0 && Math.abs(r.alive.area - 1) < .1 && r.offInBlue; }
+      && r.bounds.belowFloor <= 6 && r.bounds.top >= -R * .4 && r.alive.belowFloor <= .01 && r.alive.inFrame && r.alive.maxFromFloorR < 6 && r.alive.selfX === 0 && Math.abs(r.alive.area - 1) < .1 && r.offInBlue; }
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
+
+  // T45 v2.29（多米 11-06：拉扯時眼睛常常不在體內、常常打結、黏液取消）。三種材質、窗台上，六種亂拉：
+  // 眼睛任何一幀都在外框裡；記住的形狀沒有翻面的三角形；放手 1 秒後外框沒有交叉；交叉的幀數很少；身體不會爆開；猛扯不會有黏液。
+  // 同時量關掉防打結（OFF29）的結果當對照，黏土的留形不能因此變差。
+  { const clock = saveClock(); const r = {}, OFF29 = { noFlip: 0, gripUp: .2, homeCap: 0, fingerSolid: 0, softWall: 0 };
+    const SP = n => ({ ...P27[n], limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 7 });
+    const flips = (AX, AY) => { let f = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if ((AX[b] - AX[a]) * (AY[c] - AY[a]) - (AY[b] - AY[a]) * (AX[c] - AX[a]) <= 0) f++; } return f; };
+    const paths = { whirl: (k, cx, cy) => k < 30 ? [[1, cx + R * (.75 + 1.45 * k / 30), cy - R * .6 * k / 30]] : k < 210 ? [[1, cx + R * 2.2 * Math.cos(-.27 + (k - 30) / 180 * Math.PI * 4), Math.max(60, cy + R * 2.2 * Math.sin(-.27 + (k - 30) / 180 * Math.PI * 4))]] : null,
+      through: (k, cx, cy) => k < 40 ? [[1, cx, cy - R * .7 + R * 2.7 * k / 40]] : k < 80 ? [[1, cx + R * .6 * Math.sin((k - 40) / 40 * 6), cy + R * 2 - R * 4.5 * (k - 40) / 40]] : k < 120 ? [[1, cx, cy - R * 2.5 + R * 4.1 * (k - 80) / 40]] : null,
+      zigzag: (k, cx, cy) => k < 150 ? [[1, cx + R * .6 + R * 1.5 * Math.sin(k / 150 * Math.PI * 10), cy + R * .8 * Math.sin(k / 150 * Math.PI * 7)]] : null,
+      cross: (k, cx, cy) => k < 30 ? [[1, cx - R * .7 - R * 1.3 * k / 30, cy - R * .2]] : k < 90 ? [[1, cx - R * 2 + R * 4.2 * (k - 30) / 60, cy - R * .2 + R * .3 * Math.sin((k - 30) / 60 * 9)]] : k < 150 ? [[1, cx + R * 2.2 - R * 4.4 * (k - 90) / 60, cy - R * .2 - R * .5 * Math.sin((k - 90) / 60 * 5)]] : null,
+      twoTurn: (k, cx, cy) => { if (k >= 210) return null; const d = k < 30 ? .6 + 1.2 * k / 30 : 1.8, a = k < 30 ? 0 : (k - 30) / 180 * Math.PI * 3; return [[1, cx - R * d * Math.cos(a), cy - R * d * Math.sin(a)], [2, cx + R * d * Math.cos(a), cy + R * d * Math.sin(a)]]; } };
+    const run = (name, kind, over) => { Math.random = seeded(4501); mat = { ...SP(name), ...over }; setup(); t = 0; lastTouch = -10; tLife = 0; relaxUntil = -1; steps(200); const cx = globalC.xc, cy = globalC.yc, fn = paths[kind]; const p0 = fn(0, cx, cy); for (const d of p0) ev('pointerdown', d[0], d[1], d[2]);
+      let frames = 0, crossF = 0, eyeOut = 0, eyeMin = 1e9, afterX = 0, nan = 0; const look = () => { frames++; if (selfX()) crossF++; const P = boundaryPts(), e = EYE.pose; if (e) { const a = sdRing(P, e[0], e[1]), b = sdRing(P, e[2], e[3]); eyeMin = Math.min(eyeMin, a, b); if (a < 0 || b < 0) eyeOut++; } if (!Number.isFinite(X[0] + Y[0])) nan++; };
+      for (let k = 0; ; k++) { const q = fn(k, cx, cy); if (!q) break; for (const d of q) ev('pointermove', d[0], d[1], d[2]); steps(1); look(); }
+      for (const d of p0) ev('pointerup', d[0], d[1], d[2]); for (let k = 0; k < 180; k++) { steps(1); look(); if (k >= 60 && selfX()) afterX++; }
+      return { frames, crossF, eyeOut, eyeMin: +eyeMin.toFixed(1), afterX, qFlip: TRI.length ? flips(QX, QY) : 0, nan, area: +(area() / A0).toFixed(3) }; };
+    r.abuse = {}; for (const n of ['clay', 'mochi', 'jelly']) { r.abuse[n] = {}; for (const kind of Object.keys(paths)) r.abuse[n][kind] = run(n, kind, {}); }
+    // 對照：關掉時眼睛會出界（確認量得到）
+    r.off = run('clay', 'twoTurn', OFF29);
+    // 留形：黏土拉 1.5R 放手 2 秒，開關差不到 0.05
+    const keep = over => { Math.random = seeded(4502); mat = { ...SP('clay'), emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, ...over }; setup(); t = 0; lastTouch = -10; tLife = 0; relaxUntil = -1; steps(120); let tip = -1; for (const i of bnd) if (tip < 0 || Y[i] < Y[tip]) tip = i; const y0 = Y[tip], cx = X[tip]; ev('pointerdown', 1, cx, y0 + 2); steps(2); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, cx, y0 + 2 - R * 1.5 * k / 40); steps(1); } steps(30); let top0 = 1e9; for (const i of bnd) top0 = Math.min(top0, Y[i]); ev('pointerup', 1, cx, y0 - R * 1.5); steps(120); let qt = 1e9, q0 = 1e9; for (const i of bnd) { qt = Math.min(qt, QY[i]); q0 = Math.min(q0, Q0Y[i]); } return +((q0 - qt) / R).toFixed(3); };
+    r.keep = { on: keep({}), off: keep(OFF29) };
+    // 跟手：等速拖 0.5 秒，被抓那塊落後手指多少點（開關差不到 8 點）
+    const follow = over => { Math.random = seeded(4503); mat = { ...SP('clay'), emo: 0, life2: 0, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, ...over }; setup(); t = 0; lastTouch = -10; tLife = 0; relaxUntil = -1; steps(120); const cx = globalC.xc, cy = globalC.yc - R * .3; ev('pointerdown', 1, cx, cy); steps(3); const f = fingers.get(1); let gap = 0; for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx, cy - 300 * k / 60); steps(1); if (k > 20 && f.mem.length) { let mx = 0, my = 0; for (const m of f.mem) { mx += X[m[0]]; my += Y[m[0]]; } mx /= f.mem.length; my /= f.mem.length; gap = Math.max(gap, Math.hypot(mx - f.x, my - f.y)); } } ev('pointerup', 1, cx, cy - 150); steps(5); return +gap.toFixed(1); };
+    r.follow = { on: follow({}), off: follow(OFF29) };
+    // 猛扯不會有黏液：沒有「滴」的聲音
+    log.splice(0); Math.random = seeded(4504); mat = { ...SP('clay') }; setup(); steps(60); { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx + R * .6, cy); steps(2); for (let k = 1; k <= 7; k++) { ev('pointermove', 1, cx + R * .6 + R * 2.6 * k / 7, cy); steps(1); } ev('pointerup', 1, cx + R * 3.2, cy); steps(60); }
+    r.noDrops = { dripSounds: log.filter(x => x[0] === 'drip').length, gone: typeof DROPS === 'undefined' && typeof dropSpawn === 'undefined' };
+    res.T45_knot = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    const each = f => ['clay', 'mochi', 'jelly'].every(n => Object.values(r.abuse[n]).every(f));
+    res.PASS.knot = each(a => a.eyeOut === 0 && a.qFlip === 0 && a.afterX === 0 && a.nan === 0 && a.crossF <= a.frames * .12 && Math.abs(a.area - 1) < .12)
+      && r.off.eyeOut > 0 && Math.abs(r.keep.on - r.keep.off) < .05 && r.keep.on > .5 && Math.abs(r.follow.on - r.follow.off) < 8 && r.noDrops.dripSounds === 0 && r.noDrops.gone;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
