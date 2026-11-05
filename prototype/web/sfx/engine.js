@@ -56,15 +56,16 @@
     mode: 0, bgmUrl: null, bgmVol: 0.25, bgmDuck: 0.6, bgmG: null, bgmSrc: null, bgmT: -1,
   };
   // 一首可以無縫循環的 lofi（prototype/sfx-design/design_lofi.py，40 小節、76 BPM）。自己一條 gain 直接接輸出，不經過音效的 master；
-  // 手指抓著時降到六成，讓捏的聲音在前面（0.4 秒慢慢降、1.2 秒慢慢回）。AAC 解碼後尾巴可能多一點空白，循環只取前 40 小節
-  const BGM_LOOP = 40 * 4 * 60 / 76;
+  // 手指抓著時降到六成，讓捏的聲音在前面（0.4 秒慢慢降、1.2 秒慢慢回）。AAC 解碼後頭尾會多空白（2026-11-06 多米：循環有斷掉的聲音），檔案頭尾各多寫 1 秒週期內容，只循環中間那段，解碼器墊多少都接得上
+  const BGM_LOOP = 5570526 / 44100, BGM_PAD = 1;   // 跟 design_lofi.py 印出來的格數一致
   function startBgm() {
     const c = S.ctx; if (!c || !S.bgmUrl || S.bgmG) return;
     S.bgmG = c.createGain(); S.bgmG.gain.value = 0; S.bgmG.connect(c.destination);
     fetch(S.bgmUrl).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(ab => c.decodeAudioData(ab)).then(b => {
       const src = c.createBufferSource(); src.buffer = b; src.loop = true;
-      if (b.duration > BGM_LOOP + 0.005) { src.loopStart = 0; src.loopEnd = BGM_LOOP; }
-      src.connect(S.bgmG); src.start(); S.bgmSrc = src; S.bgmT = -1;
+      const ok = b.duration > BGM_LOOP + BGM_PAD;   // 舊檔或解碼失敗就退回整個檔案循環
+      if (ok) { src.loopStart = BGM_PAD; src.loopEnd = BGM_PAD + BGM_LOOP; }
+      src.connect(S.bgmG); src.start(0, ok ? BGM_PAD : 0); S.bgmSrc = src; S.bgmT = -1;
     }).catch(() => {});
   }
   function bgmTarget(grabbing) { return S.mode === 0 ? S.bgmVol * (grabbing ? S.bgmDuck : 1) : 0; }
