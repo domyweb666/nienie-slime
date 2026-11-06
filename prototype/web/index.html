@@ -57,9 +57,16 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .tune-actions button{flex:1;border:2.5px solid var(--chip-line);border-radius:999px;background:#fff;padding:8px;font-size:14px;font-weight:700;color:var(--ink)}
 .tune-actions button:first-child{background:var(--chip-on);color:var(--chip-on-ink)}
 .tune textarea{width:100%;box-sizing:border-box;font:12px ui-monospace,Menlo,monospace;border:1.5px solid #c9d3c4;border-radius:10px;padding:6px 8px;resize:none;color:var(--ink)}
+#walk-ask{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(46,58,42,.28)}
+#walk-ask.on{display:flex}
+#walk-ask .card{max-width:300px;background:var(--chip);border:2px solid var(--chip-line);border-radius:22px;padding:22px 20px 16px;text-align:center;color:var(--ink);font-size:17px;line-height:1.5;font-weight:600}
+#walk-ask .btns{display:flex;gap:10px;margin-top:16px}
+#walk-ask button{flex:1;min-height:44px;border-radius:999px;border:2px solid var(--chip-line);background:var(--chip);color:var(--ink);font:inherit;font-size:16px}
+#walk-ask button#walk-yes{background:var(--chip-on);color:var(--chip-on-ink)}
 </style>
 </head>
 <body>
+<div id="walk-ask" role="dialog" aria-modal="true"><div class="card">牠想跟你出門。<br>要讓牠知道你走了多少路嗎？<div class="btns"><button id="walk-no">先不要</button><button id="walk-yes">好</button></div></div></div>
 <canvas id="cv"></canvas>
 
 <div class="bar top">
@@ -85,6 +92,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <div class="tune-actions" id="cands"><button data-c="6">候選 6 黏滯 0.03</button><button data-c="19">候選 19 凍住</button><button data-c="2">候選 2 特別回彈</button><button data-c="41">41 對照：關橫檔</button><button data-c="21">21 回家慢</button><button data-c="22">22 放手餘韻</button><button data-c="23">23 呼吸</button><button data-c="25">25 滑脫</button><button data-c="26">26 黏連</button><button data-c="27">27 局部鼓</button><button data-c="33">33 家 0.46</button><button data-c="34">34 描邊粗細</button><button data-c="27v">v2.7 對照（舊外形）</button><button data-c="212">v2.12 對照（鏡頭最遠 0.45）</button><button data-c="219">v2.19 對照（不跟手、凹痕慢、沒有印象）</button><button data-c="220">v2.20 對照（整團只跟三成五）</button><button data-c="221">v2.21 對照（不出聲）</button><button data-c="222">v2.22 對照（沒眼睛、不睡、不回節奏、跳過來）</button><button data-c="223">v2.23 對照（身體小、反應小、揉沒反應）</button><button data-c="226">v2.26 對照（有眼睛、沒觸手、不變色）</button><button data-c="225">v2.25 對照（一碰就抓、凹痕小）</button><button data-c="224">v2.24 對照（放手一閃就回去）</button></div>
   <div class="tune-actions"><button id="tm-jelly">材質：果凍</button><button id="tm-mochi">材質：麻糬</button><button id="tm-clay">材質：黏土</button></div>
   <div class="tune-actions"><button id="b-float" aria-pressed="true">懸空（多米定案）</button><button id="t-intro">重播開場</button><button id="t-copy">複製數值</button><button id="t-close">收起</button></div>
+  <div class="tune-actions"><button id="t-walk-s">走路：假裝 800 步</button><button id="t-walk-b">走路：假裝 3500 步</button><button id="t-walk-0">走路：全部重來</button></div>
   <textarea id="t-out" readonly rows="3" aria-label="目前的手感數值"></textarea>
 </div>
 
@@ -660,7 +668,7 @@ function down(e){
   const p=pos(e);SLP.lastAny=t;   // v2.23 B2：點空白處也算有人在
   let grab=insideBody(p.x,p.y)||nearBody(p.x,p.y,R*.22),prop=null;
   const ps=posScreen(e);
-  if(SILL.on&&SILL.g){const q=sillTouch(ps.x,ps.y,grab);grab=q.grab;prop=q.prop}   // v2.30 窗框層、窗外：碗、擺飾、牆擋在前面的地方抓不到牠；手指落在擺飾上就抓擺飾
+  if(SILL.on&&SILL.g){const q=sillTouch(ps.x,ps.y,grab);grab=q.grab;prop=q.prop;if(!grab&&walkGiftAt(ps.x,ps.y)){walkAsk();return}}   // v2.30 窗框層、窗外：碗、擺飾、牆擋在前面的地方抓不到牠；手指落在擺飾上就抓擺飾
   const f={id:e.pointerId,sx:ps.x,sy:ps.y,ax:p.x,ay:p.y,x:p.x,y:p.y,fx:p.x,fy:p.y,lx:p.x,ly:p.y,vx:0,vy:0,vxS:0,vyS:0,peak:0,stretch:0,
     tDown:t,press:0,pressOn:false,hold:0,pushed:false,step:0,over:0,sticking:false,releaseAt:0,mode:grab?'grab':prop?'prop':'push',mem:[],hitT:-9};
   if(prop){sfxInit();f.prop=prop;prop.held={id:e.pointerId,ox:prop.x-p.x,oy:prop.y-p.y};prop.lastHit=t;prop.fade=0;prop.alpha=1;fingers.set(e.pointerId,f);try{cv.setPointerCapture(e.pointerId)}catch(_){}$('hint').classList.add('off');return}
@@ -1827,7 +1835,7 @@ function planeSet(p){const S=SILL;if(S.plane===p)return;S.plane=p;if(p==='out'){
 // 貼著哪個面：重力方向、沿哪個方向走。窗框上的重力比地上小（0.6），壓得扁但不會太重
 const SURF={floor:[0,1,false],bowl:[0,1,false],bar:[0,1,false],ledge:[0,1,false],rjamb:[.6,0,true],ljamb:[-.6,0,true],ceil:[0,-.6,false]};
 function surfSet(s){const S=SILL,q=SURF[s];S.surf=s;S.gtx=q[0];S.gty=q[1];S.tanV=q[2];S.lift=false;HOMEX=globalC.xc;HOMEY=globalC.yc}
-function sillInit(){const S=SILL;S.g=null;if(!S.on){PROPS.length=0;S.plane='room';S.zoom=1;S.ztg=1;S.route=null;S.gtx=S.gvx=0;S.gty=S.gvy=1;S.tanV=false;S.lift=false;return}const g=S.g=sillGeo();let y1=-1e9,mx=0;for(let i=0;i<N;i++)mx+=X[i];mx/=N;for(const i of bnd)y1=Math.max(y1,Y[i]);
+function sillInit(){const S=SILL;walkSettle();S.g=null;if(!S.on){PROPS.length=0;S.plane='room';S.zoom=1;S.ztg=1;S.route=null;S.gtx=S.gvx=0;S.gty=S.gvy=1;S.tanV=false;S.lift=false;return}const g=S.g=sillGeo();let y1=-1e9,mx=0;for(let i=0;i<N;i++)mx+=X[i];mx/=N;for(const i of bnd)y1=Math.max(y1,Y[i]);
   const dx=g.bx-mx,dy=g.rim-R*.9-y1;for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}   // 從碗的正上方掉進碗裡
   CX=g.bx;HOMEX=g.bx;CY=H*.5;HOMEY=CY;Object.assign(S,{air:true,c:0,cb:0,cj:0,ct:0,inBowl:false,want:true,hop:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:t,plane:'room',surf:null,tanV:false,lift:false,gvx:0,gvy:1,gtx:0,gty:1,route:null,zoom:1,ztg:1,zpx:W/2,zpy:g.oy,outT:0,stickT:-1});
   const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;INTRO.sq=0;propsInit()}
@@ -1935,6 +1943,7 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   // 被嚇跑：貼在牆上就掉下來，在碗裡就跳出去
   if(ESC.on&&S.tanV&&!S.grab){S.tanV=false;S.surf=null;S.gtx=0;S.gty=1;S.stickT=-1}
   if(ESC.on&&S.inBowl&&!S.grab&&!S.hop)sillHop(ESC.dx,false);
+  walkStep(dt);
   if(S.route&&!S.grab)routeStep(dt);
   // 在外面閒一陣子就回碗
   if(!S.grab&&!S.inBowl&&!S.air&&!S.hop&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&S.stickT<0&&t-lastTouch>25&&t-S.lastHome>10&&mat.envRoam>0){S.lastHome=t;routeStart(rtHome())}}
@@ -1986,6 +1995,61 @@ function propsStep(dt){const S=SILL,g=S.g,G0=R*SILLG,bwr=g.bx+g.bw*.48,bwy=g.by+
     if(p.y>g.fl+R*2.5||p.x>W+R*2||p.x<-R*2){p.gone=true;p.alpha=0;p.backAt=t+20;p.vx=0;p.vy=0;p.va=0;p.fade=0;p.held=null}}
   if(PROPS.length>1&&!PROPS[0].gone&&!PROPS[1].gone&&PROPS[0].alpha>.6&&PROPS[1].alpha>.6){propPair(PROPS[0],PROPS[1]);propPair(PROPS[1],PROPS[0])}
   for(const p of PROPS){if(p.gone||p.held||p.fade||t-p.lastHit<25)continue;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a));if((Math.abs(w)>.08||Math.hypot(p.x-p.hx,p.y-p.hy)>2)&&propSlotFree(p))p.fade=-1;else p.lastHit=t}}
+
+/* ---------- 走路（多米 11-06：現實裡做的事跟牠掛勾）。走了一段路，打開時牠從窗外爬回來，身上黏著路上沾到的小東西；捏一下就掉，留在窗框下緣。不改物理，東西只是綁在身體上畫出來。提案 .uiux/04-手感/走路提案-暫定.md ---------- */
+// 步數從哪來：網頁拿不到步數，面板按鈕假裝；Swift 版接 CMPedometer，算距離上次帶東西回來走了多少，填進 bank
+const WALK={items:[],stuck:null,fall:[],leave:[],bank:0,day:'',dayN:0,opens:0,perm:'',noSave:false};
+const WKINDS=['stone','leaf','petal','acorn','cap','feather'],WALK_SMALL=500,WALK_BIG=3000,WALK_DAY=3,WALK_SLOTS=6,WALK_IDLE=20;
+function walkLoad(){try{const o=JSON.parse(localStorage.getItem('nienie.walk')||'null');if(o){WALK.items=Array.isArray(o.items)?o.items.filter(q=>WKINDS.includes(q.k)):[];WALK.bank=o.bank||0;WALK.day=o.day||'';WALK.dayN=o.dayN||0;WALK.opens=o.opens||0;WALK.perm=o.perm||''}}catch(_){}}
+function walkSave(){if(WALK.noSave)return;try{localStorage.setItem('nienie.walk',JSON.stringify({items:WALK.items,bank:WALK.bank,day:WALK.day,dayN:WALK.dayN,opens:WALK.opens,perm:WALK.perm}))}catch(_){}}
+function walkSlotX(s){const g=SILL.g,x0=g.bx+g.bw/2+12,x1=Math.min(g.jr-14,x0+84);return x0+(x1-x0)*s/(WALK_SLOTS-1)}
+function walkY(q){return SILL.g.bt-(q.big?15:11)}   // 東西的中心：底部貼著窗框下緣
+function walkFreeSlot(){const used=new Set(WALK.items.map(q=>q.s).concat(WALK.fall.map(q=>q.s)));for(const s of [0,5,1,4,2,3])if(!used.has(s))return s;return -1}
+// 牠身上要黏哪裡：外框右上那一點（眼睛在中間，黏上面才看得到）
+function walkPick(){const c=globalC;let best=-1,bv=-1e9;for(const i of bnd){const v=(X[i]-c.xc)*.55-(Y[i]-c.yc)*.85;if(v>bv){bv=v;best=i}}return best}
+function walkTier(n){return n>=WALK_BIG?2:n>=WALK_SMALL?1:0}
+function walkToday(){const d=new Date().toDateString();if(WALK.day!==d){WALK.day=d;WALK.dayN=0}}
+// 走夠了就出門回來一趟。走再多也只有一件，一天最多三件，走路才不會變成趕進度
+function walkCheck(){const S=SILL;if(!S.on||!S.g||S.grab||WALK.stuck)return false;walkToday();const tier=walkTier(WALK.bank);if(!tier||WALK.dayN>=WALK_DAY)return false;WALK.bank=0;WALK.dayN++;walkTrip(tier===2);walkSave();return true}
+function walkTrip(big){const S=SILL,g=S.g;if(S.route)routeEnd(true);S.hop=null;S.stickT=-1;GAIT.on=false;WANDER.moving=false;SLP.lastAny=t;
+  let y1=-1e9,mx=0;for(const i of bnd)y1=Math.max(y1,Y[i]);for(let i=0;i<N;i++)mx+=X[i];mx/=N;
+  const rm=REDUCED,tx=rm?Math.max(g.gx+R*.9,Math.min(g.jr-R*.9,g.jr-R*1.3)):Math.max(g.gx+R*.8,Math.min(g.jr-R*.8,g.jr-R*1.2)),ty=rm?g.bt:g.oy,dx=tx-mx,dy=ty-y1;
+  for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}CX+=dx;HOMEX=tx;HOMEY+=dy;globalC.xc+=dx;globalC.yc+=dy;S.px=0;S.py=0;   // 重心也要跟著搬：路線一開始就看它決定往哪走
+  Object.assign(S,{inBowl:false,want:false,air:false,c:1,lift:false,tanV:false,gtx:0,gty:1,gvx:0,gvy:1,surf:rm?'bar':'ledge'});
+  WALK.stuck={k:WKINDS[Math.floor(Math.random()*WKINDS.length)],big,i:walkPick(),a:Math.random()*.8-.4,idle:0};
+  if(rm){S.plane='frame';S.zoom=1;S.ztg=1;LIFE.st='rest';LIFE.until=t+3}else{S.plane='out';S.zoom=.8;S.ztg=.8;S.zpx=W/2;S.zpy=g.oy;S.outT=t;routeStart(rtComeBack())}}
+function walkDrop(){const q=WALK.stuck;if(!q)return;WALK.stuck=null;const g=SILL.g;let s=walkFreeSlot();
+  if(s<0){const o=WALK.items.find(a=>!a.gift)||WALK.items[0];WALK.items.splice(WALK.items.indexOf(o),1);WALK.leave.push({...o,x:walkSlotX(o.s),y:walkY(o),al:1});s=o.s}   // 放滿了：把最舊的擠到窗外（只有你走路時才會擠）
+  const i=q.i<N?q.i:0,x0=X[i],y0=Y[i],sx=walkSlotX(s),ty=walkY(q),G=R*SILLG*.6,h=Math.max(R*.35,y0-ty+R*.35),vy=-Math.sqrt(2*G*h),T=(-vy+Math.sqrt(vy*vy+2*G*(ty-y0)))/G;
+  WALK.fall.push({k:q.k,big:q.big,s,x:x0,y:y0,vx:(sx-x0)/T,vy,a:q.a,va:(Math.random()<.5?-1:1)*(3+3*Math.random()),ty,G,G0:G,b:0,na:Math.random()*.5-.25});sfxPlay('knock.dish',.22,1.3)}
+function walkLand(q){WALK.items.push({k:q.k,big:q.big,s:q.s,a:q.na});walkSave()}
+function walkStep(dt){const S=SILL,q=WALK.stuck;
+  if(q){let touched=false;for(const f of fingers.values())if((f.mode==='grab'||f.mode==='stroke')&&t-f.tDown>.1)touched=true;if(!fingers.size&&!S.route&&S.plane!=='out')q.idle+=dt;if(touched||q.idle>WALK_IDLE)walkDrop()}
+  for(let k=WALK.fall.length-1;k>=0;k--){const f=WALK.fall[k];f.vy+=f.G*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.a+=f.va*dt;if(f.y>=f.ty&&f.vy>0){f.y=f.ty;if(f.b<1&&f.vy>R*1.5){f.vy*=-.28;f.vx=0;f.x=walkSlotX(f.s);f.va*=-.4;f.b++;sfxPlay('knock.dish',.14,1.5)}else{WALK.fall.splice(k,1);walkLand(f)}}}
+  for(let k=WALK.leave.length-1;k>=0;k--){const o=WALK.leave[k];o.al-=dt/.5;o.y-=R*.25*dt;if(o.al<=0)WALK.leave.splice(k,1)}}
+// 重建身體（換史萊姆、重來）時身上還黏著：直接放到窗框下緣，東西不會不見
+function walkSettle(){for(const f of WALK.fall)WALK.items.push({k:f.k,big:f.big,s:f.s,a:f.na});if(WALK.fall.length){WALK.fall.length=0;walkSave()}const q=WALK.stuck;if(!q)return;WALK.stuck=null;let s=walkFreeSlot();if(s<0){const o=WALK.items.shift();s=o?o.s:0}WALK.items.push({k:q.k,big:q.big,s,a:q.a});walkSave()}
+// 第二次打開，窗框下緣多一顆送的石頭。點了才問要不要讓牠知道走了多少路
+function walkOpen(){WALK.opens++;if(WALK.opens>=2&&!WALK.perm&&!WALK.items.some(q=>q.gift))WALK.items.push({k:'stone',big:false,s:walkFreeSlot()<0?2:walkFreeSlot(),a:.1,gift:true});walkSave()}
+function walkGiftAt(sx,sy){if(!SILL.g)return false;const q=WALK.items.find(a=>a.gift);if(!q)return false;return Math.hypot(sx-walkSlotX(q.s),sy-walkY(q))<26}
+function walkAsk(){const d=document.getElementById('walk-ask');if(d)d.classList.add('on')}
+function walkAnswer(yes){WALK.perm=yes?'ok':'no';for(const q of WALK.items)delete q.gift;walkSave();const d=document.getElementById('walk-ask');if(d)d.classList.remove('on')}
+function walkFake(n){WALK.bank+=n;walkCheck();walkSave()}
+function walkClear(){WALK.items.length=0;WALK.fall.length=0;WALK.leave.length=0;WALK.stuck=null;WALK.bank=0;WALK.dayN=0;WALK.day='';WALK.opens=0;WALK.perm='';walkSave()}
+// 東西的樣子（程式畫的佔位，之後換素材）
+const WSPR={};
+function walkSprite(k){const night=VIEW.bg==='night',key=k+(night?'n':'');if(WSPR[key])return WSPR[key];const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.translate(48,48);x.lineWidth=3;x.lineJoin='round';x.lineCap='round';const grad=(a,b)=>{const g=x.createLinearGradient(-20,-30,20,30);g.addColorStop(0,a);g.addColorStop(1,b);return g};
+  if(k==='stone'){x.fillStyle=grad('#c9c2b6','#8d8578');x.strokeStyle='#6e675c';x.beginPath();x.ellipse(0,4,36,27,-.12,0,Math.PI*2);x.fill();x.stroke();x.fillStyle='rgba(255,255,255,.4)';x.beginPath();x.ellipse(-12,-7,11,5,-.4,0,Math.PI*2);x.fill()}
+  else if(k==='leaf'){x.fillStyle=grad('#a6c86b','#5f9142');x.strokeStyle='#467031';x.beginPath();x.moveTo(-38,24);x.bezierCurveTo(-30,-26,10,-38,38,-32);x.bezierCurveTo(36,0,8,34,-38,24);x.fill();x.stroke();x.beginPath();x.moveTo(-38,24);x.quadraticCurveTo(-4,0,28,-24);x.stroke()}
+  else if(k==='petal'){x.fillStyle=grad('#ffd9e2','#f29ab2');x.strokeStyle='#d97a96';x.beginPath();x.moveTo(0,36);x.bezierCurveTo(-38,14,-30,-26,-6,-36);x.quadraticCurveTo(0,-28,6,-36);x.bezierCurveTo(30,-26,38,14,0,36);x.fill();x.stroke()}
+  else if(k==='acorn'){x.fillStyle=grad('#c98f4e','#8f5a27');x.strokeStyle='#6d431c';x.beginPath();x.moveTo(-24,-6);x.bezierCurveTo(-24,20,-8,32,0,38);x.bezierCurveTo(8,32,24,20,24,-6);x.closePath();x.fill();x.stroke();x.fillStyle=grad('#a57a4a','#6f4c2a');x.beginPath();x.ellipse(0,-12,29,15,0,0,Math.PI*2);x.fill();x.stroke();x.beginPath();x.moveTo(0,-26);x.lineTo(2,-37);x.stroke()}
+  else if(k==='cap'){x.fillStyle=grad('#ee7a62','#c44a3c');x.strokeStyle='#993526';x.beginPath();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,r=i%2?32:37;x.lineTo(Math.cos(a)*r,Math.sin(a)*r)}x.closePath();x.fill();x.stroke();x.fillStyle='rgba(255,255,255,.28)';x.beginPath();x.arc(0,0,22,0,Math.PI*2);x.fill()}
+  else{x.fillStyle=grad('#fffaf0','#ded3c0');x.strokeStyle='#b8ab94';x.beginPath();x.moveTo(-34,30);x.bezierCurveTo(-30,-10,4,-34,34,-36);x.bezierCurveTo(34,-6,8,24,-22,30);x.closePath();x.fill();x.stroke();x.beginPath();x.moveTo(-40,38);x.quadraticCurveTo(-6,0,26,-28);x.stroke()}
+  if(night){x.setTransform(1,0,0,1,0,0);x.globalCompositeOperation='source-atop';x.fillStyle='rgba(38,42,92,.62)';x.fillRect(0,0,96,96)}WSPR[key]=c;return c}
+function walkDraw(k,big,x,y,a,al){const s=big?30:22,im=walkSprite(k);ctx.save();if(al!=null)ctx.globalAlpha=Math.max(0,al);ctx.translate(x,y);ctx.rotate(a||0);ctx.drawImage(im,-s/2*1.05,-s/2*1.05,s*1.05,s*1.05);ctx.restore()}
+function drawItems(){if(!SILL.g)return;for(const q of WALK.items)walkDraw(q.k,q.big,walkSlotX(q.s),walkY(q),q.a);for(const o of WALK.leave)walkDraw(o.k,o.big,o.x,o.y,o.a,o.al)}
+function drawStuck(){const q=WALK.stuck;if(q&&q.i<N&&SILL.g){const c=globalC,i=q.i,dx=c.xc-X[i],dy=c.yc-Y[i],d=Math.hypot(dx,dy)||1,ins=(q.big?11:8);walkDraw(q.k,q.big,X[i]+dx/d*ins,Y[i]+dy/d*ins,q.a+Math.atan2(c.sn,c.cs))}
+  for(const f of WALK.fall)walkDraw(f.k,f.big,f.x,f.y,f.a)}
 
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
@@ -2086,7 +2150,7 @@ function propShadow(x,y,rx,ry,a){ctx.save();ctx.translate(x,y);ctx.scale(rx,ry);
 function drawProps(){const S=SILL,g=S.g;if(!g)return;for(const p of PROPS){if(p.gone||p.alpha<=.01)continue;const im=propImg(p.im);if(!im)continue;const near=Math.max(0,1-Math.abs(g.fl-(p.y+p.base))/(R*.8));if(near>0&&p.x>g.sl&&p.x<g.sr)propShadow(p.x,g.fl-2,p.w*.52*(1+.3*Math.abs(Math.sin(p.a))),11*g.U,near*p.alpha);
     ctx.save();ctx.globalAlpha=p.alpha;ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.drawImage(im,-p.ox,-p.oy,p.w,p.h);ctx.restore()}
   const b=propImg('bowl');if(b){propShadow(g.bx,g.fl-2,g.bw*.52,11*g.U,1);ctx.drawImage(b,g.bx-g.bw/2,g.by,g.bw,g.bh)}}
-function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl==='out')ctx.drawImage(sc.wall,0,0,W,H);if(pl!=='room')drawProps();else drawBowlFront()}}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外的碗和擺飾；碗裡的碗前緣
+function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl==='out'){ctx.drawImage(sc.wall,0,0,W,H);drawItems()}if(pl!=='room')drawProps();else drawBowlFront()}}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外的碗和擺飾；碗裡的碗前緣
 function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
   const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
   const s=Math.min(W/860,H/1130)*DPR,sillTop=h*.72,off=sillTop-1177*s,ox=(w-992*s)/2,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
@@ -2116,6 +2180,7 @@ function draw(){
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
   if(!FLOAT){ctx.fillStyle=col('--grass');ctx.fillRect(0,GROUND,W,H-GROUND);ctx.fillStyle=col('--grass-line');ctx.fillRect(0,GROUND,W,3)}
   if(FLOAT&&mat.specks>=.5&&!sc)drawSpecks(col);
+  if(env&&pl!=='out')drawItems();   // 走路帶回來的東西在窗框下緣：比碗和擺飾後面，窗框層時也在牠後面
   if(env&&pl==='room')drawProps();
   // 鏡頭：之後畫的都在世界座標；描邊粗細除以 z，畫面上看起來一樣粗
   {const v=viewV();ctx.setTransform(DPR*CAM.z,0,0,DPR*CAM.z,DPR*(v.x-CAM.z*CAM.x),DPR*(v.y-CAM.z*CAM.y))}
@@ -2131,7 +2196,7 @@ function draw(){
   ctx.fillStyle=`rgba(60,90,40,${(FLOAT?.10+.08*(1-lift):.16)+.04*pz})`;
   ctx.beginPath();ctx.ellipse((minX+maxX)/2,sy,sw*(FLOAT?.7+.3*(1-lift):1.05)*(1+.08*pz),   // 影子跟整體寬度置中（拉長時跟重心會偏一邊）
     R*.11*(FLOAT?.8:1),0,0,Math.PI*2);ctx.fill()}
-  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBlush(P);drawEyes(col);drawFront(sc,env,pl);return}   // v2.28 預覽：果凍皮畫身體
+  if(VIEW.skin!=='flat'&&jelReady()){jelRender(P,ctx.getTransform(),col);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(JEL.c,0,0);ctx.restore();drawBlush(P);drawEyes(col);drawStuck();drawFront(sc,env,pl);return}   // v2.28 預覽：果凍皮畫身體
   ctx.save();
   if(!FLOAT){ctx.beginPath();ctx.rect(0,0,W,GROUND+2);ctx.clip()}
   // 身體：陰影色打底，再用往左上偏移的底色蓋住
@@ -2162,6 +2227,7 @@ function draw(){
   if(mat.inkVar>0){ctx.fillStyle=col('--line');inkBand(P,Math.max(4,R*.034)/CAM.z);ctx.fill()}   // 候選 34：描邊粗細隨壓縮
   else{bodyPath(P);ctx.lineWidth=Math.max(4,R*.034)/CAM.z;ctx.lineJoin='round';ctx.strokeStyle=col('--line');ctx.stroke()}
   ctx.restore();
+  drawStuck();
   drawFront(sc,env,pl);
 }
 
@@ -2192,6 +2258,8 @@ let pressT=null;
 $('brand').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{$('tune').classList.toggle('hidden')},1200)});
 for(const ev of ['pointerup','pointerleave','pointercancel'])$('brand').addEventListener(ev,()=>clearTimeout(pressT));
 $('t-close').addEventListener('click',()=>$('tune').classList.add('hidden'));
+$('t-walk-s').addEventListener('click',()=>{$('tune').classList.add('hidden');walkFake(800)});$('t-walk-b').addEventListener('click',()=>{$('tune').classList.add('hidden');walkFake(3500)});$('t-walk-0').addEventListener('click',()=>{walkClear()});
+$('walk-yes').addEventListener('click',()=>walkAnswer(true));$('walk-no').addEventListener('click',()=>walkAnswer(false));
 $('t-intro').addEventListener('click',()=>{$('tune').classList.add('hidden');for(const f of [...fingers.values()])releaseFinger(f,true);setup();startIntro()});
 $('t-copy').addEventListener('click',()=>{const s=$('t-out').value;navigator.clipboard&&navigator.clipboard.writeText(s)});
 // 第二批候選（網頁版只有這三條；觸覺類在 Swift 版）。一次只套一條，先記下對照值再比
@@ -2212,6 +2280,7 @@ function dump(){$('t-out').value=JSON.stringify({...mat,float:FLOAT})}
 
 viewSync();sceneLoad();hintT=setTimeout(()=>$('hint').classList.add('off'),5000);
 addEventListener('resize',()=>{setup()});
+walkLoad();walkOpen();
 {let i=0;try{const k=SLIMES.findIndex(s=>s.id===localStorage.getItem('nienie.slime'));if(k>=0)i=k}catch(_){}chooseSlime(i,true,false)}   // v2.23：上次選的那隻
 requestAnimationFrame(frame);
 </script>
