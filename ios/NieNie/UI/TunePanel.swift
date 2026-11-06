@@ -70,6 +70,8 @@ struct TunePanel: View {
             }
             .tint(Palette.ink)
 
+            StepProbe()
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(TuneField.sections, id: \.self) { section in

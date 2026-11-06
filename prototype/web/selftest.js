@@ -20,6 +20,8 @@
   const DT = 1 / 60;
   // 音效引擎不准碰測試的亂數（2026-11-03）：音效檔載完之後引擎每幀抽 Math.random，把各項用固定種子產生的手抖序列錯開；載完的時間點落在第一輪中途，
   // 第一輪跟之後幾輪抽到的手抖不一樣（v2.16 到 v2.23 每版第一輪 T26 都是 3.25、之後 1.3 左右，就是這個）。跑 selftest 時音效那一幀改用真的亂數，跑完換回
+  // 走路：測試不准碰使用者存的東西；窗框下緣的東西會擋手指，先清空
+  WALK.noSave = true; WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null;
   const realRandom0 = Math.random, sfxFrame0 = SFX && SFX.frame;
   if (SFX) SFX.frame = (...a) => { const r = Math.random; Math.random = realRandom0; try { return sfxFrame0.apply(SFX, a); } finally { Math.random = r; } };
   function ev(type, id, x, y) { cv.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch', isPrimary: id === 1 })); }
@@ -1115,10 +1117,51 @@
       && r.auto.aborts === 0 && r.auto.nan === 0 && r.auto.propNaN === 0 && r.auto.rest > .5 && r.auto.overFloor <= .01 && r.auto.area[0] > .8 && r.auto.area[1] < 1.2 && r.auto.selfX === 0 && r.auto.seen.length >= 2;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T47 走路（多米 11-06：現實裡走路跟牠掛勾）。門檻與上限、從窗外爬回來、捏一下掉、20 秒自己掉、放滿擠掉最舊的、送的石頭與權限那段、存得起來。網頁拿不到真步數，用 bank 假裝
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
+    const clear = () => { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; WALK.bank = 0; WALK.dayN = 0; WALK.day = ''; WALK.opens = 0; WALK.perm = ''; };
+    const fresh = sd => { Math.random = seeded(sd || 4701); clear(); mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
+    const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; };
+    const arrive = () => { let n = 0; while (SILL.route && n < 900) { steps(1); lastTouch = t; n++; } return n; };
+    // 門檻與上限
+    fresh(); const g = SILL.g; WALK.bank = 300; const small = walkCheck(), noStuck = !WALK.stuck;
+    WALK.bank = 800; const ok = walkCheck(), s0 = WALK.stuck && { big: WALK.stuck.big, plane: SILL.plane, z: SILL.zoom, y1: +bottom().toFixed(1), left: WALK.bank };
+    const frames = arrive(); steps(90); lastTouch = t; const a0 = { sec: +(frames / 60).toFixed(1), plane: SILL.plane, z: +SILL.zoom.toFixed(2), y1: +bottom().toFixed(1), stuck: !!WALK.stuck, selfX: selfX() };
+    r.trip = { small, noStuck, ok, s0, a0 };
+    fresh(); WALK.bank = 3500; walkCheck(); r.big = !!WALK.stuck && WALK.stuck.big; arrive();
+    fresh(); { let n = 0; for (let k = 0; k < 5; k++) { WALK.bank = 800; WALK.stuck = null; if (walkCheck()) n++; if (SILL.route) routeEnd(true); } r.cap = { n, left: WALK.bank }; }
+    // 捏一下就掉，落在窗框下緣，身體不受影響
+    fresh(); WALK.bank = 800; walkCheck(); arrive(); steps(60); lastTouch = t; { const A = area() / A0; ev('pointerdown', 1, globalC.xc, globalC.yc); steps(4); const still = !!WALK.stuck; steps(4); const off = !WALK.stuck, inAir = WALK.fall.length; ev('pointerup', 1, globalC.xc, globalC.yc); steps(120); lastTouch = t; const q = WALK.items[0]; r.pinch = { still, off, inAir, n: WALK.items.length, x: q ? +walkSlotX(q.s).toFixed(0) : null, inRange: q ? walkSlotX(q.s) > g.bx + g.bw / 2 && walkSlotX(q.s) < g.jr : false, fall: WALK.fall.length, area: +(area() / A0 - A).toFixed(3), selfX: selfX() }; }
+    // 爬到一半被抓：路線取消，東西掉下來
+    fresh(); WALK.bank = 800; walkCheck(); steps(30); lastTouch = t; { const z = SILL.zoom, sx = W / 2 + (globalC.xc - W / 2) * z, sy = g.oy + (SILL.y0 + 40 - g.oy) * z; ev('pointerdown', 1, sx, sy); steps(10); const plane = SILL.plane, route = !!SILL.route, off = !WALK.stuck; ev('pointerup', 1, sx, sy); steps(150); r.grabMid = { plane, route, off, n: WALK.items.length }; }
+    // 放著不碰 20 秒自己掉
+    fresh(); WALK.bank = 800; walkCheck(); arrive(); lastTouch = t; { let n = 0; while (WALK.stuck && n < 1500) { steps(1); lastTouch = t; n++; } steps(120); r.idle = { sec: +(n / 60).toFixed(1), n: WALK.items.length }; }
+    // 放滿了：還是 6 件，最舊的被擠掉
+    fresh(); for (let s = 0; s < WALK_SLOTS; s++) WALK.items.push({ k: 'leaf', big: false, s, a: 0, tag: s }); { WALK.bank = 800; walkCheck(); arrive(); ev('pointerdown', 1, globalC.xc, globalC.yc); steps(10); ev('pointerup', 1, globalC.xc, globalC.yc); const leaving = WALK.leave.length; steps(120); r.full = { n: WALK.items.length, leaving, leaveEnd: WALK.leave.length, oldestGone: !WALK.items.some(q => q.tag === 0) }; }
+    // 換史萊姆時身上還黏著：不會不見
+    fresh(); WALK.bank = 800; walkCheck(); setup(); r.settle = { stuck: !!WALK.stuck, n: WALK.items.length };
+    // 送的石頭與權限：第一次不送，第二次送，點了才問，答完不再送
+    fresh(); { walkOpen(); const first = WALK.items.length; walkOpen(); const q = WALK.items.find(a => a.gift), second = !!q; steps(5); const d = document.getElementById('walk-ask'), hit = q && walkGiftAt(walkSlotX(q.s), walkY(q)), off = walkGiftAt(10, 10); ev('pointerdown', 1, walkSlotX(q.s), walkY(q)); steps(1); const asked = d.classList.contains('on'), fing = fingers.size; ev('pointerup', 1, walkSlotX(q.s), walkY(q)); walkAnswer(false); const closed = !d.classList.contains('on'), perm = WALK.perm, kept = WALK.items.length; walkOpen(); r.gift = { first, second, hit, off, asked, fing, closed, perm, kept, third: WALK.items.length }; }
+    // 存得起來
+    { const raw = localStorage.getItem('nienie.walk'), keep = WALK.noSave; clear(); WALK.items.push({ k: 'acorn', big: true, s: 3, a: .2 }); WALK.opens = 5; WALK.perm = 'ok'; WALK.bank = 123; WALK.noSave = false; walkSave(); clear(); walkLoad(); r.save = { n: WALK.items.length, k: WALK.items[0] && WALK.items[0].k, opens: WALK.opens, perm: WALK.perm, bank: WALK.bank }; WALK.noSave = keep; try { if (raw == null) localStorage.removeItem('nienie.walk'); else localStorage.setItem('nienie.walk', raw); } catch (_) {} }
+    // 藍底不出門；白天、夜晚畫得出來，六種都畫
+    clear(); mat = { ...SP, sill: 0 }; setup(); WALK.bank = 800; r.blue = walkCheck(); clear(); { const v0 = VIEW.bg, sk = VIEW.skin; fresh(); let err = null; try { for (const b of ['day', 'night']) { VIEW.bg = b; for (const k of WKINDS) walkSprite(k); WALK.items.push({ k: 'cap', big: false, s: 1, a: 0 }); WALK.bank = 800; WALK.dayN = 0; walkCheck(); draw(); WALK.stuck = null; if (SILL.route) routeEnd(true); } } catch (e) { err = String(e); } VIEW.bg = v0; VIEW.skin = sk; r.draw = err; }
+    clear(); res.T47_walk = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    const a = r.trip;
+    res.PASS.walk = a.small === false && a.noStuck && a.ok && a.s0.big === false && a.s0.plane === 'out' && Math.abs(a.s0.z - .8) < .01 && Math.abs(a.s0.y1 - g.oy) < 2 && a.s0.left === 0
+      && a.a0.sec < 5 && a.a0.plane === 'frame' && a.a0.z > .97 && Math.abs(a.a0.y1 - g.bt) < 3 && a.a0.stuck && a.a0.selfX === 0 && r.big === true && r.cap.n === 3
+      && r.pinch.off && r.pinch.inAir === 1 && r.pinch.n === 1 && r.pinch.inRange && r.pinch.fall === 0 && Math.abs(r.pinch.area) < .1 && r.pinch.selfX === 0
+      && r.grabMid.plane === 'room' && !r.grabMid.route && r.grabMid.off && r.grabMid.n === 1 && r.idle.sec > 19 && r.idle.sec < 22 && r.idle.n === 1
+      && r.full.n === WALK_SLOTS && r.full.leaving === 1 && r.full.leaveEnd === 0 && r.full.oldestGone && !r.settle.stuck && r.settle.n === 1
+      && r.gift.first === 0 && r.gift.second && r.gift.hit && !r.gift.off && r.gift.asked && r.gift.fing === 0 && r.gift.closed && r.gift.perm === 'no' && r.gift.kept === 1 && r.gift.third === 1
+      && r.save.n === 1 && r.save.k === 'acorn' && r.save.opens === 5 && r.save.perm === 'ok' && r.save.bank === 123 && r.blue === false && r.draw === null;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
   if (SFX) SFX.frame = sfxFrame0;
+  WALK.noSave = false; walkLoad();
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
   console.log(JSON.stringify(res, null, 1));
   return res;

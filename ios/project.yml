@@ -34,6 +34,8 @@ targets:
         # allow 120Hz on ProMotion iPhones
         CADisableMinimumFrameDurationOnPhone: true
         ITSAppUsesNonExemptEncryption: false
+        # 走路：步數決定牠身上沾到什麼；少了這行一呼叫 CMPedometer 就閃退
+        NSMotionUsageDescription: 用步數決定牠身上會沾到什麼。步數只留在這支手機上。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.domyweb.nienieslime
