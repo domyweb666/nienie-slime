@@ -36,6 +36,9 @@ final class SlimeView: UIView {
     private var laidOutSize: CGSize = .zero
 
     private let skyLayer = CAGradientLayer()
+    // v2.28 窗台: the room baked into one picture behind it (sky, window, wall, the dish, the plant, the bowl), and the bowl's front half over it while it sits inside
+    private let sceneLayer = CALayer(), bowlFrontLayer = CALayer()
+    private var sceneKey = ""
     private let speckLayers = [CAShapeLayer(), CAShapeLayer()]   // v2.17: far-away specks, two strengths
     private let shadowLayer = CAShapeLayer()
     private let shadeLayer = CAShapeLayer()      // whole body in the shade colour
@@ -70,6 +73,8 @@ final class SlimeView: UIView {
         skyLayer.startPoint = CGPoint(x: 0.5, y: 0)
         skyLayer.endPoint = CGPoint(x: 0.5, y: 1)
         layer.addSublayer(skyLayer)
+        sceneLayer.contentsGravity = .resize; sceneLayer.isHidden = true
+        layer.addSublayer(sceneLayer)
         for (n, l) in speckLayers.enumerated() {
             l.fillColor = UIColor.white.cgColor
             l.opacity = n == 0 ? 0.4 : 0.7
@@ -103,6 +108,8 @@ final class SlimeView: UIView {
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
+        bowlFrontLayer.contentsGravity = .resize; bowlFrontLayer.isHidden = true
+        layer.addSublayer(bowlFrontLayer)   // v2.28 窗台: in front of the body and the eyes
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
         layer.addSublayer(flashLayer)
@@ -205,6 +212,7 @@ final class SlimeView: UIView {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
+            sceneLayer.frame = bounds; sceneKey = ""
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
                        eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
                 l.frame = bounds
@@ -408,6 +416,31 @@ final class SlimeView: UIView {
         return img.cgImage
     }
 
+    /// v2.28 窗台: the baked room behind it and the bowl's front half over it; the blue sky and the specks only while floating.
+    private func updateScene() {
+        let kind = rig.sceneKind
+        guard kind > 0, let g = rig.sillG, bounds.width > 0, bounds.height > 0 else {
+            sceneLayer.isHidden = true; bowlFrontLayer.isHidden = true; skyLayer.isHidden = false
+            for l in speckLayers { l.isHidden = false }
+            return
+        }
+        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))"
+        if key != sceneKey {
+            if let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g) {
+                sceneKey = key
+                sceneLayer.contents = imgs.base.cgImage
+                bowlFrontLayer.contents = imgs.bowlFront.cgImage
+                bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
+            } else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
+                sceneLayer.isHidden = true; bowlFrontLayer.isHidden = true; skyLayer.isHidden = false
+                return
+            }
+        }
+        skyLayer.isHidden = true; sceneLayer.isHidden = false
+        for l in speckLayers { l.isHidden = true }
+        bowlFrontLayer.isHidden = !rig.sillInBowl
+    }
+
     /// v2.17: a layer of faint fixed specks far behind (parallax 0.55, they move slower than the slime). Without them a following
     /// camera looks like the slime walking back by itself. One speck or none per 120-point cell, hashed from the cell.
     private func drawSpecks() {
@@ -464,6 +497,7 @@ final class SlimeView: UIView {
         CATransaction.setDisableActions(true)
 
         drawSpecks()
+        updateScene()   // v2.28 窗台
 
         var minX = 1e9, maxX = -1e9, maxY = -1e9
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }

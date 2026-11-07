@@ -117,6 +117,10 @@ struct FeelParams: Equatable, Codable {
     var noFlip: Double = 0.15         // 0 = off (v2.28)
     var gripUp: Double = 0.004        // most the body turns back upright per substep while grabbed; larger and it cannot turn, so a pulled strand can only wrap around it (0.2 before)
     var homeCap: Double = 0.5         // most the whole body follows the finger per substep (× particle spacing); faster and the ring beside the finger shears open and flips (0 = no cap, 24 pt a substep measured)
+    var softWall: Double = 1          // v2.29: on the sill the left, right and top edges are soft: the body may go a little past them and is eased back (grabbed: slower); 0 = hard walls
+    // v2.28 窗台 (多米 11-06): a room with a window, gravity, a sill to stand on and a bowl to sit in; v2.31 the bowl in the middle, the pebble dish
+    // and the succulent as pictures on the sill's ends. 0 = the blue floating room (nothing of the old behaviour changes there), 1 day, 2 night
+    var scene: Double = 1
     var fingerSolid: Double = 0.2     // the grabbing finger is solid (× R): dragged across the body it pushes the flesh it did not grab aside instead of passing through; 0 = off
     var pressFlat: Double = 0         // 1: pressing down from the upper half flattens it on an invisible table (clay)
     var flatMin: Double = 0.3         // flattest, as a fraction of the height when the press began
@@ -295,6 +299,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.noFlip = 0; p.gripUp = 0.2; p.homeCap = 0; p.fingerSolid = 0   // v2.29 guards are not for fixed tentacles
+        p.scene = 0   // v2.7 floated
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
@@ -556,6 +561,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.noFlip, name: "防打結（三角形不翻面）", hint: "身體裡每個小三角形的面積不能小於靜止的這麼多倍，記住的形狀也一樣（v2.29，多米：拉扯常常打結）；0 關（v2.28）", range: 0...0.5, step: 0.01),
         TuneField(key: \.gripUp, name: "抓著時回正的上限", hint: "抓著時每小步最多轉回頭朝上多少；太大的話身體轉不動，被拉過去的那條只能纏在身上（v2.29 0.004；以前 0.2）", range: 0...0.2, step: 0.001),
         TuneField(key: \.homeCap, name: "整團跟手指的速度上限（×格距／小步）", hint: "整團被拖著走時，每小步最多移這麼多；太快的話手指附近那圈會一下被剪開、整片翻面（v2.29 0.5；0 不限）", range: 0...3, step: 0.1),
+        TuneField(key: \.softWall, name: "畫面邊是軟的", hint: "1：窗台上身體碰到畫面左右上緣可以超出去一點，慢慢被推回來；被壓在牆上不會擠成一條線、摺出結（v2.29）；0 硬牆", range: 0...1, step: 1),
+        TuneField(key: \.scene, name: "背景", hint: "0 藍：懸空（舊行為一條都不變）；1 白天、2 夜晚：窗台上有重力，牠坐在正中間的碗裡，石頭盤和盆栽只是圖（v2.28 窗台，v2.31 碗回中間）", range: 0...2, step: 1, section: "外形"),
         TuneField(key: \.fingerSolid, name: "手指是實心的（×半徑）", hint: "抓著拖過身體時，沒被抓到的部分被手指推開，不會被穿過去（v2.29 0.2；0 關）", range: 0...0.5, step: 0.01),
         TuneField(key: \.grabHold, name: "抓住跟手", hint: "被抓那塊不聽彈性、跟手指走的程度；黏土 0.85，0 是以前（落後手指約 1 個半徑）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.nearMem, name: "手指附近記形", hint: "手指附近用整身座標記形，拉出一塊就留一塊；0 只用局部區塊", range: 0...1, step: 0.05, section: "按壓與記形"),

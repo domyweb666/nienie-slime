@@ -13,6 +13,7 @@ enum SlimeEvent {
     case nudge                               // v2.20 C1: it reached your resting finger (one soft tap); v2.22 E2: it pushed back at your finger
     case voice(kind: String, gain: Double, rate: Double)   // v2.22 E1: one of its small sounds; rate from the impression
     case beat                                // v2.23 C6: one beat of it answering your rhythm (a soft tap)
+    case land(gain: Double)                  // v2.28 窗台: it landed on the sill or in the bowl after a fall or a hop
 }
 
 /// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
@@ -32,6 +33,10 @@ final class SlimeRig {
     private var effParams: FeelParams {
         var m = params
         if m.limbs > 0 { m.noFlip = 0; m.gripUp = 0.2; m.homeCap = 0; m.fingerSolid = 0 }
+        if m.scene >= 0.5 {   // v2.28 窗台: the room is fixed, so a very long pull would not fit; on the sill it does not lift itself by pulsing; a little more upright; no hop-in (it drops into the bowl)
+            m.bodySize = 0.27; m.intro = 0; m.introSwim = 0; m.jellyLift = 0
+            m.maxPull = min(m.maxPull, 3.2); m.memMax = min(m.memMax, 2.6); m.upright = max(m.upright, 0.03)
+        }
         return m
     }
     /// Reduce Motion: idle motion and twitches halved. Feedback stays on.
@@ -65,6 +70,23 @@ final class SlimeRig {
     private var bndL: [Double] = []      // rest distance between ring neighbours
     private var bndL2: [Double] = []     // rest distance between ring particles two apart (no folding back)
     private var TRI: [Int] = [], TRA: [Double] = []   // v2.29 防打結: the rest shape's triangle mesh (3 indices a triangle) and each rest area
+    // v2.28 窗台 (多米 11-06): gravity, a sill to stand on, a bowl in the middle to sit in; v2.31 the bowl centred, the props pictures only.
+    // Port of the web's SILL for the room plane only: the window frame, the outside and the climbing routes come with the next batch.
+    struct SillGeo {
+        let s, U, off, ox, fl, bw, bh, bx, by, gx, gy, gw, gh, jr, bt, oy: Double
+        let rim, lip, back, cav, outer, bf, l, r, sl, sr: Double   // rim = the bowl's rim line, lip = the front edge's lowest point, back = the back edge, cav = the inside's half width, fl = the sill's top, l/r = how far it may go on the sill
+    }
+    private(set) var sillOn = false
+    private(set) var sillG: SillGeo?
+    private(set) var sillInBowl = false
+    private var sillAir = false, sillC = 0, sillWant = false, sillGrab = false, sillHeld = false
+    private var sillPX = 0.0, sillPY = 0.0, sillVX = 0.0, sillVY = 0.0, sillFall = 0.0, sillLastHome = -99.0, sillRelX = 0.0, sillRelY = 0.0
+    private struct SillHop { var air = false; var t = 0.0; var tx = 0.0; var toBowl = false }
+    private var sillHop: SillHop?
+    private let sillGrav = 14.0   // gravity, radii per second per second
+    private var builtScene = -1.0
+    /// 0 blue (floating), 1 day, 2 night: what the view draws behind it
+    var sceneKind: Int { Int(params.scene.rounded()) }
 
     private struct Cluster {
         var idx: [Int]
@@ -259,8 +281,8 @@ final class SlimeRig {
     /// to gravity and the floor (it really hits it, so no two wobbles are alike). Distance is drawn: it starts up-right at 0.15×, each
     /// hop comes closer and bigger, the last lands at home. Reduce Motion: no travel, one small hop at home.
     func startIntro() {
-        guard params.intro >= 0.5, N > 0 else { return }
-        if params.introSwim >= 0.5 && params.life2 >= 0.5 && lv(params.lifeGait) { swimIntro(1); return }   // v2.23 開場游過來
+        guard effParams.intro >= 0.5, N > 0 else { return }
+        if effParams.introSwim >= 0.5 && params.life2 >= 0.5 && lv(params.lifeGait) { swimIntro(1); return }   // v2.23 開場游過來
         var y1 = -1e9
         for i in bnd { y1 = max(y1, Y[i]) }
         let far = !reduceMotion
@@ -300,6 +322,7 @@ final class SlimeRig {
     }
     /// The happy hop: the intro's hop, once, without travelling (mini: a touch grabs as usual).
     private func hop() {
+        if sillOn && sillAir { return }   // v2.28 窗台: not while falling
         guard !introOn, N > 0 else { return }
         var y1 = -1e9
         for i in bnd { y1 = max(y1, Y[i]) }
@@ -394,12 +417,14 @@ final class SlimeRig {
     // zoomMin 0 (v2.13, 多米: zoom out without limit): no floor on the zoom, the walls are at infinity (no walls)
     private var camMin: Double { params.zoomMin > 0 ? min(1, params.zoomMin) : 1e-4 }
     private var worldWalls: (l: Double, r: Double, t: Double, b: Double) {
+        if sillOn, let g = sillG { return (g.l, g.r, 4, g.fl) }   // v2.28 窗台: the room is the world
         if !(params.zoomMin > 0) { return (-.infinity, .infinity, -.infinity, .infinity) }
         let v = viewV, zm = camMin, ax = (W - 16) / 2 / zm, ay = (H - 210) / 2 / zm
         return (v.x - ax, v.x + ax, v.y - ay, v.y + ay)
     }
     private var camRSt = 0.0, camRUntil = -9.0   // v2.24 camGrip: how far this grab pulled; until when a release may move the shape back in
     private func updateCam(_ dt: Double) {
+        if sillOn { camZ = 1; camX = viewV.x; camY = viewV.y; folX = camX; folY = camY; folVX = 0; folVY = 0; folChase = false; return }   // v2.28 窗台: the room does not move
         let v = viewV, pad = R * (params.camPad > 0 ? params.camPad : 0.35)
         var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
         for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]); y1 = max(y1, Y[i]) }
@@ -607,7 +632,8 @@ final class SlimeRig {
 
     func setup(width: Double, height: Double) {
         W = width; H = height
-        R = max(60, min(W * params.bodySize, H * 0.18, 160))   // bodySize: 0.26 before v2.9, 0.22 v2.10 to v2.23, 0.30 v2.24 (about 4 cm wide; a finger is 1.6 to 2 cm)
+        sillOn = effParams.scene >= 0.5   // v2.28 窗台
+        R = max(60, min(W * effParams.bodySize, H * 0.18, 160))   // bodySize: 0.26 before v2.9, 0.22 v2.10 to v2.23, 0.30 v2.24 (about 4 cm wide; a finger is 1.6 to 2 cm)
         cx = W / 2
         defineShape()
 
@@ -737,7 +763,7 @@ final class SlimeRig {
         }
         fingers.removeAll()
         A0 = polygonArea()
-        builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize; builtDens = params.dens
+        builtSeed = params.seed; builtFloppy = params.floppy; builtLimbs = params.limbs; builtSize = params.bodySize; builtDens = params.dens; builtScene = params.scene
         pods = []; podClock = 0; podNext = 0.5; podShift = 0; podE = []; brJw = 0; brLift = 0; flatOn = false
         camZ = 1; camX = viewV.x; camY = viewV.y
         folX = viewV.x; folY = viewV.y; folVX = 0; folVY = 0; folChase = false
@@ -763,6 +789,7 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
+        sillInit()   // v2.28 窗台: last, it moves the body over the bowl and lets it drop
     }
 
     /// v2.29 防打結: Delaunay (Bowyer-Watson) over the rest shape, keeping the triangles whose centre is inside the boundary ring,
@@ -1571,7 +1598,7 @@ final class SlimeRig {
             // stretched (tanh-limited stretch over the limit), whichever is bigger, so a slow let-go still pops
             let sv = min(1, f.peak / R / 6)
             // a full pull counts at 2R at most: clay's limit went to 8 for free sculpting, and the pop would have shrunk with it
-            let ss = pow(min(1, f.stretch / max(0.01, min(params.maxPull, 2))), 1.5)
+            let ss = pow(min(1, f.stretch / max(0.01, min(effParams.maxPull, 2))), 1.5)
             var s = max(sv, ss)
             // 偶發特別回彈 (提案第 2 條): every `specialEvery` releases (±2) one comes back extra bouncy for 0.35 s
             var special = false
@@ -1638,7 +1665,7 @@ final class SlimeRig {
     func update(_ dt: Double) {
         guard N > 0 else { return }
         t += dt
-        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens {
+        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens || params.scene != builtScene {
             setup(width: W, height: H)
         } else if params.cSpace != builtSpace || params.cRad != builtRad {
             buildClusters()
@@ -2085,7 +2112,9 @@ final class SlimeRig {
             cpX = gx; cpY = gy
         }
         lastSdt = sdt
+        if sillOn { sillStepPre() }   // v2.28 窗台
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
+        if sillOn { sillStep(dt) }   // v2.28 窗台: landing, the bowl, the hop, home
         tentBump()
         plasticity(dt)
         twitch(L)
@@ -2106,8 +2135,9 @@ final class SlimeRig {
         }
         damp = min(0.995, damp)
         if introOn && introPh == .air { damp = 1 }   // v2.17 intro: no damping in the air (clay's 0.94 takes 6% a substep, it would not lift off)
+        if sillOn && sillAir { damp = 1 }   // v2.28 窗台: none in the air either, or it would not fall
         let alpha = mat.alpha * (special ? 1.25 : 1)
-        let G = introOn ? R * introG * dt * dt : 0   // v2.17 intro: gravity only while hopping in
+        let G: Double = sillOn ? (introOn ? R * introG : R * sillGrav) * dt * dt : (introOn ? R * introG * dt * dt : 0)   // v2.17 intro: gravity only while hopping in; v2.28 窗台: always
         // 1 Verlet
         for i in 0..<N {
             let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
@@ -2385,18 +2415,30 @@ final class SlimeRig {
         let hy = homeY + tugY + dragOY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
         let hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
-        let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx0 = hx - gcx, dy0 = hyF - gcy
+        let kh: Double = sillOn ? 0.006 * (grabbing ? mat.anchor : 1) : (grabbing ? 0.02 * mat.anchor : mat.homeK), dx0 = hx - gcx, dy0 = hyF - gcy   // v2.28 窗台: a weak home only
+        let hxOn = !(sillOn && sillAir), hyOn = !introOn && !(sillOn && !sillGrab)   // v2.28 窗台: in the air nothing pulls it home; on the sill up and down is gravity's unless grabbed
+        let soft = sillOn && mat.softWall >= 0.5
+        sillC = 0
         let hcp: Double = mat.homeCap > 0 ? mat.homeCap * h / max(mat.homeCap * h, hypot(dx0, dy0) * kh) : 1   // v2.29 homeCap: dragged along, the whole body moves at most half a spacing a substep, so the ring beside the finger is not sheared open
         let dx = dx0 * hcp, dy = dy0 * hcp
         let wl = worldWalls, padT = wl.t, padB = wl.b, padL = wl.l, padR = wl.r   // walls: the edge of the farthest view (world)
         for i in 0..<N {
-            if !GRAB[i] { X[i] += dx * kh; if !introOn { Y[i] += dy * kh } }   // hopping in, up and down is gravity and the floor's
+            if !GRAB[i] { if hxOn { X[i] += dx * kh }; if hyOn { Y[i] += dy * kh } }   // hopping in, up and down is gravity and the floor's
+            if sillOn, let g = sillG { sillHit(i, g) }   // v2.28 窗台: the bowl and the sill
             if introOn && Y[i] > introFloor { Y[i] = introFloor; PX[i] += (X[i] - PX[i]) * 0.45 }   // intro floor: it really lands, squashes, wobbles
             if flatOn && Y[i] > flatFloor { Y[i] = flatFloor; PY[i] = Y[i] }   // the invisible table: no sinking, no bounce, free to slide
-            if Y[i] < padT { Y[i] = padT }
-            if Y[i] > padB { Y[i] = padB }
-            if X[i] < padL { X[i] = padL }
-            if X[i] > padR { X[i] = padR }
+            if soft {   // v2.29: left, right and top are soft, only the floor is hard; softer while a finger holds it, pushed back quickly once let go
+                let wk = grabbing ? 0.04 : 0.25
+                if Y[i] < padT { Y[i] += (padT - Y[i]) * wk }
+                if X[i] < padL { X[i] += (padL - X[i]) * wk }
+                if X[i] > padR { X[i] += (padR - X[i]) * wk }
+                if Y[i] > padB { Y[i] = padB }
+            } else {
+                if Y[i] < padT { Y[i] = padT }
+                if Y[i] > padB { Y[i] = padB }
+                if X[i] < padL { X[i] = padL }
+                if X[i] > padR { X[i] = padR }
+            }
         }
         if mat.ringGuard > 0 { ringGuard(); ringUnkink() }   // no boundary through boundary, little knots straightened; after the walls
     }
@@ -2874,6 +2916,155 @@ final class SlimeRig {
         }
     }
 
+    // MARK: - v2.28 窗台: gravity, the sill, the bowl (room plane only; the frame, the outside and the routes are the next batch)
+
+    /// The room's geometry from the view size, the same numbers as the web's `sillGeo` (the plate picture is 992×1586 at scale s).
+    private func sillGeo() -> SillGeo {
+        let s = min(W / 860, H / 1130), U = s * 860 / 393, off = H * 0.72 - 1177 * s, ox = (W - 992 * s) / 2, fl = off + 1228 * s
+        let bw = 205 * U, bh = bw * 298 / 420, by = fl - bh, gx = ox + 156 * s, gy = off + 304 * s, gw = 680 * s, gh = 828 * s
+        return SillGeo(s: s, U: U, off: off, ox: ox, fl: fl, bw: bw, bh: bh, bx: W / 2, by: by, gx: gx, gy: gy, gw: gw, gh: gh, jr: gx + gw, bt: gy + gh, oy: gy + gh + 22 * U,
+                       rim: by + bh * 0.5, lip: by + bh * 0.568, back: by + bh * 0.05, cav: bw * 0.40, outer: bw * 0.5, bf: by + bh * 0.86,
+                       l: max(0, ox + 40 * s) + 4, r: min(W, ox + 950 * s) - 4, sl: ox + 40 * s, sr: ox + 950 * s)
+    }
+
+    /// Called at the end of setup: the body is moved right above the bowl and dropped in (no hop-in on the sill).
+    private func sillInit() {
+        sillG = nil; sillHop = nil
+        guard sillOn, N > 0 else { sillAir = false; sillInBowl = false; sillGrab = false; sillHeld = false; return }
+        let g = sillGeo()
+        sillG = g
+        var y1 = -1e9, mx = 0.0
+        for i in 0..<N { mx += X[i] }
+        mx /= Double(N)
+        for i in bnd { y1 = max(y1, Y[i]) }
+        let dx = g.bx - mx, dy = g.rim - R * 0.9 - y1
+        for i in 0..<N { X[i] += dx; PX[i] = X[i]; Y[i] += dy; PY[i] = Y[i] }
+        cx = g.bx; homeX = g.bx; cy = H * 0.5; homeY = cy
+        sillAir = true; sillC = 0; sillInBowl = false; sillWant = true; sillGrab = false; sillHeld = false
+        sillPX = 0; sillPY = 0; sillVX = 0; sillVY = 0; sillFall = 0; sillLastHome = t
+        camZ = 1; camX = viewV.x; camY = viewV.y; introSq = 0
+    }
+
+    /// Where home may be along the sill.
+    private func sillClampX(_ x: Double) -> Double {
+        guard let g = sillG else { return x }
+        let m = R * 0.9
+        return max(g.l + m, min(g.r - m, x))
+    }
+
+    /// One particle against the bowl (while it sits inside) and the sill's top. Counts the contacts for the air test.
+    private func sillHit(_ i: Int, _ g: SillGeo) {
+        if sillInBowl && !GRAB[i] {
+            let dx = X[i] - g.bx, ad = abs(dx)
+            if ad < g.cav {
+                if Y[i] > g.rim {   // the inside narrows toward the bottom
+                    let dp = min(1, (Y[i] - g.rim) / (g.bf - g.rim)), hw = g.cav * (1 - 0.22 * dp * dp)
+                    if ad > hw { X[i] = g.bx + (dx < 0 ? -hw : hw); PX[i] = X[i] }
+                }
+                let u = dx / g.cav, fl = g.bf - (g.bf - g.rim) * 0.3 * u * u * u * u
+                if Y[i] > fl { Y[i] = fl; PY[i] = fl; PX[i] += (X[i] - PX[i]) * 0.45; sillC += 1 }
+            } else if ad < g.outer + R * 0.3 && Y[i] > g.rim - 2 && Y[i] < g.rim + R * 0.6 {   // resting on the rim
+                Y[i] = g.rim - 2; PY[i] = Y[i]; PX[i] += (X[i] - PX[i]) * 0.3; sillC += 1
+            }
+        }
+        if Y[i] > g.fl { Y[i] = g.fl; PY[i] = g.fl; PX[i] += (X[i] - PX[i]) * 0.45; sillC += 1 }
+    }
+
+    /// Before the substeps: is a finger holding it, and where.
+    private func sillStepPre() {
+        var g = false
+        for f in fingers.values where f.mode == .grab { g = true; sillRelX = f.fx; sillRelY = f.fy }
+        sillGrab = g
+    }
+
+    /// After the substeps: in the air or landed, the landing thump, into and out of the bowl, where home is, the hop.
+    private func sillStep(_ dt: Double) {
+        guard let g = sillG, !clusters.isEmpty else { return }
+        let gcx = clusters[gi].xc, gcy = clusters[gi].yc
+        var y1 = -1e9
+        for i in bnd { y1 = max(y1, Y[i]) }
+        sillVX = sillPX != 0 ? (gcx - sillPX) / dt : 0
+        sillVY = sillPY != 0 ? (gcy - sillPY) / dt : 0
+        sillPX = gcx; sillPY = gcy
+        let wasAir = sillAir
+        let hopOn = sillHop != nil, hopAir = sillHop?.air ?? false, hopT = sillHop?.t ?? 1
+        // v2.31: for 0.45 s after take-off touching the bowl's side still counts as airborne (the body is wider than the rim; counted as contact, the damping ate the jump, 2 pt high)
+        sillAir = (sillC == 0 || (hopAir && hopT < 0.45)) && !sillGrab && !introOn && !(hopOn && !hopAir)
+        if sillAir {
+            sillFall = max(sillFall, sillVY)
+            let lim = R * 30 * lastSdt   // terminal speed
+            for i in 0..<N {
+                let v = Y[i] - PY[i]
+                if v > lim { PY[i] = Y[i] - lim } else if v < -lim { PY[i] = Y[i] + lim }
+            }
+        }
+        if wasAir && !sillAir && !sillGrab {   // landed
+            if sillFall > R * 2.5 { onEvent?(.land(gain: min(0.9, 0.2 + sillFall / (R * 16)))) }
+            if hopAir { sillHop = nil }
+            sillWant = false; sillFall = 0; sillLastHome = max(sillLastHome, t - 8)
+            lifeSt = .rest; lifeUntil = t + 1 + Double.random(in: 0..<1)
+        }
+        if sillGrab && !sillHeld { sillHop = nil }   // picked up: whatever it was doing stops
+        // let go right over the bowl: it wants in; anywhere else it lands on the sill (the frame and the walls come with the next batch)
+        if sillHeld && !sillGrab && !sillInBowl { sillWant = abs(sillRelX - g.bx) < g.cav * 0.9 }
+        sillHeld = sillGrab
+        // home: not while grabbed; in the air it follows the body; on the ground y follows and, inside the bowl, x eases back to the middle
+        if !sillGrab {
+            if sillAir { homeX = gcx; homeY = gcy }
+            else { homeY = gcy; if sillInBowl && !escOn { homeX += (g.bx - homeX) * (1 - exp(-dt / 0.3)) } }
+            homeX = sillClampX(homeX)
+        }
+        // out of the bowl (lifted above the rim, or pulled aside), into the bowl (falling onto it from right above)
+        if sillInBowl {
+            var out = y1 < g.rim - R * 0.3
+            if sillGrab { for f in fingers.values where f.mode == .grab && abs(f.fx - g.bx) > g.cav + R * 0.4 { out = true } }
+            if out { sillInBowl = false }
+        } else if !sillGrab && sillAir && sillWant && sillVY > 0 && abs(gcx - g.bx) < g.cav * 0.9 && y1 > g.rim - R * 0.2 && y1 < g.rim + R * 0.3 {
+            sillInBowl = true; sillWant = false
+        }
+        // the hop: crouch 0.12 s, then off (sillLaunch); in the air a little stretched
+        if var q = sillHop {
+            q.t += dt
+            if !q.air {
+                introSq = 0.14 * sin(min(1, q.t / 0.12) * .pi / 2)
+                sillHop = q
+                if q.t >= 0.12 { sillLaunch() }
+            } else {
+                introSq += (-0.06 - introSq) * (1 - exp(-dt / 0.08))
+                sillHop = q
+            }
+        } else if !introOn { introSq *= exp(-dt / 0.08) }
+        // startled inside the bowl: it jumps on the spot and drops back in (v2.31: beside the bowl there is no room for it)
+        if escOn && sillInBowl && !sillGrab && sillHop == nil { sillHopStart(escDX, toBowl: false) }
+    }
+
+    /// A hop is only for being startled (crouch 0.12 s, then take off); in and out of the bowl it climbs (next batch).
+    private func sillHopStart(_ tx: Double, toBowl: Bool) {
+        guard sillHop == nil, !sillGrab, let g = sillG else { return }
+        gaitOn = false; wanderMoving = false
+        var x = toBowl ? g.bx : sillClampX(tx), tb = toBowl
+        if !tb && sillInBowl && abs(x - g.bx) < g.outer + R * 0.9 { tb = true; x = g.bx }
+        sillHop = SillHop(air: false, t: 0, tx: x, toBowl: tb)
+        lifeSt = .rest; lifeUntil = t + 3
+    }
+
+    private func sillLaunch() {
+        guard var q = sillHop, let g = sillG, !clusters.isEmpty else { return }
+        let g0 = R * sillGrav, hs = 1.0 / 240
+        var y1 = -1e9
+        for i in bnd { y1 = max(y1, Y[i]) }
+        var hh = R * (0.55 + 0.25 * Double.random(in: 0..<1))
+        if q.toBowl { hh = max(y1 - g.rim, 0) + R * (sillInBowl ? 0.9 : 0.45) }
+        else if sillInBowl { hh = max(hh, y1 - g.rim + R * 0.85) }   // v2.31: inside the bowl it jumps higher, the rim eats part of it
+        let vy = sqrt(2 * g0 * hh), land = q.toBowl ? g.rim : g.fl
+        let T = vy / g0 + sqrt(2 * max(R * 0.1, hh + land - y1) / g0)
+        let vx = max(-W * 1.6, min(W * 1.6, (q.tx - clusters[gi].xc) / T))
+        for i in 0..<N { PY[i] = Y[i] + vy * hs; PX[i] = X[i] - vx * hs }
+        sillWant = q.toBowl; sillAir = true; sillC = 0; sillFall = 0
+        q.air = true; q.t = 0; sillHop = q
+        onEvent?(.land(gain: 0.22))
+    }
+
     // MARK: - v2.19 活物感: rest / look / go / arrive (A1, A2), the pulse gait (A3), flinch and shake-off (A5), sniffing (A7)
 
     private func smooth01(_ x: Double) -> Double { x <= 0 ? 0 : (x >= 1 ? 1 : x * x * (3 - 2 * x)) }
@@ -2913,6 +3104,7 @@ final class SlimeRig {
     }
     /// Set off toward `dir` (the way it just sniffed) or, with none, anywhere (up and down at 0.8); far and fast with the `dash` chance.
     private func goStart(_ dir: Double?) {
+        if sillOn { lifeSt = .rest; lifeUntil = t + 2 + 2 * Double.random(in: 0..<1); return }   // v2.28 窗台: it stays put; climbing out of the bowl and walking the sill come with the routes (next batch)
         let far = Double.random(in: 0..<1) < params.dash
         let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.2 + 0.3 * Double.random(in: 0..<1))
         var a = dir ?? Double.random(in: 0..<(2 * .pi))
@@ -2935,6 +3127,7 @@ final class SlimeRig {
                 (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))
     }
     private func strokeStart(_ K: (P: Double, c: Double, tau: Double, sd: Double, kA: Double)) {
+        if sillOn { gaitTY = homeY; gaitTX = sillClampX(gaitTX) }   // v2.28 窗台: it walks along the sill only
         let dx = gaitTX - homeX, dy = gaitTY - homeY, rem = hypot(dx, dy)
         gaitH = atan2(dy, dx) + Double.random(in: -0.21..<0.21)   // each stroke veers a little (±12°): a curved path, speed and heading change together
         let per = K.c / 2 + K.tau * (1 - exp(-(K.P - K.c) / K.tau))   // how far this speed profile goes per unit of peak speed
@@ -2974,6 +3167,7 @@ final class SlimeRig {
     /// The whole body moves together with its previous positions (a performance, no velocity left behind): it goes forward stroke by
     /// stroke instead of being dragged along by the home spring.
     private func moveHome(_ dx: Double, _ dy: Double, _ dt: Double) {
+        let dy = sillOn ? 0 : dy   // v2.28 窗台: home moves along the sill only
         if dx == 0 && dy == 0 { return }
         homeX += dx; homeY += dy; wanderVX = dx / dt; wanderVY = dy / dt
         for i in 0..<N where !GRAB[i] { X[i] += dx; Y[i] += dy; PX[i] += dx; PY[i] += dy }
@@ -3236,6 +3430,12 @@ final class SlimeRig {
     }
     /// Walk to a point (C1 swimming over or backing off, C4 edging over): goStart's gait (the pulse; with it off, v2.18's glide).
     private func gaitTo(_ x: Double, _ y: Double, dash: Bool) {
+        var x = x, y = y
+        if sillOn {   // v2.28 窗台: along the sill only; not in the air or mid-hop; inside the bowl it stays (climbing out comes with the routes)
+            if sillAir || sillHop != nil { return }
+            x = sillClampX(x); y = homeY
+            if sillInBowl { return }
+        }
         lifeSt = .go; wanderSX = homeX; wanderSY = homeY; wanderX = x; wanderY = y; wanderMoving = true
         if lv(params.lifeGait) {
             gaitOn = true; gaitTX = x; gaitTY = y; gaitDash = dash; gaitPh = -1; gaitPrep = 0; gaitV = 0
@@ -3706,7 +3906,7 @@ final class SlimeRig {
     /// How close the most-stretched grabbing finger is to the stretch limit, 0...1 (sharpness bonus, 提案第 15 條).
     var stretchLevel: Double {
         var m = 0.0
-        for f in fingers.values where f.mode == .grab { m = max(m, f.stretch / max(0.01, min(params.maxPull, 2))) }   // same 2R cap as the pop
+        for f in fingers.values where f.mode == .grab { m = max(m, f.stretch / max(0.01, min(effParams.maxPull, 2))) }   // same 2R cap as the pop
         return min(1, m)
     }
 

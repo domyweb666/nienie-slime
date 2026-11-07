@@ -110,6 +110,10 @@ final class SlimeController: ObservableObject {
             haptics.transient(intensity: 0.45, sharpness: 0.35)
         case .voice(let kind, let gain, let rate):
             sound.voice(kind, gain: gain, rate: rate)
+        case .land(let gain):
+            // v2.28 窗台: it landed after a fall or a hop (the web plays the press sound); a soft dull tap
+            sound.press(intensity: gain * 0.6)
+            haptics.transient(intensity: 0.15 + 0.3 * gain, sharpness: 0.2)
         case .beat:
             // v2.23 C6: one beat of its answer to your rhythm, a soft round tap
             haptics.transient(intensity: 0.3, sharpness: 0.2)
