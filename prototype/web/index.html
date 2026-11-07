@@ -75,10 +75,11 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 </div>
 
 <div class="view" id="view">
+  <div class="vrow"><b>搖</b><span class="seg" data-k="shk"><button data-v="settle">沉澱</button><button data-v="eat">散出來吃回來</button></span></div>
   <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-toggle">收起</button></div>
 </div>
 
-<div class="hint" id="hint">捏它、拉它、揉它；搖一搖手機再放著，看牠沉澱</div>
+<div class="hint" id="hint">捏它、拉它、揉它；搖一搖手機再放著</div>
 
 <div class="bar bottom">
   <div class="mats" role="group" aria-label="史萊姆" id="slimes"></div>
@@ -166,9 +167,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{shake:1,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:13,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  mochi:{shake:1,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:13,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  clay: {shake:1,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:13,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  jelly:{shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:13,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  mochi:{shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:13,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  clay: {shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:13,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -183,6 +184,8 @@ const F=[
   ['envRoam','牠自己出門','窗台上牠自己爬出碗、爬窗框、跨出窗外的機率倍數（v2.30）；0 就一直待在原地',0,2,.1],
   ['catPush','牠自己推擺飾','像貓一樣伸偽足慢慢推擺飾、邊推邊看你的機率倍數（v2.30）；0 關（v2.31 預設，擺飾拿掉了）',0,2,.1],
   ['shake','搖晃沉澱 v2.31','1：搖手機牠在碗裡彈一下、肚子裡的亮粉揚起來變霧；放著不動約 30 秒沉澱，清透、發光、睜眼、叮一聲；捏牠也會攪起一點（多米 11-07：像雪花球，動了會濁、靜了會清）；0 關',0,1,1],
+  ['shakeMode','搖的玩法','0 沉澱（雪花球）：亮粉在肚子裡揚起來再沉下去；1 散出來吃回來：搖一下亮粉從身體噴出來，掉在窗台上或碗口，牠自己爬過去一顆顆吃回來，吃完叮一聲（多米 11-07：兩個都做，切換列可以切）',0,1,1],
+  ['spillN','一次噴幾顆','散出來的玩法每搖一下噴幾顆亮粉；畫面上最多 40 顆，身體裡沒有了就噴不出來',4,30,1],
   ['shakeN','幾下搖滿','搖這麼多下亮粉就全揚起來，再用力甩也不會更多',1,6,1],
   ['settleT','沉澱秒數','完全不動的話，從全濁到全清大約幾秒',10,60,1],
   ['calmBreathT','沉澱時的呼吸週期（秒）','亮粉在沉的時候牠一次呼吸幾秒（10 秒＝每分鐘 6 次），帶著你慢下來',4,15,.5],
@@ -1447,7 +1450,7 @@ function drawEyes(col){if(!(mat.eyes>=.5)||!EYE.L.length)return;
     if(h>w*.7){ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(x-w*.32,y-h*.4,w*.34,0,Math.PI*2);ctx.fill()}}}
 // B2 睡著：40 秒沒人碰（點空白處也算碰）而且在休息，就慢慢睡著（1.6 秒時間常數閉眼、攤軟、呼吸慢一倍半）。碰它嚇醒（縮大 1.6 倍、睜大、「嗯？」），手指放旁邊 1.2 秒慢慢醒
 function sleepTry(){if(!IV3('sleep')||SLP.on)return false;
-  if(t-Math.max(lastTouch,SLP.lastAny)<40||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
+  if(t-Math.max(lastTouch,SLP.lastAny)<40||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03||SNW.loose.length)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
   SLP.on=true;LIFE.st='sleep';cutSniffs();return true}
 function wake(sharp){if(!SLP.on)return;SLP.on=false;SLP.wakeT=t;SLP.nearT=0;LIFE.st='rest';LIFE.until=t+1.5+Math.random();EYE.blinkT=t;
   if(sharp){FLN.at=t+.05;FLN.pre='rest';FLN.boost=1.6}SLP.askAt=t+(sharp?.45:.3)}
@@ -1927,7 +1930,7 @@ function rtPoke(p){const side=p.x>globalC.xc?1:-1,tx=sillClampX(p.x-side*(p.hw+R
   return[RT.walk('floor',tx),look(2.6),RT.wait(.5),RT.sniff(a,1,1.8),look(2.2),RT.sniff(a,1.25,1.8),RT.fn(()=>{if(Math.abs(p.a)>.5||Math.abs(p.x-p.hx)>R*.25){MOOD.happyT=t;voice('happy',.6)}EYE.user=t+1.2})]}
 function floorWalkX(cx){const g=SILL.g,lo=g.l+R*.9;let hi=g.r-R*.9;for(const p of PROPS)if(!p.gone&&p.x>cx)hi=Math.min(hi,p.x-p.hw-R*.95);if(hi-lo<R*.3)return null;return lo+(hi-lo)*Math.random()}
 // 牠自己想出門：看現在在哪一層，從能做的事裡挑。大半時間還是待著（v2.19：大半時間在休息）
-function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random()/Math.max(.01,mat.envRoam||0);LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.route||S.hop||S.air||!(mat.envRoam>0)||SNW.k>.3)return;   // v2.31 亮粉在沉的時候牠待著不出門
+function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random()/Math.max(.01,mat.envRoam||0);LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.route||S.hop||S.air||!(mat.envRoam>0)||SNW.k>.3||SNW.loose.length)return;   // v2.31 亮粉在沉的時候牠待著不出門；外面有亮粉時先去撿
   if(S.inBowl){if(r<.16)routeStart(rtOutFront(null));else if(r<.38&&mat.envFrame>=.5)routeStart(rtOverBack(Math.random()<.75?g.jr-R*(.8+.5*Math.random()):null));return}
   if(S.plane==='room'){const p=catPick();if(p&&Math.random()<(mat.catPush||0)*(.35+.4*IMP.tr)){routeStart(rtPoke(p));return}
     if(r<.6){routeStart(rtIntoFront());return}const x=floorWalkX(cx);if(x!=null&&Math.abs(x-cx)>R*.3)gaitTo(x,HOMEY,false);return}
@@ -2075,7 +2078,7 @@ function drawStuck(){const q=WALK.stuck;if(q&&q.i<N&&SILL.g){const c=globalC,i=q
    靜：沒人碰，亮粉慢慢往下沉（settleT 秒），牠改成每分鐘 6 次的慢呼吸、閉著眼；中途捏牠、拖牠又會揚起一點，所以「不動」本身就是玩法。
    清：全沉下去那一刻發光、睜眼、叮一聲；底部堆出一座小堆，偶爾是星星或愛心，每次搖重挑。亮粉只是畫在身體裡，不動物理；只有「彈一下」是給粒子一個速度。
    網頁拿不到手機晃動時用面板按鈕假裝；iOS 的 Safari 要在第一次觸碰時問一次能不能讀晃動。 ---------- */
-const SNW={cloud:0,k:0,kick:null,glit:[],shape:'mound',cleared:true,wasCloudy:false,last:-9,lastVoice:-9,glow:0,clearT:-9,motion:false,perm:'',gx:0,gy:0,shapeN:{mound:0,star:0,heart:0},nShake:0};
+const SNW={cloud:0,k:0,kick:null,loose:[],huntT:-9,gulpT:-9,glit:[],shape:'mound',cleared:true,wasCloudy:false,last:-9,lastVoice:-9,glow:0,clearT:-9,motion:false,perm:'',gx:0,gy:0,shapeN:{mound:0,star:0,heart:0},nShake:0};
 const GLIT_COL=['255,224,138','255,255,255','255,195,214','190,240,230'];
 let glitSeed=7;const grnd=()=>{glitSeed=(Math.imul(glitSeed,1664525)+1013904223)>>>0;return glitSeed/4294967296};   // 亮粉自己的亂數：建身體時不碰 Math.random，selftest 舊項目用固定種子的手抖序列才不會被錯開（量過錯開後 T42 的 abuse 對折幀數 13 變 224）
 // 堆的形狀。單位：半徑；x 向右，y 向上，原點在身體底部正中
@@ -2086,7 +2089,7 @@ function shkInside(shape,x,y){
 function shkTargets(shape){const B={mound:[-.6,.6,0,.32],star:[-.3,.3,-.05,.55],heart:[-.3,.3,0,.5]}[shape]||[-.6,.6,0,.32];
   for(const q of SNW.glit){let x=0,y=.1;for(let k=0;k<60;k++){x=B[0]+(B[1]-B[0])*grnd();y=B[2]+(B[3]-B[2])*grnd();if(shkInside(shape,x,y))break}q.tx=x;q.ty=y}}
 function shkBuild(){const n=Math.max(0,Math.round(mat.glitN||0));SNW.glit=[];for(let i=0;i<n;i++)SNW.glit.push({tx:0,ty:0,sx:0,sy:0,h:0,s:.7+.4*grnd(),r:.9+1.3*grnd(),c:i%4===0?1:i%7===0?2:i%11===0?3:0,ph:grnd()*6.283,sw:.5+grnd()});shkTargets(SNW.shape)}
-function shkReset(){SNW.cloud=0;SNW.k=0;SNW.cleared=true;SNW.wasCloudy=false;SNW.glow=0;SNW.shape='mound';shkBuild()}
+function shkReset(){SNW.cloud=0;SNW.k=0;SNW.cleared=true;SNW.wasCloudy=false;SNW.glow=0;SNW.shape='mound';SNW.loose=[];SNW.huntT=-9;shkBuild()}
 function shkMeasure(){const G=SNW.glit;let s=0;for(const q of G)s+=q.h;SNW.cloud=G.length?Math.min(1,s/G.length/.7):0}
 // 攪：a 是這一下攪起的份量（搖一下 1/shakeN，捏著每秒 stirRate）。從清的狀態被搖起來才重挑堆的形狀，每次堆出來都不一樣
 function shkStir(a){if(!(mat.shake>=.5)||!(a>0))return;const G=SNW.glit;if(!G.length)return;
@@ -2094,14 +2097,47 @@ function shkStir(a){if(!(mat.shake>=.5)||!(a>0))return;const G=SNW.glit;if(!G.le
   const p=Math.min(1,a*1.6);for(const q of G)if(Math.random()<p){q.h=Math.max(q.h,.5+.5*Math.random());const r=Math.sqrt(Math.random())*.8,th=Math.random()*6.283;q.sx=Math.cos(th)*r;q.sy=Math.sin(th)*r}
   SNW.cleared=false;shkMeasure();if(SNW.cloud>.5)SNW.wasCloudy=true}
 // 搖了一下：dx dy 是畫面座標的方向（內容物相對手機往哪邊甩）
-function shkShake(dx,dy){if(!(mat.shake>=.5))return;const n=Math.max(1,mat.shakeN||3);SNW.nShake++;SNW.last=t;shkStir(1/n);
+function shkShake(dx,dy){if(!(mat.shake>=.5))return;const n=Math.max(1,mat.shakeN||3);SNW.nShake++;SNW.last=t;if(mat.shakeMode>=.5)shkSpill(dx,dy);else shkStir(1/n);
   if(SLP.on)wake(true);MOOD.happyT=t;if(t-SNW.lastVoice>1.5){SNW.lastVoice=t;voice('happy',.5)}
   // 牠在碗裡彈一下：給所有粒子一個速度（Verlet：改上一幀的位置）。上限 2.6R／秒橫、0.7R／秒往上，碗的內壁會擋，不會飛出碗
   if(SILL.on&&SILL.g&&!SILL.grab&&!INTRO.on&&(mat.shakeKick||0)>0){const k=Math.min(2,mat.shakeKick);let ux=dx||0,uy=dy||0;const l=Math.hypot(ux,uy);if(l<1e-3){ux=Math.random()<.5?-1:1;uy=-.6}else{ux/=l;uy/=l}
     SNW.kick={vx:Math.max(-1,Math.min(1,ux))*R*2.6*k,vy:Math.max(-1,Math.min(.2,uy))*R*.7*k,until:t+.15}}}
+
+/* v2.31 散出來吃回來（多米 11-07：沉澱和散出來都做，切換比較）。搖一下，身體裡的亮粉從甩的那一側噴出去，窗台上有重力：掉在窗台上，或掉進碗裡（停在碗口那條線上，跟堆一樣）；藍底沒重力，飄出去慢慢停住。
+   沒人碰 1.2 秒後牠自己去撿：窗台上走過去（在碗裡先爬出來、在碗裡的先爬進去），藍底游過去；身體邊碰到就吸進去，亮粉回到肚子裡慢慢沉。全撿完發光、叮一聲。噴出去的顆數有上限，身體裡沒有了就噴不出來 */
+function shkSpill(dx,dy){const G=SNW.glit,c=globalC;if(!c)return;const cand=[];for(const q of G)if(!q.out)cand.push(q);const n=Math.min(Math.round(mat.spillN||12),cand.length,Math.max(0,40-SNW.loose.length));if(n<=0)return;
+  let ux=dx||0,uy=dy||0;const l=Math.hypot(ux,uy);if(l<1e-3){ux=Math.random()<.5?-1:1;uy=-.5}else{ux/=l;uy/=l}const a0=Math.atan2(uy,ux);
+  for(let k=0;k<n;k++){const j=Math.floor(Math.random()*cand.length),q=cand.splice(j,1)[0];q.out=true;const a=a0+(Math.random()-.5)*1.3,sp=R*(2.5+3*Math.random());
+    SNW.loose.push({q,x:c.xc+Math.cos(a)*R*.8,y:c.yc+Math.sin(a)*R*.8,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-(SILL.on?R*2.2:0),c:q.c,r:q.r*1.25,ph:q.ph,rest:false,inBowl:false,eat:null})}
+  SNW.cleared=false;SNW.wasCloudy=true}
+function shkAbsorb(){for(const p of SNW.loose){p.q.out=false;p.q.h=0}SNW.loose=[]}   // 切回沉澱模式：外面的亮粉直接回肚子
+function shkLooseStep(dt){const L=SNW.loose;if(!L.length)return;const c=globalC;if(!c)return;const g=SILL.on?SILL.g:null;
+  for(let k=L.length-1;k>=0;k--){const p=L[k];
+    if(p.eat){const u=Math.min(1,(t-p.eat.t0)/.35),e=u*u*(3-2*u);p.x=p.eat.x0+(c.xc-p.eat.x0)*e;p.y=p.eat.y0+(c.yc-p.eat.y0)*e;if(u>=1){L.splice(k,1);p.q.out=false;p.q.h=.35;const r=Math.sqrt(Math.random())*.6,th=Math.random()*6.283;p.q.sx=Math.cos(th)*r;p.q.sy=Math.sin(th)*r;
+        if(!L.length){SNW.cleared=true;SNW.wasCloudy=false;SNW.glow=1;SNW.clearT=t;EYE.pulse=t;MOOD.happyT=t;sfxPlay('ding',.5)}}continue}
+    p.ph+=dt;if(p.rest)continue;
+    if(g){p.vy+=R*SILLG*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*1.2);
+      if(p.x<g.l+3){p.x=g.l+3;p.vx=Math.abs(p.vx)*.4}else if(p.x>g.r-3){p.x=g.r-3;p.vx=-Math.abs(p.vx)*.4}
+      const dx=p.x-g.bx,ad=Math.abs(dx);let fl=g.fl;p.inBowl=false;
+      if(ad<g.cav){fl=g.lip-3;p.inBowl=true}else if(ad<g.outer+3&&p.y>g.rim-8){p.x=g.bx+Math.sign(dx||1)*(g.outer+4);p.vx=Math.sign(dx||1)*Math.max(Math.abs(p.vx),R*.3)}
+      if(p.y>=fl){p.y=fl;if(p.vy>R*1.2){p.vy=-p.vy*.3;p.vx*=.6}else{p.vy=0;p.vx=0;p.rest=true}}}
+    else{p.x+=p.vx*dt;p.y+=p.vy*dt;const d=Math.exp(-dt*2.5);p.vx*=d;p.vy*=d;p.x=Math.max(CX-W*.45,Math.min(CX+W*.45,p.x));p.y=Math.max(CY-H*.32,Math.min(CY+H*.32,p.y));if(Math.hypot(p.vx,p.vy)<R*.15)p.rest=true}}
+  // 牠去撿：沒人碰、搖完 1.2 秒後
+  const calm=!fingers.size&&t-SNW.last>1.2&&!SILL.grab&&!INTRO.on&&!(SILL.on&&SILL.air);if(!calm)return;
+  let ate=false;for(const p of L){if(!p.rest||p.eat)continue;let near=false;
+    if(g&&p.inBowl)near=SILL.inBowl&&Math.abs(c.xc-p.x)<R*.7;else{for(const i of bnd)if(Math.hypot(X[i]-p.x,Y[i]-p.y)<R*.38){near=true;break}}
+    if(near){p.eat={t0:t,x0:p.x,y0:p.y};ate=true}}
+  if(ate&&t-SNW.gulpT>.4){SNW.gulpT=t;voice('gulp',.5);sfxPlay('press',.18)}
+  if(t-SNW.huntT<2.5||SILL.hop||(SILL.on&&SILL.route)||ESC.on)return;let best=null,bd=1e9;for(const p of L){if(!p.rest||p.eat)continue;const d=g?Math.abs(p.x-c.xc)+(p.inBowl!==SILL.inBowl?R*2:0):Math.hypot(p.x-c.xc,p.y-c.yc);if(d<bd){bd=d;best=p}}
+  if(!best)return;SNW.huntT=t;SLP.lastAny=t;if(SLP.on)wake(false);
+  if(g){if(best.inBowl){if(!SILL.inBowl)routeStart(rtIntoFront())}else gaitTo(sillClampX(best.x),HOMEY,false)}else gaitTo(best.x,best.y,false)}
+function drawLoose(){const L=SNW.loose;if(!L.length)return;ctx.save();const v=viewV();ctx.setTransform(DPR*CAM.z,0,0,DPR*CAM.z,DPR*(v.x-CAM.z*CAM.x),DPR*(v.y-CAM.z*CAM.y));const pr=1/Math.max(.2,CAM.z);
+  for(const p of L){const tw=.65+.35*Math.sin(p.ph*2.3+t*2.5);ctx.fillStyle=`rgba(${GLIT_COL[p.c]},${(.9*tw).toFixed(2)})`;ctx.beginPath();ctx.arc(p.x,p.y,p.r*pr,0,6.283);ctx.fill();ctx.fillStyle=`rgba(255,255,255,${(.35*tw).toFixed(2)})`;ctx.beginPath();ctx.arc(p.x-p.r*.3*pr,p.y-p.r*.3*pr,p.r*.4*pr,0,6.283);ctx.fill()}ctx.restore()}
 function shkStep(dt){if(SNW.last-t>1)SNW.last=-9;if(SNW.lastVoice-t>1)SNW.lastVoice=-9;if(SNW.clearT-t>1)SNW.clearT=-9;   // 時鐘被倒回去（自測）：停在未來的計時器歸零，不然眼睛一直 ∩（全程連跑第二輪 T38 抓到）
   const K=SNW.kick;if(K){if(t>=K.until||K.until-t>1)SNW.kick=null;else if(SILL.on&&!SILL.grab&&!SILL.air){const hs=dt/SUB,kx=K.vx*hs,ky=K.vy*hs;for(let i=0;i<N;i++){if(GRAB[i])continue;const vx=X[i]-PX[i],vy=Y[i]-PY[i];PX[i]=X[i]-(vx+(kx-vx)*.35);PY[i]=Y[i]-(vy+(ky-vy)*.35)}}}   // 彈一下：0.15 秒內把速度往目標混，不是加上去（連搖三下不會越彈越高跳出碗；量過加上去的版本第三下就飛出去）；在空中不推
   if(!(mat.shake>=.5)){SNW.k*=Math.exp(-dt/.3);return}const G=SNW.glit;if(G.length!==Math.max(0,Math.round(mat.glitN||0)))shkBuild();
+  if(mat.shakeMode>=.5){shkLooseStep(dt);SNW.k*=Math.exp(-dt/.3);SNW.glow*=Math.exp(-dt/2.2);for(const q of G)if(q.h>0&&!fingers.size)q.h=Math.max(0,q.h-dt*.85/(Math.max(1,mat.settleT||30)*q.s));shkMeasure();return}   // 散出來的玩法：外面的亮粉自己有物理，肚子裡的只是吃回來後慢慢沉
+  if(SNW.loose.length)shkAbsorb();
   let touching=false;for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'&&f.on)touching=true;
   if(touching)shkStir((mat.stirRate||0)*dt);
   const calm=!fingers.size&&t-SNW.last>.6;
@@ -2116,7 +2152,7 @@ function drawGlitter(P){if(!(mat.shake>=.5)||!SNW.glit.length)return;const G=SNW
   const pr=1/Math.max(.2,CAM.z);
   ctx.save();jelPath(ctx,P);ctx.clip();
   if(cl>.01){const g=ctx.createRadialGradient(c.xc,c.yc+R*.1,R*.1,c.xc,c.yc+R*.1,R*1.05);g.addColorStop(0,`rgba(255,255,255,${(.42*cl).toFixed(3)})`);g.addColorStop(1,`rgba(255,255,255,${(.12*cl).toFixed(3)})`);ctx.fillStyle=g;ctx.fillRect(c.xc-R*1.6,c.yc-R*1.6,R*3.2,R*3.2)}
-  for(const q of G){const h=q.h,tx=c.xc+q.tx*R,ty=by-q.ty*R,sx=c.xc+(q.sx+.08*Math.sin(q.ph))*R,sy=c.yc+(q.sy+.05*Math.cos(q.ph*1.3))*R,x=tx+(sx-tx)*h,y=ty+(sy-ty)*h,tw=.6+.4*Math.sin(q.ph*2.1+t*2.5),a=(h<.03?.85:.45+.4*h)*tw;
+  for(const q of G){if(q.out)continue;const h=q.h,tx=c.xc+q.tx*R,ty=by-q.ty*R,sx=c.xc+(q.sx+.08*Math.sin(q.ph))*R,sy=c.yc+(q.sy+.05*Math.cos(q.ph*1.3))*R,x=tx+(sx-tx)*h,y=ty+(sy-ty)*h,tw=.6+.4*Math.sin(q.ph*2.1+t*2.5),a=(h<.03?.85:.45+.4*h)*tw;
     ctx.fillStyle=`rgba(${GLIT_COL[q.c]},${a.toFixed(2)})`;ctx.beginPath();ctx.arc(x,y,q.r*(h<.03?1.15:1)*pr,0,6.283);ctx.fill()}
   if(SNW.glow>.01){const g=ctx.createRadialGradient(c.xc,c.yc,0,c.xc,c.yc,R*1.1);g.addColorStop(0,`rgba(255,250,210,${(.55*SNW.glow).toFixed(3)})`);g.addColorStop(1,'rgba(255,250,210,0)');ctx.fillStyle=g;ctx.fillRect(c.xc-R*1.6,c.yc-R*1.6,R*3.2,R*3.2)}
   ctx.restore();
@@ -2130,9 +2166,9 @@ function shkMotionInit(){if(SNW.motion||typeof DeviceMotionEvent==='undefined')r
 
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
-const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0};
-try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
-function viewOver(){const o={};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});return o}
+const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle'};
+try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;if(o.shk==='eat'||o.shk==='settle')VIEW.shk=o.shk;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
+function viewOver(){const o={shakeMode:VIEW.shk==='eat'?1:0};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});return o}
 const JSKINS={
   A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92},
   B:{kEdge:.50,kCore:.16,aEdge:.86,aCore:.97,amb:.88,dif:.20,glow:.46,line:.26,nk:.90,shin:320,s0:.42,s1:.68,spec:.80,sheen:.10,arc:.88},
@@ -2231,7 +2267,7 @@ function drawDeco(){if(!(SILL.on&&SILL.g)||!(mat.props>=.5&&mat.props<1.5))retur
 function drawProps(){const S=SILL,g=S.g;if(!g)return;for(const p of PROPS){if(p.gone||p.alpha<=.01)continue;const im=propImg(p.im);if(!im)continue;const near=Math.max(0,1-Math.abs(g.fl-(p.y+p.base))/(R*.8));if(near>0&&p.x>g.sl&&p.x<g.sr)propShadow(p.x,g.fl-2,p.w*.52*(1+.3*Math.abs(Math.sin(p.a))),11*g.U,near*p.alpha);
     ctx.save();ctx.globalAlpha=p.alpha;ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.drawImage(im,-p.ox,-p.oy,p.w,p.h);ctx.restore()}
   const b=propImg('bowl');if(b){propShadow(g.bx,g.fl-2,g.bw*.52,11*g.U,1);ctx.drawImage(b,g.bx-g.bw/2,g.by,g.bw,g.bh)}}
-function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl!=='room'){if(pl==='out')ctx.drawImage(sc.wall,0,0,W,H);drawDeco();drawItems();drawProps()}else drawBowlFront()}}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外時的擺飾、走路的東西、碗；碗裡的碗前緣
+function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl!=='room'){if(pl==='out')ctx.drawImage(sc.wall,0,0,W,H);drawDeco();drawItems();drawProps()}else drawBowlFront()}drawLoose()}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外時的擺飾、走路的東西、碗；碗裡的碗前緣
 function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
   const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
   const s=Math.min(W/860,H/1130)*DPR,sillTop=h*.72,off=sillTop-1177*s,ox=(w-992*s)/2,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
@@ -2246,7 +2282,7 @@ let fpsAcc=0,fpsN=0;function viewFps(dt){fpsAcc+=dt;fpsN++;if(fpsAcc>=.5){const 
 function viewSync(){const root=document.getElementById('view');root.classList.toggle('shut',!!VIEW.shut);document.getElementById('v-toggle').textContent=VIEW.shut?'切換':'收起';
   root.querySelectorAll('.seg').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(VIEW[k])===b.dataset.v)))});
   try{localStorage.setItem('nienie.view',JSON.stringify(VIEW))}catch(_){}}
-function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face)||('bg' in o&&(o.bg==='blue')!==(VIEW.bg==='blue'));Object.assign(VIEW,o);viewSync();if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
+function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face)||('bg' in o&&(o.bg==='blue')!==(VIEW.bg==='blue'));Object.assign(VIEW,o);viewSync();if('shk' in o){mat.shakeMode=VIEW.shk==='eat'?1:0;if(!mat.shakeMode)shkAbsorb();syncSliders()}if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
   if(VIEW.skin!=='flat'&&JEL.fail)hint('這支手機不支援果凍皮，先用平塗')}
 document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;viewSet({[g.dataset.k]:b.dataset.v})});
 document.getElementById('view').addEventListener('pointerdown',e=>e.stopPropagation());
@@ -2340,7 +2376,7 @@ $('brand').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{$('tune').
 for(const ev of ['pointerup','pointerleave','pointercancel'])$('brand').addEventListener(ev,()=>clearTimeout(pressT));
 $('t-close').addEventListener('click',()=>$('tune').classList.add('hidden'));
 $('t-walk-s').addEventListener('click',()=>{$('tune').classList.add('hidden');walkFake(800)});$('t-walk-b').addEventListener('click',()=>{$('tune').classList.add('hidden');walkFake(3500)});$('t-walk-0').addEventListener('click',()=>{walkClear()});
-$('t-shake-1').addEventListener('click',()=>{$('tune').classList.add('hidden');shkShake(0,0)});$('t-shake-3').addEventListener('click',()=>{$('tune').classList.add('hidden');for(let k=0;k<3;k++)setTimeout(()=>shkShake(k%2?1:-1,-.5),k*220)});$('t-shake-0').addEventListener('click',()=>{for(const q of SNW.glit)q.h=0;shkMeasure()});
+$('t-shake-1').addEventListener('click',()=>{$('tune').classList.add('hidden');shkShake(0,0)});$('t-shake-3').addEventListener('click',()=>{$('tune').classList.add('hidden');for(let k=0;k<3;k++)setTimeout(()=>shkShake(k%2?1:-1,-.5),k*220)});$('t-shake-0').addEventListener('click',()=>{shkAbsorb();for(const q of SNW.glit)q.h=0;shkMeasure()});
 $('walk-yes').addEventListener('click',()=>walkAnswer(true));$('walk-no').addEventListener('click',()=>walkAnswer(false));
 $('t-intro').addEventListener('click',()=>{$('tune').classList.add('hidden');for(const f of [...fingers.values()])releaseFinger(f,true);setup();startIntro()});
 $('t-copy').addEventListener('click',()=>{const s=$('t-out').value;navigator.clipboard&&navigator.clipboard.writeText(s)});

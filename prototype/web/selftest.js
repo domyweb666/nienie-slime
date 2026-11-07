@@ -1147,7 +1147,7 @@
       && r.save.n === 1 && r.save.k === 'acorn' && r.save.opens === 5 && r.save.perm === 'ok' && r.save.bank === 123 && r.blue === false && r.draw === null;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
-  // T48 v2.31 搖晃沉澱（多米 11-07：互動改成搖手機，像雪花球）。搖三下就滿、第四下不會更多、牠在碗裡彈但不出碗、物理沒壞；放著約 30 秒沉澱清透（叮一聲、睜眼、發光，只清一次）；沉澱時慢呼吸、閉眼；沉到一半捏牠又濁回去；堆的形狀三種都會出現；亮粉都在身體裡；藍底也能搖；搖會叫醒；關掉就沒有
+  // T48 v2.31 搖晃沉澱（多米 11-07：互動改成搖手機，像雪花球）與散出來吃回來（第二種玩法）。搖三下就滿、第四下不會更多、牠在碗裡彈但不出碗、物理沒壞；放著約 30 秒沉澱清透（叮一聲、睜眼、發光，只清一次）；沉澱時慢呼吸、閉眼；沉到一半捏牠又濁回去；堆的形狀三種都會出現；亮粉都在身體裡；藍底也能搖；搖會叫醒；關掉就沒有
   { const clock = saveClock(); const r = {}, SP = { ...P27.clay, shake: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
     const fresh = (sd, over) => { Math.random = seeded(sd || 4801); mat = { ...SP, ...(over || {}) }; setup(); E2.tk.length = 0; E2.tkT = 0; ESC.on = false; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     const run = (n, f) => { for (let k = 0; k < n; k++) { steps(1); if (f) f(k); } };
@@ -1166,6 +1166,11 @@
     fresh(4802, { sill: 0 }); { const A = area() / A0, x0 = globalC.xc, y0 = globalC.yc; shkShake(1, -.5); shkShake(-1, -.5); shkShake(1, -.5); steps(30); r.blue = { cloud: cl(), moved: +Math.hypot(globalC.xc - x0, globalC.yc - y0).toFixed(1), area: +(area() / A0 - A).toFixed(3), nan: X.some(v => !Number.isFinite(v)), inside: +inside().toFixed(2) }; }
     fresh(); { SLP.on = true; SLP.k = 1; LIFE.st = 'sleep'; shkShake(1, -.5); steps(5); r.wake = { awake: !SLP.on }; SLP.k = 0; }
     fresh(4803, { shake: 0 }); { shkShake(1, -.5); steps(30); r.off = { cloud: cl() }; }
+    // 散出來吃回來（多米 11-07 第二種玩法）：搖三下亮粉噴出去落在窗台或碗口、肚子裡少了；放著牠自己去撿，50 秒內撿完、全回肚子裡、叮一聲；藍底也一樣
+    const eatRun = () => { log.splice(0); three(); steps(60); const l0 = SNW.loose.length, rest0 = SNW.loose.filter(p => p.rest).length, out0 = SNW.glit.filter(q => q.out).length; let n = 0; while (SNW.loose.length && n < 3000) { steps(1); n++; } steps(30); return { l0, rest0, out0, sec: +(n / 60).toFixed(1), left: SNW.loose.length, out: SNW.glit.filter(q => q.out).length, ding: log.filter(l => l[0] === 'ding').length, glow: +SNW.glow.toFixed(2), selfX: selfX(), nan: X.some(v => !Number.isFinite(v)) }; };
+    fresh(4804, { shakeMode: 1 }); r.eat = eatRun(); r.eat.inBowl = SILL.inBowl;
+    fresh(4805, { shakeMode: 1, sill: 0 }); r.eatBlue = eatRun();
+    fresh(4806, { shakeMode: 1 }); { three(); steps(60); const l0 = SNW.loose.length; mat.shakeMode = 0; steps(2); r.eatSwitch = { l0, left: SNW.loose.length, out: SNW.glit.filter(q => q.out).length }; }   // 切回沉澱：外面的直接回肚子
     // 果凍皮畫得出來（濁的時候皮往奶凍混、清的那一下發光）
     { const sk = VIEW.skin, bg = VIEW.bg; let err = null; try { fresh(); VIEW.skin = 'A'; VIEW.bg = 'day'; three(); steps(5); draw(); SNW.glow = 1; draw(); } catch (e) { err = String(e); } VIEW.skin = sk; VIEW.bg = bg; r.draw = err; }
     res.T48_shake = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
@@ -1173,7 +1178,8 @@
     res.PASS.shake = a.c0 === 0 && a.c1 > .35 && a.c3 > .85 && a.c4 - a.c3 < .08 && a.c7 <= 1 && a.moved > 2.5 && a.inBowl && Math.abs(a.area) < .15 && a.selfX === 0 && !a.nan && a.happy === 'happy'
       && s.mid.k > .8 && s.mid.open < .4 && s.mid.cloud > .4 && s.mid.inside > .95 && s.cyc > .6 && s.cyc < 1.3 && s.sec > 24 && s.sec < 40 && s.ding === 1 && s.glow > .9 && s.open > .75 && s.cloud < .03 && s.inside > .95 && s.dingLater === 1 && s.k < .1
       && r.stir.c2 > r.stir.c1 + .05 && !r.stir.cleared && r.stir.selfX === 0 && r.shapes.mound > r.shapes.star && r.shapes.mound > r.shapes.heart && r.shapes.star > 0 && r.shapes.heart > 0
-      && r.blue.cloud > .85 && r.blue.moved < 6 && Math.abs(r.blue.area) < .1 && !r.blue.nan && r.blue.inside > .95 && r.wake.awake && r.off.cloud === 0 && r.draw === null;
+      && r.blue.cloud > .85 && r.blue.moved < 6 && Math.abs(r.blue.area) < .1 && !r.blue.nan && r.blue.inside > .95 && r.wake.awake && r.off.cloud === 0 && r.draw === null
+      && [r.eat, r.eatBlue].every(e => e.l0 >= 10 && e.rest0 >= 6 && e.out0 === e.l0 && e.left === 0 && e.sec < 50 && e.out === 0 && e.ding === 1 && e.glow > .6 && e.selfX === 0 && !e.nan) && r.eatSwitch.l0 >= 10 && r.eatSwitch.left === 0 && r.eatSwitch.out === 0;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();
