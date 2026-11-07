@@ -18,14 +18,14 @@
 
 ## 等多米
 
-1. 開口發 TestFlight：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`（先確認最後一次 push 的編譯是綠的）。
+1. **build 117 已發 TestFlight**（11-07 晚上多米開口，run 42367574466）。等多米裝上去回報。
 2. 裝上去照 `標準清單.md` 最後一節的順序看：會不會開、手感沒退步、不打結、碗、背景切換、走路假裝、權限兩道、搖、果凍皮掉幀。
 3. 舊帳：build 106 步數讀到幾天前、閘門 1 三個測試、`CLAUDE.md` 草稿 v2.24 到 v2.31（這次又加了第 7 條）要不要照改。
 4. 還沒定的：搖的兩種玩法要不要留吃回來（手機沒搬）、「運動多牠就比較興奮」要不要做（待設計）。
 
 ## 下一步
 
-1. 第一句話問要不要發 TestFlight。發了就等多米回報，照回報修，一次一件，數字都在面板。
+1. 第一句話問 build 117 裝上去怎樣（照標準清單最後一節的順序問）。照回報修，一次一件，數字都在面板。
 2. 多米回報前不要再堆新功能到 `swiftui-port`。
 3. 修的時候：Swift 這台電腦編譯不了，每次 push 看 Actions（`gh run watch <id> --exit-status`，約 2 到 5 分鐘）；錯誤用 `gh run view <id> --log-failed | grep error:` 抓。這次踩到的：參數名字蓋掉同名常數（`night`）、`2 * .pi` 沒有型別上下文要寫 `Double.pi`。
 
