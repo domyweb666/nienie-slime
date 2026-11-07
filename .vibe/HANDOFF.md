@@ -1,4 +1,4 @@
-# Handoff: v2.31（2026-11-07）
+# Handoff: v2.31（2026-11-07 晚上，第十八會話結束）
 
 > 短版。細節看 git log、`.vibe/標準清單.md` 最後一節、`.vibe/代決清單.md` 11-07 那幾列；長版在 `.vibe/handoff/archive/2026-11-07-v2.31-長版.md`。
 
@@ -7,6 +7,7 @@
 - 網頁 v2.31 上線（`?v=233`）：皮 A 清透、碗在正中間、石頭盤和盆栽是背景、牠只爬進爬出碗、搖晃沉澱（搖三下肚子裡變霧，放著約 30 秒清透、發光、叮；捏也會攪起一點；亮粉一直在身體裡）；第二種玩法「散出來吃回來」用切換列切：搖了亮粉噴到窗台或碗口，牠自己爬去一顆顆吃回來，吃完叮。走路回來那趟翻過碗後緣進碗，東西放窗台上碗的左右。
 - selftest 49 項在同一個 iframe 連跑 3 輪全過。
 - 手機版沒動：還是平塗、碗在左、沒有搖、沒有走路素材。
+- limrun 登入好了（多米換了有點數的帳號，這台電腦的 lim 已登入），開過一台 iPhone 16 Pro（iOS 26.4，402×874）用 `open-url` 開網頁版成功，還沒截圖就被多米叫停，實例已刪。
 
 ## 等多米
 
@@ -16,6 +17,7 @@
 
 ## 下一步
 
+0. 接著做 limrun：`lim ios create --label project=nienie-slime --inactivity-timeout 10m --model iphone --json` 拿 id → `lim ios open-url --id <id> <網頁網址?v=233>` → `lim ios screenshot out.png --id <id>` 看果凍皮畫不畫得出來 → `lim ios tap` 點牠一下看跳不跳「動作與方向」權限 → 長按標題 1.2 秒開面板（`lim ios perform` 的 touchDown／wait／touchUp）→ 點「搖：假裝搖三下」→ 隔幾秒截圖看兩種玩法（切換列切）→ 標題旁的每幀毫秒數 → 測完立刻 `lim ios delete <id>`。真正的搖（加速度）模擬器給不了。
 1. 第一句話問上面三件。
 2. 搖或走路定了就把輸家拿掉。走路：`WALK`、`walk*`、面板三顆、`ios/NieNie/UI/StepProbe.swift`、`NSMotionUsageDescription`。搖：`SNW`、`shk*`、面板三顆。
 3. 再來是手機版移植：防打結、眼睛、果凍皮、窗台和碗、擺飾背景、搖或走路。先不要動程式，比對 `prototype/web/index.html` 與 `ios/NieNie/Slime/SlimeRig.swift`、`ios/NieNie/App/SlimeController.swift`，列批次給多米點頭。
