@@ -42,7 +42,8 @@
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
-  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23 };
+  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, shake: 0 };
+  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], shake: 0 }; PSAVE[k].shake = 0; }   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -1013,9 +1014,9 @@
     // e 閒著就爬回碗（v2.30：閒 25 秒，用爬的）
     { lastTouch = t - 30; SILL.lastHome = t - 20; LIFE.st = 'rest'; let n = 0; let peak = 1e9; while (!SILL.inBowl && n < 900) { steps(1); peak = Math.min(peak, bottom()); n++; } while (SILL.route && n < 1200) { steps(1); n++; } const a7 = (lastTouch = t, worst(180)); r.home = { frames: n, inBowl: SILL.inBowl, clearedRim: peak < g.lip, belowFloor: +(a7.hi - g.fl).toFixed(2), selfX: snap().selfX }; }
     // f 跳出碗
-    { sillHop(sillClampX(g.bx + g.bw * .5 + R * 1.2), false); const a8 = worst(180); r.hopOut = { inBowl: SILL.inBowl, onSill: Math.abs(bottom() - g.fl) < 2, x: +((globalC.xc - g.bx) / R).toFixed(2), selfX: snap().selfX, belowFloor: +(a8.hi - g.fl).toFixed(2) }; }
+    { sillHop(sillClampX(g.bx + g.bw * .5 + R * 1.2), false); const a8 = worst(180); r.hopOut = { inBowl: SILL.inBowl, onSill: Math.abs(bottom() - g.fl) < 2, rose: +(g.rim - a8.lo).toFixed(1), x: +((globalC.xc - g.bx) / R).toFixed(2), selfX: snap().selfX, belowFloor: +(a8.hi - g.fl).toFixed(2) }; }   // v2.31 碗在中間：嚇到是原地跳一下再掉回碗裡（旁邊放不下）
     // g 慢慢放到右窗框旁邊：黏住（v2.30 窗框層，貼著的面重力轉向）；再抓就回窗台層
-    fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc, tx = g.jr - R * .6, ty = g.gy + R * .9; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 70; k++) { ev('pointermove', 1, cx + (tx - cx) * k / 70, cy + (ty - cy) * k / 70); steps(1); } steps(50); ev('pointerup', 1, tx, ty); steps(3); const stuck = SILL.plane === 'frame' && SILL.surf === 'rjamb'; steps(60); lastTouch = t; const held = SILL.surf === 'rjamb'; ev('pointerdown', 1, globalC.xc, globalC.yc); steps(2); const regrab = SILL.plane === 'room' && SILL.surf == null; ev('pointerup', 1, globalC.xc, globalC.yc); worst(240); r.stick = { stuck, held, regrab, selfX: snap().selfX }; }
+    fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc, tx = g.jr - R * .6, ty = g.gy + R * .9; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 70; k++) { ev('pointermove', 1, cx + (tx - cx) * k / 70, cy + (ty - cy) * k / 70); steps(1); } steps(50); ev('pointerup', 1, tx, ty); steps(3); const stuck = SILL.plane === 'frame' && SILL.surf === 'rjamb'; steps(60); lastTouch = t; const held = SILL.surf === 'rjamb', fell = SILL.plane === 'room' && SILL.surf === 'floor' && !SILL.inBowl; ev('pointerdown', 1, globalC.xc, globalC.yc); steps(2); const regrab = SILL.plane === 'room' && SILL.surf == null; ev('pointerup', 1, globalC.xc, globalC.yc); worst(240); r.stick = { stuck, held, fell, regrab, selfX: snap().selfX }; }   // v2.31 只跟碗互動（envFrame 0）：慢慢放在窗框旁邊不黏，掉回窗台；黏窗框在 T46 用 envFrame 1 量
     // h 拉不出房間：往下壓不穿地板、拉到上面不出畫面
     fresh(); worst(180); { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 30; k++) { ev('pointermove', 1, cx, cy + k * H * .5 / 30); steps(1); } const a10 = worst(30); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, cx, cy + H * .5 - k * H * 1.1 / 40); steps(1); } steps(20); const tp = top(); ev('pointercancel', 1, 0, 0); r.bounds = { belowFloor: +(a10.hi - g.fl).toFixed(2), top: +tp.toFixed(1), selfX: snap().selfX }; }
     // 全程開：活物、情緒都開，放 25 秒不碰，不飛走不穿牆
@@ -1028,8 +1029,8 @@
       && !r.side.inBowl && r.side.onSill && r.side.belowFloor <= .01 && r.side.inFrame && r.side.selfX === 0
       && r.walk.moved > .5 && r.walk.footRange < 6 && r.walk.selfX === 0
       && r.home.inBowl && r.home.clearedRim && r.home.belowFloor <= .01 && r.home.selfX === 0
-      && !r.hopOut.inBowl && r.hopOut.onSill && r.hopOut.selfX === 0
-      && r.stick.stuck && r.stick.held && r.stick.regrab && r.stick.selfX === 0
+      && r.hopOut.inBowl && !r.hopOut.onSill && r.hopOut.rose > R * .2 && r.hopOut.selfX === 0
+      && !r.stick.stuck && !r.stick.held && r.stick.fell && r.stick.regrab && r.stick.selfX === 0
       && r.bounds.belowFloor <= 6 && r.bounds.top >= -R * .4 && r.alive.belowFloor <= .01 && r.alive.inFrame && r.alive.maxFromFloorR < 6 && r.alive.selfX === 0 && Math.abs(r.alive.area - 1) < .1 && r.offInBlue; }
   res.ALL_PASS = Object.values(res.PASS).every(Boolean);
 
@@ -1068,8 +1069,9 @@
       && r.off.eyeOut > 0 && Math.abs(r.keep.on - r.keep.off) < .05 && r.keep.on > .5 && Math.abs(r.follow.on - r.follow.off) < 8 && r.noDrops.dripSounds === 0 && r.noDrops.gone;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
-  // T46 v2.30 環境互動（多米 11-06：跨出窗外、爬窗邊、打翻擺飾、爬出爬進碗）。標準清單 v2.30 每一條：路線走得完、換層時不重疊也不跳、擺飾倒得了也回得來、手指那幾條、自己跑 2 分鐘不爆。T45 不退步由 PASS.knot 管
-  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
+  // T46 v2.30 環境互動（多米 11-06：跨出窗外、爬窗邊、打翻擺飾、爬出爬進碗）。標準清單 v2.30 每一條：路線走得完、換層時不重疊也不跳、手指那幾條、自己跑 2 分鐘不爆。T45 不退步由 PASS.knot 管
+  // v2.31（多米 11-07）：碗回中間、擺飾拿掉、牠只跟碗互動。擺飾那幾項刪掉；爬窗框、窗外的路線用 envFrame 1 量（程式還在，預設不走）
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, envFrame: 1, props: 0 };
     const fresh = sd => { Math.random = seeded(sd || 4601); mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     let aborts = 0; const re0 = routeEnd; routeEnd = function (a) { if (a && SILL.route) aborts++; return re0(a); };
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; };
@@ -1089,53 +1091,41 @@
         goOut: q.goOut.end.plane === 'out' && Math.abs(q.goOut.end.z - .8) < .03 && Math.abs(q.goOut.end.y1 - g.oy) < 3,
         comeBack: q.comeBack.end.plane === 'frame' && q.comeBack.end.z > .97 && cross(q.comeBack.ch, g.bt + 2),
         backIn: q.backIn.end.bowl && cross(q.backIn.ch, g.back + 2) }; }
-    // 擺飾
-    const moved = p => Math.abs(p.x - p.hx) > R * .2 || Math.abs(Math.atan2(Math.sin(p.a), Math.cos(p.a))) > .3 || p.gone;
-    fresh(); go(rtOutFront(null)); steps(60); go(rtPoke(PROPS[0])); steps(90); r.poke = { moved: moved(PROPS[0]), ax: +PROPS[0].x.toFixed(0), a: +PROPS[0].a.toFixed(2) };
-    fresh(); go(rtOutFront(null)); steps(60); lastTouch = t; { const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 12; k++) { ev('pointermove', 1, cx + 150 * k / 12, cy - 40 * k / 12); steps(1); } ev('pointerup', 1, cx + 150, cy - 40); steps(300); r.fling = { moved: moved(PROPS[0]) || moved(PROPS[1]), x0: +PROPS[0].x.toFixed(0), x1: +PROPS[1].x.toFixed(0), a1: +PROPS[1].a.toFixed(2), selfX: selfX() }; }
-    fresh(); go(rtOutFront(null)); steps(60); lastTouch = t; gaitTo(PROPS[0].x, HOMEY, false); for (let k = 0; k < 300 && GAIT.on; k++) steps(1); steps(60); r.walk = { moved: moved(PROPS[0]) };
-    fresh(); { const p = PROPS[1]; p.vx = 900; p.va = 4; let goneAt = -1, backAt = -1; const t0 = t; for (let k = 0; k < 1400; k++) { steps(1); lastTouch = t; if (p.gone && goneAt < 0) goneAt = t - t0; if (goneAt >= 0 && !p.gone && backAt < 0) backAt = t - t0; } r.off = { goneAt: +goneAt.toFixed(2), backAt: +backAt.toFixed(2), a: +p.a.toFixed(3), x: +(p.x - p.hx).toFixed(1), alpha: p.alpha }; }
-    fresh(); { const p = PROPS[1]; p.a = 1.4; p.x -= 45; p.lastHit = t; steps(120); const tilted = moved(p); for (let k = 0; k < 1800; k++) { steps(1); lastTouch = t; } r.relax = { tilted, a: +p.a.toFixed(3), x: +(p.x - p.hx).toFixed(1), alpha: p.alpha }; }
-    fresh(); { const p = PROPS[0], x0 = p.x, y0 = p.y; ev('pointerdown', 1, x0, y0); steps(1); const f = fingers.get(1), mode = f && f.mode, held = !!p.held; for (let k = 1; k <= 30; k++) { ev('pointermove', 1, x0 - k * 2, y0 - k * 5); steps(1); } const lifted = y0 - p.y; ev('pointerup', 1, x0 - 60, y0 - 150); steps(180); r.grabProp = { mode, held, lifted: +lifted.toFixed(0), gone: p.gone, belowFloor: +(p.y - p.hy).toFixed(1) }; }
-    fresh(); { const p = PROPS[0]; ev('pointerdown', 1, p.x - 10, p.y); steps(2); ev('pointerup', 1, p.x - 10, p.y); let mx = 0; for (let k = 0; k < 90; k++) { steps(1); mx = Math.max(mx, Math.abs(p.a)); } r.tap = { peak: +mx.toFixed(3), end: +Math.abs(p.a).toFixed(3) }; }
-    fresh(); go(rtOverBack(g.jr - R)); steps(60); { const a = PROPS[0].x, b = PROPS[1].x; go([RT.walk('bar', sillClampX(g.jr - R))]); steps(60); r.frameNoHit = { d: +Math.abs(PROPS[0].x - a + PROPS[1].x - b).toFixed(2) }; }
-    PROPS[0].x += 30; setup(); r.reset = { home: PROPS.every(p => p.x === p.hx && p.y === p.hy && p.a === 0 && !p.gone) };
     // 手指
     fresh(); go(rtOverBack(g.jr - R)); steps(60); go(rtGoOut()); steps(180); lastTouch = t; { const z = SILL.zoom, sx = W / 2 + (globalC.xc - W / 2) * z, sy = g.oy + (SILL.y0 + 40 - g.oy) * z, b = [modeAt(g.gx - 15, 560), modeAt(200, g.bt + 12)]; ev('pointerdown', 1, sx, sy); let mj = 0, px = globalC.xc, py = globalC.yc; steps(1); const plane0 = SILL.plane, m = fingers.get(1) && fingers.get(1).mode; for (let k = 0; k < 40; k++) { steps(1); mj = Math.max(mj, Math.hypot(globalC.xc - px, globalC.yc - py)); px = globalC.xc; py = globalC.yc; } const z1 = SILL.zoom; ev('pointerup', 1, sx, sy); steps(180); r.outGrab = { blocked: b, m, plane0, z1: +z1.toFixed(2), jump: +mj.toFixed(1), end: SILL.plane }; }
-    fresh(); go(rtOverBack(g.gx + R * .8)); steps(90); lastTouch = t; r.frameBlock = { bowl: modeAt(100, 540), prop: modeAt(PROPS[0].x, PROPS[0].y) };
+    fresh(); go(rtOverBack(g.gx + R * .8)); steps(90); lastTouch = t; r.frameBlock = { bowl: modeAt(100, 540) };
     const st = (tx, ty, fr, hold) => { fresh(); go(rtOutFront(null)); steps(60); lastTouch = t; drag(tx, ty, fr, hold); steps(1); const sf = SILL.stickT >= 0 ? SILL.surf : null, pl = SILL.plane; steps(240); lastTouch = t; return { sf, pl, plane: SILL.plane, surf: SILL.surf, bowl: SILL.inBowl, y1: +bottom().toFixed(1) }; };
     r.slowStick = st(310, 300, 60, 40); r.flungNoStick = st(310, 300, 6, 0); r.relMid = st(240, 300, 60, 40); r.relBowl = st(g.bx, 280, 60, 40); r.relFront = st(200, 560, 40, 30);
+    { fresh(); mat.envFrame = 0; go(rtOutFront(null)); steps(60); lastTouch = t; drag(330, 300, 60, 40); steps(240); lastTouch = t; r.relSide = { plane: SILL.plane, surf: SILL.surf, bowl: SILL.inBowl, y1: +bottom().toFixed(1) }; }   // v2.31 只跟碗互動：放在碗旁邊的窗戶範圍，掉回窗台
     // 自己跑 2 分鐘
-    Math.random = seeded(4602); mat = { ...SP, envRoam: 1, catPush: 1 }; setup(); { aborts = 0; const seen = {}; let rest = 0, nan = 0, y1 = -1e9, ar0 = 9, ar1 = 0, xr0 = 1e9, xr1 = -1e9, propNaN = 0; for (let f = 0; f < 7200; f++) { steps(1); const S = SILL; seen[S.plane + (S.inBowl ? '+bowl' : '') + (S.tanV && !S.lift ? '+wall' : '')] = 1; if (!S.route && !GAIT.on) rest++; if (!Number.isFinite(X[f % N] + Y[f % N])) nan++; y1 = Math.max(y1, S.y1); xr0 = Math.min(xr0, S.x0); xr1 = Math.max(xr1, S.x1); if (f % 10 === 0) { const a = area() / A0; ar0 = Math.min(ar0, a); ar1 = Math.max(ar1, a); } for (const p of PROPS) if (!Number.isFinite(p.x + p.y + p.a)) propNaN++; } r.auto = { aborts, rest: +(rest / 7200).toFixed(2), nan, propNaN, overFloor: +(y1 - g.fl).toFixed(2), area: [+ar0.toFixed(2), +ar1.toFixed(2)], x: [+xr0.toFixed(0), +xr1.toFixed(0)], seen: Object.keys(seen), selfX: selfX() }; }
+    Math.random = seeded(4602); mat = { ...SP, envRoam: 1, catPush: 0 }; setup(); { aborts = 0; const seen = {}; let rest = 0, nan = 0, y1 = -1e9, ar0 = 9, ar1 = 0, xr0 = 1e9, xr1 = -1e9, propNaN = 0; for (let f = 0; f < 7200; f++) { steps(1); const S = SILL; seen[S.plane + (S.inBowl ? '+bowl' : '') + (S.tanV && !S.lift ? '+wall' : '')] = 1; if (!S.route && !GAIT.on) rest++; if (!Number.isFinite(X[f % N] + Y[f % N])) nan++; y1 = Math.max(y1, S.y1); xr0 = Math.min(xr0, S.x0); xr1 = Math.max(xr1, S.x1); if (f % 10 === 0) { const a = area() / A0; ar0 = Math.min(ar0, a); ar1 = Math.max(ar1, a); } for (const p of PROPS) if (!Number.isFinite(p.x + p.y + p.a)) propNaN++; } r.auto = { aborts, rest: +(rest / 7200).toFixed(2), nan, propNaN, overFloor: +(y1 - g.fl).toFixed(2), area: [+ar0.toFixed(2), +ar1.toFixed(2)], x: [+xr0.toFixed(0), +xr1.toFixed(0)], seen: Object.keys(seen), selfX: selfX() }; }
     routeEnd = re0; res.T46_env = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     const o = r.routeOK;
     res.PASS.env = o.allFinish && o.jumps < R * .12 && o.selfX === 0 && o.outFront && o.intoFront && o.overBack && o.loop && o.climb && o.goOut && o.comeBack && o.backIn
-      && r.poke.moved && r.fling.moved && r.walk.moved && r.off.goneAt > 0 && r.off.goneAt < 2 && r.off.backAt > 19 && r.off.backAt < 22 && Math.abs(r.off.x) < 1 && r.relax.tilted && Math.abs(r.relax.a) < .01 && Math.abs(r.relax.x) < 1
-      && r.grabProp.mode === 'prop' && r.grabProp.held && r.grabProp.lifted > 80 && !r.grabProp.gone && r.tap.peak > .05 && r.tap.end < .01 && r.frameNoHit.d < .01 && r.reset.home
-      && r.outGrab.m === 'grab' && r.outGrab.plane0 === 'room' && r.outGrab.z1 > .97 && r.outGrab.jump < R * .12 && r.outGrab.end === 'room' && r.outGrab.blocked.every(m => m !== 'grab') && r.frameBlock.bowl !== 'grab' && r.frameBlock.prop === 'prop'
-      && r.slowStick.sf === 'rjamb' && r.slowStick.plane === 'frame' && r.flungNoStick.sf == null && r.relMid.plane === 'frame' && r.relMid.surf === 'bar' && r.relBowl.bowl && r.relFront.plane === 'room' && !r.relFront.bowl
+      && r.outGrab.m === 'grab' && r.outGrab.plane0 === 'room' && r.outGrab.z1 > .97 && r.outGrab.jump < R * .12 && r.outGrab.end === 'room' && r.outGrab.blocked.every(m => m !== 'grab') && r.frameBlock.bowl !== 'grab'
+      && r.slowStick.sf === 'rjamb' && r.slowStick.plane === 'frame' && r.flungNoStick.sf == null && r.relMid.bowl && r.relBowl.bowl && r.relFront.plane === 'room' && !r.relFront.bowl && r.relSide.plane === 'room' && !r.relSide.bowl && Math.abs(r.relSide.y1 - g.fl) < 3
       && r.auto.aborts === 0 && r.auto.nan === 0 && r.auto.propNaN === 0 && r.auto.rest > .5 && r.auto.overFloor <= .01 && r.auto.area[0] > .8 && r.auto.area[1] < 1.2 && r.auto.selfX === 0 && r.auto.seen.length >= 2;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   // T47 走路（多米 11-06：現實裡走路跟牠掛勾）。門檻與上限、從窗外爬回來、捏一下掉、20 秒自己掉、放滿擠掉最舊的、送的石頭與權限那段、存得起來。網頁拿不到真步數，用 bank 假裝
   { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
     const clear = () => { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; WALK.bank = 0; WALK.dayN = 0; WALK.day = ''; WALK.opens = 0; WALK.perm = ''; };
-    const fresh = sd => { Math.random = seeded(sd || 4701); clear(); mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
+    const fresh = sd => { Math.random = seeded(sd || 4701); clear(); mat = { ...SP }; setup(); ESC.on = false; E2.tk.length = 0; E2.tkT = 0; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; };
     const arrive = () => { let n = 0; while (SILL.route && n < 900) { steps(1); lastTouch = t; n++; } return n; };
     // 門檻與上限
     fresh(); const g = SILL.g; WALK.bank = 300; const small = walkCheck(), noStuck = !WALK.stuck;
     WALK.bank = 800; const ok = walkCheck(), s0 = WALK.stuck && { big: WALK.stuck.big, plane: SILL.plane, z: SILL.zoom, y1: +bottom().toFixed(1), left: WALK.bank };
-    const frames = arrive(); steps(90); lastTouch = t; const a0 = { sec: +(frames / 60).toFixed(1), plane: SILL.plane, z: +SILL.zoom.toFixed(2), y1: +bottom().toFixed(1), stuck: !!WALK.stuck, selfX: selfX() };
+    const frames = arrive(); steps(90); lastTouch = t; const a0 = { sec: +(frames / 60).toFixed(1), plane: SILL.plane, bowl: SILL.inBowl, z: +SILL.zoom.toFixed(2), y1: +bottom().toFixed(1), stuck: !!WALK.stuck, selfX: selfX() };   // v2.31：回來那趟直接進碗
     r.trip = { small, noStuck, ok, s0, a0 };
     fresh(); WALK.bank = 3500; walkCheck(); r.big = !!WALK.stuck && WALK.stuck.big; arrive();
     fresh(); { let n = 0; for (let k = 0; k < 5; k++) { WALK.bank = 800; WALK.stuck = null; if (walkCheck()) n++; if (SILL.route) routeEnd(true); } r.cap = { n, left: WALK.bank }; }
     // 捏一下就掉，落在窗框下緣，身體不受影響
-    fresh(); WALK.bank = 800; walkCheck(); arrive(); steps(60); lastTouch = t; { const A = area() / A0; ev('pointerdown', 1, globalC.xc, globalC.yc); steps(4); const still = !!WALK.stuck; steps(4); const off = !WALK.stuck, inAir = WALK.fall.length; ev('pointerup', 1, globalC.xc, globalC.yc); steps(120); lastTouch = t; const q = WALK.items[0]; r.pinch = { still, off, inAir, n: WALK.items.length, x: q ? +walkSlotX(q.s).toFixed(0) : null, inRange: q ? walkSlotX(q.s) > g.bx + g.bw / 2 && walkSlotX(q.s) < g.jr : false, fall: WALK.fall.length, area: +(area() / A0 - A).toFixed(3), selfX: selfX() }; }
+    fresh(); WALK.bank = 800; walkCheck(); arrive(); steps(60); lastTouch = t; { const A = area() / A0; ev('pointerdown', 1, globalC.xc, globalC.yc); steps(4); const still = !!WALK.stuck; steps(4); const off = !WALK.stuck, inAir = WALK.fall.length; ev('pointerup', 1, globalC.xc, globalC.yc); steps(120); lastTouch = t; const q = WALK.items[0]; r.pinch = { still, off, inAir, n: WALK.items.length, x: q ? +walkSlotX(q.s).toFixed(0) : null, inRange: q ? Math.abs(walkSlotX(q.s) - g.bx) > g.bw / 2 && walkSlotX(q.s) > g.l && walkSlotX(q.s) < g.r : false, fall: WALK.fall.length, area: +(area() / A0 - A).toFixed(3), selfX: selfX() }; }
     // 爬到一半被抓：路線取消，東西掉下來
     fresh(); WALK.bank = 800; walkCheck(); steps(30); lastTouch = t; { const z = SILL.zoom, sx = W / 2 + (globalC.xc - W / 2) * z, sy = g.oy + (SILL.y0 + 40 - g.oy) * z; ev('pointerdown', 1, sx, sy); steps(10); const plane = SILL.plane, route = !!SILL.route, off = !WALK.stuck; ev('pointerup', 1, sx, sy); steps(150); r.grabMid = { plane, route, off, n: WALK.items.length }; }
     // 放著不碰 20 秒自己掉
-    fresh(); WALK.bank = 800; walkCheck(); arrive(); lastTouch = t; { let n = 0; while (WALK.stuck && n < 1500) { steps(1); lastTouch = t; n++; } steps(120); r.idle = { sec: +(n / 60).toFixed(1), n: WALK.items.length }; }
+    fresh(); WALK.bank = 800; walkCheck(); arrive(); lastTouch = t; { let n = 0, routeF = 0, outF = 0, fingF = 0, kinds = {}; while (WALK.stuck && n < 1500) { steps(1); lastTouch = t; n++; if (SILL.route) { routeF++; const q = SILL.route.steps[SILL.route.i]; if (q) kinds[q.k] = (kinds[q.k] || 0) + 1; } if (SILL.plane === 'out') outF++; if (fingers.size) fingF++; } steps(120); r.idle = { sec: +(n / 60).toFixed(1), n: WALK.items.length, routeF, outF, fingF, kinds, plane: SILL.plane, st: LIFE.st }; }   // routeF、outF、fingF：沒掉的話是哪個條件擋住（v2.31 全程第三輪抓到一次 25 秒沒掉）
     // 放滿了：還是 6 件，最舊的被擠掉
     fresh(); for (let s = 0; s < WALK_SLOTS; s++) WALK.items.push({ k: 'leaf', big: false, s, a: 0, tag: s }); { WALK.bank = 800; walkCheck(); arrive(); ev('pointerdown', 1, globalC.xc, globalC.yc); steps(10); ev('pointerup', 1, globalC.xc, globalC.yc); const leaving = WALK.leave.length; steps(120); r.full = { n: WALK.items.length, leaving, leaveEnd: WALK.leave.length, oldestGone: !WALK.items.some(q => q.tag === 0) }; }
     // 換史萊姆時身上還黏著：不會不見
@@ -1149,7 +1139,7 @@
     clear(); res.T47_walk = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     const a = r.trip;
     res.PASS.walk = a.small === false && a.noStuck && a.ok && a.s0.big === false && a.s0.plane === 'out' && Math.abs(a.s0.z - .8) < .01 && Math.abs(a.s0.y1 - g.oy) < 2 && a.s0.left === 0
-      && a.a0.sec < 5 && a.a0.plane === 'frame' && a.a0.z > .97 && Math.abs(a.a0.y1 - g.bt) < 3 && a.a0.stuck && a.a0.selfX === 0 && r.big === true && r.cap.n === 3
+      && a.a0.sec < 12 && a.a0.plane === 'room' && a.a0.bowl && a.a0.z > .97 && Math.abs(a.a0.y1 - g.bf) < 3 && a.a0.stuck && a.a0.selfX === 0 && r.big === true && r.cap.n === 3
       && r.pinch.off && r.pinch.inAir === 1 && r.pinch.n === 1 && r.pinch.inRange && r.pinch.fall === 0 && Math.abs(r.pinch.area) < .1 && r.pinch.selfX === 0
       && r.grabMid.plane === 'room' && !r.grabMid.route && r.grabMid.off && r.grabMid.n === 1 && r.idle.sec > 19 && r.idle.sec < 22 && r.idle.n === 1
       && r.full.n === WALK_SLOTS && r.full.leaving === 1 && r.full.leaveEnd === 0 && r.full.oldestGone && !r.settle.stuck && r.settle.n === 1
@@ -1157,9 +1147,38 @@
       && r.save.n === 1 && r.save.k === 'acorn' && r.save.opens === 5 && r.save.perm === 'ok' && r.save.bank === 123 && r.blue === false && r.draw === null;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T48 v2.31 搖晃沉澱（多米 11-07：互動改成搖手機，像雪花球）。搖三下就滿、第四下不會更多、牠在碗裡彈但不出碗、物理沒壞；放著約 30 秒沉澱清透（叮一聲、睜眼、發光，只清一次）；沉澱時慢呼吸、閉眼；沉到一半捏牠又濁回去；堆的形狀三種都會出現；亮粉都在身體裡；藍底也能搖；搖會叫醒；關掉就沒有
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, shake: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
+    const fresh = (sd, over) => { Math.random = seeded(sd || 4801); mat = { ...SP, ...(over || {}) }; setup(); E2.tk.length = 0; E2.tkT = 0; ESC.on = false; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
+    const run = (n, f) => { for (let k = 0; k < n; k++) { steps(1); if (f) f(k); } };
+    const cl = () => +SNW.cloud.toFixed(3);
+    const inside = () => { let n = 0; const c = globalC; let by = -1e9; for (const i of bnd) by = Math.max(by, Y[i]); by -= R * .06; if (SILL.on && SILL.inBowl && SILL.g) by = Math.min(by, SILL.g.lip - R * .04); for (const q of SNW.glit) { const tx = c.xc + q.tx * R, ty = by - q.ty * R, sx = c.xc + q.sx * R, sy = c.yc + q.sy * R, x = tx + (sx - tx) * q.h, y = ty + (sy - ty) * q.h; if (insideBody(x, y)) n++; } return SNW.glit.length ? n / SNW.glit.length : 0; };
+    const three = () => { shkShake(1, -.5); steps(10); shkShake(-1, -.5); steps(10); shkShake(1, -.5); };
+    // 搖三下滿、第四下不會更多、牠彈了但還在碗裡、物理沒壞、眼睛 ∩
+    fresh(); { const A = area() / A0, x0 = globalC.xc, y0 = globalC.yc; let mv = 0; const c0 = cl(); shkShake(1, -.5); run(12, () => { mv = Math.max(mv, Math.hypot(globalC.xc - x0, globalC.yc - y0)); }); const c1 = cl(), happy = EYE.mode; shkShake(-1, -.5); steps(12); shkShake(1, -.5); steps(12); const c3 = cl(); shkShake(-1, -.5); steps(12); const c4 = cl(); shkShake(1, -.5); shkShake(-1, -.5); shkShake(1, -.5); steps(120); r.shake = { c0, c1, c3, c4, c7: cl(), moved: +mv.toFixed(1), inBowl: SILL.inBowl, area: +(area() / A0 - A).toFixed(3), selfX: selfX(), nan: X.some(v => !Number.isFinite(v)), happy, k: +SNW.k.toFixed(2) }; }
+    // 放著：沉澱時慢呼吸（10 秒一次）、閉眼；大約 30 秒清透：叮一聲、睜眼、發光；之後不再叮
+    fresh(); three(); { log.splice(0); steps(300); const mid = { k: +SNW.k.toFixed(2), open: +EYE.openD.toFixed(2), cloud: cl(), inside: +inside().toFixed(2) }; const p0 = BR.phase; steps(600); const cyc = +(BR.phase - p0).toFixed(2); let n = 0; while (!SNW.cleared && n < 3600) { steps(1); n++; } const sec = +((900 + n) / 60).toFixed(1), ding = log.filter(l => l[0] === 'ding').length, glow = +SNW.glow.toFixed(2); steps(40); const open = +EYE.openD.toFixed(2); steps(600); r.settle = { mid, cyc, sec, ding, glow, open, cloud: cl(), inside: +inside().toFixed(2), dingLater: log.filter(l => l[0] === 'ding').length, k: +SNW.k.toFixed(2), shape: SNW.shape }; }
+    // 沉到一半捏牠：又濁回去，清的那一下延後
+    fresh(); three(); steps(600); { const c1 = cl(), cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 60; k++) { ev('pointermove', 1, cx + 25 * Math.sin(k / 3), cy + 12 * Math.cos(k / 4)); steps(1); } steps(60); const c2 = cl(); ev('pointerup', 1, cx, cy); steps(60); r.stir = { c1, c2, cleared: SNW.cleared, selfX: selfX() }; }
+    // 堆的形狀：搖 60 次，三種都出現，小堆最多
+    fresh(); { const cnt = { mound: 0, star: 0, heart: 0 }; for (let k = 0; k < 60; k++) { for (const q of SNW.glit) q.h = 0; shkMeasure(); SNW.cleared = true; shkShake(k % 2 ? 1 : -1, -.5); cnt[SNW.shape]++; steps(5); } r.shapes = cnt; }
+    // 藍底（懸空）也能搖，只有亮粉動；搖會叫醒；關掉就什麼都沒有
+    fresh(4802, { sill: 0 }); { const A = area() / A0, x0 = globalC.xc, y0 = globalC.yc; shkShake(1, -.5); shkShake(-1, -.5); shkShake(1, -.5); steps(30); r.blue = { cloud: cl(), moved: +Math.hypot(globalC.xc - x0, globalC.yc - y0).toFixed(1), area: +(area() / A0 - A).toFixed(3), nan: X.some(v => !Number.isFinite(v)), inside: +inside().toFixed(2) }; }
+    fresh(); { SLP.on = true; SLP.k = 1; LIFE.st = 'sleep'; shkShake(1, -.5); steps(5); r.wake = { awake: !SLP.on }; SLP.k = 0; }
+    fresh(4803, { shake: 0 }); { shkShake(1, -.5); steps(30); r.off = { cloud: cl() }; }
+    // 果凍皮畫得出來（濁的時候皮往奶凍混、清的那一下發光）
+    { const sk = VIEW.skin, bg = VIEW.bg; let err = null; try { fresh(); VIEW.skin = 'A'; VIEW.bg = 'day'; three(); steps(5); draw(); SNW.glow = 1; draw(); } catch (e) { err = String(e); } VIEW.skin = sk; VIEW.bg = bg; r.draw = err; }
+    res.T48_shake = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    const a = r.shake, s = r.settle;
+    res.PASS.shake = a.c0 === 0 && a.c1 > .35 && a.c3 > .85 && a.c4 - a.c3 < .08 && a.c7 <= 1 && a.moved > 2.5 && a.inBowl && Math.abs(a.area) < .15 && a.selfX === 0 && !a.nan && a.happy === 'happy'
+      && s.mid.k > .8 && s.mid.open < .4 && s.mid.cloud > .4 && s.mid.inside > .95 && s.cyc > .6 && s.cyc < 1.3 && s.sec > 24 && s.sec < 40 && s.ding === 1 && s.glow > .9 && s.open > .75 && s.cloud < .03 && s.inside > .95 && s.dingLater === 1 && s.k < .1
+      && r.stir.c2 > r.stir.c1 + .05 && !r.stir.cleared && r.stir.selfX === 0 && r.shapes.mound > r.shapes.star && r.shapes.mound > r.shapes.heart && r.shapes.star > 0 && r.shapes.heart > 0
+      && r.blue.cloud > .85 && r.blue.moved < 6 && Math.abs(r.blue.area) < .1 && !r.blue.nan && r.blue.inside > .95 && r.wake.awake && r.off.cloud === 0 && r.draw === null;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
-  Object.assign(PRESETS, P27); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
+  Object.assign(PRESETS, P27R); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
   if (SFX) SFX.frame = sfxFrame0;
   WALK.noSave = false; walkLoad();
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
