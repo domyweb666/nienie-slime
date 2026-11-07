@@ -3462,6 +3462,8 @@ final class SlimeRig {
         }
         snwGlow *= exp(-dt / 2.2)
     }
+    /// v2.31: how clouded and how aglow it is, for the jelly skin's colour (0 when the shake is off)
+    var haze: (cloud: Double, glow: Double) { params.shake >= 0.5 ? (snwCloud, snwGlow) : (0, 0) }
     /// What the view draws inside the body: the haze, every bit between its place in the pile (clear) and where it hangs (cloudy), the glow. World points.
     var glitterView: GlitterView? {
         guard params.shake >= 0.5, !snwGlit.isEmpty, !clusters.isEmpty else { return nil }
@@ -4331,7 +4333,7 @@ final class SlimeRig {
         let l = eyeAt(eyeL), r = eyeAt(eyeR), S = R * params.eyeSize, ga: Double = params.gazeAmp * (1 - 0.8 * eyeDK)
         let ox: Double = (eyeGX * ga + eyeDX) * S, oy: Double = (eyeGY * ga * 0.75 + eyeDY) * S
         let P = boundaryPoints()
-        let M: Double = S * 0.118 + R * 0.02   // one eye's height (flat skin; the jelly skin draws the eyes at 0.68)
+        let M: Double = S * 0.118 * (params.skin >= 0.5 ? 0.68 : 1) + R * 0.02   // one eye's height (the jelly skin draws the eyes at 0.68)
         let g0 = atan2(clusters[gi].sn, clusters[gi].cs)
         let cx = (l.x + r.x) / 2 + ox, cy = (l.y + r.y) / 2 + oy, ax = r.x - l.x, ay = r.y - l.y
         let sp: Double = min(hypot(ax, ay), eyeD0 * 1.3)

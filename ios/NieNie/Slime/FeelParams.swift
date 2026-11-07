@@ -121,6 +121,8 @@ struct FeelParams: Equatable, Codable {
     // v2.28 窗台 (多米 11-06): a room with a window, gravity, a sill to stand on and a bowl to sit in; v2.31 the bowl in the middle, the pebble dish
     // and the succulent as pictures on the sill's ends. 0 = the blue floating room (nothing of the old behaviour changes there), 1 day, 2 night
     var scene: Double = 1
+    // v2.28 果凍皮 / v2.31 皮 A 清透 (多米 11-07): the body as a lit see-through jelly (Metal), the glitter shows inside; 0 = the flat cartoon fill (and phones without Metal)
+    var skin: Double = 1
     var envRoam: Double = 1           // v2.30: how often it leaves the bowl by itself and walks the sill (0 = it stays put)
     // v2.31 搖晃沉澱 (多米 11-07: 互動改成搖手機, like a snow globe: shake it up, then wait for it to settle). One rule for the whole app: moved, it clouds; still, it clears.
     var shake: Double = 1             // 1: a shake bounces it in the bowl and stirs the glitter inside it up into a haze; left alone about settleT s it clears, glows, opens its eyes, dings; a pinch stirs a little too. 0 off
@@ -309,7 +311,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.noFlip = 0; p.gripUp = 0.2; p.homeCap = 0; p.fingerSolid = 0   // v2.29 guards are not for fixed tentacles
-        p.scene = 0   // v2.7 floated
+        p.scene = 0; p.skin = 0   // v2.7 floated, flat
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
@@ -581,6 +583,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.shakeG, name: "搖的門檻（公尺／秒²）", hint: "手機加速度超過這個算搖了一下；躺著輕輕晃也要搖得到，走路、拿起手機不會誤觸", range: 6...25, step: 0.5, section: "活物感"),
         TuneField(key: \.glitN, name: "亮粉顆數", hint: "肚子裡幾顆", range: 40...300, step: 10, section: "活物感"),
         TuneField(key: \.envRoam, name: "牠自己出門", hint: "窗台上牠自己爬出碗、在窗台上走、爬回碗的機率倍數（v2.30）；0 就一直待在原地", range: 0...2, step: 0.1, section: "活物感"),
+        TuneField(key: \.skin, name: "皮", hint: "1 果凍 A 清透（多米 11-07 定）：看得到肚子裡的亮粉在沉；亮粉揚起來時往奶凍混。0 平塗（舊畫法，沒有 Metal 的手機也用這個）", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.scene, name: "背景", hint: "0 藍：懸空（舊行為一條都不變）；1 白天、2 夜晚：窗台上有重力，牠坐在正中間的碗裡，石頭盤和盆栽只是圖（v2.28 窗台，v2.31 碗回中間）", range: 0...2, step: 1, section: "外形"),
         TuneField(key: \.fingerSolid, name: "手指是實心的（×半徑）", hint: "抓著拖過身體時，沒被抓到的部分被手指推開，不會被穿過去（v2.29 0.2；0 關）", range: 0...0.5, step: 0.01),
         TuneField(key: \.grabHold, name: "抓住跟手", hint: "被抓那塊不聽彈性、跟手指走的程度；黏土 0.85，0 是以前（落後手指約 1 個半徑）", range: 0...1, step: 0.05, section: "按壓與記形"),

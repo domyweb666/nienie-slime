@@ -42,6 +42,9 @@ final class SlimeView: UIView {
     private let itemsGroup = CALayer(), stuckGroup = CALayer()
     // v2.31 搖晃沉澱: inside the body (in litGroup, under the eyes) the haze, the glitter by colour, the glow; the halo outside
     private let fogLayer = CAGradientLayer(), glowLayer = CAGradientLayer(), haloLayer = CAGradientLayer()
+    // v2.28 果凍皮: the body as a lit jelly on Metal, under litGroup (the glitter and the eyes stay Core Animation); the blush with it
+    private let jelly = JellySkin()
+    private let blushLayers = [CAGradientLayer(), CAGradientLayer()]
     private let glitLayers = [CAShapeLayer(), CAShapeLayer(), CAShapeLayer(), CAShapeLayer()]
     private let glitColors: [UIColor] = [UIColor(red: 1, green: 224 / 255, blue: 138 / 255, alpha: 1), .white, UIColor(red: 1, green: 195 / 255, blue: 214 / 255, alpha: 1), UIColor(red: 190 / 255, green: 240 / 255, blue: 230 / 255, alpha: 1)]
     private var itemLayers: [CALayer] = [], stuckLayers: [CALayer] = []
@@ -110,6 +113,8 @@ final class SlimeView: UIView {
         }
         litGroup.addSublayer(highlightLayer)
         for l in [fogLayer, glowLayer, haloLayer] { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true }
+        if let j = jelly { j.layer.zPosition = -0.5; j.layer.isHidden = true; layer.addSublayer(j.layer) }
+        for l in blushLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; litGroup.addSublayer(l) }
         litGroup.addSublayer(fogLayer)
         for (k, l) in glitLayers.enumerated() { l.fillColor = glitColors[k].cgColor; litGroup.addSublayer(l) }
         litGroup.addSublayer(glowLayer)
@@ -228,6 +233,7 @@ final class SlimeView: UIView {
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
             for l in [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup] { l.frame = bounds }
+            if let j = jelly { j.layer.frame = bounds; j.resize(width: Int(size.width.rounded()), height: Int(size.height.rounded()), scale: window?.screen.scale ?? UIScreen.main.scale) }
             sceneKey = ""
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
                        eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
@@ -488,6 +494,44 @@ final class SlimeView: UIView {
         }
     }
 
+    private var jellyOn: Bool { jelly != nil && rig.params.skin >= 0.5 }
+    /// v2.28 果凍皮: the Metal skin instead of the flat fill, outline, highlight, dents and trail (those stay for the flat control); the blush under the eyes.
+    private func drawJelly(body: CGPath, z: Double) {
+        let on = jellyOn
+        shadeLayer.isHidden = on; baseLayer.isHidden = on; highlightLayer.isHidden = on; outlineLayer.isHidden = on
+        dentShadeLayer.isHidden = on || dentShadeLayer.isHidden; dentLitLayer.isHidden = on || dentLitLayer.isHidden
+        if on { for l in dentLayers { l.isHidden = true }; for l in trailLayers { l.isHidden = true } }
+        guard on, let j = jelly else {
+            jelly?.layer.isHidden = true
+            for l in blushLayers { l.isHidden = true }
+            return
+        }
+        j.layer.isHidden = false
+        let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
+        let R = rig.R * z
+        let dents = rig.dents.compactMap { d -> JellySkin.Dent? in
+            let r = rig.R * rig.params.dentSize * d.d
+            guard r >= 0.5 else { return nil }
+            let p = rig.toScreen(d.x, d.y)
+            return JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(r * z * 1.2), d: Float(min(1, d.d)))
+        }
+        let hz = rig.haze
+        j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
+                 skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow))
+        // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
+        if let e = rig.eyeView {
+            let S = e.size * z, l = rig.toScreen(e.lx, e.ly), r = rig.toScreen(e.rx, e.ry), a = atan2(r.y - l.y, r.x - l.x)
+            let pink0 = UIColor(red: 1, green: 132 / 255, blue: 150 / 255, alpha: 0.72).cgColor, pink1 = UIColor(red: 1, green: 132 / 255, blue: 150 / 255, alpha: 0.42).cgColor, pink2 = UIColor(red: 1, green: 132 / 255, blue: 150 / 255, alpha: 0).cgColor
+            for (k, (x0, y0, sd)) in [(l.x, l.y, -1.0), (r.x, r.y, 1.0)].enumerated() {
+                let bl = blushLayers[k]
+                bl.isHidden = false
+                bl.bounds = CGRect(x: 0, y: 0, width: S * 0.26, height: S * 0.16)
+                bl.position = CGPoint(x: x0 + cos(a) * sd * S * 0.23, y: y0 + sin(a) * sd * S * 0.23 + S * 0.11)
+                bl.colors = [pink0, pink1, pink2]; bl.locations = [0, 0.55, 1]
+            }
+        } else { for l in blushLayers { l.isHidden = true } }
+    }
+
     /// v2.31 搖晃沉澱: the haze (thickest low in the middle), the glitter, the glow at the clear moment; all clipped to the body by litGroup
     private func drawGlitter() {
         guard let gv = rig.glitterView else {
@@ -580,6 +624,7 @@ final class SlimeView: UIView {
         drawSpecks()
         updateScene()   // v2.28 窗台
         drawGlitter()   // v2.31 搖晃沉澱
+        drawJelly(body: bodyPath(P), z: z)   // v2.28 果凍皮
 
         var minX = 1e9, maxX = -1e9, maxY = -1e9
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }
@@ -718,7 +763,8 @@ final class SlimeView: UIView {
         // v2.23 eyes (多米 11-02: try a face, eyes only): bean eyes looking where it looks; ∩ happy, ∪ asleep, > < squeezed, a line when shut
         let ef = CGMutablePath(), el = CGMutablePath(), eli = CGMutablePath()
         if let e = rig.eyeView {
-            let S = e.size * z, ew = S * 0.082 * sqrt(e.spread), eh = S * 0.118, ox = e.lookX * S, oy = e.lookY * S
+            let js: Double = jellyOn ? 0.68 : 1   // the jelly skin draws the eyes smaller, as on the web
+            let S = e.size * z, ew = S * 0.082 * js * sqrt(e.spread), eh = S * 0.118 * js, ox = e.lookX * S, oy = e.lookY * S
             eyeLineLayer.lineWidth = max(2.5, S * 0.034)
             // addArc draws a line from the current point, so each arc needs its own move, or the two eyes get joined by a line (web: beginPath per eye)
             let eyeArc: (Double, Double, Double, Double, Double) -> Void = { ax, ay, ar, a0, a1 in
