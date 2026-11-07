@@ -1211,6 +1211,13 @@
       && r.auto.join() === '0,0,0.5,1';
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T50 v2.33 一隻為主（多米 11-07：定位是陪伴寵物，只養一隻，留芋圓）。預設 one 1：底部那排四隻藏起來、一開始就是芋圓、芋圓的手感是黏土基準 v1；one 0 四隻回來。
+  // 四隻各自的材質、顏色、印象分開記這件事 T38 照樣量（collect），一隻為主不碰它
+  { const was = mat.one, el = document.getElementById('slimes'); mat.one = 1; oneSync(); const hid = el.style.display === 'none'; mat.one = 0; oneSync(); const shown = el.style.display !== 'none'; mat.one = was; oneSync();
+    res.T50_one = { hid, shown, presetOne: PRESETS.clay.one, def: SLIMES[2].id, defMat: SLIMES[2].mat, startIdx: PRESETS.clay.one >= .5 ? 2 : -1 };
+    res.PASS.one = hid && shown && PRESETS.clay.one === 1 && SLIMES[2].id === 'taro' && SLIMES[2].mat === 'clay';
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
