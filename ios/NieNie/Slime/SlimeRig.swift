@@ -3344,8 +3344,8 @@ final class SlimeRig {
             let dx = x, dy = y - 0.25, d = hypot(dx, dy)
             if d < 1e-6 { return true }
             var a = atan2(dx, dy)
-            a = a.truncatingRemainder(dividingBy: 2 * .pi); if a < 0 { a += 2 * .pi }
-            let sec = 2 * .pi / 5, u = a.truncatingRemainder(dividingBy: sec), v = abs(u - sec / 2) / (sec / 2)
+            a = a.truncatingRemainder(dividingBy: 2 * Double.pi); if a < 0 { a += 2 * Double.pi }
+            let sec: Double = 2 * Double.pi / 5, u = a.truncatingRemainder(dividingBy: sec), v = abs(u - sec / 2) / (sec / 2)
             return d <= 0.11 + (0.27 - 0.11) * (1 - v)
         }
         if shape == "heart" {
