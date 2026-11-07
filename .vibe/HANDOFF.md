@@ -1,82 +1,33 @@
-# Handoff: 第十八會話，v2.31 皮定清透、碗回中間、只跟碗互動、搖晃沉澱（網頁片）
+# Handoff: v2.31（2026-11-07）
 
-> 產出時間：2026-11-07 晚上
-> 給下一個會話接續用。舊版備份在 `.vibe/handoff/archive/`
+> 短版。細節看 git log、`.vibe/標準清單.md` 最後一節、`.vibe/代決清單.md` 11-07 那幾列；長版在 `.vibe/handoff/archive/2026-11-07-v2.31-長版.md`。
 
-## ✅ 這次完成了什麼
+## 現況
 
-多米 11-07 給了四點：讀交接檔接續；皮選清透；碗擺中間、牠只跟碗互動（爬出碗、爬進碗）、不跟另外兩個桌面物件互動；互動改成搖手機，照附的雪花球版本（先搖亂，再等牠靜下來）。網頁片全做了，已上線（`?v=233`）：
+- 網頁 v2.31 上線（`?v=233`）：皮 A 清透、碗在正中間、石頭盤和盆栽是背景、牠只爬進爬出碗、搖晃沉澱（搖三下肚子裡變霧，放著約 30 秒清透、發光、叮；捏也會攪起一點；亮粉一直在身體裡，不會掉出來）。走路回來那趟翻過碗後緣進碗，東西放窗台上碗的左右。
+- selftest 49 項在同一個 iframe 連跑 3 輪全過。
+- 手機版沒動：還是平塗、碗在左、沒有搖、沒有走路素材。
 
-- 皮定 A 清透：切換列的「皮」整排拿掉，只剩背景。B 奶凍的數字留著，亮粉揚起來時皮照濁度往 B 混。
-- 碗回正中間（`sillGeo` 的 `bx:W/2`）。擺飾改成純背景（多米 11-07 第二次：放回去，只是背景）：石頭盤在窗台左端、盆栽右端，`drawDeco` 畫的，沒有物理；面板 `props` 0 沒有、1 背景（預設）、2 v2.30 的剛體對照。推擺飾 `catPush` 預設 0。
-- 只跟碗互動：牠自己只會爬出碗、在窗台上走、爬回碗。爬窗框、繞一圈、跨出窗外的程式還在，面板 `envFrame` 1 才開；放手落在窗戶範圍改成掉回窗台，碗正上方還是掉進碗。走路回來那趟改成一路翻過碗後緣進碗（停在窗框下緣會整隻被碗擋住、捏不到），東西改放窗台上碗的左右各三格。
-- 搖晃沉澱（`index.html` 搜尋「v2.31 搖晃沉澱」，物件叫 `SNW`，原本的 `SHK` 是甩一甩）：整個 app 一條規則，動了會濁、靜了會清。搖：牠在碗裡彈一下（0.15 秒把速度往目標混，有上限，連搖八下量過還在碗裡）、眼睛 ∩、亮粉揚起來變霧，三下滿、第四下不會更多。靜：亮粉約 30 秒沉完，牠閉眼、呼吸 10 秒一次、不出門、不睡著。清：發光、睜大眼、叮一聲（程式合成的三個正弦，走音效 master）；堆在碗口看得到的那條線，小堆 79%、星星 12%、愛心 9%。捏著每秒攪起 0.12。手機晃動用 `devicemotion`，門檻 13 公尺／秒²；iOS 第一次碰牠時問一次權限；面板有「搖：假裝搖一下／三下／立刻沉澱」。
-- selftest：T46 刪掉擺飾那幾項、改用 `envFrame 1` 量路線、放手落點改成碗在中間的預期（窗戶中間掉進碗、碗旁邊掉回窗台）；T47 東西的位置改量窗台；新增 T48 搖晃沉澱（13 項）。舊項目一律 `shake 0`。
-- 文件：提案 `.uiux/04-手感/搖晃沉澱提案-暫定.md`（含我的看法：搖比吹氣好，照雪花球版做）、`標準清單.md` 最後一節、`黃金行為.md` 17 到 19、`代決清單.md` 11-07 那幾列、`.vibe/CLAUDE-md-v2.31-草稿.md`。
+## 等多米
 
-自測結果見本檔最後一節「這次自測」。
+1. 搖和走路留哪一個（目的是黏性；Agent 建議留搖）。
+2. 真機搖起來怎樣：門檻 13 會不會誤觸或搖不到、霧夠不夠濃、30 秒會不會太久。
+3. 舊帳：build 106 步數讀到幾天前、閘門 1 三個測試、`CLAUDE.md` 草稿 v2.24 到 v2.31 要不要照改。
 
-## 🚧 還沒做完 / 待決定
+## 下一步
 
-- 多米要做的：真機搖（躺著、坐著各幾次，看門檻 13 會不會誤觸或搖不到；iPhone Safari 第一次碰牠會問「動作與方向」）；看霧的濃度、堆的大小、叮的音量、等 30 秒會不會不耐煩；網頁親手摸 `標準清單.md` 最後一節。
-- 上一輪還沒回的：build 106 步數讀到幾天前、v2.30 爬的樣子、閘門 1 三個測試。
-- 堆的形狀星星、愛心我只靠自測確認在身體裡，畫面沒親眼放大看過（zoom 工具座標對不上）。
-- 走路的東西放在窗台上，牠走過去會蓋住東西；要不要另外找位置等多米看過再說。
-- 手機版：皮、窗台、環境互動、走路、搖晃沉澱都還沒移植，這是下一個最大的工。搖晃在原生用 CoreMotion 不用問權限。
-- `.vibe/CLAUDE-md-v2.24` 到 `v2.31-草稿.md` 都等多米點頭才改 `CLAUDE.md`。
-- 舊帳：閘門 3 沒量、沒盲測過、新的手 0 輪、核心動作卡沒過閘門 1、買實物沒做、`README.md` 過時。
+1. 第一句話問上面三件。
+2. 搖或走路定了就把輸家拿掉。走路：`WALK`、`walk*`、面板三顆、`ios/NieNie/UI/StepProbe.swift`、`NSMotionUsageDescription`。搖：`SNW`、`shk*`、面板三顆。
+3. 再來是手機版移植：防打結、眼睛、果凍皮、窗台和碗、擺飾背景、搖或走路。先不要動程式，比對 `prototype/web/index.html` 與 `ios/NieNie/Slime/SlimeRig.swift`、`ios/NieNie/App/SlimeController.swift`，列批次給多米點頭。
 
-## 📌 關鍵決策（這次定下來的，下次別再爭論）
+## 怎麼做事（不變）
 
-- 多米 11-07：皮 A 清透；碗在中間；牠只跟碗互動；互動改成搖手機，照雪花球版本，不照對打機（越搖越強不要）。
-- 搖三下就滿、約 30 秒清、沉澱時呼吸每分鐘 6 次：討論裡給的；其餘數字我取的（代決清單）。
-- 彈一下要用「速度往目標混」不是加速度：加上去的版本連搖三下就飛出碗。
-- 亮粉堆在碗口那條線，不在真正的底部（坐在碗裡時底部被碗前緣擋住）。
-- 沉澱那段牠不出門、不睡著；清的那一刻睜大眼，∩ 留給搖的時候。
-- 先前仍有效的：黏液取消；手感定基準，手感層只為基準表的數字改；背景藍＝懸空，舊行為不動；TestFlight 等多米開口。
-
-## 🧰 環境與流程（不變的事實）
-
-- 多米沒有 Mac。編譯走 GitHub Actions，裝機走 TestFlight；build 號＝run number；動到 `ios/` 的 push 會自動跑一次只編譯的檢查，不會上傳
-- 要發 TestFlight：等 push 觸發的編譯過，再 `gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`
-- `swiftui-port` 有 Swift＋web＋docs；`main` 只放 web＋docs（Pages 自動發布）。推 main：`git worktree add <scratchpad>/wt-main origin/main -B main-sync` → `git checkout <hash> -- prototype .uiux .vibe CLAUDE.md` → 確認 `git diff --cached --name-only -- ios` 是空的 → `git commit -C <hash>` → `git push origin main-sync:main` → 移除 worktree 與分支
-- 網頁網址：`https://domyweb666.github.io/nienie-slime/prototype/web/index.html?v=233`。改版就換 `?v=`
-- 本機預覽：`preview_start` 名稱 `web-proto`，`http://localhost:8765/`，viewport 393×852。先 `resize_window` 再 `navigate`，不然頁面用寬的版面算好位置，之後 resize 才重建
-- 面板藏著時 rAF 不跑：把 `requestAnimationFrame` 換成空函式，自己呼叫 `update(1/60)`、`draw()`。畫面放大或重複是面板的問題，數字以 `getBoundingClientRect` 為準。`zoom` 的座標對不上，用整張截圖就好
-- 網頁版會記住上次選的背景（`localStorage` 的 `nienie.view`），測完藍底記得切回白天
-- selftest：放進固定 393×852 的 iframe，`ifr.contentWindow.eval(src)`，結果存 `localStorage`。全程一輪約 5 到 8 分鐘，跑的時候 javascript_tool 會逾時（連問結果都會），等它跑完再問。只跑一段：`src.slice(0, src.indexOf('  // T1 輕按')) + '  res.PASS={};\n' + src.slice(src.indexOf('  // T46 v2.30'))`，T46 到 T48 約 40 秒
-- selftest 的時鐘會倒回去（`restoreClock`），任何「到幾秒為止」的計時器都要像眨眼那樣加「停在未來就歸零」的保護（這次 T46 留下的 `EYE.sqU` 讓 T48 一直 > <）；搖晃的 `SNW.last`、`kick.until` 也加了（連跑第二輪 T38 的眼睛一直 ∩）
-- 全程連跑要在同一個 iframe 裡跑三輪，每次重開 iframe 都算「第一輪」（音效載入時機不定）；三輪一起看
-- 測試跑的時候不准改 `index.html`：每輪開始才載入，改了會混到不同版本
-- 補丁用 Write 寫 python 檔再 `python -I`（heredoc 帶中文會壞），每個取代都檢查次數；語法先用 `node -e "new Function(...)"` 檢查再開瀏覽器
-- Swift 這台電腦編譯不了。limrun：`npx -y lim@0.51.0`，測完立刻刪自己開的實例。`SlimeHaptics.swift` 是 CRLF，其他 Swift 檔是 LF
-
-## 📂 下個會話最重要的檔案
-
-- `.uiux/04-手感/搖晃沉澱提案-暫定.md`
-- `.vibe/標準清單.md` 最後一節 ← v2.31 的驗收
-- `prototype/web/index.html`：搜尋「v2.31 搖晃沉澱」「v2.31 碗回正中間」「envFrame」
-- `prototype/web/selftest.js` T48
-- `.vibe/CLAUDE-md-v2.31-草稿.md`
-
-## ⏭️ 下一步從哪繼續
-
-1. 第一句話問多米：真機搖起來怎樣（門檻、霧的濃度、30 秒會不會太久）、走路的東西放窗台旁邊可不可以、上一輪三件事（build 106 步數、爬的樣子、閘門 1 測試）有沒有結果。
-2. 有回報就照回報改，一次改一件，數字都在面板。
-3. 多米沒回報、也沒指定別的，下一件是把窗台、皮、搖晃沉澱移植到手機版。先不要動程式：比對 `prototype/web/index.html` 跟 `ios/NieNie/Slime/SlimeRig.swift`、`ios/NieNie/App/SlimeController.swift`，列出要移植的批次（防打結、眼睛、果凍皮、窗台、碗、走路、搖晃沉澱）和每批怎麼驗，給多米點頭才開工。這台電腦編譯不了 Swift，每批都要靠 push 觸發的編譯檢查；TestFlight 累積一批，等多米開口才發。
-
-## 🗑️ 這次會話的雜訊（下次別重新討論）
-
-- 新物件本來叫 `SHK`，跟 v2.19 甩一甩的 `SHK` 撞名，改叫 `SNW`
-- 彈一下的第一版是一次性速度（只動 3 點），第二版是 0.15 秒累加（連搖三下飛出碗），定案是往目標混
-- 沉的速度第一版 1.15／秒（22 秒就清），定案 0.85／秒（約 30 秒）
-- 討論裡說拿掉「呼吸」按鈕：原型本來就沒有那顆，吹氣提案裡才有
-- T44 的嚇到跳出碗在碗居中時做不到（旁邊只有 90 點），改成原地跳回碗裡
-- T42 v2.27 的 abuse 對折幀數一度 224（門檻 135）：亮粉建立時吃掉共用的 Math.random，舊測試的手抖序列被錯開；改成自己的亂數就回到 13
-- 走路回家一度 6 次有 1 次留在窗外：放的位置跟窗外層座標對不上；回家先走回窗框層放得下的 x 再換層，不然撞右窗框跳 14 點（T46 的門檻 12.7）
-
-## 🧪 這次自測
-
-- 全程 49 項（T1 到 T48）在同一個 iframe 連跑 3 輪：3 輪 ALL_PASS 全 true，每輪約 4.5 分鐘。KNOWN_ISSUES 的對折幀數 T5 一輪 3、兩輪 0，其餘 0。
-- 中途抓到並修掉的：T42 亂數錯開（亮粉改自己的亂數）、T44 嚇到跳不出碗（原地跳）、T46 回家換層撞右窗框跳 14 點、T47 回家留在窗外、T38 連跑第二輪眼睛一直 ∩（SNW 計時器沒防時鐘倒回）。全部在雜訊那節。
-- 畫面親眼看過：白天濁與清（含堆）、夜晚、藍底；堆的星星與愛心只靠 T48 確認在身體裡。
+- 多米沒 Mac。推 `swiftui-port` 會跑只編譯的檢查；TestFlight 等多米開口：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`。
+- 推 main（只放 web 和 docs）：`git worktree add <scratchpad>/wt-main origin/main -B main-sync` → `git checkout <hash> -- prototype .uiux .vibe CLAUDE.md` → 確認 `git diff --cached --name-only -- ios` 是空的 → `git commit -C <hash>` → `git push origin main-sync:main` → 移除 worktree 與分支。改版換 `?v=`。
+- 本機預覽：`preview_start` 名稱 `web-proto`；先 `resize_window` 393×852 再 `navigate`。面板藏著時 rAF 不跑，把 `requestAnimationFrame` 換成空函式，自己呼叫 `update(1/60)`、`draw()`。
+- selftest：放進 393×852 的 iframe，`ifr.contentWindow.eval(src)`，結果存 `localStorage`。同一個 iframe 連跑 3 輪（每次重開 iframe 都算第一輪，會不一樣）。只跑一段：`src.slice(0, src.indexOf('  // T1 輕按')) + '  res.PASS={};\n' + src.slice(src.indexOf('  // T46 v2.30'))`。跑的時候不准改 `index.html`。
+- 補丁用 Write 寫 python 再 `python -I`，每個取代檢查次數；先 `node -e "new Function(...)"` 檢查語法再開瀏覽器。
+- 任何「到幾秒為止」的計時器都要防時鐘倒回（selftest 會 restoreClock）。
+- limrun：`npx -y lim@0.51.0`，`lim ios create --label project=nienie-slime --inactivity-timeout 10m`，`lim ios open-url` 開網頁版；測完立刻 `lim ios delete`，別的專案的（`project=` 標籤）不動。
+- 2026-11-07 limrun 開實例被拒：帳號沒有剩餘點數也沒有訂閱，要多米去 console 的 billing 加點數才能再用。
+- 文件：改動寫進 `標準清單.md`（驗收）、`代決清單.md`（替多米決定的）、`黃金行為.md`、`CLAUDE-md-vX-草稿.md`；提案放 `.uiux/04-手感/`。
