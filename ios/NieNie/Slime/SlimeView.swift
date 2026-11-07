@@ -40,6 +40,10 @@ final class SlimeView: UIView {
     // the bowl's front half over it while it sits inside; 走路: the small things on the sill and the one stuck to it
     private let skyImgLayer = CALayer(), wallLayer = CALayer(), propsLayer = CALayer(), bowlFrontLayer = CALayer()
     private let itemsGroup = CALayer(), stuckGroup = CALayer()
+    // v2.31 搖晃沉澱: inside the body (in litGroup, under the eyes) the haze, the glitter by colour, the glow; the halo outside
+    private let fogLayer = CAGradientLayer(), glowLayer = CAGradientLayer(), haloLayer = CAGradientLayer()
+    private let glitLayers = [CAShapeLayer(), CAShapeLayer(), CAShapeLayer(), CAShapeLayer()]
+    private let glitColors: [UIColor] = [UIColor(red: 1, green: 224 / 255, blue: 138 / 255, alpha: 1), .white, UIColor(red: 1, green: 195 / 255, blue: 214 / 255, alpha: 1), UIColor(red: 190 / 255, green: 240 / 255, blue: 230 / 255, alpha: 1)]
     private var itemLayers: [CALayer] = [], stuckLayers: [CALayer] = []
     private var sceneKey = ""
     private let speckLayers = [CAShapeLayer(), CAShapeLayer()]   // v2.17: far-away specks, two strengths
@@ -105,6 +109,12 @@ final class SlimeView: UIView {
             dentLayers.append(l)
         }
         litGroup.addSublayer(highlightLayer)
+        for l in [fogLayer, glowLayer, haloLayer] { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true }
+        litGroup.addSublayer(fogLayer)
+        for (k, l) in glitLayers.enumerated() { l.fillColor = glitColors[k].cgColor; litGroup.addSublayer(l) }
+        litGroup.addSublayer(glowLayer)
+        haloLayer.zPosition = 0.5
+        layer.addSublayer(haloLayer)
         eyeLightLayer.fillColor = UIColor.white.cgColor
         eyeLineLayer.fillColor = nil; eyeLineLayer.lineCap = .round; eyeLineLayer.lineJoin = .round
         litGroup.addSublayer(eyeFillLayer); litGroup.addSublayer(eyeLightLayer); litGroup.addSublayer(eyeLineLayer)
@@ -478,6 +488,40 @@ final class SlimeView: UIView {
         }
     }
 
+    /// v2.31 搖晃沉澱: the haze (thickest low in the middle), the glitter, the glow at the clear moment; all clipped to the body by litGroup
+    private func drawGlitter() {
+        guard let gv = rig.glitterView else {
+            fogLayer.isHidden = true; glowLayer.isHidden = true; haloLayer.isHidden = true
+            for l in glitLayers { l.path = nil }
+            return
+        }
+        let z = rig.drawZ, R = rig.R * z, c = rig.toScreen(gv.cx, gv.cy), pr = 1 / max(0.2, z)
+        func radial(_ l: CAGradientLayer, cx: Double, cy: Double, r: Double, colors: [CGColor], locations: [NSNumber]) {
+            l.isHidden = false
+            l.bounds = CGRect(x: 0, y: 0, width: 2 * r, height: 2 * r)
+            l.position = CGPoint(x: cx, y: cy)
+            l.colors = colors; l.locations = locations
+        }
+        if gv.cloud > 0.01 {
+            radial(fogLayer, cx: c.x, cy: c.y + R * 0.1, r: R * 1.05,
+                   colors: [UIColor(white: 1, alpha: 0.42 * gv.cloud).cgColor, UIColor(white: 1, alpha: 0.12 * gv.cloud).cgColor], locations: [0.095, 1])
+        } else { fogLayer.isHidden = true }
+        var paths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
+        var alpha = [0.0, 0.0, 0.0, 0.0], count = [0, 0, 0, 0]
+        for d in gv.dots {
+            let p = rig.toScreen(d.x, d.y), rr = d.r * pr * z, k = min(3, max(0, d.c))
+            paths[k].addEllipse(in: CGRect(x: p.x - rr, y: p.y - rr, width: 2 * rr, height: 2 * rr))
+            alpha[k] += d.a; count[k] += 1
+        }
+        for k in 0..<4 { glitLayers[k].path = count[k] > 0 ? paths[k] : nil; glitLayers[k].opacity = Float(count[k] > 0 ? alpha[k] / Double(count[k]) : 0) }
+        if gv.glow > 0.01 {
+            let g1 = UIColor(red: 1, green: 250 / 255, blue: 210 / 255, alpha: 0.55 * gv.glow).cgColor, g0 = UIColor(red: 1, green: 250 / 255, blue: 210 / 255, alpha: 0).cgColor
+            radial(glowLayer, cx: c.x, cy: c.y, r: R * 1.1, colors: [g1, g0], locations: [0, 1])
+            let h1 = UIColor(red: 1, green: 240 / 255, blue: 170 / 255, alpha: 0.28 * gv.glow).cgColor, h0 = UIColor(red: 1, green: 240 / 255, blue: 170 / 255, alpha: 0).cgColor
+            radial(haloLayer, cx: c.x, cy: c.y, r: R * 1.7, colors: [h1, h1, h0], locations: [0, 0.353, 1])
+        } else { glowLayer.isHidden = true; haloLayer.isHidden = true }
+    }
+
     /// v2.17: a layer of faint fixed specks far behind (parallax 0.55, they move slower than the slime). Without them a following
     /// camera looks like the slime walking back by itself. One speck or none per 120-point cell, hashed from the cell.
     private func drawSpecks() {
@@ -535,6 +579,7 @@ final class SlimeView: UIView {
 
         drawSpecks()
         updateScene()   // v2.28 窗台
+        drawGlitter()   // v2.31 搖晃沉澱
 
         var minX = 1e9, maxX = -1e9, maxY = -1e9
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }

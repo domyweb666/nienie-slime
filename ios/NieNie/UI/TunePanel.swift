@@ -78,6 +78,13 @@ struct TunePanel: View {
                 chip("全部重來") { controller.walkClear() }
                 Spacer(minLength: 0)
             }
+            // 搖晃沉澱（v2.31 批次 5）：沒辦法搖手機時假裝；真機直接搖
+            HStack(spacing: 6) {
+                chip("搖：假裝搖一下") { controller.shakeFake(1) }
+                chip("假裝搖三下") { controller.shakeFake(3) }
+                chip("立刻沉澱") { controller.shakeSettleNow() }
+                Spacer(minLength: 0)
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {

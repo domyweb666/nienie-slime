@@ -24,6 +24,8 @@ protocol SlimeSoundSource: AnyObject {
     func stopAll()
     /// v2.22 E1: one of its small sounds (`voice.<kind>` in the manifest); `rate` is the pitch from the impression.
     func voice(_ kind: String, gain: Double, rate: Double)
+    /// v2.31 搖晃沉澱: the ding when it has settled clear (three sines, baked to a file)
+    func ding(gain: Double)
     /// 候選 17: one release "pop" file, for Core Haptics to register (nil until there is one).
     var releaseSampleURL: URL? { get }
 }
@@ -271,6 +273,10 @@ final class SlimeAudio: SlimeSoundSource {
 
     func voice(_ kind: String, gain: Double, rate: Double) {
         one("voice.\(kind)", Play(gain: Self.clamp(gain, 0, 1), rate: rate, lowpass: 4000))
+    }
+
+    func ding(gain: Double) {
+        one("ding.all", Play(gain: Self.clamp(gain, 0, 1), rate: 1, lowpass: 16000))
     }
 
     func strand(gain: Double) {

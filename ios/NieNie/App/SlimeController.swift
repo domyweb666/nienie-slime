@@ -26,6 +26,9 @@ final class SlimeController: ObservableObject {
     /// 走路 (v2.31 批次 4): the gift stone was tapped, the app asks whether it may know how far you walked
     @Published var walkAsk = false
     private let pedometer = CMPedometer()
+    /// v2.31 搖晃沉澱: the phone's shakes from CoreMotion (no permission needed natively), one shake at most every 0.18 s
+    private let motion = CMMotionManager()
+    private var lastShakeAt: TimeInterval = 0
     /// Frame readout for the hidden panel, refreshed a couple of times a second by the view.
     @Published private(set) var stats = SlimeView.FrameStats()
 
@@ -49,6 +52,7 @@ final class SlimeController: ObservableObject {
         syncAudio()
         rig.walkOpen()   // 走路: the second open leaves the gift stone
         walkReadSteps()
+        startMotion()   // v2.31 搖晃沉澱
 
         NotificationCenter.default.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification,
                                                object: nil, queue: .main) { [weak self] _ in
@@ -61,6 +65,7 @@ final class SlimeController: ObservableObject {
             self?.rig.cancelAllTouches()
             self?.haptics.stopContinuous()
             self?.sound.stopAll()
+            self?.motion.stopDeviceMotionUpdates()
         }
         // v2.20: the impression lives for this run only; 10 min or more in the background and it is a first meeting again
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
@@ -71,6 +76,7 @@ final class SlimeController: ObservableObject {
             if Date().timeIntervalSince(at) >= 600 { self.rig.resetImpression(); self.impressions = [:] }
             self.backgroundAt = nil
             self.walkReadSteps()   // 走路: what you walked while it was away
+            self.startMotion()
         }
     }
 
@@ -122,6 +128,10 @@ final class SlimeController: ObservableObject {
             // v2.28 窗台: it landed after a fall or a hop (the web plays the press sound); a soft dull tap
             sound.press(intensity: gain * 0.6)
             haptics.transient(intensity: 0.15 + 0.3 * gain, sharpness: 0.2)
+        case .ding(let gain):
+            // v2.31 搖晃沉澱: settled clear; a small bright tap with it
+            sound.ding(gain: gain)
+            haptics.transient(intensity: 0.3, sharpness: 0.6)
         case .beat:
             // v2.23 C6: one beat of its answer to your rhythm, a soft round tap
             haptics.transient(intensity: 0.3, sharpness: 0.2)
@@ -236,6 +246,32 @@ final class SlimeController: ObservableObject {
             }
         }
     }
+
+    // MARK: - v2.31 搖晃沉澱: the phone's shakes, and the panel's pretend ones
+
+    /// Device motion at 60 Hz; the acceleration without gravity, in m/s², past shakeG counts as one shake. Screen direction: the phone flung right, it goes left in the bowl.
+    private func startMotion() {
+        guard motion.isDeviceMotionAvailable, !motion.isDeviceMotionActive else { return }
+        motion.deviceMotionUpdateInterval = 1.0 / 60
+        motion.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
+            guard let self, let m else { return }
+            let a = m.userAcceleration
+            let mag = sqrt(a.x * a.x + a.y * a.y + a.z * a.z) * 9.81
+            let now = m.timestamp
+            if mag > self.current.shakeG && now - self.lastShakeAt > 0.18 {
+                self.lastShakeAt = now
+                self.rig.shake(dx: -a.x, dy: a.y)
+            }
+        }
+    }
+    /// The panel: 假裝搖一下 / 三下 (220 ms apart, alternating sides) / 立刻沉澱
+    func shakeFake(_ n: Int) {
+        if n <= 1 { rig.shake(dx: 0, dy: 0); return }
+        for k in 0..<n {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22 * Double(k)) { [weak self] in self?.rig.shake(dx: k % 2 == 1 ? 1 : -1, dy: -0.5) }
+        }
+    }
+    func shakeSettleNow() { rig.shakeSettleNow() }
 
     // MARK: - Buttons
 

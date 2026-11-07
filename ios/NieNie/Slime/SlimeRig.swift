@@ -14,6 +14,7 @@ enum SlimeEvent {
     case voice(kind: String, gain: Double, rate: Double)   // v2.22 E1: one of its small sounds; rate from the impression
     case beat                                // v2.23 C6: one beat of it answering your rhythm (a soft tap)
     case land(gain: Double)                  // v2.28 窗台: it landed on the sill or in the bowl after a fall or a hop
+    case ding(gain: Double)                  // v2.31 搖晃沉澱: the glitter has settled, it is clear again
 }
 
 /// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
@@ -114,6 +115,15 @@ final class SlimeRig {
     private let walkKinds = ["stone", "leaf", "petal", "acorn", "cap", "feather"], walkSmall = 500, walkBig = 3000, walkDayMax = 3, walkIdle = 20.0
     /// One small thing as drawn: on the sill (screen points, the room does not move) or stuck to it / falling (world points)
     struct WalkSprite { let kind: String; let big: Bool; let x, y, a, alpha: Double }
+    // v2.31 搖晃沉澱 (多米 11-07: like a snow globe). Shake: it bounces in the bowl (capped), the glitter in its belly rises into a haze; shakeN shakes and it is full.
+    // Still: nothing touching it, the glitter sinks over settleT s, it breathes 6 times a minute with its eyes shut. Clear: the moment it is all down it glows, opens
+    // its eyes, dings; a little pile at the bottom, now and then a star or a heart, picked again each time it is shaken up. The glitter is only drawn inside the body,
+    // the physics does not change; only the bounce gives the particles a speed. Port of the web's SNW, settle mode only (散出來吃回來 stays on the web for now).
+    private struct Glit { var tx = 0.0, ty = 0.0, sx = 0.0, sy = 0.0, h = 0.0, s = 1.0, r = 1.0, c = 0, ph = 0.0, sw = 1.0 }
+    private var snwGlit: [Glit] = [], snwCloud = 0.0, snwK = 0.0, snwShape = "mound", snwCleared = true, snwWasCloudy = false
+    private var snwLast = -9.0, snwLastVoice = -9.0, snwGlow = 0.0, snwClearT = -9.0, snwKick: (vx: Double, vy: Double, until: Double)?
+    private var glitSeed: UInt32 = 7
+    struct GlitterView { let cloud, glow, cx, cy: Double; let dots: [(x: Double, y: Double, r: Double, c: Int, a: Double)] }
     private var builtScene = -1.0
     /// 0 blue (floating), 1 day, 2 night: what the view draws behind it
     var sceneKind: Int { Int(params.scene.rounded()) }
@@ -836,6 +846,7 @@ final class SlimeRig {
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         sillInit()   // v2.28 窗台: last, it moves the body over the bowl and lets it drop
+        shkReset()   // v2.31 搖晃沉澱: clear, the glitter in a pile
     }
 
     /// v2.29 防打結: Delaunay (Bowyer-Watson) over the rest shape, keeping the triangles whose centre is inside the boundary ring,
@@ -1942,6 +1953,7 @@ final class SlimeRig {
         // (3.8 s sine) this is exactly the old waveform
         do {
             var T = mat.jelly >= 0.5 ? mat.jellyT : mat.breathT, amp = 1.0
+            if snwK > 0 { T = T * (1 - snwK) + mat.calmBreathT * snwK; amp *= 1 + 0.4 * snwK }   // v2.31: the glitter settling, 6 breaths a minute, taking you down with it
             do {   // v2.18: comfortable slow and deep, tense fast and shallow
                 let cp = max(0, moodC), ar = max(moodA, moodScare)
                 T *= (1 + 0.4 * cp) * (1 - 0.4 * ar); amp *= (1 + 0.5 * cp) * (1 - 0.4 * ar)
@@ -1990,8 +2002,9 @@ final class SlimeRig {
         if mat.jelly >= 0.5 {
             let ph = brPhase - floor(brPhase), c = 0.22
             let w = ph < c ? sin(.pi / 2 * ph / c) : 0.5 * (1 + cos(.pi * (ph - c) / (1 - c)))
-            let dw = w - brJw
-            brJw = w; brWave = -w; brAmp = mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare)) * brAmpX * (1 + 0.35 * slpK)
+            let w2 = w * (1 - snwK) + 0.5 * (1 - cos(2 * .pi * ph)) * snwK   // v2.31: settling, a smooth slow breath instead of the pulse
+            let dw = w2 - brJw
+            brJw = w2; brWave = -w2; brAmp = (1 + 0.4 * snwK) * mat.jellyAmp / 0.045 * (1 + 0.5 * max(0, moodC)) * (1 - 0.4 * max(moodA, moodScare)) * brAmpX * (1 + 0.35 * slpK)
             if dw > 0 { brLift += dw * mat.jellyLift * R * Lamp * mat.life * (1 - goFade) }
         }
         brLift *= exp(-dt / 1.0)
@@ -2168,6 +2181,7 @@ final class SlimeRig {
         if sillOn { sillStepPre() }   // v2.28 窗台
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         if sillOn { sillStep(dt) }   // v2.28 窗台: landing, the bowl, the hop, home
+        shkStep(dt)   // v2.31 搖晃沉澱
         tentBump()
         plasticity(dt)
         twitch(L)
@@ -3139,7 +3153,7 @@ final class SlimeRig {
     /// It decides to go somewhere (goStart on the sill): mostly it stays; from the bowl it sometimes climbs out; on the sill it mostly goes back in, else walks a little.
     private func sillGo() {
         lifeSt = .rest; lifeUntil = t + 2 + 2 * Double.random(in: 0..<1)
-        guard sillG != nil, !clusters.isEmpty, sillRoute == nil, sillHop == nil, !sillAir, params.envRoam > 0 else { return }
+        guard sillG != nil, !clusters.isEmpty, sillRoute == nil, sillHop == nil, !sillAir, params.envRoam > 0, snwK <= 0.3 else { return }   // v2.31: while the glitter settles it stays in
         let cx0 = clusters[gi].xc, r = Double.random(in: 0..<1) / max(0.01, params.envRoam)
         if sillInBowl { if r < 0.16 { routeStart(rtOutFront(nil)) }; return }
         if sillPlane == .frame { routeStart(rtBackIn()); return }   // v2.31: it does not climb the frame by itself, it comes back in
@@ -3315,6 +3329,156 @@ final class SlimeRig {
         sillWant = q.toBowl; sillAir = true; sillC = 0; sillFall = 0
         q.air = true; q.t = 0; sillHop = q
         onEvent?(.land(gain: 0.22))
+    }
+
+    // MARK: - v2.31 搖晃沉澱
+
+    /// The glitter's own random numbers: building the body does not touch the shared ones (the web's self-test relies on that)
+    private func grnd() -> Double {
+        glitSeed = glitSeed &* 1664525 &+ 1013904223
+        return Double(glitSeed) / 4294967296
+    }
+    /// The pile's shape, in radii: x right, y up, the origin at the body's bottom middle
+    private func shkInside(_ shape: String, _ x: Double, _ y: Double) -> Bool {
+        if shape == "star" {
+            let dx = x, dy = y - 0.25, d = hypot(dx, dy)
+            if d < 1e-6 { return true }
+            var a = atan2(dx, dy)
+            a = a.truncatingRemainder(dividingBy: 2 * .pi); if a < 0 { a += 2 * .pi }
+            let sec = 2 * .pi / 5, u = a.truncatingRemainder(dividingBy: sec), v = abs(u - sec / 2) / (sec / 2)
+            return d <= 0.11 + (0.27 - 0.11) * (1 - v)
+        }
+        if shape == "heart" {
+            let u = x / 0.24, v = (y - 0.22) / 0.24, q = u * u + v * v - 1
+            return q * q * q - u * u * v * v * v <= 0
+        }
+        let hw = 0.58
+        if abs(x) > hw { return false }
+        return y >= 0 && y <= 0.30 * (1 - (x / hw) * (x / hw))
+    }
+    private func shkTargets(_ shape: String) {
+        let B: [Double] = shape == "star" ? [-0.3, 0.3, -0.05, 0.55] : (shape == "heart" ? [-0.3, 0.3, 0, 0.5] : [-0.6, 0.6, 0, 0.32])
+        for k in snwGlit.indices {
+            var x = 0.0, y = 0.1
+            for _ in 0..<60 {
+                x = B[0] + (B[1] - B[0]) * grnd(); y = B[2] + (B[3] - B[2]) * grnd()
+                if shkInside(shape, x, y) { break }
+            }
+            snwGlit[k].tx = x; snwGlit[k].ty = y
+        }
+    }
+    private func shkBuild() {
+        let n = max(0, Int(params.glitN.rounded()))
+        snwGlit = []
+        for i in 0..<n {
+            snwGlit.append(Glit(tx: 0, ty: 0, sx: 0, sy: 0, h: 0, s: 0.7 + 0.4 * grnd(), r: 0.9 + 1.3 * grnd(),
+                                c: i % 4 == 0 ? 1 : (i % 7 == 0 ? 2 : (i % 11 == 0 ? 3 : 0)), ph: grnd() * 6.283, sw: 0.5 + grnd()))
+        }
+        shkTargets(snwShape)
+    }
+    private func shkReset() {
+        snwCloud = 0; snwK = 0; snwCleared = true; snwWasCloudy = false; snwGlow = 0; snwShape = "mound"; snwKick = nil
+        shkBuild()
+    }
+    private func shkMeasure() {
+        var sum = 0.0
+        for q in snwGlit { sum += q.h }
+        snwCloud = snwGlit.isEmpty ? 0 : min(1, sum / Double(snwGlit.count) / 0.7)
+    }
+    /// Stir: `a` is how much this stirs up (one shake 1/shakeN, holding stirRate a second). Shaken up from clear, the pile's shape is picked again
+    private func shkStir(_ a: Double) {
+        guard params.shake >= 0.5, a > 0, !snwGlit.isEmpty else { return }
+        if snwCloud < 0.15 && a >= 0.1 {
+            let r = Double.random(in: 0..<1)
+            snwShape = r < 0.09 ? "heart" : (r < 0.21 ? "star" : "mound")
+            shkTargets(snwShape)
+        }
+        let pr = min(1, a * 1.6)
+        for k in snwGlit.indices where Double.random(in: 0..<1) < pr {
+            snwGlit[k].h = max(snwGlit[k].h, 0.5 + 0.5 * Double.random(in: 0..<1))
+            let rr = sqrt(Double.random(in: 0..<1)) * 0.8, th = Double.random(in: 0..<6.283)
+            snwGlit[k].sx = cos(th) * rr; snwGlit[k].sy = sin(th) * rr
+        }
+        snwCleared = false
+        shkMeasure()
+        if snwCloud > 0.5 { snwWasCloudy = true }
+    }
+    /// One shake of the phone; dx, dy is the screen direction the contents are flung relative to the phone.
+    func shake(dx: Double, dy: Double) {
+        guard params.shake >= 0.5 else { return }
+        let n = max(1, params.shakeN)
+        snwLast = t
+        shkStir(1 / n)
+        if slpOn { wake(true) }
+        happyT = t
+        if t - snwLastVoice > 1.5 { snwLastVoice = t; voice("happy", 0.5) }
+        // it bounces in the bowl: every particle gets a speed (Verlet: the previous position moves). Capped at 2.6R/s sideways, 0.7R/s up; the bowl's wall holds it
+        if sillOn, sillG != nil, !sillGrab, !introOn, params.shakeKick > 0 {
+            let k = min(2, params.shakeKick)
+            var ux = dx, uy = dy
+            let l = hypot(ux, uy)
+            if l < 1e-3 { ux = Double.random(in: 0..<1) < 0.5 ? -1 : 1; uy = -0.6 } else { ux /= l; uy /= l }
+            snwKick = (vx: max(-1, min(1, ux)) * R * 2.6 * k, vy: max(-1, min(0.2, uy)) * R * 0.7 * k, until: t + 0.15)
+        }
+    }
+    /// The panel's 立刻沉澱
+    func shakeSettleNow() {
+        for k in snwGlit.indices { snwGlit[k].h = 0 }
+        shkMeasure()
+    }
+    private func shkStep(_ dt: Double) {
+        if snwLast - t > 1 { snwLast = -9 }; if snwLastVoice - t > 1 { snwLastVoice = -9 }; if snwClearT - t > 1 { snwClearT = -9 }   // the clock went back: timers stuck in the future reset
+        if let K = snwKick {
+            if t >= K.until || K.until - t > 1 { snwKick = nil }
+            else if sillOn && !sillGrab && !sillAir {   // the bounce: for 0.15 s the speed is mixed toward the target, not added (three shakes in a row do not fling it out of the bowl)
+                let hs = lastSdt, kx = K.vx * hs, ky = K.vy * hs
+                for i in 0..<N where !GRAB[i] {
+                    let vx = X[i] - PX[i], vy = Y[i] - PY[i]
+                    PX[i] = X[i] - (vx + (kx - vx) * 0.35); PY[i] = Y[i] - (vy + (ky - vy) * 0.35)
+                }
+            }
+        }
+        guard params.shake >= 0.5 else { snwK *= exp(-dt / 0.3); return }
+        if snwGlit.count != max(0, Int(params.glitN.rounded())) { shkBuild() }
+        var touching = false
+        for f in fingers.values where f.mode == .grab || (f.mode == .stroke && f.on) { touching = true }
+        if touching { shkStir(params.stirRate * dt) }
+        let calm = fingers.isEmpty && t - snwLast > 0.6
+        if calm {   // each bit sinks at its own pace; measured: settleT 30, shaken full, about 30 s to clear
+            let T = max(1, params.settleT)
+            for k in snwGlit.indices where snwGlit[k].h > 0 { snwGlit[k].h = max(0, snwGlit[k].h - dt * 0.85 / (T * snwGlit[k].s)) }
+        }
+        for k in snwGlit.indices { snwGlit[k].ph += dt * snwGlit[k].sw }
+        shkMeasure()
+        let kt: Double = snwCloud > 0.03 && calm && !slpOn ? 1 : 0
+        snwK += (kt - snwK) * (1 - exp(-dt / (kt > 0 ? 1.2 : 0.25)))
+        if !snwCleared && snwCloud < 0.03 && calm {
+            snwCleared = true
+            if snwWasCloudy {   // the clear moment: glow, eyes open wide, ding
+                snwWasCloudy = false; snwGlow = 1; snwClearT = t; eyePulse = t; eyeBlinkT = t - 0.1
+                if slpOn { wake(false) }
+                onEvent?(.ding(gain: 0.5))
+            }
+        }
+        snwGlow *= exp(-dt / 2.2)
+    }
+    /// What the view draws inside the body: the haze, every bit between its place in the pile (clear) and where it hangs (cloudy), the glow. World points.
+    var glitterView: GlitterView? {
+        guard params.shake >= 0.5, !snwGlit.isEmpty, !clusters.isEmpty else { return nil }
+        let c = clusters[gi]
+        var by = -1e9
+        for i in bnd { by = max(by, Y[i]) }
+        by -= R * 0.06
+        if sillOn && sillInBowl, let g = sillG { by = min(by, g.lip - R * 0.04) }   // sitting in the bowl the pile is on the rim line, where it shows
+        var dots: [(x: Double, y: Double, r: Double, c: Int, a: Double)] = []
+        dots.reserveCapacity(snwGlit.count)
+        for q in snwGlit {
+            let h = q.h, tx = c.xc + q.tx * R, ty = by - q.ty * R
+            let sx = c.xc + (q.sx + 0.08 * sin(q.ph)) * R, sy = c.yc + (q.sy + 0.05 * cos(q.ph * 1.3)) * R
+            let tw = 0.6 + 0.4 * sin(q.ph * 2.1 + t * 2.5), a = (h < 0.03 ? 0.85 : 0.45 + 0.4 * h) * tw
+            dots.append((tx + (sx - tx) * h, ty + (sy - ty) * h, q.r * (h < 0.03 ? 1.15 : 1), q.c, a))
+        }
+        return GlitterView(cloud: snwCloud, glow: snwGlow, cx: c.xc, cy: c.yc, dots: dots)
     }
 
     // MARK: - 走路 (v2.31 批次 4): it brings something back
@@ -4122,13 +4286,14 @@ final class SlimeRig {
         }
         eyePoseStep(dt)   // v2.29: keep the face inside the body
         if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
-        let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil
+        let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil || t - snwLast < 1.2   // v2.31: shaken, ∩ like on a ride
         let squeeze = moodStrain > 0.4 || tickOn || (escOn && t - escT0 < 0.5) || t < eyeSqU
         let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
         if mode != eyeMode { eyeMode = mode; if mode == .open { eyeBlinkT = t - 0.08 } }   // back to open: opening from shut
         var open = 1.0, wide = 1.0
         if slpOn || slpK > 0.02 { open = max(0, 1 - slpK * 1.5) }
         if let g { open = min(open, t - g.tDown < 0.3 ? 0.55 : 0.8) }
+        if snwK > 0.02 && g == nil { open = min(open, 1 - 0.85 * snwK * min(1, max(0, (snwCloud - 0.06) / 0.3))) }   // v2.31: eyes shut while the glitter settles, breathing with you; open again once clear
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
         if impWary > 0.5 || moodScare > 0.3 || t - slpWakeT < 0.8 { wide = 1.18 }
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
@@ -4222,7 +4387,7 @@ final class SlimeRig {
     /// B2: untouched 40 s (a tap on empty space counts) while resting, it falls asleep: eyes close, it melts a little, breathes slow and deep.
     private func sleepTry() -> Bool {
         guard iv3(params.sleep), !slpOn else { return false }
-        guard t - max(lastTouch, slpLastAny) >= 40, lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn else { return false }
+        guard t - max(lastTouch, slpLastAny) >= 40, lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn, snwCloud <= 0.03 else { return false }   // v2.31: not while the glitter settles, it has to open its eyes at the clear moment
         slpOn = true; lifeSt = .sleep; cutSniffs()
         return true
     }

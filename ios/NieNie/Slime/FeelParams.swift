@@ -122,6 +122,15 @@ struct FeelParams: Equatable, Codable {
     // and the succulent as pictures on the sill's ends. 0 = the blue floating room (nothing of the old behaviour changes there), 1 day, 2 night
     var scene: Double = 1
     var envRoam: Double = 1           // v2.30: how often it leaves the bowl by itself and walks the sill (0 = it stays put)
+    // v2.31 搖晃沉澱 (多米 11-07: 互動改成搖手機, like a snow globe: shake it up, then wait for it to settle). One rule for the whole app: moved, it clouds; still, it clears.
+    var shake: Double = 1             // 1: a shake bounces it in the bowl and stirs the glitter inside it up into a haze; left alone about settleT s it clears, glows, opens its eyes, dings; a pinch stirs a little too. 0 off
+    var shakeN: Double = 3            // this many shakes and all the glitter is up; harder shaking adds nothing
+    var settleT: Double = 30          // seconds from fully clouded to fully clear when nothing touches it
+    var calmBreathT: Double = 10      // its breath period while the glitter settles (10 s = 6 a minute), taking you down with it
+    var stirRate: Double = 0.12       // glitter stirred up per second while held or rubbed (0.12: 5 s of rubbing is about 60% cloudy); 0 = only a shake clouds it
+    var shakeKick: Double = 1         // how hard a shake bounces it in the bowl (capped: flung hard lying down it stays in the bowl); 0 = only the glitter moves
+    var shakeG: Double = 13           // m/s² of phone acceleration that counts as one shake: a gentle shake lying down must count, walking or picking the phone up must not
+    var glitN: Double = 150           // bits of glitter inside it
     var fingerSolid: Double = 0.2     // the grabbing finger is solid (× R): dragged across the body it pushes the flesh it did not grab aside instead of passing through; 0 = off
     var pressFlat: Double = 0         // 1: pressing down from the upper half flattens it on an invisible table (clay)
     var flatMin: Double = 0.3         // flattest, as a fraction of the height when the press began
@@ -563,6 +572,14 @@ struct TuneField: Identifiable {
         TuneField(key: \.gripUp, name: "抓著時回正的上限", hint: "抓著時每小步最多轉回頭朝上多少；太大的話身體轉不動，被拉過去的那條只能纏在身上（v2.29 0.004；以前 0.2）", range: 0...0.2, step: 0.001),
         TuneField(key: \.homeCap, name: "整團跟手指的速度上限（×格距／小步）", hint: "整團被拖著走時，每小步最多移這麼多；太快的話手指附近那圈會一下被剪開、整片翻面（v2.29 0.5；0 不限）", range: 0...3, step: 0.1),
         TuneField(key: \.softWall, name: "畫面邊是軟的", hint: "1：窗台上身體碰到畫面左右上緣可以超出去一點，慢慢被推回來；被壓在牆上不會擠成一條線、摺出結（v2.29）；0 硬牆", range: 0...1, step: 1),
+        TuneField(key: \.shake, name: "搖晃沉澱 v2.31", hint: "1：搖手機牠在碗裡彈一下、肚子裡的亮粉揚起來變霧；放著不動約 30 秒沉澱，清透、發光、睜眼、叮一聲；捏牠也會攪起一點（多米 11-07：像雪花球，動了會濁、靜了會清）；0 關", range: 0...1, step: 1, section: "活物感"),
+        TuneField(key: \.shakeN, name: "幾下搖滿", hint: "搖這麼多下亮粉就全揚起來，再用力甩也不會更多", range: 1...6, step: 1, section: "活物感"),
+        TuneField(key: \.settleT, name: "沉澱秒數", hint: "完全不動的話，從全濁到全清大約幾秒", range: 10...60, step: 1, section: "活物感"),
+        TuneField(key: \.calmBreathT, name: "沉澱時的呼吸週期（秒）", hint: "亮粉在沉的時候牠一次呼吸幾秒（10 秒＝每分鐘 6 次），帶著你慢下來", range: 4...15, step: 0.5, section: "活物感"),
+        TuneField(key: \.stirRate, name: "捏著時攪起的速度", hint: "抓著、揉著時每秒攪起多少亮粉（0.12：揉 5 秒約六成濁）；0 只有搖才會濁", range: 0...0.5, step: 0.01, section: "活物感"),
+        TuneField(key: \.shakeKick, name: "搖時牠在碗裡彈的力道", hint: "每搖一下給牠的速度倍數，有上限，躺著用力甩也不會飛出碗；0 只有亮粉動", range: 0...2, step: 0.1, section: "活物感"),
+        TuneField(key: \.shakeG, name: "搖的門檻（公尺／秒²）", hint: "手機加速度超過這個算搖了一下；躺著輕輕晃也要搖得到，走路、拿起手機不會誤觸", range: 6...25, step: 0.5, section: "活物感"),
+        TuneField(key: \.glitN, name: "亮粉顆數", hint: "肚子裡幾顆", range: 40...300, step: 10, section: "活物感"),
         TuneField(key: \.envRoam, name: "牠自己出門", hint: "窗台上牠自己爬出碗、在窗台上走、爬回碗的機率倍數（v2.30）；0 就一直待在原地", range: 0...2, step: 0.1, section: "活物感"),
         TuneField(key: \.scene, name: "背景", hint: "0 藍：懸空（舊行為一條都不變）；1 白天、2 夜晚：窗台上有重力，牠坐在正中間的碗裡，石頭盤和盆栽只是圖（v2.28 窗台，v2.31 碗回中間）", range: 0...2, step: 1, section: "外形"),
         TuneField(key: \.fingerSolid, name: "手指是實心的（×半徑）", hint: "抓著拖過身體時，沒被抓到的部分被手指推開，不會被穿過去（v2.29 0.2；0 關）", range: 0...0.5, step: 0.01),

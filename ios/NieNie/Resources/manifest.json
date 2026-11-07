@@ -146,5 +146,8 @@
       "voice-hello-02.wav",
       "voice-hello-03.wav"
     ]
-  }
+  },
+  "ding": [
+    "ding-01.wav"
+  ]
 }
