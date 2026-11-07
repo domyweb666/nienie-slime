@@ -1,37 +1,42 @@
-# Handoff: v2.31（2026-11-07 晚上，第十九會話，等多米點移植批次）
+# Handoff: v2.31 手機版七批移植完（2026-11-07 晚上，第十九會話結束）
 
-> 短版。細節看 git log、`.vibe/標準清單.md` 最後一節「模擬器實測」、`.vibe/代決清單.md` 11-07 最後四列；長版在 `.vibe/handoff/archive/2026-11-07-v2.31-長版.md`。
+> 短版。細節看 git log（`port batch 0` 到 `port batch 6`）、`.uiux/04-手感/手機版移植批次-暫定.md`、`.vibe/標準清單.md` 最後一節「手機版移植」、`.vibe/代決清單.md` 11-07「移植」那幾列。
 
 ## 現況
 
-- 網頁 v2.31 上線（`?v=233`），程式這次沒動：皮 A 清透、碗在正中間、石頭盤和盆栽是背景、牠只爬進爬出碗、搖晃沉澱；第二種玩法「散出來吃回來」用切換列切。
-- selftest 49 項在同一個 iframe 連跑 3 輪全過（上次跑的，這次沒動程式沒重跑）。
-- **這次做了 limrun 模擬器實測**（iPhone 16 Pro、iOS 26.4、402×874）：線上 `?v=233` 果凍皮、碗、擺飾、亮粉都畫得出來，每幀 33 毫秒（模擬器上限）。兩種玩法流程都走得完：沉澱從濁到清約 40 秒（寫的是 30 秒，沒動數字）；散出來吃回來一輪約 20 秒（噴 36 顆、9 秒剩 3 顆、24 秒吃完回碗）。第一次開線上網址整頁空白，重開就好，原因沒抓到。點牠不會跳「動作與方向」權限（模擬器沒加速度計）。細節在 `標準清單.md` 最後一節。
-- 手機版沒動：還是平塗、碗在左、沒有搖、沒有走路素材。
-- limrun：帳號有點數、這台電腦的 lim 已登入。我開的實例測完已刪。另外有兩台**沒標籤**的實例自己冒出來（17:08、17:34，25m 硬上限、5m 閒置），都在沒人動 5 分鐘後自己終止；懷疑是 lim 的 `--create` 預設補開的，下次指令一律帶 `--id --no-create`。
+- 網頁 v2.31 上線（`?v=233`），這次沒動。
+- **手機版（`swiftui-port`）追到網頁 v2.31**，七批七個 commit，每批都過了 Actions 的編譯檢查，**沒有一批在真機跑過**：
+  0. 黏液整段刪掉。
+  1. 三角網防打結、手指實心、抓著時回正上限、整團跟手上限、眼睛不出界。
+  2. 窗台、重力、正中間的碗、落地壓扁、放手規則、嚇到原地跳、鏡頭固定、白天夜晚背景（`SceneArt.swift` 烘成三張圖：天空、牆、擺飾加碗）。
+  3. 路線系統：爬出碗、爬回碗、閒著回碗。
+  4. 走路：CMPedometer 真步數、第二次打開送石頭、點石頭問「牠想跟你出門」、500／3000 步、一天三件、六格、捏掉、20 秒自己掉；回家從窗外（鏡頭 0.8）翻過窗框下緣、碗後緣進碗；小東西程式畫。
+  5. 搖晃沉澱：CoreMotion 加速度、彈一下、亮粉揚起變霧、約 30 秒沉澱閉眼慢呼吸、清透發光叮（`ding-01.wav`）、堆的形狀。只搬沉澱，吃回來留網頁。
+  6. 果凍皮：`JellySkin.metal` 照網頁著色器改寫，`JellySkin.swift` 管遮罩、模糊、打光，畫在眼睛底下；腮紅；眼睛縮 0.68。
+- 面板新滑桿：背景（0 藍 1 白天 2 夜晚）、皮（0 平塗 1 果凍）、牠自己出門、防打結五個、搖八個；按鈕：走路三顆、搖三顆。
+- limrun 模擬器實測了網頁 v2.31（細節在標準清單 v2.31 那節「模擬器實測」）。
 
 ## 等多米
 
-1. **已定（11-07 晚上）**：走路是主機制，搖留著當捏以外的另一種互動，兩個都不拿掉。還沒定：散出來吃回來要不要搬手機（我建議先不搬）。
-2. （已點頭）移植批次照 `.uiux/04-手感/手機版移植批次-暫定.md`。
-3. 真機搖起來怎樣：門檻 13 會不會誤觸或搖不到、霧夠不夠濃、30 秒會不會太久（模擬器量到約 40 秒）、叮的音量。
-4. 舊帳：build 106 步數讀到幾天前、閘門 1 三個測試、`CLAUDE.md` 草稿 v2.24 到 v2.31 要不要照改。
+1. 開口發 TestFlight：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`（先確認最後一次 push 的編譯是綠的）。
+2. 裝上去照 `標準清單.md` 最後一節的順序看：會不會開、手感沒退步、不打結、碗、背景切換、走路假裝、權限兩道、搖、果凍皮掉幀。
+3. 舊帳：build 106 步數讀到幾天前、閘門 1 三個測試、`CLAUDE.md` 草稿 v2.24 到 v2.31（這次又加了第 7 條）要不要照改。
+4. 還沒定的：搖的兩種玩法要不要留吃回來（手機沒搬）、「運動多牠就比較興奮」要不要做（待設計）。
 
 ## 下一步
 
-1. 多米 11-07 晚上點頭了：順序 0 到 6、吃回來先不搬、皮放最後。TestFlight 等七批全做完再發一次，中間只靠 Actions 編譯。進度勾在 `.uiux/04-手感/手機版移植批次-暫定.md` 最後一節。
-2. 批次 0 的內容：Swift 預設改成眼睛開、`limbs 0`、`tentBump 0`；黏液整段刪（`FeelParams` 的 `drops`、`dropsV`，`SlimeRig` 的 drops 區，`SlimeView` 的 drop、strand 圖層，候選 219 等對照裡的 drops 欄位）。
-3. 批次 1 對照網頁 `index.html` 搜尋「v2.29 防打結」（`buildMesh`、`meshGuard`、`noFlip`）、「v2.29 眼睛不跑出身體」。
-4. 不拿掉搖也不拿掉走路（多米 11-07 晚上定的）。
-4. 可選的小事：線上第一次開空白那件，要抓的話在 `index.html` 加 `window.onerror` 顯示層；調整面板在 402 寬排版爆掉（按鈕直排、底下幾排橫向溢出），開發用的，多米說要修再修。
+1. 第一句話問要不要發 TestFlight。發了就等多米回報，照回報修，一次一件，數字都在面板。
+2. 多米回報前不要再堆新功能到 `swiftui-port`。
+3. 修的時候：Swift 這台電腦編譯不了，每次 push 看 Actions（`gh run watch <id> --exit-status`，約 2 到 5 分鐘）；錯誤用 `gh run view <id> --log-failed | grep error:` 抓。這次踩到的：參數名字蓋掉同名常數（`night`）、`2 * .pi` 沒有型別上下文要寫 `Double.pi`。
 
 ## 怎麼做事（不變）
 
-- 多米沒 Mac。推 `swiftui-port` 會跑只編譯的檢查；TestFlight 等多米開口：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`。
-- 推 main（只放 web 和 docs）：`git worktree add <scratchpad>/wt-main origin/main -B main-sync` → `git checkout <hash> -- prototype .uiux .vibe CLAUDE.md` → 確認 `git diff --cached --name-only -- ios` 是空的 → `git commit -C <hash>` → `git push origin main-sync:main` → 移除 worktree 與分支。改版換 `?v=`。這次只改 docs，沒推 main。
+- 多米沒 Mac。推 `swiftui-port` 會跑只編譯的檢查；TestFlight 等多米開口。
+- 推 main（只放 web 和 docs）：`git worktree add <scratchpad>/wt-main origin/main -B main-sync` → `git checkout <hash> -- prototype .uiux .vibe CLAUDE.md` → 確認 `git diff --cached --name-only -- ios` 是空的 → `git commit -C <hash>` → `git push origin main-sync:main` → 移除 worktree 與分支。改版換 `?v=`。這次沒推 main（網頁沒改，docs 下次一起）。
 - 本機預覽：`preview_start` 名稱 `web-proto`；先 `resize_window` 393×852 再 `navigate`。面板藏著時 rAF 不跑，把 `requestAnimationFrame` 換成空函式，自己呼叫 `update(1/60)`、`draw()`。
-- selftest：放進 393×852 的 iframe，`ifr.contentWindow.eval(src)`，結果存 `localStorage`。同一個 iframe 連跑 3 輪（每次重開 iframe 都算第一輪，會不一樣）。只跑一段：`src.slice(0, src.indexOf('  // T1 輕按')) + '  res.PASS={};\n' + src.slice(src.indexOf('  // T46 v2.30'))`。跑的時候不准改 `index.html`。
-- 補丁用 Write 寫 python 再 `python -I`，每個取代檢查次數；先 `node -e "new Function(...)"` 檢查語法再開瀏覽器。
-- 任何「到幾秒為止」的計時器都要防時鐘倒回（selftest 會 restoreClock）。
-- limrun（`npx -y lim@0.51.0`，先 `export LIM_DAEMON=false`）：開 `lim ios create --label project=nienie-slime --inactivity-timeout 10m --hard-timeout 40m --model iphone --json`；開網頁 `lim ios open-url --id <id> <網址>`（第一次空白就再開一次）；截圖 `lim ios screenshot out.png --id <id> --size scaled`（402×874，座標和 tap 一樣）；點 `lim ios tap X Y --id <id>`；長按用 `perform` 的 touchDown／`{"type":"wait","durationMs":1600}`／touchUp。網頁上 `tapElement` 會逾時、面板要捲 30 次才到底，要按面板按鈕比較快的做法是複製一份到 scratchpad、注入捷徑鈕和狀態列、`python -m http.server 8766` 加 `lim ios tunnel --selector localhost:8766 --id <id> --detach --no-inspect`，模擬器開 `http://localhost:8766/`（捷徑鈕要聽 pointerup，位置先截圖量，CSS 的 top 和螢幕差約 80 點）。測完立刻 `lim ios tunnel stop`、`lim ios delete <id>`、`lim ios list` 確認；別的專案的（`project=` 標籤）不動。真正的搖（加速度）模擬器給不了。
+- selftest：放進 393×852 的 iframe，`ifr.contentWindow.eval(src)`，結果存 `localStorage`。同一個 iframe 連跑 3 輪。只跑一段：`src.slice(0, src.indexOf('  // T1 輕按')) + '  res.PASS={};\n' + src.slice(src.indexOf('  // T46 v2.30'))`。跑的時候不准改 `index.html`。
+- 補丁用 Write 寫 python 再 `python -I`，每個取代檢查次數；Swift 改完至少看大括號平衡和 diff。
+- 任何「到幾秒為止」的計時器都要防時鐘倒回。
+- limrun（`npx -y lim@0.51.0`，先 `export LIM_DAEMON=false`，指令帶 `--id --no-create`）：開 `lim ios create --label project=nienie-slime --inactivity-timeout 10m --hard-timeout 40m --model iphone --json`；網頁第一次空白就再開一次；測完立刻 `lim ios tunnel stop`、`lim ios delete <id>`、`lim ios list` 確認。細節在 11-07 的 limrun 記憶與標準清單。
+- 叮的音檔：`mkding.py`（三個正弦 1318.5／2637／1975.5 Hz，音量 1／.35／.18，衰減 1.4／.9／.6 秒，8 毫秒起音，48k 單聲道，峰值 −6 dBFS），要改音色重寫一份丟進 `ios/NieNie/Resources/ding-01.wav`。
 - 文件：改動寫進 `標準清單.md`（驗收）、`代決清單.md`（替多米決定的）、`黃金行為.md`、`CLAUDE-md-vX-草稿.md`；提案放 `.uiux/04-手感/`。
