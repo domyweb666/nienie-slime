@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreMotion
 import SwiftUI
 import UIKit
 
@@ -22,6 +23,9 @@ final class SlimeController: ObservableObject {
     @Published private(set) var slotSaved: [Int: Bool] = [:]
     /// Latency test (3-4 做法三): the screen flashes white for one frame when a finger lands.
     @Published var latencyTest = false
+    /// 走路 (v2.31 批次 4): the gift stone was tapped, the app asks whether it may know how far you walked
+    @Published var walkAsk = false
+    private let pedometer = CMPedometer()
     /// Frame readout for the hidden panel, refreshed a couple of times a second by the view.
     @Published private(set) var stats = SlimeView.FrameStats()
 
@@ -40,8 +44,11 @@ final class SlimeController: ObservableObject {
         rig = SlimeRig(params: start)
         rig.reduceMotion = reduceMotion
         rig.onEvent = { [weak self] e in self?.handle(e) }
+        rig.onGiftTap = { [weak self] in self?.walkAsk = true }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
         syncAudio()
+        rig.walkOpen()   // 走路: the second open leaves the gift stone
+        walkReadSteps()
 
         NotificationCenter.default.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification,
                                                object: nil, queue: .main) { [weak self] _ in
@@ -63,6 +70,7 @@ final class SlimeController: ObservableObject {
             guard let self, let at = self.backgroundAt else { return }
             if Date().timeIntervalSince(at) >= 600 { self.rig.resetImpression(); self.impressions = [:] }
             self.backgroundAt = nil
+            self.walkReadSteps()   // 走路: what you walked while it was away
         }
     }
 
@@ -201,6 +209,32 @@ final class SlimeController: ObservableObject {
         guard radius > 0 else { return gain }
         let size = max(0, min(1, (radius - 18) / 24))
         return max(0, min(1, gain * (1 + weight * (0.8 * size - 0.4))))
+    }
+
+    // MARK: - 走路 (v2.31 批次 4): real steps from CMPedometer, only after 多米 said yes on the gift stone; the steps stay on this phone
+
+    func walkAnswer(_ yes: Bool) {
+        rig.walkAnswer(yes)
+        if yes {   // it counts from this morning: what you already walked today counts
+            UserDefaults.standard.set(Calendar.current.startOfDay(for: Date()), forKey: "nienie.walk.lastRead")
+            walkReadSteps()
+        }
+    }
+    /// The panel's pretend steps (the web has the same buttons)
+    func walkFake(_ n: Int) { rig.walkBankSteps(n) }
+    func walkClear() { rig.walkClear(); UserDefaults.standard.removeObject(forKey: "nienie.walk.lastRead") }
+    private func walkReadSteps() {
+        guard rig.walkPerm == "ok", CMPedometer.isStepCountingAvailable() else { return }
+        let now = Date()
+        let from = (UserDefaults.standard.object(forKey: "nienie.walk.lastRead") as? Date) ?? Calendar.current.startOfDay(for: now)
+        guard now.timeIntervalSince(from) > 1 else { return }
+        pedometer.queryPedometerData(from: from, to: now) { [weak self] data, error in
+            DispatchQueue.main.async {
+                guard let self, error == nil, let n = data?.numberOfSteps.intValue else { return }
+                UserDefaults.standard.set(now, forKey: "nienie.walk.lastRead")
+                if n > 0 { self.rig.walkBankSteps(n) }
+            }
+        }
     }
 
     // MARK: - Buttons

@@ -70,6 +70,12 @@ struct ContentView: View {
             .padding(.top, 14)
             .padding(.bottom, 18)
         }
+        .alert("牠想跟你出門", isPresented: $controller.walkAsk) {   // 走路: asked only when the gift stone is tapped; 先不要 keeps the stone and never asks again
+            Button("先不要") { controller.walkAnswer(false) }
+            Button("好") { controller.walkAnswer(true) }
+        } message: {
+            Text("要讓牠知道你走了多少路嗎？步數只留在這支手機上。")
+        }
         .task {
             UserDefaults.standard.set(UserDefaults.standard.integer(forKey: "launchCount") + 1, forKey: "launchCount")
             guard showHint else { return }

@@ -71,6 +71,13 @@ struct TunePanel: View {
             .tint(Palette.ink)
 
             StepProbe()
+            // 走路（v2.31 批次 4）：假裝走了一段路，牠從窗外帶東西回來；全部重來清掉窗台上的東西、今天的次數和問過的權限
+            HStack(spacing: 6) {
+                chip("走路：假裝 800 步") { controller.walkFake(800) }
+                chip("假裝 3500 步") { controller.walkFake(3500) }
+                chip("全部重來") { controller.walkClear() }
+                Spacer(minLength: 0)
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {

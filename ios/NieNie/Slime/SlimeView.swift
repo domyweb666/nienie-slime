@@ -36,8 +36,11 @@ final class SlimeView: UIView {
     private var laidOutSize: CGSize = .zero
 
     private let skyLayer = CAGradientLayer()
-    // v2.28 窗台: the room baked into one picture behind it (sky, window, wall, the dish, the plant, the bowl), and the bowl's front half over it while it sits inside
-    private let sceneLayer = CALayer(), bowlFrontLayer = CALayer()
+    // v2.28 窗台: the room baked into pictures (sky; the wall with the window; the dish, the plant and the bowl) placed behind or in front of the body by plane,
+    // the bowl's front half over it while it sits inside; 走路: the small things on the sill and the one stuck to it
+    private let skyImgLayer = CALayer(), wallLayer = CALayer(), propsLayer = CALayer(), bowlFrontLayer = CALayer()
+    private let itemsGroup = CALayer(), stuckGroup = CALayer()
+    private var itemLayers: [CALayer] = [], stuckLayers: [CALayer] = []
     private var sceneKey = ""
     private let speckLayers = [CAShapeLayer(), CAShapeLayer()]   // v2.17: far-away specks, two strengths
     private let shadowLayer = CAShapeLayer()
@@ -73,8 +76,8 @@ final class SlimeView: UIView {
         skyLayer.startPoint = CGPoint(x: 0.5, y: 0)
         skyLayer.endPoint = CGPoint(x: 0.5, y: 1)
         layer.addSublayer(skyLayer)
-        sceneLayer.contentsGravity = .resize; sceneLayer.isHidden = true
-        layer.addSublayer(sceneLayer)
+        skyLayer.zPosition = -5
+        for l in [skyImgLayer, wallLayer, propsLayer, itemsGroup] { l.contentsGravity = .resize; l.isHidden = true; layer.addSublayer(l) }
         for (n, l) in speckLayers.enumerated() {
             l.fillColor = UIColor.white.cgColor
             l.opacity = n == 0 ? 0.4 : 0.7
@@ -108,7 +111,9 @@ final class SlimeView: UIView {
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
-        bowlFrontLayer.contentsGravity = .resize; bowlFrontLayer.isHidden = true
+        stuckGroup.isHidden = true; stuckGroup.zPosition = 1
+        layer.addSublayer(stuckGroup)   // 走路: the thing stuck to it, over the body
+        bowlFrontLayer.contentsGravity = .resize; bowlFrontLayer.isHidden = true; bowlFrontLayer.zPosition = 4
         layer.addSublayer(bowlFrontLayer)   // v2.28 窗台: in front of the body and the eyes
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
@@ -212,7 +217,8 @@ final class SlimeView: UIView {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
-            sceneLayer.frame = bounds; sceneKey = ""
+            for l in [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup] { l.frame = bounds }
+            sceneKey = ""
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
                        eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
                 l.frame = bounds
@@ -416,29 +422,60 @@ final class SlimeView: UIView {
         return img.cgImage
     }
 
-    /// v2.28 窗台: the baked room behind it and the bowl's front half over it; the blue sky and the specks only while floating.
+    /// v2.28 窗台: the baked room behind it (or, behind the bowl and outside, in front of it), the bowl's front half over it while it sits inside;
+    /// 走路: the small things. The blue sky and the specks only while floating.
     private func updateScene() {
         let kind = rig.sceneKind
+        let all: [CALayer] = [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup, bowlFrontLayer]
         guard kind > 0, let g = rig.sillG, bounds.width > 0, bounds.height > 0 else {
-            sceneLayer.isHidden = true; bowlFrontLayer.isHidden = true; skyLayer.isHidden = false
+            for l in all { l.isHidden = true }
+            skyLayer.isHidden = false
             for l in speckLayers { l.isHidden = false }
             return
         }
         let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))"
         if key != sceneKey {
-            if let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g) {
-                sceneKey = key
-                sceneLayer.contents = imgs.base.cgImage
-                bowlFrontLayer.contents = imgs.bowlFront.cgImage
-                bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
-            } else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
-                sceneLayer.isHidden = true; bowlFrontLayer.isHidden = true; skyLayer.isHidden = false
+            guard let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g) else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
+                for l in all { l.isHidden = true }
+                skyLayer.isHidden = false
                 return
             }
+            sceneKey = key
+            skyImgLayer.contents = imgs.sky.cgImage; wallLayer.contents = imgs.wall.cgImage; propsLayer.contents = imgs.props.cgImage
+            bowlFrontLayer.contents = imgs.bowlFront.cgImage
+            bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
         }
-        skyLayer.isHidden = true; sceneLayer.isHidden = false
+        skyLayer.isHidden = true
         for l in speckLayers { l.isHidden = true }
-        bowlFrontLayer.isHidden = !rig.sillInBowl
+        for l in all { l.isHidden = false }
+        // who is in front: on the sill the room is behind it; behind the bowl the bowl and the things are in front; outside the wall is too (it shows through the window only)
+        let plane = rig.sillPlane
+        skyImgLayer.zPosition = -4
+        wallLayer.zPosition = plane == .out ? 2 : -3
+        propsLayer.zPosition = plane == .room ? -2 : 3
+        itemsGroup.zPosition = plane == .room ? -1 : 3.5
+        bowlFrontLayer.isHidden = !(rig.sillInBowl && plane == .room)
+        let night = kind == 2
+        place(rig.walkBackSprites, in: &itemLayers, group: itemsGroup, world: false, night: night)
+        place(rig.walkWorldSprites, in: &stuckLayers, group: stuckGroup, world: true, night: night)
+    }
+    private func place(_ sprites: [SlimeRig.WalkSprite], in pool: inout [CALayer], group: CALayer, world: Bool, night: Bool) {
+        while pool.count < sprites.count && pool.count < 16 {
+            let l = CALayer(); l.contentsGravity = .resize; l.contentsScale = 2
+            group.addSublayer(l); pool.append(l)
+        }
+        let z: Double = world ? rig.drawZ : 1
+        for (k, l) in pool.enumerated() {
+            guard k < sprites.count else { l.isHidden = true; continue }
+            let sp = sprites[k], sz: Double = (sp.big ? 30 : 22) * 1.05 * z
+            let c: (x: Double, y: Double) = world ? rig.toScreen(sp.x, sp.y) : (sp.x, sp.y)
+            l.isHidden = false
+            l.contents = SceneArt.sprite(sp.kind, night: night).cgImage
+            l.bounds = CGRect(x: 0, y: 0, width: sz, height: sz)
+            l.position = CGPoint(x: c.x, y: c.y)
+            l.setAffineTransform(CGAffineTransform(rotationAngle: sp.a))
+            l.opacity = Float(sp.alpha)
+        }
     }
 
     /// v2.17: a layer of faint fixed specks far behind (parallax 0.55, they move slower than the slime). Without them a following
