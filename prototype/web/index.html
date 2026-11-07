@@ -1917,6 +1917,7 @@ function rtFrameLoop(){const g=SILL.g,xr=g.jr-R*.72,xl=g.gx+R*.72;return[RT.walk
 function rtClimbDrop(){const g=SILL.g,xr=g.jr-R*.72,y=g.gy+R*(1+1.6*Math.random());return[RT.walk('bar',xr),RT.turn('rjamb'),RT.walk('rjamb',y),RT.wait(.6+Math.random()),RT.drop(1),RT.surf('bar')]}
 // 翻到窗外：坐在窗框下緣時身體不碰牆，換層看不出來；往後掉到台階上，鏡頭縮小
 function rtGoOut(){const g=SILL.g,x=sillClampX(g.jr-R*(.8+.5*Math.random()));return[RT.walk('bar',x),RT.sniff(-Math.PI/2+.2,.4,.6),RT.plane('out'),RT.drop(.55),RT.surf('ledge')]}
+// v2.31 回家的目標用窗框層放得下的範圍（碗在中間時窗外的範圍在更右邊，不先走回來就換層會撞右窗框跳 14 點）；路線的 walk 不經過 sillClampX，走得到
 function rtComeBack(){const S=SILL,g=S.g,x=Math.max(g.gx+R*.8,Math.min(g.jr-R*.8,globalC.xc));return[RT.walk('ledge',x),RT.fn(()=>{S.ztg=1}),RT.move(g.bt-3),RT.plane('frame'),RT.drop(.6),RT.surf('bar')]}
 function rtHome(){const S=SILL;if(S.inBowl)return null;if(S.plane==='out')return rtComeBack().concat(rtBackIn());if(S.plane==='frame')return S.tanV||S.surf==='ceil'?rtFromWall().concat(rtBackIn()):rtBackIn();return rtIntoFront()}
 function rtFromWall(){const S=SILL,g=S.g;if(S.surf==='ceil')return[RT.wait(.2),RT.drop(.8),RT.surf('bar')];return[RT.walk(S.surf,g.bt-R*.85),RT.turn('bar')]}
@@ -1961,6 +1962,8 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   if(ESC.on&&S.inBowl&&!S.grab&&!S.hop)sillHop(ESC.dx,false);
   walkStep(dt);
   if(S.route&&!S.grab)routeStep(dt);
+  // v2.31 只跟碗互動：留在窗外（回家路線半路失敗）2 秒就再回一次
+  if(!S.grab&&S.plane==='out'&&!(mat.envFrame>=.5)&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&t-S.lastHome>2){S.lastHome=t;routeStart(rtHome())}
   // 在外面閒一陣子就回碗
   if(!S.grab&&!S.inBowl&&!S.air&&!S.hop&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&S.stickT<0&&t-lastTouch>25&&t-S.lastHome>10&&mat.envRoam>0){S.lastHome=t;routeStart(rtHome())}}
 
@@ -2029,7 +2032,7 @@ function walkToday(){const d=new Date().toDateString();if(WALK.day!==d){WALK.day
 function walkCheck(){const S=SILL;if(!S.on||!S.g||S.grab||WALK.stuck)return false;walkToday();const tier=walkTier(WALK.bank);if(!tier||WALK.dayN>=WALK_DAY)return false;WALK.bank=0;WALK.dayN++;walkTrip(tier===2);walkSave();return true}
 function walkTrip(big){const S=SILL,g=S.g;if(S.route)routeEnd(true);S.hop=null;S.stickT=-1;GAIT.on=false;WANDER.moving=false;SLP.lastAny=t;ESC.on=false;   // v2.31：逃跑狀態留著的話，回來的路線第一步就被取消，牠會一直留在窗外（selftest 全程第四輪抓到）
   let y1=-1e9,mx=0;for(const i of bnd)y1=Math.max(y1,Y[i]);for(let i=0;i<N;i++)mx+=X[i];mx/=N;
-  const rm=REDUCED,tx=rm?Math.max(g.gx+R*.9,Math.min(g.jr-R*.9,g.jr-R*1.3)):Math.max(g.gx+R*.8,Math.min(g.jr-R*.8,g.jr-R*1.2)),ty=rm?g.bt:g.oy,dx=tx-mx,dy=ty-y1;
+  const rm=REDUCED,sxw=q=>W/2+(q-W/2)/.8,tx=rm?Math.max(g.gx+R*.9,Math.min(g.jr-R*.9,g.jr-R*1.3)):Math.max(sxw(g.bx+g.bw*.5+R*.1),Math.min(sxw(g.jr+R*.15),sxw(g.jr-R*1.2))),ty=rm?g.bt:g.oy,dx=tx-mx,dy=ty-y1;   // v2.31 窗外是世界座標（鏡頭 0.8），範圍跟 sillClampX 的 out 一樣：放錯地方會被夾著走，回家的抬升 8 秒到不了就留在窗外（全程自測抓到）
   for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}CX+=dx;HOMEX=tx;HOMEY+=dy;globalC.xc+=dx;globalC.yc+=dy;S.px=0;S.py=0;   // 重心也要跟著搬：路線一開始就看它決定往哪走
   Object.assign(S,{inBowl:false,want:false,air:false,c:1,lift:false,tanV:false,gtx:0,gty:1,gvx:0,gvy:1,surf:rm?'bar':'ledge'});
   WALK.stuck={k:WKINDS[Math.floor(Math.random()*WKINDS.length)],big,i:walkPick(),a:Math.random()*.8-.4,idle:0};
@@ -2096,7 +2099,8 @@ function shkShake(dx,dy){if(!(mat.shake>=.5))return;const n=Math.max(1,mat.shake
   // 牠在碗裡彈一下：給所有粒子一個速度（Verlet：改上一幀的位置）。上限 2.6R／秒橫、0.7R／秒往上，碗的內壁會擋，不會飛出碗
   if(SILL.on&&SILL.g&&!SILL.grab&&!INTRO.on&&(mat.shakeKick||0)>0){const k=Math.min(2,mat.shakeKick);let ux=dx||0,uy=dy||0;const l=Math.hypot(ux,uy);if(l<1e-3){ux=Math.random()<.5?-1:1;uy=-.6}else{ux/=l;uy/=l}
     SNW.kick={vx:Math.max(-1,Math.min(1,ux))*R*2.6*k,vy:Math.max(-1,Math.min(.2,uy))*R*.7*k,until:t+.15}}}
-function shkStep(dt){const K=SNW.kick;if(K){if(t>=K.until)SNW.kick=null;else if(SILL.on&&!SILL.grab&&!SILL.air){const hs=dt/SUB,kx=K.vx*hs,ky=K.vy*hs;for(let i=0;i<N;i++){if(GRAB[i])continue;const vx=X[i]-PX[i],vy=Y[i]-PY[i];PX[i]=X[i]-(vx+(kx-vx)*.35);PY[i]=Y[i]-(vy+(ky-vy)*.35)}}}   // 彈一下：0.15 秒內把速度往目標混，不是加上去（連搖三下不會越彈越高跳出碗；量過加上去的版本第三下就飛出去）；在空中不推
+function shkStep(dt){if(SNW.last-t>1)SNW.last=-9;if(SNW.lastVoice-t>1)SNW.lastVoice=-9;if(SNW.clearT-t>1)SNW.clearT=-9;   // 時鐘被倒回去（自測）：停在未來的計時器歸零，不然眼睛一直 ∩（全程連跑第二輪 T38 抓到）
+  const K=SNW.kick;if(K){if(t>=K.until||K.until-t>1)SNW.kick=null;else if(SILL.on&&!SILL.grab&&!SILL.air){const hs=dt/SUB,kx=K.vx*hs,ky=K.vy*hs;for(let i=0;i<N;i++){if(GRAB[i])continue;const vx=X[i]-PX[i],vy=Y[i]-PY[i];PX[i]=X[i]-(vx+(kx-vx)*.35);PY[i]=Y[i]-(vy+(ky-vy)*.35)}}}   // 彈一下：0.15 秒內把速度往目標混，不是加上去（連搖三下不會越彈越高跳出碗；量過加上去的版本第三下就飛出去）；在空中不推
   if(!(mat.shake>=.5)){SNW.k*=Math.exp(-dt/.3);return}const G=SNW.glit;if(G.length!==Math.max(0,Math.round(mat.glitN||0)))shkBuild();
   let touching=false;for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'&&f.on)touching=true;
   if(touching)shkStir((mat.stirRate||0)*dt);
