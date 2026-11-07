@@ -172,10 +172,8 @@ struct FeelParams: Equatable, Codable {
     var e2: Double = 1                // E2: every action answered: a tap → it leans toward your finger; held still → it pushes once, then nuzzles; tickled → it squirms, too long → slips free; wary and dragged → it claws away
     var e3: Double = 1                // E3: the impression shows: trust 3–4× faster; trusting rounder, taller, warmer, slower breath; wary flatter, paler
     var e4: Double = 1                // E4: trusting and left alone 10–20 s, it swims to the front, waves a pseudopod, hums, goes back (3 times a run at most)
-    var drops: Double = 0             // v2.29 (多米 11-06: 取消這項設計，手機版的程式等移植時一起拿掉) drops: long pulls, yanks, flings, pinches, slow lifts drop bits (body at most 15% smaller); they float, it swims over and takes them back; you can drag them; trusting it pushes one to you; hold one and it comes to snatch it
     // v2.23 (多米 build 86: the drops look wrong and come off too easily, too many; still no feeling it reacts to you; try a face, eyes only;
     // sleep, rhythm, swim-in and the collection all at once). All but eyes only count while life2 is 1
-    var dropsV: Double = 1            // drops v2.23: only a yank or a hard fling drops one (one a grab, 4 s apart, 2 on screen, body at least 0.9); a strand pulls out, thins and snaps; a teardrop that wobbles round. 0: v2.22
     var eyes: Double = 1              // v2.27 off (多米 11-05: remove the eyes). 1: two small eyes: look at your finger, blink; squint held, > < pulled, ∩ purring or happy, ∪ asleep, wide when wary. 0: no face
     var sleep: Double = 1             // B2: untouched 40 s (a tap on the empty screen counts) while resting, it falls asleep; a touch startles it awake, a finger beside it 1.2 s wakes it gently
     var echo: Double = 1              // C6: tap the empty screen 2–8 times in a rhythm (0.12–1.2 s apart); it answers with the same count and rhythm; answer it back the same and it is happy
@@ -286,8 +284,8 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
     func applyV27(_ p: inout FeelParams) {
         p.off24()
         p.morph = 0; p.tentMem = 0
-        p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0   // nothing of v2.20 to v2.22
-        p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
+        p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0   // nothing of v2.20 to v2.22
+        p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
@@ -383,13 +381,13 @@ struct Candidate: Identifiable {
         Candidate(id: 34, name: "34 描邊粗細", hint: "被壓的邊變粗、被拉的變細") { p, _ in p.inkVar = 1 },
         Candidate(id: 212, name: "v2.12 對照（鏡頭最遠 0.45）", hint: "鏡頭最遠 0.45、牆在最遠鏡頭的邊、鏡頭貼邊、每個半徑 9 個點、從中間抓拉不動；黏土拉伸 8R、記形 4R、回原形 0.3") { p, m in
             p.off24(); p.zoomMin = 0.45; p.camFill = 1; p.camCenter = 0; p.dens = 9; p.grabReach = 0; p.dent = 0; p.camFollow = 0; p.life2 = 0; p.slide = 0; if m == .clay { p.maxPull = 8; p.memMax = 4; p.recover = 0.3 } },
-        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 219, name: "v2.19 對照（不跟手、凹痕慢、沒有印象）", hint: "拖的時候只變形不位移、點一下的凹痕跟回原形一起退（黏土 15 秒退一半）、不記得你怎麼對它") { p, _ in p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0 },
         Candidate(id: 226, name: "v2.26 對照（有眼睛、沒觸手、不變色）", hint: "回到 build 99 的外形：沒有固定觸手、有眼睛、不會變色") { p, _ in p.off27() },
         Candidate(id: 225, name: "v2.25 對照（一碰就抓、凹痕小）", hint: "手指一碰就抓，劃過身體會整團被帶走；凹痕整個在手指底下，揉和摸沒有痕跡，亮光只會轉") { p, _ in p.off26() },
         Candidate(id: 224, name: "v2.24 對照（放手一閃就回去、舊觸覺）", hint: "沒有參考形狀的慣性、拖到停不會衝過頭；連續觸覺跟變形量、沒有顆粒、按下去只有一下、呼嚕是兩下輕敲") { p, _ in p.off25() },
         Candidate(id: 223, name: "v2.23 對照（身體小、反應小、揉沒反應）", hint: "身體 0.22、抓著時畫面會滑、縮傾蹭看都小、揉要很慢才有反應、來回揉會逃") { p, _ in p.off24() },
-        Candidate(id: 222, name: "v2.22 對照（沒眼睛、舊黏液、不睡、不回節奏、跳過來）", hint: "v2.23 的五樣一起關") { p, _ in p.dropsV = 0; p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0 },
-        Candidate(id: 221, name: "v2.21 對照（不出聲、沒有黏液）", hint: "沒有 E1 到 E4、沒有黏液") { p, _ in p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0; p.drops = 0 },
+        Candidate(id: 222, name: "v2.22 對照（沒眼睛、不睡、不回節奏、跳過來）", hint: "v2.23 的五樣一起關") { p, _ in p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0 },
+        Candidate(id: 221, name: "v2.21 對照（不出聲）", hint: "沒有 E1 到 E4") { p, _ in p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0 },
         Candidate(id: 220, name: "v2.20 對照（整團只跟三成五）", hint: "單指拉只有三成五跟過去，果凍拉 1.6R 就頂住") { p, _ in p.slide = 0 },
         Candidate(id: 218, name: "v2.18 對照（沒有 v2.19 活物感）", hint: "一直在動、被拖著滑過去、一碰全停、固定節拍呼吸、隨機偽足、有影子") { p, _ in p.life2 = 0 },
         Candidate(id: 216, name: "v2.16 對照（鏡頭釘在中間）", hint: "鏡頭不跟、整隻一定在畫面裡、遊走只在中間一小塊") { p, _ in p.camFollow = 0 },
@@ -460,8 +458,6 @@ struct TuneField: Identifiable {
         TuneField(key: \.e2, name: "E2 動作都有它的回應", hint: "1：點它，它朝你的手指傾一下；按著不動 0.35 秒，它往你的手指推一下（輕頂）；手指放著不動它慢慢蹭你；搔癢它扭來扭去，撥太久會掙脫；戒的時候被拖會扒著反方向；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.e3, name: "E3 看得出印象", hint: "1：熟得快三到四倍；熟的圓一點、挺一點、顏色偏暖、呼吸慢；戒的扁一點、顏色淡一點；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.e4, name: "E4 來找你", hint: "1：熟的時候你 10 到 20 秒沒碰它，它游到畫面前面揮一下偽足、哼一聲，再回去休息；一次打開最多 3 次；0 關（碰到不做清單的「主動找你」，多米 11-02 決定留著）", range: 0...1, step: 1, section: "活物感"),
-        TuneField(key: \.drops, name: "黏液", hint: "1：拉很長、猛扯、甩、兩指擠、按久慢慢抬手會掉黏液（身體最多小一成五）；黏液飄著，它會游過去吸回來；你可以拖黏液，丟到它身上就吸；熟的時候它會推給你；你抓著一滴它會來搶；0 關", range: 0...1, step: 1, section: "活物感"),
-        TuneField(key: \.dropsV, name: "黏液 v2.23", hint: "1：只有猛扯（拉開 1.2R 以上、手指每秒 5R 以上）、用力甩放手才掉，一抓最多 1 滴、4 秒內不再掉、畫面上最多 2 滴、身體最少 0.9；從身體拉出一條絲、變細、斷開，那滴先是水滴形、晃幾下才變圓；0 回 v2.22", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.eyes, name: "眼睛 v2.23", hint: "1：兩顆小眼睛（多米 11-02：加表情看看，只要眼睛）。看你的手指、會眨眼；被捏瞇起來、猛扯擠成 > <、呼嚕和開心彎成 ∩、睡著閉成 ∪、戒的時候睜大；0 回沒有臉", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.sleep, name: "B2 睡著", hint: "1：40 秒沒人碰（含點空白處），休息時慢慢閉眼睡著：呼吸慢、深一點、攤軟、不走；碰它嚇醒（縮大一點、「嗯？」），手指放旁邊 1.2 秒慢慢醒；0 關", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.echo, name: "C6 照你的節奏回你", hint: "1：在空白處用固定節奏點 2 到 8 下（間隔 0.12 到 1.2 秒），停下來後它照同樣的次數和節奏一縮一縮回你（每下「噗」、輕震）；你再點一樣的節奏，它開心；0 關", range: 0...1, step: 1, section: "活物感"),

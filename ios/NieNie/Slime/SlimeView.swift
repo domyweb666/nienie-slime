@@ -50,15 +50,7 @@ final class SlimeView: UIView {
     private let dentUnit: CGFloat = 40           // the pit image is drawn for this radius (points)
     private let highlightLayer = CAShapeLayer()
     private let outlineLayer = CAShapeLayer()
-    // v2.22 drops, drawn in front of the body the same way: shade, the base colour shifted up-left inside, a highlight, an outline
-    private let dropShadeLayer = CAShapeLayer()
-    private let dropLitGroup = CALayer()
-    private let dropMask = CAShapeLayer()
-    private let dropBaseLayer = CAShapeLayer()
-    private let dropHiLayer = CAShapeLayer()
-    private let dropLineLayer = CAShapeLayer()
     private var tintKey = -1   // v2.22 E3: the impression tint last applied (rounded), −1 = plain colours
-    private let strandLayer = CAShapeLayer()     // v2.23 the strand a drop pulls out, behind the body (its root covered)
     private let eyeFillLayer = CAShapeLayer()    // v2.23 eyes, inside the body: open eyes...
     private let eyeLightLayer = CAShapeLayer()   // ...their white glints...
     private let eyeLineLayer = CAShapeLayer()    // ...and the ∩ ∪ > < and shut ones as strokes
@@ -85,8 +77,6 @@ final class SlimeView: UIView {
         }
         shadowLayer.fillColor = UIColor(red: 60 / 255, green: 90 / 255, blue: 40 / 255, alpha: 0.18).cgColor
         layer.addSublayer(shadowLayer)
-        strandLayer.lineJoin = .round
-        layer.addSublayer(strandLayer)
         layer.addSublayer(shadeLayer)
         litGroup.mask = litMask
         layer.addSublayer(litGroup)
@@ -113,13 +103,6 @@ final class SlimeView: UIView {
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
-        layer.addSublayer(dropShadeLayer)
-        dropLitGroup.mask = dropMask
-        layer.addSublayer(dropLitGroup)
-        dropLitGroup.addSublayer(dropBaseLayer)
-        layer.addSublayer(dropHiLayer)
-        dropLineLayer.fillColor = nil
-        layer.addSublayer(dropLineLayer)
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
         layer.addSublayer(flashLayer)
@@ -168,11 +151,6 @@ final class SlimeView: UIView {
         highlightLayer.fillColor = colors.light.cgColor
         outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
         outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
-        dropShadeLayer.fillColor = colors.shade.cgColor
-        dropBaseLayer.fillColor = colors.base.cgColor
-        dropHiLayer.fillColor = colors.light.cgColor
-        dropLineLayer.strokeColor = colors.line.cgColor
-        strandLayer.fillColor = colors.base.cgColor; strandLayer.strokeColor = colors.line.cgColor
         eyeFillLayer.fillColor = colors.eye.cgColor; eyeLineLayer.strokeColor = colors.eye.cgColor
         tintKey = -1
         CATransaction.commit()
@@ -228,8 +206,7 @@ final class SlimeView: UIView {
             CATransaction.setDisableActions(true)
             skyLayer.frame = bounds
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
-                       dropShadeLayer, dropLitGroup, dropMask, dropBaseLayer, dropHiLayer, dropLineLayer,
-                       strandLayer, eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
+                       eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
                 l.frame = bounds
             }
             redraw()
@@ -620,33 +597,8 @@ final class SlimeView: UIView {
             tintKey = tk
             let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
             let sh = tinted(colors.shade, tr, w, shade: true).cgColor, ba = tinted(colors.base, tr, w).cgColor
-            shadeLayer.fillColor = sh; baseLayer.fillColor = ba; dropShadeLayer.fillColor = sh; dropBaseLayer.fillColor = ba; strandLayer.fillColor = ba
+            shadeLayer.fillColor = sh; baseLayer.fillColor = ba
         }
-        // v2.22 drops: an ellipse stretched along its speed; the base colour shifted up-left inside it, a small highlight, the outline
-        let dv = rig.dropViews
-        let dsh = CGMutablePath(), dba = CGMutablePath(), dhi = CGMutablePath()
-        for d in dv where !d.pts.isEmpty {   // v2.23: the teardrop outline, drawn like the body
-            let c = rig.toScreen(d.x, d.y), r = d.r * z, P = d.pts.map { rig.toScreen($0.x, $0.y) }
-            dsh.addPath(bodyPath(P)); dba.addPath(bodyPath(P, dx: -r * 0.2, dy: -r * 0.24))
-            dhi.addEllipse(in: CGRect(x: -r * 0.24, y: -r * 0.11, width: r * 0.48, height: r * 0.22),
-                           transform: CGAffineTransform(rotationAngle: -0.5).concatenating(CGAffineTransform(translationX: c.x - r * 0.36, y: c.y - r * 0.4)))
-        }
-        for d in dv where d.pts.isEmpty {
-            let c = rig.toScreen(d.x, d.y), r = d.r * z, sp = hypot(d.vx, d.vy), st = 1 + min(0.5, sp / (rig.R * 3)), a = atan2(d.vy, d.vx)
-            let rect = CGRect(x: -r * st, y: -r / st, width: 2 * r * st, height: 2 * r / st), rot = CGAffineTransform(rotationAngle: a)
-            dsh.addEllipse(in: rect, transform: rot.concatenating(CGAffineTransform(translationX: c.x, y: c.y)))
-            dba.addEllipse(in: rect, transform: rot.concatenating(CGAffineTransform(translationX: c.x - r * 0.18, y: c.y - r * 0.22)))
-            dhi.addEllipse(in: CGRect(x: -r * 0.28, y: -r * 0.13, width: r * 0.56, height: r * 0.26),
-                           transform: CGAffineTransform(rotationAngle: -0.5).concatenating(CGAffineTransform(translationX: c.x - r * 0.38, y: c.y - r * 0.42)))
-        }
-        dropShadeLayer.path = dsh; dropMask.path = dsh; dropBaseLayer.path = dba; dropHiLayer.path = dhi
-        dropLineLayer.path = dsh; dropLineLayer.lineWidth = max(2.5, rig.R * 0.024)
-        // v2.23 strands: thick at both ends, thin in the middle; behind the body
-        let stp = CGMutablePath()
-        for poly in rig.strandViews where poly.count > 2 {
-            stp.addLines(between: poly.map { q -> CGPoint in let s = rig.toScreen(q.x, q.y); return CGPoint(x: s.x, y: s.y) }); stp.closeSubpath()
-        }
-        strandLayer.path = stp; strandLayer.lineWidth = max(2.5, rig.R * 0.024)
         // v2.23 eyes (多米 11-02: try a face, eyes only): bean eyes looking where it looks; ∩ happy, ∪ asleep, > < squeezed, a line when shut
         let ef = CGMutablePath(), el = CGMutablePath(), eli = CGMutablePath()
         if let e = rig.eyeView {
