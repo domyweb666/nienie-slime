@@ -111,6 +111,13 @@ struct FeelParams: Equatable, Codable {
     var grabK: Double = 0.55          // how far the grabbed patch moves to the finger per substep (× its weight); clay 1.2
     var nearR: Double = 1.58          // radius of the whole-body-frame memory around the fingers, in radii; clay 3 = the whole lump
     var ringGuard: Double = 1         // 1: a boundary particle may not pass through another boundary segment
+    // v2.29 防打結 (多米 11-06: 拉扯時常常打結; measured on the web: rough pulling flipped up to 602 of 960 inner triangles and they stayed flipped 3 s after release).
+    // Distance constraints only know near and far, not which side: a whole patch can turn inside out. The rest shape is cut into a triangle
+    // mesh and no triangle may shrink below noFlip of its rest area (the remembered shape too), so nothing can fold over and knot.
+    var noFlip: Double = 0.15         // 0 = off (v2.28)
+    var gripUp: Double = 0.004        // most the body turns back upright per substep while grabbed; larger and it cannot turn, so a pulled strand can only wrap around it (0.2 before)
+    var homeCap: Double = 0.5         // most the whole body follows the finger per substep (× particle spacing); faster and the ring beside the finger shears open and flips (0 = no cap, 24 pt a substep measured)
+    var fingerSolid: Double = 0.2     // the grabbing finger is solid (× R): dragged across the body it pushes the flesh it did not grab aside instead of passing through; 0 = off
     var pressFlat: Double = 0         // 1: pressing down from the upper half flattens it on an invisible table (clay)
     var flatMin: Double = 0.3         // flattest, as a fraction of the height when the press began
     // v2.12 (多米 build 55: pulled a little bigger and it would not go further; measured: the screen edge, right 1.1R, up 1.8R)
@@ -287,6 +294,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         p.slide = 0; p.drag = 0; p.dentFade = 10; p.imp = 0; p.e1 = 0; p.e2 = 0; p.e3 = 0; p.e4 = 0   // nothing of v2.20 to v2.22
         p.eyes = 0; p.sleep = 0; p.echo = 0; p.introSwim = 0   // nor v2.23
         p.camFollow = 0; p.wander = 0.22; p.emo = 0; p.life2 = 0   // before v2.17 the view stayed at home and the wander kept to the middle; no moods before v2.18, no v2.19 life
+        p.noFlip = 0; p.gripUp = 0.2; p.homeCap = 0; p.fingerSolid = 0   // v2.29 guards are not for fixed tentacles
         p.limbs = 5; p.pods = 0; p.jelly = 0; p.idlePace = 1; p.bodySize = 0.26; p.zoomMin = 1; p.camFill = 1; p.dens = 9; p.nearMem = 0; p.memMax = 1.1; p.grabHold = 0; p.grabK = 0.55; p.pressFlat = 0
         switch self {
         case .jelly, .mochi: p.wriggle = 0.07
@@ -545,6 +553,10 @@ struct TuneField: Identifiable {
         TuneField(key: \.dens, name: "點的密度", hint: "每個半徑幾個點；12（v2.13），以前 9：拉到 8R 時外圈太疏、尾端交叉。越密越吃效能，改了會重建身體", range: 6...14, step: 1, section: "按壓與記形"),
         TuneField(key: \.flatMin, name: "最扁", hint: "壓到最扁是原本高度的幾成", range: 0.15...0.8, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.ringGuard, name: "邊不能穿邊", hint: "1：邊界的點不能穿過另一段邊界（多米：交叉時像快壞掉）；0 關", range: 0...1, step: 1),
+        TuneField(key: \.noFlip, name: "防打結（三角形不翻面）", hint: "身體裡每個小三角形的面積不能小於靜止的這麼多倍，記住的形狀也一樣（v2.29，多米：拉扯常常打結）；0 關（v2.28）", range: 0...0.5, step: 0.01),
+        TuneField(key: \.gripUp, name: "抓著時回正的上限", hint: "抓著時每小步最多轉回頭朝上多少；太大的話身體轉不動，被拉過去的那條只能纏在身上（v2.29 0.004；以前 0.2）", range: 0...0.2, step: 0.001),
+        TuneField(key: \.homeCap, name: "整團跟手指的速度上限（×格距／小步）", hint: "整團被拖著走時，每小步最多移這麼多；太快的話手指附近那圈會一下被剪開、整片翻面（v2.29 0.5；0 不限）", range: 0...3, step: 0.1),
+        TuneField(key: \.fingerSolid, name: "手指是實心的（×半徑）", hint: "抓著拖過身體時，沒被抓到的部分被手指推開，不會被穿過去（v2.29 0.2；0 關）", range: 0...0.5, step: 0.01),
         TuneField(key: \.grabHold, name: "抓住跟手", hint: "被抓那塊不聽彈性、跟手指走的程度；黏土 0.85，0 是以前（落後手指約 1 個半徑）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.nearMem, name: "手指附近記形", hint: "手指附近用整身座標記形，拉出一塊就留一塊；0 只用局部區塊", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.memMax, name: "記形上限（×半徑）", hint: "記住的形狀最多離原形多遠；黏土 5（v2.15，超過約 8.5R 會抖），v2.13 是 12，v2.12 是 4，以前 1.1", range: 0.5...20, step: 0.1, section: "按壓與記形"),

@@ -27,6 +27,13 @@ enum SlimeEvent {
 /// never tangles. Rules learned the hard way are in `.uiux/lessons.md` and CLAUDE.md.
 final class SlimeRig {
     var params: FeelParams
+    /// The params as the physics uses them. v2.29: the anti-knot guards are not applied to fixed tentacles (limbs > 0, the 8-legged control):
+    /// those have their own rungs and slip, and 多米 11-06 no longer wants the legs.
+    private var effParams: FeelParams {
+        var m = params
+        if m.limbs > 0 { m.noFlip = 0; m.gripUp = 0.2; m.homeCap = 0; m.fingerSolid = 0 }
+        return m
+    }
     /// Reduce Motion: idle motion and twitches halved. Feedback stays on.
     var reduceMotion = false
     var onEvent: ((SlimeEvent) -> Void)?
@@ -57,6 +64,7 @@ final class SlimeRig {
     private(set) var bnd: [Int] = []     // boundary particle indices, in ring order
     private var bndL: [Double] = []      // rest distance between ring neighbours
     private var bndL2: [Double] = []     // rest distance between ring particles two apart (no folding back)
+    private var TRI: [Int] = [], TRA: [Double] = []   // v2.29 防打結: the rest shape's triangle mesh (3 indices a triangle) and each rest area
 
     private struct Cluster {
         var idx: [Int]
@@ -216,11 +224,20 @@ final class SlimeRig {
     private var eyeL: [Int] = [], eyeR: [Int] = [], eyeD0 = 1.0, eyeGX = 0.0, eyeGY = 0.0, eyeSacT = 0.0, eyeSX = 0.0, eyeSY = 0.0
     private var eyeUser = -9.0, eyeOpenD = 1.0, eyeWideD = 1.0, eyeBlinkT = -9.0, eyeNextBlink = 2.0, eyePulse = -9.0, eyeSqU = -9.0, eyeBlink = 1.0
     private var eyeDX = 0.0, eyeDY = 0.0, eyeDK = 0.0   // v2.24: the face sliding out from under a finger (× eye size), and how close the finger is 0...1
+    // v2.29 眼睛不跑出身體 (多米 11-06; measured 59 pt outside the outline in rough play): the face as placed this frame, with the eye distance capped at 1.3× rest,
+    // the face tilted at most 50°, both eyes one eye's width inside the outline (else the face slides to the nearest thick spot, then the eyes close up);
+    // eyeCX/CY/CK = the correction eased over 0.05 s, so it does not jump
+    private var eyeCX = 0.0, eyeCY = 0.0, eyeCK = 1.0
+    private var eyePose: (lx: Double, ly: Double, rx: Double, ry: Double)?
     private(set) var eyeMode = EyeMode.open
     struct EyeView { let lx, ly, rx, ry, gx, gy, lookX, lookY, open, wide, blink, size, spread: Double; let mode: EyeMode }
     /// The eyes as drawn (world points): each on the mean of its 4 particles; gaze −1...1; size = R × eyeSize; spread = how far apart vs rest.
     var eyeView: EyeView? {
         guard params.eyes >= 0.5, !eyeL.isEmpty, !eyeR.isEmpty else { return nil }
+        if let pz = eyePose, effParams.noFlip > 0 {   // v2.29: the gaze and the dodge are already inside the pose
+            return EyeView(lx: pz.lx, ly: pz.ly, rx: pz.rx, ry: pz.ry, gx: eyeGX, gy: eyeGY, lookX: 0, lookY: 0, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
+                           size: R * params.eyeSize, spread: max(0.8, min(1.3, hypot(pz.rx - pz.lx, pz.ry - pz.ly) / eyeD0)), mode: eyeMode)
+        }
         let l = eyeAt(eyeL), r = eyeAt(eyeR)
         let ga: Double = params.gazeAmp * (1 - 0.8 * eyeDK)   // v2.24: the whole face slides on the body; the closer the finger, the less it slides toward it
         return EyeView(lx: l.x, ly: l.y, rx: r.x, ry: r.y, gx: eyeGX, gy: eyeGY, lookX: eyeGX * ga + eyeDX, lookY: eyeGY * ga * 0.75 + eyeDY, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
@@ -703,6 +720,7 @@ final class SlimeRig {
         }
         for k in 0..<bnd.count { BIDX[bnd[k]] = k }
         buildRungs()
+        buildMesh()   // v2.29 防打結
         // highlight rides on the upper-left of the blob
         var bd = 1e9
         for i in 0..<N where TID[i] < 0 {
@@ -745,6 +763,97 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
+    }
+
+    /// v2.29 防打結: Delaunay (Bowyer-Watson) over the rest shape, keeping the triangles whose centre is inside the boundary ring,
+    /// wound counter-clockwise, with their rest areas. Port of the web's `buildMesh`.
+    private func buildMesh() {
+        let n = N
+        guard n >= 3, bnd.count >= 3 else { TRI = []; TRA = []; return }
+        var xs = Q0X + [0, 0, 0], ys = Q0Y + [0, 0, 0]
+        var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
+        for i in 0..<n { x0 = min(x0, xs[i]); x1 = max(x1, xs[i]); y0 = min(y0, ys[i]); y1 = max(y1, ys[i]) }
+        let d = max(x1 - x0, y1 - y0) * 20
+        xs[n] = x0 - d; ys[n] = y0 - d; xs[n + 1] = x1 + d; ys[n + 1] = y0 - d; xs[n + 2] = (x0 + x1) / 2; ys[n + 2] = y1 + d
+        struct Tri { let a, b, c: Int; let ux, uy, r: Double }
+        func circ(_ a: Int, _ b: Int, _ c: Int) -> Tri {
+            let ax = xs[a], ay = ys[a], bx = xs[b], by = ys[b], cx = xs[c], cy = ys[c]
+            let D: Double = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+            let A: Double = ax * ax + ay * ay, B: Double = bx * bx + by * by, C: Double = cx * cx + cy * cy
+            let ux: Double = (A * (by - cy) + B * (cy - ay) + C * (ay - by)) / D
+            let uy: Double = (A * (cx - bx) + B * (ax - cx) + C * (bx - ax)) / D
+            return Tri(a: a, b: b, c: c, ux: ux, uy: uy, r: (ax - ux) * (ax - ux) + (ay - uy) * (ay - uy))
+        }
+        var T = [circ(n, n + 1, n + 2)]
+        for i in 0..<n {
+            var keep: [Tri] = []
+            var E: [Int: (a: Int, b: Int, dup: Bool)] = [:]   // edges of the triangles this point falls into; an edge seen twice is inside the hole
+            for q in T {
+                let ex = xs[i] - q.ux, ey = ys[i] - q.uy
+                if ex * ex + ey * ey < q.r {
+                    for (a, b) in [(q.a, q.b), (q.b, q.c), (q.c, q.a)] {
+                        let k = a < b ? a * 100000 + b : b * 100000 + a
+                        if let e = E[k] { E[k] = (e.a, e.b, true) } else { E[k] = (a, b, false) }
+                    }
+                } else { keep.append(q) }
+            }
+            T = keep
+            for e in E.values where !e.dup { T.append(circ(e.a, e.b, i)) }
+        }
+        let nb = bnd.count
+        func inRing(_ x: Double, _ y: Double) -> Bool {
+            var c = false
+            var j = nb - 1
+            for i in 0..<nb {
+                let ax = Q0X[bnd[i]], ay = Q0Y[bnd[i]], bx = Q0X[bnd[j]], by = Q0Y[bnd[j]]
+                if (ay > y) != (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax { c.toggle() }
+                j = i
+            }
+            return c
+        }
+        var tri: [Int] = [], area: [Double] = []
+        for q in T {
+            if q.a >= n || q.b >= n || q.c >= n { continue }
+            let mx = (xs[q.a] + xs[q.b] + xs[q.c]) / 3, my = (ys[q.a] + ys[q.b] + ys[q.c]) / 3
+            if !inRing(mx, my) { continue }
+            let s: Double = 0.5 * ((xs[q.b] - xs[q.a]) * (ys[q.c] - ys[q.a]) - (ys[q.b] - ys[q.a]) * (xs[q.c] - xs[q.a]))
+            if abs(s) < 1e-6 { continue }
+            if s > 0 { tri.append(q.a); tri.append(q.b); tri.append(q.c) } else { tri.append(q.a); tri.append(q.c); tri.append(q.b) }
+            area.append(abs(s))
+        }
+        TRI = tri; TRA = area
+    }
+
+    /// v2.29 防打結: every triangle whose area fell below `kp` of its rest area is pushed back open along the area's gradient.
+    /// `grab` (the GRAB flags) lets the held particles move a quarter as much. One particle moves at most 0.4 spacing a call,
+    /// so a triangle that flipped all the way does not fling the body. Port of the web's `meshGuard`.
+    private func meshGuard(_ AX: inout [Double], _ AY: inout [Double], _ kp: Double, _ grab: [Bool]?) {
+        let cap = h * 0.4
+        let m = TRI.count
+        var t = 0
+        while t + 2 < m {
+            let a = TRI[t], b = TRI[t + 1], c = TRI[t + 2]
+            let ax = AX[a], ay = AY[a], bx = AX[b], by = AY[b], cx = AX[c], cy = AY[c]
+            let A: Double = 0.5 * ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax))
+            let Am: Double = TRA[t / 3] * kp
+            if A < Am {
+                let gax = 0.5 * (by - cy), gay = 0.5 * (cx - bx)
+                let gbx = 0.5 * (cy - ay), gby = 0.5 * (ax - cx)
+                let gcx = 0.5 * (ay - by), gcy = 0.5 * (bx - ax)
+                let wa: Double = (grab?[a] ?? false) ? 0.25 : 1, wb: Double = (grab?[b] ?? false) ? 0.25 : 1, wc: Double = (grab?[c] ?? false) ? 0.25 : 1
+                let ga = gax * gax + gay * gay, gb = gbx * gbx + gby * gby, gc = gcx * gcx + gcy * gcy
+                let den: Double = wa * ga + wb * gb + wc * gc
+                if den >= 1e-9 {
+                    var lam: Double = (Am - A) / den
+                    let mv: Double = lam * sqrt(max(wa * wa * ga, max(wb * wb * gb, wc * wc * gc)))
+                    if mv > cap { lam *= cap / mv }
+                    AX[a] += lam * wa * gax; AY[a] += lam * wa * gay
+                    AX[b] += lam * wb * gbx; AY[b] += lam * wb * gby
+                    AX[c] += lam * wc * gcx; AY[c] += lam * wc * gcy
+                }
+            }
+            t += 3
+        }
     }
 
     private func buildClusters() {
@@ -1338,7 +1447,7 @@ final class SlimeRig {
 
     /// Each frame: judging, stroke and grab turning into each other, the trail, grains on a stroke, and how far the body is carried (moved with its previous step, no velocity left; home moves along)
     private func strokeStep(_ dt: Double) {
-        let mat = params, strokeOn: Bool = mat.strokeV > 0 && mat.inertiaHz > 0
+        let mat = effParams, strokeOn: Bool = mat.strokeV > 0 && mat.inertiaHz > 0
         if !strokeOn { for (id, f) in fingers where f.mode == .stroke { strokeGrab(f, id: id) } }
         var tx = 0.0, ty = 0.0, n = 0.0, on = false, grab = false
         for (id, f) in fingers {
@@ -1534,7 +1643,7 @@ final class SlimeRig {
         } else if params.cSpace != builtSpace || params.cRad != builtRad {
             buildClusters()
         }
-        let mat = params
+        let mat = effParams
         if mat.homeFrac != builtHome { builtHome = mat.homeFrac; cy = H * mat.homeFrac; homeY = cy }   // 候選 33
         // 候選 26: a stuck finger lets go when its time is up
         for (id, f) in fingers where f.sticking && t >= f.releaseAt { release(id, quiet: false) }
@@ -1986,7 +2095,7 @@ final class SlimeRig {
     /// `L` gates rate-like idle motion (sway, twitch gating); `Lamp` and `tl` are the amplitude and clock
     /// of the phase-based idle motion (breathing, wriggle, drift, float), frozen while touched with idleFreeze.
     private func substep(_ dt: Double, _ L: Double, _ Lamp: Double, _ tl: Double) {
-        let mat = params
+        let mat = effParams
         // 偶發特別回彈: for 0.35 s after a special release the body is stiffer and less damped, so it wobbles once more
         let special = t < specialUntil
         var damp = mat.damp + (special ? 0.03 : 0)
@@ -2015,6 +2124,13 @@ final class SlimeRig {
                     X[m.i] += (f.fx + m.ox + m.dx * f.press - X[m.i]) * k
                     Y[m.i] += (f.fy + m.oy + m.dy * f.press - Y[m.i]) * k
                     if m.w > GWT[m.i] { GWT[m.i] = m.w }
+                }
+                if mat.fingerSolid > 0 {   // v2.29: dragged across the body, the finger pushes the flesh it did not grab aside instead of passing through
+                    let rf = R * mat.fingerSolid, r2 = rf * rf
+                    for i in 0..<N where !GRAB[i] {
+                        let ax = X[i] - f.fx, ay = Y[i] - f.fy, d2 = ax * ax + ay * ay
+                        if d2 < r2 && d2 > 1e-6 { let d = sqrt(d2), sc = (rf - d) / d * 0.5; X[i] += ax * sc; Y[i] += ay * sc }
+                    }
                 }
             } else if f.mode == .push {
                 let rf = R * 0.22
@@ -2220,7 +2336,7 @@ final class SlimeRig {
         // upright: turn back head-up. Kinematic (position and previous position together), so no overshoot.
         let gAng = atan2(clusters[gi].sn, clusters[gi].cs)
         let grabbing = !fingers.isEmpty
-        let rotK = -gAng * min(0.2, mat.upright * (grabbing ? mat.anchor * mat.gripRot : 1))
+        let rotK = -gAng * min(0.2, grabbing ? min(mat.upright * mat.anchor * mat.gripRot, mat.gripUp >= 0 ? mat.gripUp : 1) : mat.upright)   // v2.29 gripUp: grabbed, the body has to be able to turn, else a pulled strand can only wrap around it
         if rotK != 0 { rotateFree(by: rotK, around: gcx, gcy) }
         // idle sway: pure performance displacement, no velocity left behind
         let sway = L * mat.life * 0.0009 * sin(t * 2 * .pi / 5.3)
@@ -2263,12 +2379,15 @@ final class SlimeRig {
         //    so a tentacle pushed root-to-tip could fold over itself; the rungs keep each edge on its own side and the
         //    axis links keep advancing (the fold was the axis turning 180° within one link)
         if mat.tentRung > 0 { tentacleRungs(mat) }
+        if mat.noFlip > 0 { meshGuard(&X, &Y, mat.noFlip, GRAB) }   // v2.29 防打結: before the walls, so the collisions have the last word and it does not sink into the floor
         // 4 home (float), bounds
         let hx = homeX + tugX + dragOX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY + tugY + dragOY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
         let hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
-        let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx = hx - gcx, dy = hyF - gcy
+        let kh = grabbing ? 0.02 * mat.anchor : mat.homeK, dx0 = hx - gcx, dy0 = hyF - gcy
+        let hcp: Double = mat.homeCap > 0 ? mat.homeCap * h / max(mat.homeCap * h, hypot(dx0, dy0) * kh) : 1   // v2.29 homeCap: dragged along, the whole body moves at most half a spacing a substep, so the ring beside the finger is not sheared open
+        let dx = dx0 * hcp, dy = dy0 * hcp
         let wl = worldWalls, padT = wl.t, padB = wl.b, padL = wl.l, padR = wl.r   // walls: the edge of the farthest view (world)
         for i in 0..<N {
             if !GRAB[i] { X[i] += dx * kh; if !introOn { Y[i] += dy * kh } }   // hopping in, up and down is gravity and the floor's
@@ -2383,7 +2502,7 @@ final class SlimeRig {
     }
 
     private func plasticity(_ dt: Double) {
-        let mat = params
+        let mat = effParams
         // where each particle sits in rest space right now (rotation only, averaged over its clusters)
         for i in 0..<N { RX[i] = 0; RY[i] = 0; GW[i] = 0 }
         // v2.19: with the same weights, where the performed scaling alone would put each particle in rest space (SX2, SY2); memory
@@ -2505,6 +2624,7 @@ final class SlimeRig {
         }
         if mat.tentMem > 0 { restFix(mat) }
         tentRest(dt, mat)
+        if mat.noFlip > 0 { meshGuard(&QX, &QY, max(mat.noFlip, 0.3), nil) }   // v2.29: the remembered shape may not flip either (measured: 102 triangles flipped after rough pulling, and it never came undone)
         var mx = 0.0, my = 0.0
         for i in 0..<N { mx += QX[i]; my += QY[i] }
         mx /= Double(N); my /= Double(N)
@@ -3319,6 +3439,7 @@ final class SlimeRig {
             if k == 0 { eyeL = pick } else { eyeR = pick }
         }
         if !eyeL.isEmpty && !eyeR.isEmpty { let l = eyeAt(eyeL), r = eyeAt(eyeR); eyeD0 = max(1, hypot(r.x - l.x, r.y - l.y)) }
+        eyeCX = 0; eyeCY = 0; eyeCK = 1; eyePose = nil   // v2.29
         eyeDX = 0; eyeDY = 0; eyeDK = 0; eyeGX = 0; eyeGY = 0; eyeSacT = 0; eyeUser = -9; eyeMode = .open; eyeOpenD = 1; eyeWideD = 1; eyeBlinkT = -9; eyePulse = -9; eyeSqU = -9; eyeBlink = 1
     }
     /// Where it looks: a grabbing finger → a finger beside it → where you tapped the rhythm → you (straight out) →
@@ -3370,6 +3491,7 @@ final class SlimeRig {
             let kd: Double = 1 - exp(-dt / 0.1)
             eyeDX += (tx - eyeDX) * kd; eyeDY += (ty - eyeDY) * kd; eyeDK += (dk - eyeDK) * kd
         }
+        eyePoseStep(dt)   // v2.29: keep the face inside the body
         if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
         let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil
         let squeeze = moodStrain > 0.4 || tickOn || (escOn && t - escT0 < 0.5) || t < eyeSqU
@@ -3386,6 +3508,87 @@ final class SlimeRig {
         eyeBlink = u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1)))
         let k = 1 - exp(-dt / 0.05)
         eyeOpenD += (open - eyeOpenD) * k; eyeWideD += (wide - eyeWideD) * k
+    }
+    /// Signed distance from (x, y) to the closed polygon P: positive inside (winding number), negative outside.
+    private func sdRing(_ P: [(x: Double, y: Double)], _ x: Double, _ y: Double) -> Double {
+        var w = 0
+        var dm = 1e18
+        let n = P.count
+        var j = n - 1
+        for i in 0..<n {
+            let ax = P[j].x, ay = P[j].y, bx = P[i].x, by = P[i].y, ex = bx - ax, ey = by - ay
+            let l2: Double = max(1e-9, ex * ex + ey * ey)
+            let u: Double = max(0, min(1, ((x - ax) * ex + (y - ay) * ey) / l2))
+            let dx = ax + ex * u - x, dy = ay + ey * u - y, d = dx * dx + dy * dy
+            if d < dm { dm = d }
+            let cr: Double = ex * (y - ay) - ey * (x - ax)
+            if ay <= y { if by > y && cr > 0 { w += 1 } } else if by <= y && cr < 0 { w -= 1 }
+            j = i
+        }
+        dm = sqrt(dm)
+        return w != 0 ? dm : -dm
+    }
+    /// v2.29 眼睛不跑出身體: the eyes stay bound to their particles, with three more rules. The eye distance is at most 1.3× rest (pulled open
+    /// at both sides the face is not torn apart); the face tilts at most 30° with the body plus 20° locally (two eyes stacked read as no face);
+    /// both eyes keep one eye's height from the outline, else the whole face slides to the nearest spot thick enough, then the eyes close up.
+    /// The correction eases in over 0.05 s; an eye really outside is clamped back this very frame. Port of the web's `eyePose`.
+    private func eyePoseStep(_ dt: Double) {
+        guard effParams.noFlip > 0, !eyeL.isEmpty, !eyeR.isEmpty, !clusters.isEmpty, bnd.count >= 3 else { eyePose = nil; return }
+        let l = eyeAt(eyeL), r = eyeAt(eyeR), S = R * params.eyeSize, ga: Double = params.gazeAmp * (1 - 0.8 * eyeDK)
+        let ox: Double = (eyeGX * ga + eyeDX) * S, oy: Double = (eyeGY * ga * 0.75 + eyeDY) * S
+        let P = boundaryPoints()
+        let M: Double = S * 0.118 + R * 0.02   // one eye's height (flat skin; the jelly skin draws the eyes at 0.68)
+        let g0 = atan2(clusters[gi].sn, clusters[gi].cs)
+        let cx = (l.x + r.x) / 2 + ox, cy = (l.y + r.y) / 2 + oy, ax = r.x - l.x, ay = r.y - l.y
+        let sp: Double = min(hypot(ax, ay), eyeD0 * 1.3)
+        let th0 = atan2(ay, ax), dth = atan2(sin(th0 - g0), cos(th0 - g0))
+        let th: Double = max(-0.5, min(0.5, atan2(sin(g0), cos(g0)))) + max(-0.35, min(0.35, dth))
+        let ux = cos(th), uy = sin(th)
+        func fits(_ x: Double, _ y: Double, _ s: Double) -> Bool {
+            sdRing(P, x - ux * s / 2, y - uy * s / 2) >= M && sdRing(P, x + ux * s / 2, y + uy * s / 2) >= M
+        }
+        var tx = 0.0, ty = 0.0, tk = 1.0   // this frame's wanted correction: shift, and the eye distance factor
+        if !fits(cx, cy, sp) {
+            var sx = cx, sy = cy, best = -1e9
+            var i = 0
+            while i < N {
+                if TID[i] < 0 {
+                    let d = sdRing(P, X[i], Y[i]), sc: Double = min(d, M * 1.8) - 0.04 * hypot(X[i] - cx, Y[i] - cy)
+                    if sc > best { best = sc; sx = X[i]; sy = Y[i] }
+                }
+                i += 2
+            }
+            var s2 = sp
+            var k = 0
+            while k < 3 && !fits(sx, sy, s2) { s2 *= 0.72; k += 1 }
+            tk = s2 / sp
+            var lo = 0.0, hi = 1.0
+            if fits(sx, sy, s2) {
+                for _ in 0..<6 { let m = (lo + hi) / 2; if fits(cx + (sx - cx) * m, cy + (sy - cy) * m, s2) { hi = m } else { lo = m } }
+            }
+            tx = (sx - cx) * hi; ty = (sy - cy) * hi
+        }
+        let q: Double = 1 - exp(-dt / 0.05)
+        eyeCX += (tx - eyeCX) * q; eyeCY += (ty - eyeCY) * q; eyeCK += (tk - eyeCK) * q
+        let s3 = sp * eyeCK
+        var ex = [cx + eyeCX - ux * s3 / 2, cx + eyeCX + ux * s3 / 2], ey = [cy + eyeCY - uy * s3 / 2, cy + eyeCY + uy * s3 / 2]
+        // really outside: clamp straight back in, step by step toward the thickest spot nearby
+        for e in 0..<2 {
+            if sdRing(P, ex[e], ey[e]) >= M * 0.6 { continue }
+            var bx = ex[e], by = ey[e], bd = -1e9
+            var i = 0
+            while i < N {
+                if TID[i] < 0 {
+                    let d = sdRing(P, X[i], Y[i]), sc: Double = min(d, M) - 0.03 * hypot(X[i] - ex[e], Y[i] - ey[e])
+                    if sc > bd { bd = sc; bx = X[i]; by = Y[i] }
+                }
+                i += 2
+            }
+            var lo = 0.0, hi = 1.0
+            for _ in 0..<6 { let u = (lo + hi) / 2; if sdRing(P, ex[e] + (bx - ex[e]) * u, ey[e] + (by - ey[e]) * u) >= M * 0.6 { hi = u } else { lo = u } }
+            ex[e] += (bx - ex[e]) * hi; ey[e] += (by - ey[e]) * hi
+        }
+        eyePose = (ex[0], ey[0], ex[1], ey[1])
     }
     /// B2: untouched 40 s (a tap on empty space counts) while resting, it falls asleep: eyes close, it melts a little, breathes slow and deep.
     private func sleepTry() -> Bool {
