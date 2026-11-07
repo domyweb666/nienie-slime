@@ -1,67 +1,61 @@
-# Handoff: 手機版七批追到網頁 v2.31，build 117 已發 TestFlight，等多米真機回報
+# Handoff: 網頁 v2.32 興奮做了，吹氣不做，定位文件等多米選主 job；build 117 仍等真機回報
 
-> 產出時間：2026-11-07 19:27（第十九會話結束）
+> 產出時間：2026-11-07 20:30（第二十會話結束）
 > 前一會話的最後狀態，給下一個會話接續用。舊版在 `.vibe/handoff/archive/`。
 
 ## ✅ 這次完成了什麼
 
-- 用 limrun 的 iPhone 16 Pro 模擬器實測網頁 v2.31：果凍皮畫得出來，沉澱約 40 秒清、散出來吃回來一輪約 20 秒；結果在 `標準清單.md` v2.31 那節「模擬器實測」。
-- 多米定案：走路是主機制，搖留著當捏以外的另一種互動，兩個都不拿掉。寫進 `CLAUDE-md-v2.31-草稿.md` 第 5-2 條。
-- 寫移植批次文件 `.uiux/04-手感/手機版移植批次-暫定.md`，多米點頭：順序 0 到 6、吃回來先不搬、果凍皮放最後、TestFlight 全做完再發一次。
-- 手機版（`swiftui-port`）七批全搬完，每批一個 commit（`port batch 0` 到 `port batch 6`），每批都過 Actions 編譯：刪黏液；防打結與眼睛不出界；窗台、重力、正中間的碗、白天夜晚背景；爬出碗爬回碗；走路（CMPedometer 真步數、問權限、回家翻過碗後緣）；搖晃沉澱（CoreMotion、叮聲 wav）；果凍皮（Metal 著色器照網頁改寫）。
-- 新檔：`ios/NieNie/Slime/SceneArt.swift`、`JellySkin.swift`、`JellySkin.metal`；`Resources/scene-*.webp` 四張、`ding-01.wav`。
-- 面板新東西：背景（0 藍 1 白天 2 夜晚）、皮（0 平塗 1 果凍）、牠自己出門、防打結五個、搖八個滑桿；走路三顆、搖三顆按鈕。
-- 多米開口後發了 TestFlight：**build 117**（run 42367574466），編譯和上傳都成功。
-- 文件：`標準清單.md` 最後一節「手機版移植」是第一次裝機的檢查順序；`代決清單.md` 11-07「移植」那幾列是替多米決定的事；`ios/README.md` 頂端補了一段；limrun 的兩份記憶更新了。
+- 接續上一會話：build 117 多米還沒回報，所以 `swiftui-port` 的 Swift 一行沒動。
+- 多米三個決定：做「運動多牠就比較興奮」、吹氣不做、要我重新定位 app（JTBD）。
+- 網頁 **v2.32 興奮**（`prototype/web/index.html`）：興奮程度 = 今天走路帶回幾件（0 或 1 件 0、2 件 .5、3 件 1），函式 `exLevel()`；面板「興奮」滑桿 -1 自動、0 到 3 假裝。撥七項：`restDur` ×(1−.5ex)、`gaitConst` 的 sd ×(1+.3ex)、張望機率 .45+.35ex、E4 次數 3+round(2ex)、呼嚕上升 ×(1+.4ex)、眨眼間隔 ×(1−.3ex)、看你 .45+.15ex；走路回家路線最後加 `RT.fn` 設 `WALK.hopN`，`walkStep` 在落進碗、沒人碰時 `hop()` 一下或兩下。抓著時一字不動。
+- selftest 加 T49（`res.PASS.excite`）：藍底放 90 秒量休息比例、走路速度、探的次數（0／2／3 件三組）；回家小跳 2／0／中斷 0；同種子拉 2R 放手兩邊差 3% 內（放手後要把 `LIFE.att`、`LIFE.ask` 清掉，不然牠去探手指離開的地方，偽足長度是亂數）；自動對照 dayN。三輪結果見「驗證」。
+- 文件：`.uiux/04-手感/興奮提案-暫定.md`、`.uiux/04-手感/跑步與照片提案-暫定.md`（四個主意，等多米裁「拍照不做」）、`.uiux/01-定位與JTBD-暫定.md`（主 job 建議 A「手癢、腦袋轉不停的那兩分鐘」）、`標準清單.md` v2.32 節、`代決清單.md` 四列、`CLAUDE-md-v2.32-草稿.md`、核心動作卡不做清單加吹氣、吹氣提案標「不做」、README 改到現況。
+
+## 🧪 驗證
+
+- selftest 三輪全過（49 項，三輪 ALL_PASS）。T49 三輪的數字：休息時長 0 件 6.15 秒、2 件 4.65、3 件 3.1（比例 0.75／0.5）；藍底放 90 秒休息比例 0.39 到 0.48 對 0.22 到 0.30；走路速度 ×1.25 到 ×1.38；回家小跳 2／0／中斷 0；拉 2R 放手兩邊差 1% 內（三種子平均）。
+- T49 寫法踩了四次才穩：量放著的迴圈不能每幀 `lastTouch = t`；放手後要清 `LIFE.att`、`LIFE.ask`；手感段關眼睛、三個種子平均、門檻用同一級三個種子之間的差當底線；T47 結尾要 `clear()`（走路留下的 dayN 3 會讓 T48 興奮，T48 掉過一輪）。
+- 沒有真機、沒有真人。興奮的數字（×0.5、×1.3 那些）全是我取的，要多米在網頁面板拉到 3 看。
 
 ## 🚧 還沒做完 / 待決定
 
-- 七批沒有一批在真機跑過，build 117 是第一次裝。Metal 果凍皮、CMPedometer、CoreMotion 都是編譯過但沒看過畫面，一次冒出好幾個問題很正常。
-- 多米還沒回報 build 117 裝上去怎樣。
-- 搖的兩種玩法要不要留吃回來，手機沒搬（網頁切換列還有）。等多米玩過網頁再說。
-- 「運動多牠就比較興奮」待設計：基準線是平常的牠，走路只往上加，不做走得少就難過。要先寫提案。
-- 舊帳：build 106 步數讀到幾天前、閘門 1 三個測試、`CLAUDE.md` 草稿 v2.24 到 v2.31（這次加了第 7 條）要不要照改。
-- 網頁 docs 這幾個 commit 還沒同步到 main（網頁沒改，下次一起推）。
+- build 117 七批真機回報（標準清單「手機版移植」那節的順序）。回報前不往 `swiftui-port` 加功能。
+- 定位：多米要選主 job（A 建議／B 桌上的小東西／C 走路的理由），改一句話，核心動作卡跟著改。
+- 跑步與照片：四個主意等裁，「拍照不做」那條要多米重裁。
+- 興奮搬手機：等走路真機過了。Swift 要改 `SlimeRig`（restDur、gait、looks、eyes、purr）、`SlimeController`（算今天幾件）、面板一條滑桿。
+- 網頁 v2.32 還沒推 main（推 main 用 worktree 只放 `prototype .uiux .vibe CLAUDE.md`）。
+- 舊帳沒變：吃回來留不留、build 106 步數讀幾天前、閘門 1 三個測試、CLAUDE.md 草稿 v2.24 到 v2.32、面板 402 寬排版、四隻收集留不留。
 
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
-- 走路主、搖副，兩個都留（多米 11-07 晚上）。
-- TestFlight 全做完再發一次，不分批發（多米）。
-- 吃回來先不搬手機；果凍皮放最後、走 Metal 不用 CAGradientLayer 拼（多米點頭）。
-- 手機版的背景、皮、搖的數字都放調整面板，畫面上不加切換列（我定的，代決清單有）。
-- 走路答「好」之後步數從當天 0 點算起；每次回前景讀一次（我定的）。
-- 叮聲照網頁三個正弦用 Python 烘成 wav，不在 app 裡合成（我定的）。
-- 先前仍有效的：皮 A 清透、碗在中間、只跟碗互動、黏液取消、手感基準只為基準表的數字改。
+- 興奮做（多米 11-07 晚上）。用件數不用步數、只往上加、抓著時不動（我定，提案多米沒改）。
+- 吹氣不做（多米 11-07）。
+- 走路主、搖副、兩個都留（上一會話）。
+- 定位建議 A，但要多米選；選之前核心動作卡的一句話不動。
 
 ## 📂 下個會話最重要的檔案
 
-- `.vibe/標準清單.md` 最後一節「手機版移植」 ← 多米回報時對照這個順序
-- `.uiux/04-手感/手機版移植批次-暫定.md` ← 七批各做了什麼、進度勾
-- `.vibe/代決清單.md` 11-07「移植」那幾列
-- `ios/NieNie/Slime/SlimeRig.swift`：搜尋「v2.28 窗台」「v2.30 routes」「走路 (v2.31 批次 4)」「v2.31 搖晃沉澱」各一段
-- `ios/NieNie/Slime/SlimeView.swift`：`updateScene`、`drawGlitter`、`drawJelly`
-- `ios/NieNie/App/SlimeController.swift`：走路讀步數、搖的 CoreMotion
-- `prototype/web/index.html` 對照用（搬的時候每段都照它）
+- `.uiux/01-定位與JTBD-暫定.md` ← 多米回「選 A／B／C」時從這份改
+- `.vibe/標準清單.md` 最後兩節（手機版移植、v2.32 興奮）
+- `prototype/web/index.html`：搜尋「v2.32」共約 10 處；`exLevel`
+- `prototype/web/selftest.js`：T49
+- `.uiux/04-手感/手機版移植批次-暫定.md`、`跑步與照片提案-暫定.md`
 
 ## ⏭️ 下一步從哪繼續
 
-1. 第一句話問多米：build 117 裝上去，照標準清單最後一節的順序，第一眼看到什麼。會不會開、手感有沒有退步、不打結、碗、背景切換、走路假裝鈕、兩道權限、搖三下、果凍皮掉幀。
-2. 照回報修，一次一件。這台電腦編譯不了 Swift：改完 push `swiftui-port`，`gh run watch <id> --repo domyweb666/nienie-slime --exit-status` 等約 2 到 5 分鐘；錯了 `gh run view <id> --log-failed | grep error:`。修一批再發一次 TestFlight（要多米開口）：`gh workflow run ios.yml --repo domyweb666/nienie-slime --ref swiftui-port -f testflight=true`。
-3. 多米回報前不要往 `swiftui-port` 堆新功能。
-4. 如果多米先回網頁的事（吃回來留不留、搖的門檻），照舊流程改網頁、跑 selftest、推 main 換 `?v=`。
+1. 多米回 build 117：照標準清單「手機版移植」順序修，一次一件，推 `swiftui-port` 等 Actions，修一批再發 TestFlight（要多米開口）。
+2. 多米回定位：改核心動作卡一句話任務，閘門 1 一句話測試換新句子。
+3. 多米沒回程式的事、只回定位或跑步：照文件改，不碰程式。
+4. 要推網頁 v2.32 到 main 的話：worktree 只放 `prototype .uiux .vibe CLAUDE.md`，確認 `git diff --cached --name-only -- ios` 空的。
 
 ## 🛠️ 怎麼做事（這次學到的，加在舊規矩上）
 
-- Swift 補丁：Write 寫 python 再 `python -I`，每個取代檢查次數；改完看大括號平衡和 diff 再推。這次踩到兩個：函式參數跟常數同名會蓋掉（`night`）；`2 * .pi / 5` 沒有型別上下文要寫 `Double.pi`。
-- 推 `swiftui-port` 每次都會跑一次編譯檢查（約 2 到 5 分鐘），docs-only 也會。
-- limrun：`export LIM_DAEMON=false`，指令一律帶 `--id --no-create`；開 `lim ios create --label project=nienie-slime --inactivity-timeout 10m --hard-timeout 40m --model iphone --json`；網頁第一次開空白就再開一次；網頁上 `tapElement` 會逾時，要按面板按鈕就複製一份到 scratchpad 注入捷徑鈕（聽 pointerup，位置先截圖量）加 `lim ios tunnel --selector localhost:8766`；測完 `tunnel stop`、`delete`、`list` 確認。
-- 叮聲：三個正弦 1318.5／2637／1975.5 Hz，音量 1／.35／.18，衰減 1.4／.9／.6 秒，8 毫秒起音，48k 單聲道，峰值 −6 dBFS，播放時 gain 0.5。
-- 舊規矩不變：多米沒 Mac；推 main 用 worktree 只放 `prototype .uiux .vibe CLAUDE.md`，確認 `git diff --cached --name-only -- ios` 是空的；本機預覽 `web-proto` 先 resize 393×852；selftest 同一個 iframe 連跑 3 輪、跑的時候不改 `index.html`；計時器都防時鐘倒回。
+- selftest 這台跑法：`preview_start web-proto`，resize 393×852，`navigate ?nocache=N`，javascript_tool 裡 `fetch('selftest.js?'+Date.now())` 後 `setTimeout(3500)` 排 3 輪把結果丟 `window.__runs`，之後每 45 秒讀一次；頁面跑的時候整個卡住，每次讀都會逾時到結果出來為止，一輪 49 項約 4 分鐘。
+- 量「放著牠會不會動」的迴圈裡不能每幀 `lastTouch = t`，那會讓 `idle` 永遠小於 0.5，牠一步都不走（T49 第一次就踩到）。
+- 網頁補丁照舊：python 腳本 `rep(old,new,count)` 逐條驗次數，跑完 `new Function` 檢查語法。
+- 舊規矩不變：多米沒 Mac；Swift 補丁 python -I；limrun 指令帶 `--id --no-create`；計時器都防時鐘倒回；跑 selftest 時不改 `index.html`。
 
 ## 🗑️ 這次會話的雜訊（下次別重新討論）
 
-- 一開始我建議留搖拿掉走路，多米的理由（走路掛在本來就每天做的事上）比較強，已改口，別再提。
-- limrun 冒出兩台沒標籤的實例，都是 5 分鐘沒人動自己關了，疑似 `--create` 預設補開的；指令帶 `--no-create` 就好，不用再查。
-- 模擬器沒有加速度計，點牠不會跳「動作與方向」權限，不是 bug。
-- 線上網頁第一次開整頁空白一次、重開就好，重現不了，沒改程式。
-- 網頁調整面板在 402 寬排版會爆（開發用），多米說要修再修。
+- 興奮用「跟著這次打開 app、背景 10 分鐘歸零」那段話在提案裡是甲案，實作上件數整天都在，重看跟即時看同一個數，所以沒有計時器。別再問要不要加。
+- T49 第一輪手感差 8% 是放手後的偽足，不是手感；已改量法。
