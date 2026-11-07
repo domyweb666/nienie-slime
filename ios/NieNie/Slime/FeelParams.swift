@@ -121,6 +121,7 @@ struct FeelParams: Equatable, Codable {
     // v2.28 窗台 (多米 11-06): a room with a window, gravity, a sill to stand on and a bowl to sit in; v2.31 the bowl in the middle, the pebble dish
     // and the succulent as pictures on the sill's ends. 0 = the blue floating room (nothing of the old behaviour changes there), 1 day, 2 night
     var scene: Double = 1
+    var envRoam: Double = 1           // v2.30: how often it leaves the bowl by itself and walks the sill (0 = it stays put)
     var fingerSolid: Double = 0.2     // the grabbing finger is solid (× R): dragged across the body it pushes the flesh it did not grab aside instead of passing through; 0 = off
     var pressFlat: Double = 0         // 1: pressing down from the upper half flattens it on an invisible table (clay)
     var flatMin: Double = 0.3         // flattest, as a fraction of the height when the press began
@@ -562,6 +563,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.gripUp, name: "抓著時回正的上限", hint: "抓著時每小步最多轉回頭朝上多少；太大的話身體轉不動，被拉過去的那條只能纏在身上（v2.29 0.004；以前 0.2）", range: 0...0.2, step: 0.001),
         TuneField(key: \.homeCap, name: "整團跟手指的速度上限（×格距／小步）", hint: "整團被拖著走時，每小步最多移這麼多；太快的話手指附近那圈會一下被剪開、整片翻面（v2.29 0.5；0 不限）", range: 0...3, step: 0.1),
         TuneField(key: \.softWall, name: "畫面邊是軟的", hint: "1：窗台上身體碰到畫面左右上緣可以超出去一點，慢慢被推回來；被壓在牆上不會擠成一條線、摺出結（v2.29）；0 硬牆", range: 0...1, step: 1),
+        TuneField(key: \.envRoam, name: "牠自己出門", hint: "窗台上牠自己爬出碗、在窗台上走、爬回碗的機率倍數（v2.30）；0 就一直待在原地", range: 0...2, step: 0.1, section: "活物感"),
         TuneField(key: \.scene, name: "背景", hint: "0 藍：懸空（舊行為一條都不變）；1 白天、2 夜晚：窗台上有重力，牠坐在正中間的碗裡，石頭盤和盆栽只是圖（v2.28 窗台，v2.31 碗回中間）", range: 0...2, step: 1, section: "外形"),
         TuneField(key: \.fingerSolid, name: "手指是實心的（×半徑）", hint: "抓著拖過身體時，沒被抓到的部分被手指推開，不會被穿過去（v2.29 0.2；0 關）", range: 0...0.5, step: 0.01),
         TuneField(key: \.grabHold, name: "抓住跟手", hint: "被抓那塊不聽彈性、跟手指走的程度；黏土 0.85，0 是以前（落後手指約 1 個半徑）", range: 0...1, step: 0.05, section: "按壓與記形"),
