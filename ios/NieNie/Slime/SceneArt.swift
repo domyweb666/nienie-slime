@@ -230,7 +230,7 @@ enum SceneArt {
             if night {
                 ctx.translateBy(x: -48, y: -48)
                 ctx.setBlendMode(.sourceAtop)
-                night.setFill()
+                Self.night.setFill()   // the parameter shadows the colour
                 ctx.fill(CGRect(origin: .zero, size: size))
             }
         }
