@@ -131,6 +131,7 @@ struct FeelParams: Equatable, Codable {
     var calmBreathT: Double = 10      // its breath period while the glitter settles (10 s = 6 a minute), taking you down with it
     var stirRate: Double = 0.12       // glitter stirred up per second while held or rubbed (0.12: 5 s of rubbing is about 60% cloudy); 0 = only a shake clouds it
     var shakeKick: Double = 1         // how hard a shake bounces it in the bowl (capped: flung hard lying down it stays in the bowl); 0 = only the glitter moves
+    var excite: Double = -1           // v2.32 興奮 (多米 11-07: the more you walk, the livelier it is): -1 from what it brought back today (0-1 things 0, 2 half, 3 full); 0 to 3 pretend that many
     var one: Double = 1               // v2.33 一隻為主 (多米 11-07: a companion pet, you keep one, 芋圓): 1 hides the four-slime row and always starts on 芋圓; 0 the four come back
     var trKeep: Double = 1            // v2.34 熟留下來 (多米 11-07: a pet remembers you): 1 trust is saved per slime on this phone, wariness still resets each visit; 0 back to v2.33
     var shakeG: Double = 10           // 11-08: 13 → 10, never shaken on a phone before build 117; a hand shake of ±2 cm at 2.5 Hz is about 5, ±5 cm at 3 Hz about 18. m/s² of phone acceleration that counts as one shake: a gentle shake lying down must count, walking or picking the phone up must not
@@ -582,6 +583,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.calmBreathT, name: "沉澱時的呼吸週期（秒）", hint: "亮粉在沉的時候牠一次呼吸幾秒（10 秒＝每分鐘 6 次），帶著你慢下來", range: 4...15, step: 0.5, section: "活物感"),
         TuneField(key: \.stirRate, name: "捏著時攪起的速度", hint: "抓著、揉著時每秒攪起多少亮粉（0.12：揉 5 秒約六成濁）；0 只有搖才會濁", range: 0...0.5, step: 0.01, section: "活物感"),
         TuneField(key: \.shakeKick, name: "搖時牠在碗裡彈的力道", hint: "每搖一下給牠的速度倍數，有上限，躺著用力甩也不會飛出碗；0 只有亮粉動", range: 0...2, step: 0.1, section: "活物感"),
+        TuneField(key: \.excite, name: "興奮（v2.32）", hint: "-1 自動：今天走路帶回 0 或 1 件平常、2 件有精神、3 件很興奮；0 到 3 假裝帶回幾件。興奮時休息短、走得遠、多張望、多看你、多來找你、呼嚕來得快、眨眼快、回家落地小跳；抓著時一字不動", range: -1...3, step: 1, section: "活物感"),
         TuneField(key: \.one, name: "一隻為主（v2.33）", hint: "1（多米 11-07：陪伴寵物只養一隻，留芋圓）：底部那排四隻不顯示，一開始就是芋圓；0 四隻回來（重開 app 才換回上次選的那隻）", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.trKeep, name: "熟留下來（v2.34）", hint: "1（多米 11-07：陪伴寵物要記得你）：熟每隻分開存在這支手機，關掉、隔天再開都在；戒照樣每次歸零，背景 10 分鐘只歸零戒；0 回 v2.33，背景 10 分鐘熟跟戒都歸零", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.shakeG, name: "搖的門檻（公尺／秒²）", hint: "手機加速度超過這個算搖了一下；躺著輕輕晃也要搖得到，走路、拿起手機不會誤觸", range: 6...25, step: 0.5, section: "活物感"),

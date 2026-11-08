@@ -91,7 +91,7 @@ final class SlimeRig {
     // it lifts itself until its bottom is at y (climbing strokes), plane = in or out of the bowl, drop = gravity back on, walk = along the sill
     // to x, surf = stick to a surface, wait. gt = the gravity it wants (0 while lifting), gv = the gravity it has (eased over 0.12 s);
     // tanV = walking vertically, lift = lifting itself, y1 = the body's bottom this frame.
-    private enum RouteStep { case sniff(a: Double, L: Double, T: Double), move(y: Double), plane(SillPlane, inBowl: Bool?), drop(g: Double), walk(surf: String, to: Double), surf(String), wait(T: Double), zoomHome }
+    private enum RouteStep { case sniff(a: Double, L: Double, T: Double), move(y: Double), plane(SillPlane, inBowl: Bool?), drop(g: Double), walk(surf: String, to: Double), surf(String), wait(T: Double), zoomHome, walkHops }
     private struct Route { var steps: [RouteStep]; var i = -1; var st0 = 0.0; var y0: Double? = nil; var i0 = -1 }
     private var sillRoute: Route?
     private var sillLift = false, sillTanV = false, sillSurf: String?
@@ -404,7 +404,7 @@ final class SlimeRig {
         let tg = moodStrain * R * 0.35; tugX = -pullDX * tg; tugY = -pullDY * tg   // tug of war: you can still pull it
         let gentleNow: Bool = g != nil ? g!.gentleT > 1 : (stkG > 1 && t - stkLast < 0.6)
         let pt: Double = gentleNow && moodC > 0.2 ? min(1, (moodC - 0.2) / 0.5) : 0
-        purr += (pt - purr) * (1 - exp(-dt / 0.3))
+        purr += (pt - purr) * (1 - exp(-dt * (1 + 0.4 * exLevel()) / 0.3))   // v2.32: excited, the purr comes sooner
         if escOn {
             let p = min(1, (t - escT0) / escT), e = 1 - pow(1 - p, 3)
             let nx = escSX + (escDX - escSX) * e, ny = escSY + (escDY - escSY) * e
@@ -3245,6 +3245,9 @@ final class SlimeRig {
             case .zoomHome:
                 sillZTG = 1
                 continue
+            case .walkHops:   // v2.32 興奮: home from a walk, one hop (livelier) or two (very excited); a finger cutting the way home skips it
+                walkHopN = Int((2 * exLevel()).rounded()); walkHopAt = t
+                continue
             case .surf(let name):
                 surfSet(name)
                 continue
@@ -3298,7 +3301,7 @@ final class SlimeRig {
             if u > 40 { routeEnd(abort: true) }
         case .drop:
             if ((sillPlane == .room ? sillC : sillCB) > 0 && u > 0.08) || u > 2.5 { sillGTY = 1; routeNext() }   // behind the bowl and outside only the floor counts: sliding down a wall is not landing
-        case .plane, .surf, .zoomHome:
+        case .plane, .surf, .zoomHome, .walkHops:
             routeNext()
         }
     }
@@ -3522,6 +3525,14 @@ final class SlimeRig {
         let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
         return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
     }
+    // MARK: - v2.32 興奮: how lively today, from what it brought back (0-1 things 0, 2 half, 3 full); the panel can pretend. Only ever adds on top of the ordinary it
+    private var walkHopN = 0, walkHopAt = 0.0, exAt = -9.0, exN = 0
+    private func exLevel() -> Double {
+        var n: Int
+        if params.excite >= 0 { n = Int(params.excite.rounded()) }
+        else { if t - exAt > 1 || exAt > t { exAt = t; walkToday(); exN = walkDayN }; n = exN }   // the date checked once a second
+        return n >= 3 ? 1 : n >= 2 ? 0.5 : 0
+    }
     private func walkToday() { let d = Self.dayKey(Date()); if walkDay != d { walkDay = d; walkDayN = 0 } }
     /// Walked enough: one trip out and back. However far you walked it is one thing, three a day at most, so walking never becomes a chore.
     @discardableResult
@@ -3540,6 +3551,7 @@ final class SlimeRig {
     private func walkTrip(big: Bool) {
         guard let g = sillG, !clusters.isEmpty else { return }
         if sillRoute != nil { routeEnd(abort: true) }
+        walkHopN = 0
         sillHop = nil; gaitOn = false; wanderMoving = false; slpLastAny = t; escOn = false   // v2.31: a leftover flight would cancel the first step of the way home and it would stay outside
         var y1 = -1e9, mx = 0.0
         for i in bnd { y1 = max(y1, Y[i]) }
@@ -3555,7 +3567,7 @@ final class SlimeRig {
         sillGTX = 0; sillGTY = 1; sillGVX = 0; sillGVY = 1; sillSurf = rm ? "bar" : "ledge"
         walkStuck = WalkStuck(k: walkKinds.randomElement() ?? "stone", big: big, i: walkPick(), a: Double.random(in: -0.4..<0.4), idle: 0)
         if rm { sillPlane = .frame; sillZoom = 1; sillZTG = 1; lifeSt = .rest; lifeUntil = t + 3 }
-        else { sillPlane = .out; sillZoom = 0.8; sillZTG = 0.8; sillZPX = W / 2; sillZPY = g.oy; sillOutT = t; routeStart(rtComeBack() + rtBackIn()) }
+        else { sillPlane = .out; sillZoom = 0.8; sillZTG = 0.8; sillZPX = W / 2; sillZPY = g.oy; sillOutT = t; routeStart(rtComeBack() + rtBackIn() + [.walkHops]) }
     }
     /// Knocked off: it flies to a free place on the sill, bounces once. Full: the oldest is pushed off (only when you walked).
     private func walkDrop() {
@@ -3577,6 +3589,8 @@ final class SlimeRig {
     }
     private func walkLand(_ f: WalkFall) { walkItems.append(WalkItem(k: f.k, big: f.big, s: f.s, a: f.na, gift: false)); walkSave() }
     private func walkStep(_ dt: Double) {
+        // v2.32 興奮: home, nobody touching, one or two little hops
+        if walkHopN > 0 && sillRoute == nil && !sillAir && sillInBowl && !introOn && fingers.isEmpty && t >= walkHopAt { walkHopN -= 1; walkHopAt = t + 0.9; hop() }
         if var q = walkStuck {   // a finger on it knocks the thing off at once (whoever opens may be anxious, no waiting for the show); left alone it falls off by itself
             var touched = false
             for f in fingers.values where (f.mode == .grab || f.mode == .stroke) && t - f.tDown > 0.1 { touched = true }
@@ -3684,7 +3698,7 @@ final class SlimeRig {
         if !lv(params.lifeRest) { return 0.8 + Double.random(in: 0..<2.2) }
         var d = 2.5 + Double.random(in: 0..<3.5)
         if Double.random(in: 0..<1) < 0.2 { d += 5 + Double.random(in: 0..<6) }
-        return d * params.restMul * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare)) * (iv2(params.impC5) ? 1 - 0.4 * impWary : 1)   // v2.20 C5: wary rests less
+        return d * params.restMul * (1 - 0.5 * exLevel()) * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare)) * (iv2(params.impC5) ? 1 - 0.4 * impWary : 1)   // v2.20 C5: wary rests less
     }
     private func pickDir() -> Double {
         if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6) }   // too far out: sniff back
@@ -3718,7 +3732,7 @@ final class SlimeRig {
         let rm = reduceMotion
         if gaitClimb { return (1.15 * (rm ? 2 : 1), 0.32 * (rm ? 2 : 1), 0.36 * (rm ? 2 : 1), 0.34 * R * (rm ? 0.5 : 1), 0.15 * (rm ? 0.5 : 1)) }   // v2.30: climbing out of the bowl, slower and shorter strokes
         return ((gaitDash ? 0.62 : 1.1) * (rm ? 2 : 1), (gaitDash ? 0.15 : 0.25) * (rm ? 2 : 1), (gaitDash ? 0.24 : 0.35) * (rm ? 2 : 1),
-                (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))
+                (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1) * (1 + 0.3 * exLevel()), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))
     }
     private func strokeStart(_ K: (P: Double, c: Double, tau: Double, sd: Double, kA: Double)) {
         if sillOn { if sillTanV { gaitTX = homeX } else { gaitTY = homeY; if sillRoute == nil { gaitTX = sillClampX(gaitTX) } } }   // v2.28 窗台: along the sill; v2.30 or straight up and down while it lifts itself
@@ -3843,7 +3857,7 @@ final class SlimeRig {
         }
         if !lured && !e4 {
             if lifeSt == .rest && t >= lifeUntil {
-                if restOn && (Double.random(in: 0..<1) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1) < 0.45 ? 2 : 1; lifeNoGo = false; lifeUntil = t }
+                if restOn && (Double.random(in: 0..<1) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1) < 0.45 + 0.35 * exLevel() ? 2 : 1; lifeNoGo = false; lifeUntil = t }
                 else if canGo { goStart(nil) } else { lifeUntil = t + restDur() }
             }
             if lifeSt == .look && t >= lifeUntil {
@@ -4202,7 +4216,7 @@ final class SlimeRig {
         guard iv3(params.e4), !clusters.isEmpty else { e4On = false; return false }
         if !e4On {
             if e4Wait < 0 { e4Wait = (10 + Double.random(in: 0..<10)) * params.e4Mul }
-            guard impTrust > 0.5, e4Count < 3, t - lastTouch > e4Wait, t - e4LastT > 40, fingers.isEmpty, lifeSt == .rest else { return false }
+            guard impTrust > 0.5, Double(e4Count) < 3 + (2 * exLevel()).rounded(), t - lastTouch > e4Wait, t - e4LastT > 40, fingers.isEmpty, lifeSt == .rest else { return false }
             let q = toWorld(W / 2, viewV.y + H * 0.12), dx = q.x - clusters[gi].xc, dy = q.y - clusters[gi].yc, d = hypot(dx, dy)
             e4On = true; e4Wave = false; e4T0 = t
             if d > R * 0.6 { gaitTo(q.x, q.y, dash: d > R * 4) } else { e4Wave = true; wagT = t; voice("hello") }
@@ -4260,7 +4274,7 @@ final class SlimeRig {
         if o == nil {
             if t >= eyeSacT {
                 eyeSacT = t + 1.2 + Double.random(in: 0..<2.8)
-                if Double.random(in: 0..<1) < 0.45 { eyeSX = 0; eyeSY = 0 }
+                if Double.random(in: 0..<1) < 0.45 + 0.15 * exLevel() { eyeSX = 0; eyeSY = 0 }
                 else { let a = Double.random(in: 0..<(2 * .pi)), k = (0.5 + Double.random(in: 0..<0.5)) * (params.gazeAmp > 0.1 ? 0.5 : 1); eyeSX = cos(a) * k; eyeSY = sin(a) * k * 0.7 }   // v2.24: idle glances do not grow with gazeAmp
             }
             o = (eyeSX, eyeSY)
@@ -4299,7 +4313,7 @@ final class SlimeRig {
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
         if impWary > 0.5 || moodScare > 0.3 || t - slpWakeT < 0.8 { wide = 1.18 }
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
-        if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1) < 0.2 ? 0.32 : 2 + Double.random(in: 0..<4)) }
+        if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
         eyeBlink = u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1)))
         let k = 1 - exp(-dt / 0.05)
