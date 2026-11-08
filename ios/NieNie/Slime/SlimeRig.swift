@@ -91,7 +91,7 @@ final class SlimeRig {
     // it lifts itself until its bottom is at y (climbing strokes), plane = in or out of the bowl, drop = gravity back on, walk = along the sill
     // to x, surf = stick to a surface, wait. gt = the gravity it wants (0 while lifting), gv = the gravity it has (eased over 0.12 s);
     // tanV = walking vertically, lift = lifting itself, y1 = the body's bottom this frame.
-    private enum RouteStep { case sniff(a: Double, L: Double, T: Double), move(y: Double), plane(SillPlane, inBowl: Bool?), drop(g: Double), walk(surf: String, to: Double), surf(String), wait(T: Double), zoomHome, walkHops }
+    private enum RouteStep { case sniff(a: Double, L: Double, T: Double), move(y: Double), plane(SillPlane, inBowl: Bool?), drop(g: Double), walk(surf: String, to: Double), surf(String), wait(T: Double), zoomHome, walkHops, turn(String) }
     private struct Route { var steps: [RouteStep]; var i = -1; var st0 = 0.0; var y0: Double? = nil; var i0 = -1 }
     private var sillRoute: Route?
     private var sillLift = false, sillTanV = false, sillSurf: String?
@@ -569,6 +569,7 @@ final class SlimeRig {
     private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
 
     final class Finger {
+        var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
         enum Mode { case grab, push, none, stroke }   // v2.26 F6 stroke: sliding over it, nothing pinned
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
         var rawX, rawY, lastRawX, lastRawY: Double   // real finger position (never a prediction)
@@ -2192,6 +2193,7 @@ final class SlimeRig {
         if sillOn { sillStep(dt) }   // v2.28 窗台: landing, the bowl, the hop, home
         shkStep(dt)   // v2.31 搖晃沉澱
         tentBump()
+        if clingOn { for i in 0..<N { clingPin(i) } }   // v2.36: again after the tentacle bumps (else they push it ~2.6 pt off the wall)
         plasticity(dt)
         twitch(L)
         eyeStep(dt)   // v2.23
@@ -2504,6 +2506,7 @@ final class SlimeRig {
             if sillOn, let g = sillG { sillHit(i, g) }   // v2.28 窗台: the bowl and the sill
             if introOn && Y[i] > introFloor { Y[i] = introFloor; PX[i] += (X[i] - PX[i]) * 0.45 }   // intro floor: it really lands, squashes, wobbles
             if flatOn && Y[i] > flatFloor { Y[i] = flatFloor; PY[i] = Y[i] }   // the invisible table: no sinking, no bounce, free to slide
+            if clingOn { clingPin(i) }   // v2.36 黏牆: the suckers are last, no collision pushes them off
             if soft {   // v2.29: left, right and top are soft, only the floor is hard; softer while a finger holds it, pushed back quickly once let go
                 let wk = grabbing ? 0.04 : 0.25
                 if Y[i] < padT { Y[i] += (padT - Y[i]) * wk }
@@ -3006,6 +3009,7 @@ final class SlimeRig {
 
     /// Called at the end of setup: the body is moved right above the bowl and dropped in (no hop-in on the sill).
     private func sillInit() {
+        clingEnd(); sillStickT = -1   // v2.36
         sillG = nil; sillHop = nil; sillRoute = nil; sillLift = false; sillTanV = false; sillSurf = nil; sillGTX = 0; sillGTY = 1; sillGVX = 0; sillGVY = 1; gaitClimb = false
         sillPlane = .room; sillZoom = 1; sillZTG = 1; sillOutT = 0; sillCB = 0
         walkSettle()   // 走路: a rebuild with something still stuck to it puts the thing on the sill, it is not lost
@@ -3104,12 +3108,35 @@ final class SlimeRig {
         }
         if sillGrab && !sillHeld {   // picked up: whatever it was doing stops
             if sillRoute != nil { routeEnd(abort: true) }
-            sillHop = nil; sillSurf = nil; sillTanV = false; sillLift = false; sillGTX = 0; sillGTY = 1
+            sillHop = nil; sillSurf = nil; sillTanV = false; sillLift = false; sillGTX = 0; sillGTY = 1; sillStickT = -1
             planeSet(.room)   // lifted: back in front of everything
         }
         // let go right over the bowl: it wants in; anywhere else it lands on the sill (the frame and the walls come with the next batch)
-        if sillHeld && !sillGrab && !sillInBowl { sillWant = !noBowl && abs(sillRelX - g.bx) < g.cav * 0.9 }
+        if sillHeld && !sillGrab && clingOn {   // v2.36: let go with suckers still on, it springs back onto the wall and keeps sticking
+            planeSet(.frame); surfSet(clingSide); sillInBowl = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1); clingSaid = false
+            onEvent?(.press(gain: 0.25))
+        } else if sillHeld && !sillGrab && !sillInBowl {
+            sillWant = !noBowl && abs(sillRelX - g.bx) < g.cav * 0.9
+            if !sillWant && params.cling >= 0.5 && gcx > g.gx && gcx < g.jr && y1 < g.bt - 1 {
+                var x0 = 1e9, x1 = -1e9, y0 = 1e9
+                for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]) }
+                let inFront = !noBowl && x0 < g.bx + g.bw / 2 && x1 > g.bx - g.bw / 2 && y1 > g.back + R * 0.5   // over the bowl it would vanish behind it
+                let sp = hypot(sillVX, sillVY)
+                let sd: String? = !inFront && sp < R * 2.5 && y1 < g.bt - R * 0.4 ? (x1 > g.jr - R * 0.3 ? "rjamb" : x0 < g.gx + R * 0.3 ? "ljamb" : y0 < g.gy + R * 0.3 ? "ceil" : nil) : nil
+                if let sd {   // v2.36: only sticking takes it onto the frame (it does not climb the frame by itself)
+                    planeSet(.frame); surfSet(sd); sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1)
+                    for i in 0..<N { PX[i] = X[i]; PY[i] = Y[i] }
+                    onEvent?(.press(gain: 0.3))
+                    clingStart(sd)
+                }
+            }
+        }
         sillHeld = sillGrab
+        if sillStickT > t { sillStickT = t }   // the clock went back
+        if sillStickT >= 0 && params.life2 >= 0.5 && sillRoute == nil && fingers.isEmpty && t - sillStickT > (sillStickDur > 0 ? sillStickDur : 1.6) {
+            sillStickT = -1; clingEnd(); routeStart(rtFromWall() + rtBackIn())   // 8-15 s on the wall, then it climbs down and comes home
+        }
+        clingStep(dt)
         // home: not while grabbed; in the air it follows the body; on the ground y follows and, inside the bowl, x eases back to the middle
         if !sillGrab {
             if sillAir { homeX = gcx; homeY = gcy }
@@ -3140,6 +3167,9 @@ final class SlimeRig {
             }
         } else if !introOn { introSq *= exp(-dt / 0.08) }
         // startled inside the bowl: it jumps on the spot and drops back in (v2.31: beside the bowl there is no room for it)
+        if escOn && (sillTanV || clingOn) && !sillGrab {   // v2.36: pulled until it wants to flee and let go, it drops off the wall and runs
+            clingEnd(); sillTanV = false; sillSurf = nil; sillGTX = 0; sillGTY = 1; sillStickT = -1
+        }
         if escOn && sillInBowl && !sillGrab && sillHop == nil { sillHopStart(escDX, toBowl: false) }
         walkStep(dt)   // 走路: the thing stuck to it, the ones falling, the ones fading
         if walkPending { walkPending = false; walkCheck() }   // steps read before the sill was ready
@@ -3150,7 +3180,7 @@ final class SlimeRig {
             if let r = rtHome() { routeStart(r) }
         }
         // left alone a while out of the bowl, it goes back
-        if !sillGrab && !sillInBowl && !sillAir && sillHop == nil && sillRoute == nil && !gaitOn && !escOn && fingers.isEmpty && lifeSt == .rest
+        if !sillGrab && !sillInBowl && !sillAir && sillHop == nil && sillRoute == nil && !gaitOn && !escOn && fingers.isEmpty && lifeSt == .rest && sillStickT < 0
             && t - lastTouch > 25 && t - sillLastHome > 10 && params.envRoam > 0 {
             sillLastHome = t
             if let r = rtHome() { routeStart(r) }
@@ -3162,10 +3192,10 @@ final class SlimeRig {
     /// It decides to go somewhere (goStart on the sill): mostly it stays; from the bowl it sometimes climbs out; on the sill it mostly goes back in, else walks a little.
     private func sillGo() {
         lifeSt = .rest; lifeUntil = t + 2 + 2 * Double.random(in: 0..<1)
-        guard sillG != nil, !clusters.isEmpty, sillRoute == nil, sillHop == nil, !sillAir, params.envRoam > 0, snwK <= 0.3 else { return }   // v2.31: while the glitter settles it stays in
+        guard sillG != nil, !clusters.isEmpty, sillRoute == nil, sillHop == nil, !sillAir, params.envRoam > 0, snwK <= 0.3, sillStickT < 0, !clingOn else { return }   // v2.31: while the glitter settles it stays in
         let cx0 = clusters[gi].xc, r = Double.random(in: 0..<1) / max(0.01, params.envRoam)
         if sillInBowl { if r < 0.16 { routeStart(rtOutFront(nil)) }; return }
-        if sillPlane == .frame { routeStart(rtBackIn()); return }   // v2.31: it does not climb the frame by itself, it comes back in
+        if sillPlane == .frame { routeStart(rtFromWall() + rtBackIn()); return }   // v2.31: it does not climb the frame by itself, it comes back in
         if sillPlane == .out { routeStart(rtComeBack()); return }
         if noBowl, let g = sillG, abs(cx0 - g.bx) < R * 0.3 {   // v2.35: the middle is home; now and then a little walk
             if r < 0.16, let x = floorWalkX(cx0), abs(x - cx0) > R * 0.3 { gaitTo(x, homeY, dash: false) }
@@ -3199,8 +3229,99 @@ final class SlimeRig {
     private func rtHome() -> [RouteStep]? {
         if sillInBowl { return nil }
         if sillPlane == .out { return rtComeBack() + rtBackIn() }
-        if sillPlane == .frame { return rtBackIn() }
+        if sillPlane == .frame { return rtFromWall() + rtBackIn() }
         return rtIntoFront()
+    }
+    // MARK: - v2.36 黏牆 (port of the web's CLING): a ring of suckers pinned to the wall; pulled past the threshold they let go one by one
+
+    private var clingOn = false, clingSide = "", clingT0 = 0.0, clingAX: [Double] = [], clingAY: [Double] = []
+    private var clingN0 = 0, clingN = 0, clingAcc = 0.0, clingSaid = false
+    private var sillStickT = -1.0, sillStickDur = 0.0
+    private func clingWallD(_ side: String, _ x: Double, _ y: Double) -> Double {
+        guard let g = sillG else { return 1e9 }
+        return side == "rjamb" ? g.jr - x : side == "ljamb" ? x - g.gx : y - g.gy
+    }
+    /// How far it must be pulled off before a sucker lets go: trusting 1 R, wary 1.5 R
+    private func clingP0() -> Double { R * (params.imp >= 0.5 ? max(1, min(1.5, 1.25 - 0.25 * impTrust + 0.25 * impWary)) : 1.2) }
+    private func clingStart(_ side: String) {
+        guard params.cling >= 0.5 else { return }
+        clingOn = true; clingSide = side; clingT0 = t; clingN0 = 0; clingN = 0; clingAcc = 0; clingSaid = false
+        clingAX = Array(repeating: .nan, count: N); clingAY = clingAX
+        eyeUser = t + 1.5
+    }
+    private func clingEnd() {
+        clingOn = false; clingN = 0
+        for i in clingAX.indices { clingAX[i] = .nan; clingAY[i] = .nan }
+    }
+    private func clingFree(_ i: Int) {
+        guard i < clingAX.count, !clingAX[i].isNaN else { return }
+        clingAX[i] = .nan; clingAY[i] = .nan; clingN -= 1
+    }
+    private func clingPin(_ i: Int) {
+        guard i < clingAX.count else { return }
+        let a = clingAX[i]
+        if !a.isNaN { X[i] = a; Y[i] = clingAY[i]; PX[i] = a; PY[i] = Y[i] }
+    }
+    private func clingStep(_ dt: Double) {
+        guard clingOn, let g = sillG else { return }
+        if clingT0 > t { clingT0 = t }
+        let sd = clingSide
+        if !sillGrab {   // the first 0.6 s the edge that touches the wall takes hold, at most 16 suckers
+            if t - clingT0 < 0.6 && clingN < 16 {
+                for i in bnd where i < clingAX.count {
+                    if clingN >= 16 { break }
+                    if !clingAX[i].isNaN || GRAB[i] { continue }
+                    if clingWallD(sd, X[i], Y[i]) < R * 0.08 {
+                        clingAX[i] = sd == "rjamb" ? g.jr : sd == "ljamb" ? g.gx : X[i]
+                        clingAY[i] = sd == "ceil" ? g.gy : Y[i]
+                        clingN += 1; clingN0 = max(clingN0, clingN)
+                    }
+                }
+            }
+            if t - clingT0 >= 0.6 && clingN <= 0 { clingEnd() }   // nothing reached the wall: only gravity holds it there, as in v2.30
+            return
+        }
+        var pull = 0.0, fx = 0.0, fy = 0.0
+        for f in fingers.values where f.mode == .grab {
+            let d = clingWallD(sd, f.fx, f.fy)
+            if f.clD0 == nil { f.clD0 = d; for i in 0..<N where GRAB[i] { clingFree(i) } }   // what the finger holds is not pinned: it comes loose from where you took it
+            let p = d - (f.clD0 ?? d)
+            if p > pull { pull = p; fx = f.fx; fy = f.fy }
+        }
+        let p0 = clingP0()
+        if pull <= p0 || clingN <= 0 { clingAcc = 0; return }
+        eyeSqU = max(eyeSqU, t + 0.3)
+        if !clingSaid { clingSaid = true; voice("protest") }
+        for i in 0..<min(N, clingAX.count) where !GRAB[i] && clingAX[i].isNaN {   // the whole thing trembles
+            PX[i] += Double.random(in: -0.5..<0.5) * R * 0.01; PY[i] += Double.random(in: -0.5..<0.5) * R * 0.01
+        }
+        clingAcc += dt
+        let step = 0.22 / (1 + 1.5 * (pull - p0) / R)   // just past the threshold a sucker every 0.2 s, faster the further you pull
+        while clingAcc >= step && clingN > 0 {
+            clingAcc -= step
+            var far = -1, fd = -1.0
+            for i in 0..<min(N, clingAX.count) where !clingAX[i].isNaN {
+                let d = hypot(X[i] - fx, Y[i] - fy)
+                if d > fd { fd = d; far = i }
+            }
+            if far < 0 { break }
+            clingFree(far)
+            // the phone can do what the web cannot: each sucker letting go is a tap, heavier as more come off
+            onEvent?(.tick(gain: min(1, 0.3 + 0.7 * Double(clingN0 - clingN) / Double(max(1, clingN0)))))
+        }
+        if clingN <= max(2, Int((Double(clingN0) * 0.25).rounded(.up))) {   // pulled off: the rest let go at once, one heavy pop
+            clingEnd()
+            onEvent?(.release(gain: 0.95, rate: 0.95, special: true))
+            voice("poke")
+        }
+    }
+
+    /// v2.30/v2.36 off the wall: down a jamb to the frame's bottom and round the corner; from the top it lets go and drops
+    private func rtFromWall() -> [RouteStep] {
+        guard let g = sillG else { return [] }
+        if sillSurf == "ceil" { return [.wait(T: 0.2), .drop(g: 0.8), .surf("bar")] }
+        if sillTanV, let s = sillSurf { return [.walk(surf: s, to: g.bt - R * 0.85), .turn("bar")] }
+        return []
     }
     /// From the ledge outside back onto the frame's bottom (v2.31: the target is where the frame has room; outside, the room is further right at zoom 0.8).
     private func rtComeBack() -> [RouteStep] {
@@ -3223,7 +3344,13 @@ final class SlimeRig {
 
     /// Sticking to a surface: floor and bowl both mean gravity straight down (the jambs and the ceiling come with the frame).
     private func surfSet(_ name: String) {
-        sillSurf = name; sillGTX = 0; sillGTY = 1; sillTanV = false; sillLift = false
+        sillSurf = name; sillLift = false
+        switch name {   // v2.30 SURF: on a jamb gravity points into the jamb (0.6), on the top it points up (0.6); it walks up and down a jamb
+        case "rjamb": sillGTX = 0.6; sillGTY = 0; sillTanV = true
+        case "ljamb": sillGTX = -0.6; sillGTY = 0; sillTanV = true
+        case "ceil": sillGTX = 0; sillGTY = -0.6; sillTanV = false
+        default: sillGTX = 0; sillGTY = 1; sillTanV = false
+        }
         if !clusters.isEmpty { homeX = clusters[gi].xc; homeY = clusters[gi].yc }
     }
     /// A route's walking: the gait with lifeSt = .route (the life leaves it alone), climbing strokes when `climb`.
@@ -3235,6 +3362,7 @@ final class SlimeRig {
     private func routeStart(_ steps: [RouteStep]) {
         guard !steps.isEmpty else { return }
         if sillRoute != nil { routeEnd(abort: true) }
+        sillStickT = -1; clingEnd()   // v2.36
         cutSniffs(); gaitOn = false; wanderMoving = false
         sillRoute = Route(steps: steps, i: -1, st0: t)
         lifeSt = .route
@@ -3260,6 +3388,9 @@ final class SlimeRig {
             case .zoomHome:
                 sillZTG = 1
                 continue
+            case .turn(let name):   // v2.36: round a corner onto another surface (off a jamb onto the frame's bottom)
+                surfSet(name)
+                return
             case .walkHops:   // v2.32 興奮: home from a walk, one hop (livelier) or two (very excited); a finger cutting the way home skips it
                 walkHopN = Int((2 * exLevel()).rounded()); walkHopAt = t
                 continue
@@ -3316,6 +3447,9 @@ final class SlimeRig {
             if u > 40 { routeEnd(abort: true) }
         case .drop:
             if ((sillPlane == .room ? sillC : sillCB) > 0 && u > 0.08) || u > 2.5 { sillGTY = 1; routeNext() }   // behind the bowl and outside only the floor counts: sliding down a wall is not landing
+        case .turn(let s):
+            let c = s == "bar" ? sillCB : sillC
+            if (c > 0 && u > 0.15) || u > 1.2 { routeNext() }
         case .plane, .surf, .zoomHome, .walkHops:
             routeNext()
         }
@@ -3568,7 +3702,7 @@ final class SlimeRig {
     private func walkTrip(big: Bool) {
         guard let g = sillG, !clusters.isEmpty else { return }
         if sillRoute != nil { routeEnd(abort: true) }
-        walkHopN = 0
+        walkHopN = 0; clingEnd(); sillStickT = -1   // v2.36
         sillHop = nil; gaitOn = false; wanderMoving = false; slpLastAny = t; escOn = false   // v2.31: a leftover flight would cancel the first step of the way home and it would stay outside
         var y1 = -1e9, mx = 0.0
         for i in bnd { y1 = max(y1, Y[i]) }
