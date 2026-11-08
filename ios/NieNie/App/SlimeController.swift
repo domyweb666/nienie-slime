@@ -29,6 +29,8 @@ final class SlimeController: ObservableObject {
     /// v2.31 搖晃沉澱: the phone's shakes from CoreMotion (no permission needed natively), one shake at most every 0.18 s
     private let motion = CMMotionManager()
     private var lastShakeAt: TimeInterval = 0
+    /// The panel's readout: the strongest shake in the last 2 s (m/s²), so a shake that does nothing tells whether the sensor is off or the threshold is too high
+    private var shakePeak = 0.0, shakePeakAt: TimeInterval = 0
     /// Frame readout for the hidden panel, refreshed a couple of times a second by the view.
     @Published private(set) var stats = SlimeView.FrameStats()
 
@@ -78,6 +80,11 @@ final class SlimeController: ObservableObject {
             self.walkReadSteps()   // 走路: what you walked while it was away
             self.startMotion()
         }
+        // 搖晃沉澱 (多米 11-08: shaking does nothing on build 117): a system alert resigns active without going to the background
+        // (the motion & fitness prompt after 好 on the gift stone, Control Center, a banner pulled down), so willEnterForeground never came
+        // and the shake stayed stopped until the app went to the background. Every return to active turns it back on
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                               object: nil, queue: .main) { [weak self] _ in self?.startMotion() }
     }
 
     /// The material's numbers with the chosen slime's shape seed and personality on top.
@@ -190,10 +197,13 @@ final class SlimeController: ObservableObject {
 
     var audioBufferMs: Double { AVAudioSession.sharedInstance().ioBufferDuration * 1000 }
 
-    /// One line for the panel: real Hz, worst frame, dropped frames, main-thread work, finger contact radius, audio buffer.
+    /// One line for the panel: real Hz, worst frame, dropped frames, main-thread work, finger contact radius, audio buffer;
+    /// then the shake sensor: on or off, the strongest shake in the last 2 s against the threshold (both m/s²).
     var hudText: String {
         String(format: "%.0f Hz｜最長幀 %.1f ms｜掉 %ld｜算 %.2f ms｜指 %.0f pt｜音訊緩衝 %.1f ms",
                stats.hz, stats.maxFrameMs, stats.dropped, stats.workMs, stats.touchRadius, audioBufferMs)
+        + "｜晃動感測 " + (motion.isDeviceMotionActive ? "開" : "關")
+        + String(format: " %.1f／門檻 %.1f", shakePeak, current.shakeG)
     }
 
     // MARK: - Parameter plumbing
@@ -258,6 +268,7 @@ final class SlimeController: ObservableObject {
             let a = m.userAcceleration
             let mag = sqrt(a.x * a.x + a.y * a.y + a.z * a.z) * 9.81
             let now = m.timestamp
+            if mag > self.shakePeak || now - self.shakePeakAt > 2 { self.shakePeak = mag; self.shakePeakAt = now }
             if mag > self.current.shakeG && now - self.lastShakeAt > 0.18 {
                 self.lastShakeAt = now
                 self.rig.shake(dx: -a.x, dy: a.y)

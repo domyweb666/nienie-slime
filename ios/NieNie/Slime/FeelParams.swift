@@ -131,7 +131,7 @@ struct FeelParams: Equatable, Codable {
     var calmBreathT: Double = 10      // its breath period while the glitter settles (10 s = 6 a minute), taking you down with it
     var stirRate: Double = 0.12       // glitter stirred up per second while held or rubbed (0.12: 5 s of rubbing is about 60% cloudy); 0 = only a shake clouds it
     var shakeKick: Double = 1         // how hard a shake bounces it in the bowl (capped: flung hard lying down it stays in the bowl); 0 = only the glitter moves
-    var shakeG: Double = 13           // m/s² of phone acceleration that counts as one shake: a gentle shake lying down must count, walking or picking the phone up must not
+    var shakeG: Double = 10           // 11-08: 13 → 10, never shaken on a phone before build 117; a hand shake of ±2 cm at 2.5 Hz is about 5, ±5 cm at 3 Hz about 18. m/s² of phone acceleration that counts as one shake: a gentle shake lying down must count, walking or picking the phone up must not
     var glitN: Double = 150           // bits of glitter inside it
     var fingerSolid: Double = 0.2     // the grabbing finger is solid (× R): dragged across the body it pushes the flesh it did not grab aside instead of passing through; 0 = off
     var pressFlat: Double = 0         // 1: pressing down from the upper half flattens it on an invisible table (clay)
