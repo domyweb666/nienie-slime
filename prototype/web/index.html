@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.34</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.36</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -70,7 +70,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>v2.34 <i id="v-fps" style="font-style:normal"></i></span></div>
+  <div class="brand" id="brand">捏捏<span>v2.36 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
 </div>
 
@@ -167,9 +167,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{one:1,trKeep:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  mochi:{one:1,trKeep:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  clay: {one:1,trKeep:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  jelly:{one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  mochi:{one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  clay: {one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -194,6 +194,7 @@ const F=[
   ['shakeG','搖的門檻（公尺／秒²）','手機加速度超過這個算搖了一下；躺著輕輕晃也要搖得到，走路、拿起手機不會誤觸',6,25,.5],
   ['glitN','亮粉顆數','肚子裡幾顆',40,300,10],
   ['envFrame','牠爬窗框、跨出窗外','1：v2.30 的爬窗框、繞一圈、跨出窗外都開；0（多米 11-07）只跟碗互動：爬出碗、爬進碗，放手落在窗戶範圍也掉回窗台（走路回來那趟還是從窗外翻進碗）',0,1,1],
+  ['bowl','碗（v2.35）','0（多米 11-08）：拿掉碗，牠住在窗台正中間，閒著走回中間；走路回家從窗框下緣落到窗台；亮粉直接落在窗台。1 回 v2.34 有碗（牠住在碗裡）',0,1,1],
   ['props','桌上的擺飾','1（多米 11-07）：石頭盤、盆栽放在窗台兩端，只是背景，牠碰不到、手指抓不到；0 窗台上只有碗；2 v2.30 的剛體對照，撞得倒、推得動',0,2,1],
   ['noFlip','防打結（三角形不翻面）','身體裡每個小三角形的面積不能小於靜止的這麼多倍，記住的形狀也一樣（v2.29，多米：拉扯常常打結）；0 關（v2.28）',0,.5,.01],
   ['gripUp','抓著時回正的上限','抓著時每小步最多轉回頭朝上多少；太大的話身體轉不動，被拉過去的那條只能纏在身上（v2.29 0.004；v2.28 窗台上是 0.2）',0,.2,.001],
@@ -233,6 +234,7 @@ const F=[
   ['e1','E1 它會出聲','v2.22：被戳「噗」、被揉「嗯～」、被扯「嗯嗯」、開心「噗咿」、討摸「嗯？」、搔癢咯咯笑、打招呼；熟的高一點、戒的低一點；0 關。以下 E1 到 E4 只在活物 v2.19 是 1 時有用',0,1,1],
   ['e2','E2 動作都有它的回應','1：點它，它朝你的手指傾一下；按著不動 0.35 秒，它往你的手指推一下；手指放在它身上不動，它慢慢蹭你；快速小幅度來回撥（搔癢）它扭來扭去，撥太久會掙脫躲開；戒的時候被拖會扒著反方向；0 關',0,1,1],
   ['e3','E3 看得出印象','1：熟起來快三到四倍（揉 5 秒、乖乖被拖兩次就看得出差別）；熟的圓一點、挺一點、顏色偏暖、呼吸慢；戒的扁一點、顏色淡一點；0 關',0,1,1],
+  ['cling','黏牆（v2.36）','1（多米 11-07：像章魚黏在牆上，捏下來會抵抗）：把牠慢慢放在窗框旁邊會黏住，貼牆那圈像吸盤釘在牆上，8 到 15 秒後自己爬下來；抓著往外拉，拉開超過一段（熟的 1R、戒的 1.5R）才一顆一顆剝開，眼睛 > <、發抖，剩最後幾顆一起放掉彈回手指；放手時還沒剝完就彈回牆上。牠自己不會去窗框（只跟碗互動照舊）。0 回 v2.35：只跟碗互動時放在窗框旁邊不會黏',0,1,1],
   ['trKeep','熟留下來（v2.34）','1（多米 11-07 定位：陪伴寵物要記得你）：熟每隻分開存在這支手機，關掉、隔天再開都還在，走得少、幾天沒來都不會掉；戒照樣只活在這一次（背景 10 分鐘歸零）；0 回 v2.33：熟跟戒一起歸零。切了重新整理才生效',0,1,1],
   ['one','一隻為主（v2.33）','1（多米 11-07：定位是陪伴寵物，只養一隻，留芋圓）：底部那排四隻不顯示，一開始就是芋圓；她的材質未定（多米 11-07：還不知道什麼手感最好），預設黏土只是佔位，「材質」三顆按鈕隨時切，等材質盲測；0 回四隻（蜜蜜、薄荷、芋圓、桃桃），重新整理才生效',0,1,1],
   ['excite','興奮（運動多，v2.32）','-1：自動，照今天走路帶回幾件（0 或 1 件平常、2 件精神好、3 件很興奮）；0 到 3 假裝今天帶回幾件。只在沒碰牠時看得出來：休息短、走得快、探得勤、來找你多、呼嚕來得快、回家進碗前小跳、眨眼快看你多；抓著牠時手感一字不動（提案 興奮提案-暫定.md）',-1,3,1],
@@ -382,6 +384,31 @@ const FLAT={on:false,floor:0,qb:0};
 // v2.28 窗台（多米 11-06）：有重力、站在窗台上、坐得進碗。背景選藍就回懸空，舊的東西一條都不動
 const SILL={on:false,g:null,air:false,c:0,cb:0,cj:0,ct:0,inBowl:false,want:false,hop:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:-99,y1:0,y0:0,x0:0,x1:0,relX:0,relY:0,
   plane:'room',surf:null,tanV:false,lift:false,gvx:0,gvy:1,gtx:0,gty:1,route:null,zoom:1,ztg:1,zpx:0,zpy:0,outT:0,stickT:-1};   // v2.30 plane 哪一層、surf 貼在哪個面、tanV 沿直的方向走、lift 重力關掉自己抬、gv 現在的重力方向（gt 目標）、route 正在走的路線、zoom 窗外用的鏡頭縮放
+// v2.36 黏牆（多米 11-07：像章魚黏在牆上，捏下來時牠奮力抵抗、緊黏牆壁，還是被揣下來；.uiux/04-手感/傾斜與黏牆提案-暫定.md）。
+// 你把牠慢慢放在窗框旁邊才黏，牠自己不去（只跟碗互動照舊）。剛黏上的 0.6 秒內，碰到牆的外圈點一顆顆釘上去（吸盤，最多 16 顆，釘的位置投影到牆上，貼牆那面是平的）。
+// 被抓著往外拉，手指離牆比抓下去時多拉開 p0（熟 1R、戒 1.5R、印象關著 1.2R）才開始剝：從離手指最遠那顆開始一顆一顆放，拉越遠剝越快，剝的時候眼睛 > <、發抖、「嗯嗯」；
+// 剩四分之一（至少 2 顆）時一起放掉，彈回手指。放手時還有沒剝的，整團彈回牆上繼續黏。ax、ay 每顆釘在哪（NaN 沒釘）；n0 最多釘過幾顆
+const CLING={on:false,side:'',t0:0,ax:null,ay:null,n0:0,n:0,acc:0,peelT:-9,popT:-9,said:false,p0:0};
+function clingWallD(side,x,y){const g=SILL.g;return side==='rjamb'?g.jr-x:side==='ljamb'?x-g.gx:y-g.gy}
+function clingP0(){return R*(mat.imp>=.5?Math.max(1,Math.min(1.5,1.25-.25*IMP.tr+.25*IMP.w)):1.2)}
+function clingStart(side){if(!(mat.cling>=.5))return;Object.assign(CLING,{on:true,side,t0:t,n0:0,n:0,acc:0,said:false});CLING.ax=new Float64Array(N).fill(NaN);CLING.ay=new Float64Array(N).fill(NaN);EYE.user=t+1.5}
+function clingEnd(){CLING.on=false;CLING.n=0;if(CLING.ax){CLING.ax.fill(NaN);CLING.ay.fill(NaN)}}
+function clingFree(i){if(CLING.ax&&CLING.ax[i]===CLING.ax[i]){CLING.ax[i]=NaN;CLING.ay[i]=NaN;CLING.n--}}
+// 每小步：釘住的點留在牆上（放在所有碰撞之後，最後算）
+function clingPin(i){const a=CLING.ax[i];if(a===a){X[i]=a;Y[i]=CLING.ay[i];PX[i]=a;PY[i]=Y[i]}}
+function clingStep(dt){const S=SILL,g=S.g;if(!CLING.on||!g)return;if(CLING.t0>t)CLING.t0=t;if(CLING.popT>t)CLING.popT=-9;if(CLING.peelT>t)CLING.peelT=-9;const sd=CLING.side;
+  if(!S.grab){if(t-CLING.t0<.6&&CLING.n<16)for(const i of bnd){if(CLING.n>=16)break;if(CLING.ax[i]===CLING.ax[i]||GRAB[i])continue;
+      if(clingWallD(sd,X[i],Y[i])<R*.08){CLING.ax[i]=sd==='rjamb'?g.jr:sd==='ljamb'?g.gx:X[i];CLING.ay[i]=sd==='ceil'?g.gy:Y[i];CLING.n++;if(CLING.n>CLING.n0)CLING.n0=CLING.n}}
+    if(t-CLING.t0>=.6&&CLING.n<=0)clingEnd();   // 一顆都沒碰到牆：照 v2.30 那樣只靠重力朝牆
+    return}
+  let pull=0,fx=0,fy=0;for(const f of fingers.values()){if(f.mode!=='grab')continue;const d=clingWallD(sd,f.fx,f.fy);if(f.clD0==null){f.clD0=d;for(let i=0;i<N;i++)if(GRAB[i])clingFree(i)}   // 手指抓到的點不再釘著：從哪裡抓就從哪裡開始鬆
+    const p=d-f.clD0;if(p>pull){pull=p;fx=f.fx;fy=f.fy}}
+  const p0=clingP0();CLING.p0=p0;if(pull<=p0||CLING.n<=0){CLING.acc=0;return}
+  CLING.peelT=t;EYE.sqU=Math.max(EYE.sqU,t+.3);if(!CLING.said){CLING.said=true;voice('protest',.8)}
+  for(let i=0;i<N;i++)if(!GRAB[i]&&CLING.ax[i]!==CLING.ax[i]){PX[i]+=(Math.random()-.5)*R*.01;PY[i]+=(Math.random()-.5)*R*.01}   // 整團發抖
+  CLING.acc+=dt;const step=.22/(1+1.5*(pull-p0)/R);   // 剛過門檻約 0.2 秒剝一顆，拉越遠越快
+  while(CLING.acc>=step&&CLING.n>0){CLING.acc-=step;let far=-1,fd=-1;for(let i=0;i<N;i++){if(CLING.ax[i]!==CLING.ax[i])continue;const d=Math.hypot(X[i]-fx,Y[i]-fy);if(d>fd){fd=d;far=i}}if(far<0)break;clingFree(far)}
+  if(CLING.n<=Math.max(2,Math.ceil(CLING.n0*.25))){clingEnd();CLING.popT=t;sfxPlay('release',.9,.95);voice('poke',.8)}}   // 揣下來那一下：剩下的一起放掉
 const SILLG=14;   // 重力：每秒每秒幾個半徑
 function sillGeo(){const s=Math.min(W/860,H/1130),U=s*860/393,off=H*.72-1177*s,ox=(W-992*s)/2,fl=off+1228*s,bw=205*U,bh=bw*298/420,by=fl-bh,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s;   // v2.31 碗回正中間（多米 11-07）：窗框下緣兩側只剩 53 點，所以牠不再自己爬窗框（envFrame 0）；v2.30 曾移到左邊
   return{s,U,off,ox,fl,bw,bh,bx:W/2,by,gx,gy,gw,gh,jr:gx+gw,bt:gy+gh,oy:gy+gh+22*U,rim:by+bh*.5,lip:by+bh*.568,back:by+bh*.05,cav:bw*.40,outer:bw*.5,bf:by+bh*.86,l:Math.max(0,ox+40*s)+4,r:Math.min(W,ox+950*s)-4,sl:ox+40*s,sr:ox+950*s}}   // bt 窗框下緣、jr 右窗框、oy 窗外台階、lip 碗前緣最低點（bowlFront 挖掉的橢圓下緣）、back 碗後緣、sl sr 窗台兩端
@@ -1013,6 +1040,7 @@ function substep(dt,L,Lamp,tl){   // L：管速率類（搖、抖、遊走的門
     if(FLAT.on&&Y[i]>FLAT.floor){Y[i]=FLAT.floor;PY[i]=Y[i]}   // 看不見的桌面：不往下穿、不反彈，可以往兩邊滑
     if(soft){const wk=grabbing?.04:.25;if(Y[i]<padT)Y[i]+=(padT-Y[i])*wk;if(X[i]<padL)X[i]+=(padL-X[i])*wk;if(X[i]>padR)X[i]+=(padR-X[i])*wk;if(Y[i]>padB)Y[i]=padB}   // v2.29：左右上是軟的，只有地板硬；手指抓著時更軟，放開就很快推回來
     else{if(Y[i]<padT)Y[i]=padT;if(Y[i]>padB)Y[i]=padB;if(X[i]<padL)X[i]=padL;if(X[i]>padR)X[i]=padR}
+    if(CLING.on)clingPin(i);   // v2.36 黏牆：吸盤那圈最後算，碰撞推不開
   }
   if(SILL.on&&SILL.g&&PROPS.length){propsHitBody(dt);propsStep(dt)}   // v2.30 擺飾
   if(mat.ringGuard>0){ringGuard();ringUnkink()}   // 邊不能穿邊、局部小結拉直，放在牆之後（見 ringGuard、ringUnkink）
@@ -1790,7 +1818,7 @@ function update(dt){
   {const gr=[...fingers.values()].filter(f=>f.mode==='grab'),gx=globalC.xc,gy=globalC.yc;if(mat.inertiaHz>0&&mat.inertiaDrag>0&&gr.length&&CPX!=null){const k=1-Math.exp(-dt/.03),vx=(gx-CPX)/dt,vy=(gy-CPY)/dt,ax=(vx-CVX)/dt,ay=(vy-CVY)/dt;CVX=vx;CVY=vy;CAX+=(ax-CAX)*k;CAY+=(ay-CAY)*k;const al=Math.hypot(CAX,CAY),am=R*80;if(al>am){CAX*=am/al;CAY*=am/al}
       const r2=1/(2*R);for(let i=0;i<N;i++){let d=1e9;for(const f of gr)d=Math.min(d,Math.hypot(X[i]-f.fx,Y[i]-f.fy));QW[i]=GRAB[i]?0:Math.min(1,d*r2)}}else{CAX=0;CAY=0;CVX=CPX!=null?(gx-CPX)/dt:0;CVY=CPY!=null?(gy-CPY)/dt:0}CPX=gx;CPY=gy}
   const sdt=dt/SUB;
-  for(let s=0;s<SUB;s++)substep(sdt,L,Lamp,tl);tentBump();
+  for(let s=0;s<SUB;s++)substep(sdt,L,Lamp,tl);tentBump();if(CLING.on)for(let i=0;i<N;i++)clingPin(i);   // v2.36 黏牆：觸手互撞之後再釘一次，吸盤那圈一點都不動
   plasticity(dt);
   twitch(L);
   eyeStep(dt);   // v2.23
@@ -1867,6 +1895,8 @@ function drawDents(col){const sh=col('--shade'),hi=col('--hi');
 // room 窗台：地板是木頭窗台，撞擺飾、畫面左右；畫在碗和擺飾前面（在碗裡時碗前緣再蓋回來）
 // frame 窗框：地板是窗框下緣，撞左右和上窗框；畫在窗框上面、碗和擺飾後面
 // out 窗外：地板是窗框後面的台階，只撞地板；畫在牆和窗框後面，鏡頭縮小兩成
+// v2.35 拿掉碗（多米 11-08）：mat.bowl 0 時牠住在窗台正中間，碗不畫、不擋、不碰
+function noBowl(){return SILL.on&&!(mat.bowl>=.5)}
 function sillClampX(x){const S=SILL,g=S.g;if(S.plane==='frame'){const m=R*.72;return Math.max(g.gx+m,Math.min(g.jr-m,x))}
   if(S.plane==='out'){const z=.8,sx=q=>W/2+(q-W/2)/z;return Math.max(sx(g.bx+g.bw*.5+R*.1),Math.min(sx(g.jr+R*.15),x))}   // 窗外：左邊到碗旁邊，右邊走到牆後面只露半邊（換算回世界座標）
   const m=R*.9;return Math.max(g.l+m,Math.min(g.r-m,x))}
@@ -1875,8 +1905,8 @@ function planeSet(p){const S=SILL;if(S.plane===p)return;S.plane=p;if(p==='out'){
 const SURF={floor:[0,1,false],bowl:[0,1,false],bar:[0,1,false],ledge:[0,1,false],rjamb:[.6,0,true],ljamb:[-.6,0,true],ceil:[0,-.6,false]};
 function surfSet(s){const S=SILL,q=SURF[s];S.surf=s;S.gtx=q[0];S.gty=q[1];S.tanV=q[2];S.lift=false;HOMEX=globalC.xc;HOMEY=globalC.yc}
 function sillInit(){const S=SILL;walkSettle();S.g=null;if(!S.on){PROPS.length=0;S.plane='room';S.zoom=1;S.ztg=1;S.route=null;S.gtx=S.gvx=0;S.gty=S.gvy=1;S.tanV=false;S.lift=false;return}const g=S.g=sillGeo();let y1=-1e9,mx=0;for(let i=0;i<N;i++)mx+=X[i];mx/=N;for(const i of bnd)y1=Math.max(y1,Y[i]);
-  const dx=g.bx-mx,dy=g.rim-R*.9-y1;for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}   // 從碗的正上方掉進碗裡
-  CX=g.bx;HOMEX=g.bx;CY=H*.5;HOMEY=CY;Object.assign(S,{air:true,c:0,cb:0,cj:0,ct:0,inBowl:false,want:true,hop:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:t,plane:'room',surf:null,tanV:false,lift:false,gvx:0,gvy:1,gtx:0,gty:1,route:null,zoom:1,ztg:1,zpx:W/2,zpy:g.oy,outT:0,stickT:-1});
+  const dx=g.bx-mx,dy=(noBowl()?g.fl-R*.6:g.rim-R*.9)-y1;for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}   // 從碗的正上方掉進碗裡
+  CX=g.bx;HOMEX=g.bx;CY=H*.5;HOMEY=CY;Object.assign(S,{air:true,c:0,cb:0,cj:0,ct:0,inBowl:false,want:!noBowl(),hop:null,grab:false,held:false,py:0,px:0,vx:0,vy:0,fall:0,lastHome:t,plane:'room',surf:null,tanV:false,lift:false,gvx:0,gvy:1,gtx:0,gty:1,route:null,zoom:1,ztg:1,zpx:W/2,zpy:g.oy,outT:0,stickT:-1,stickDur:0});clingEnd();
   const q=viewV();CAM.z=1;CAM.x=q.x;CAM.y=q.y;INTRO.sq=0;propsInit()}
 function sillHit(i){const S=SILL,g=S.g,P=S.plane;
   if(P==='frame'){   // 窗框的牆是軟著陸：放手時身體可能疊在窗框上，一次全推回來會炸
@@ -1893,10 +1923,10 @@ function sillHit(i){const S=SILL,g=S.g,P=S.plane;
   if(Y[i]>g.fl){Y[i]=g.fl;PY[i]=g.fl;PX[i]+=(X[i]-PX[i])*.45;S.c++;S.cb++}}
 // 手指落在哪：窗台層牠在最前面，其他情況碗、擺飾擋在牠前面；窗外還有牆和窗框擋著。手指落在擺飾上（牠不在前面）就抓擺飾
 function sillTouch(sx,sy,grab){const S=SILL,g=S.g,pr=propAt(sx,sy);if(S.plane==='room')return{grab,prop:grab?null:pr};
-  if(pr)return{grab:false,prop:pr};if(sx>g.bx-g.bw/2&&sx<g.bx+g.bw/2&&sy>g.by+g.bh*.1&&sy<g.fl)return{grab:false,prop:null};
+  if(pr)return{grab:false,prop:pr};if(!noBowl()&&sx>g.bx-g.bw/2&&sx<g.bx+g.bw/2&&sy>g.by+g.bh*.1&&sy<g.fl)return{grab:false,prop:null};
   if(S.plane==='out'&&!(sx>g.gx&&sx<g.jr&&sy>g.gy&&sy<g.bt))return{grab:false,prop:null};return{grab,prop:null}}
 // 跳：只留給被嚇到的時候（蹲 0.12 秒再起跳）。平常進出碗用爬的
-function sillHop(tx,toBowl){const S=SILL;if(S.hop||S.grab)return;GAIT.on=false;WANDER.moving=false;if(S.route)routeEnd(true);let x=toBowl?S.g.bx:sillClampX(tx);if(!toBowl&&S.inBowl&&Math.abs(x-S.g.bx)<S.g.outer+R*.9){toBowl=true;x=S.g.bx}   // v2.31 碗在中間，旁邊放不下整隻：嚇到就原地跳一下再掉回碗裡（量過往旁邊跳會被碗口卡住，只跳 2 點高）
+function sillHop(tx,toBowl){const S=SILL;if(S.hop||S.grab)return;GAIT.on=false;WANDER.moving=false;if(S.route)routeEnd(true);if(noBowl())toBowl=false;let x=toBowl?S.g.bx:sillClampX(tx);if(!toBowl&&S.inBowl&&Math.abs(x-S.g.bx)<S.g.outer+R*.9){toBowl=true;x=S.g.bx}   // v2.31 碗在中間，旁邊放不下整隻：嚇到就原地跳一下再掉回碗裡（量過往旁邊跳會被碗口卡住，只跳 2 點高）
   S.hop={ph:'crouch',t:0,tx:x,toBowl:!!toBowl};LIFE.st='rest';LIFE.until=t+3}
 function sillLaunch(){const S=SILL,g=S.g,H0=S.hop,gc=globalC,g0=R*SILLG,hs=1/60/SUB;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
   let hh=R*(.55+.25*Math.random());if(H0.toBowl)hh=Math.max(y1-g.rim,0)+R*(S.inBowl?.9:.45);else if(S.inBowl)hh=Math.max(hh,y1-g.rim+R*.85);   // v2.31 在碗裡原地跳（嚇到）要跳高一點，碗口會吃掉一部分
@@ -1907,7 +1937,7 @@ function sillLaunch(){const S=SILL,g=S.g,H0=S.hop,gc=globalC,g0=R*SILLG,hs=1/60/
 /* 路線：一串步驟照順序走。sniff 伸偽足、move 重力關掉自己抬到底部在 y（一縮一衝）、plane 換層、drop 重力打開往下掉、walk 貼著某個面走到某個座標、turn 轉到另一個面、surf 直接貼上、wait、fn */
 const RT={sniff:(a,L,T)=>({k:'sniff',a,L,T}),move:y=>({k:'move',y}),plane:(p,ib)=>({k:'plane',p,ib}),drop:g=>({k:'drop',g}),walk:(s,to)=>({k:'walk',s,to}),turn:s=>({k:'turn',s}),surf:s=>({k:'surf',s}),wait:T=>({k:'wait',T}),fn:f=>({k:'fn',f})};
 function gaitGo(tx,ty,climb){LIFE.st='route';WANDER.sx=HOMEX;WANDER.sy=HOMEY;WANDER.dx=tx;WANDER.dy=ty;WANDER.moving=true;Object.assign(GAIT,{on:true,tx,ty,dash:false,climb:!!climb,ph:-1,prep:0,v:0,h:Math.atan2(ty-HOMEY,tx-HOMEX),k:1,str:1,last:false,off:0})}
-function routeStart(steps){const S=SILL;if(!steps)return;if(S.route)routeEnd(true);S.stickT=-1;cutSniffs();GAIT.on=false;WANDER.moving=false;S.route={steps,i:-1,st0:t};LIFE.st='route';routeNext()}
+function routeStart(steps){const S=SILL;if(!steps)return;if(S.route)routeEnd(true);S.stickT=-1;clingEnd();cutSniffs();GAIT.on=false;WANDER.moving=false;S.route={steps,i:-1,st0:t};LIFE.st='route';routeNext()}
 function routeEnd(abort){const S=SILL;if(!S.route)return;S.route=null;GAIT.on=false;GAIT.k=1;WANDER.moving=false;S.lift=false;if(abort){S.tanV=false;S.gtx=0;S.gty=1;S.surf=null}
   if(LIFE.st==='route'||LIFE.st==='go'||LIFE.st==='arrive'){LIFE.st='rest';LIFE.until=t+restDur()}}
 function routeNext(){const S=SILL,Q=S.route;if(!Q)return;
@@ -1932,10 +1962,10 @@ function routeStep(dt){const S=SILL,Q=S.route,q=Q.steps[Q.i];if(!q){routeEnd(fal
 // 從碗裡爬出來：偽足先搭上去，身體抬到前緣之上，換到碗前面，再流到窗台上
 function rtOutFront(x){const g=SILL.g,a=-Math.PI/2+(Math.random()<.5?-.3:.3);return[RT.sniff(a,.5,.7),RT.move(g.lip-6),RT.plane('room',false),RT.move(g.fl-2),RT.surf('floor')].concat(x!=null?[RT.walk('floor',x)]:[])}
 // 從窗台爬回碗：走到碗前面，抬到前緣之上，換進碗裡，流下去
-function rtIntoFront(){const g=SILL.g;return[RT.walk('floor',sillClampX(g.bx)),RT.sniff(-Math.PI/2,.5,.7),RT.move(g.lip-6),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
+function rtIntoFront(){const g=SILL.g;if(noBowl())return[RT.walk('floor',sillClampX(g.bx))];return[RT.walk('floor',sillClampX(g.bx)),RT.sniff(-Math.PI/2,.5,.7),RT.move(g.lip-6),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
 // 翻過碗後緣到窗框下緣：抬到整個高過碗，換到碗後面，落下去
-function rtOverBack(x){const g=SILL.g;return[RT.sniff(-Math.PI/2,.6,.8),RT.move(g.back-3),RT.plane('frame',false),RT.drop(.6),RT.surf('bar')].concat(x!=null?[RT.walk('bar',x)]:[])}
-function rtBackIn(){const g=SILL.g,x=Math.max(g.gx+R*.72,g.bx);return[RT.walk('bar',x),RT.sniff(-Math.PI/2,.5,.7),RT.move(g.back-3),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
+function rtOverBack(x){const g=SILL.g;return[RT.sniff(-Math.PI/2,.6,.8),RT.move(noBowl()?g.bt-3:g.back-3),RT.plane('frame',false),RT.drop(.6),RT.surf('bar')].concat(x!=null?[RT.walk('bar',x)]:[])}
+function rtBackIn(){const g=SILL.g,x=Math.max(g.gx+R*.72,g.bx);if(noBowl())return[RT.walk('bar',x),RT.sniff(Math.PI/2,.4,.6),RT.plane('room',false),RT.drop(.8),RT.surf('floor')];return[RT.walk('bar',x),RT.sniff(-Math.PI/2,.5,.7),RT.move(g.back-3),RT.plane('room',true),RT.drop(.8),RT.surf('bowl')]}
 // 繞窗框一圈：貼右窗框爬上去、倒掛走到左邊、貼左窗框下來，沿窗框下緣走回碗後面翻進去（v2.31 碗在中間，左窗框下面不再是碗；只在 envFrame 1 時會走）
 function rtFrameLoop(){const g=SILL.g,xr=g.jr-R*.72,xl=g.gx+R*.72;return[RT.walk('bar',xr),RT.turn('rjamb'),RT.walk('rjamb',g.gy+R*.82),RT.turn('ceil'),RT.walk('ceil',xl),RT.turn('ljamb'),RT.walk('ljamb',g.bt-R*.85),RT.turn('bar')].concat(rtBackIn())}
 function rtClimbDrop(){const g=SILL.g,xr=g.jr-R*.72,y=g.gy+R*(1+1.6*Math.random());return[RT.walk('bar',xr),RT.turn('rjamb'),RT.walk('rjamb',y),RT.wait(.6+Math.random()),RT.drop(1),RT.surf('bar')]}
@@ -1951,15 +1981,16 @@ function rtPoke(p){const side=p.x>globalC.xc?1:-1,tx=sillClampX(p.x-side*(p.hw+R
   return[RT.walk('floor',tx),look(2.6),RT.wait(.5),RT.sniff(a,1,1.8),look(2.2),RT.sniff(a,1.25,1.8),RT.fn(()=>{if(Math.abs(p.a)>.5||Math.abs(p.x-p.hx)>R*.25){MOOD.happyT=t;voice('happy',.6)}EYE.user=t+1.2})]}
 function floorWalkX(cx){const g=SILL.g,lo=g.l+R*.9;let hi=g.r-R*.9;for(const p of PROPS)if(!p.gone&&p.x>cx)hi=Math.min(hi,p.x-p.hw-R*.95);if(hi-lo<R*.3)return null;return lo+(hi-lo)*Math.random()}
 // 牠自己想出門：看現在在哪一層，從能做的事裡挑。大半時間還是待著（v2.19：大半時間在休息）
-function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random()/Math.max(.01,mat.envRoam||0);LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.route||S.hop||S.air||!(mat.envRoam>0)||SNW.k>.3||SNW.loose.length)return;   // v2.31 亮粉在沉的時候牠待著不出門；外面有亮粉時先去撿
+function sillGo(){const S=SILL,g=S.g,cx=globalC.xc,r=Math.random()/Math.max(.01,mat.envRoam||0);LIFE.st='rest';LIFE.until=t+2+2*Math.random();if(S.route||S.hop||S.air||!(mat.envRoam>0)||SNW.k>.3||SNW.loose.length||(S.stickT>=0&&CLING.on))return;   // v2.31 亮粉在沉的時候牠待著不出門；外面有亮粉時先去撿
   if(S.inBowl){if(r<.16)routeStart(rtOutFront(null));else if(r<.38&&mat.envFrame>=.5)routeStart(rtOverBack(Math.random()<.75?g.jr-R*(.8+.5*Math.random()):null));return}
   if(S.plane==='room'){const p=catPick();if(p&&Math.random()<(mat.catPush||0)*(.35+.4*IMP.tr)){routeStart(rtPoke(p));return}
+    if(noBowl()&&Math.abs(cx-g.bx)<R*.3){if(r<.16){const x=floorWalkX(cx);if(x!=null&&Math.abs(x-cx)>R*.3)gaitTo(x,HOMEY,false)}else if(r<.38&&mat.envFrame>=.5)routeStart(rtOverBack(Math.random()<.75?g.jr-R*(.8+.5*Math.random()):null));return}   // v2.35 沒有碗：中間就是家
     if(r<.6){routeStart(rtIntoFront());return}const x=floorWalkX(cx);if(x!=null&&Math.abs(x-cx)>R*.3)gaitTo(x,HOMEY,false);return}
   if(S.plane==='frame'){if(S.tanV||S.surf==='ceil'){routeStart(rtFromWall());return}if(!(mat.envFrame>=.5)){routeStart(rtBackIn());return}if(r<.22)routeStart(rtFrameLoop());else if(r<.4)routeStart(rtClimbDrop());else if(r<.62)routeStart(rtGoOut());else if(r<.82)routeStart(rtBackIn());else{const x=sillClampX(cx+(Math.random()<.5?-1:1)*R*(.5+Math.random()));gaitTo(x,HOMEY,false)}return}
   if(S.plane==='out'){if(!(mat.envFrame>=.5)||t-S.outT>10||r<.35)routeStart(rtComeBack());else{const x=sillClampX(cx+(Math.random()<.5?-1:1)*R*(.6+Math.random()));gaitTo(x,HOMEY,false)}}}
 function sillStepPre(){let g=false;for(const f of fingers.values())if(f.mode==='grab'){g=true;SILL.relX=f.fx;SILL.relY=f.fy}SILL.grab=g}
 // 放手時身體有沒有跟碗或擺飾重疊：重疊就只能留在窗台層（換到後面會看到牠突然被蓋住）
-function sillOverlapFront(x0,x1,y0,y1){const g=SILL.g;if(x0<g.bx+g.bw/2&&x1>g.bx-g.bw/2&&y1>g.back+R*.5)return true;for(const p of PROPS){if(p.gone)continue;if(x0<p.x+p.r&&x1>p.x-p.r&&y1>p.y-p.r)return true}return false}
+function sillOverlapFront(x0,x1,y0,y1){const g=SILL.g;if(!noBowl()&&x0<g.bx+g.bw/2&&x1>g.bx-g.bw/2&&y1>g.back+R*.5)return true;for(const p of PROPS){if(p.gone)continue;if(x0<p.x+p.r&&x1>p.x-p.r&&y1>p.y-p.r)return true}return false}
 function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==null)return;let y1=-1e9,y0=1e9,x0=1e9,x1=-1e9;for(const i of bnd){if(Y[i]>y1)y1=Y[i];if(Y[i]<y0)y0=Y[i];if(X[i]<x0)x0=X[i];if(X[i]>x1)x1=X[i]}S.y1=y1;S.y0=y0;S.x0=x0;S.x1=x1;
   S.vx=S.px?(cx-S.px)/dt:0;S.vy=S.py?(cy-S.py)/dt:0;S.px=cx;S.py=cy;
   {const k=1-Math.exp(-dt/.12);S.gvx+=(S.gtx-S.gvx)*k;S.gvy+=(S.gty-S.gvy)*k}   // 重力方向慢慢轉，轉角才不會一下甩出去
@@ -1969,11 +2000,15 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   // 被抓：路線取消，回到窗台層（舉起來，畫在最前面）
   if(S.grab&&!S.held){if(S.route)routeEnd(true);if(S.hop)S.hop=null;S.stickT=-1;S.surf=null;S.tanV=false;S.lift=false;S.gtx=0;S.gty=1;planeSet('room')}
   // 放手：碗正上方掉進碗；窗戶範圍內、身體不跟碗或擺飾重疊就落到窗框層；慢慢放在窗框旁邊會黏住；其他落在窗台
-  if(S.held&&!S.grab&&!S.inBowl){const sp=Math.hypot(S.vx,S.vy);S.want=Math.abs(S.relX-g.bx)<g.cav*.9;
-    if(!S.want&&mat.envFrame>=.5&&cx>g.gx&&cx<g.jr&&y1<g.bt-1&&!sillOverlapFront(x0,x1,y0,y1)){planeSet('frame');
-      if(sp<R*2.5&&y1<g.bt-R*.4){const sd=x1>g.jr-R*.3?'rjamb':x0<g.gx+R*.3?'ljamb':y0<g.gy+R*.3?'ceil':null;if(sd){surfSet(sd);S.stickT=t;for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3)}}}}
+  if(S.held&&!S.grab&&CLING.on){planeSet('frame');surfSet(CLING.side);S.inBowl=false;S.stickT=t;S.stickDur=8+7*Math.random();CLING.said=false;sfxPlay('press',.25)}   // v2.36 黏牆：放手時還有沒剝開的，彈回牆上繼續黏
+  else if(S.held&&!S.grab&&!S.inBowl){const sp=Math.hypot(S.vx,S.vy);S.want=!noBowl()&&Math.abs(S.relX-g.bx)<g.cav*.9;const fr=mat.envFrame>=.5,cl=mat.cling>=.5;
+    if(!S.want&&(fr||cl)&&cx>g.gx&&cx<g.jr&&y1<g.bt-1&&!sillOverlapFront(x0,x1,y0,y1)){const sd=sp<R*2.5&&y1<g.bt-R*.4?(x1>g.jr-R*.3?'rjamb':x0<g.gx+R*.3?'ljamb':y0<g.gy+R*.3?'ceil':null):null;
+      if(fr||sd)planeSet('frame');   // v2.36：只跟碗互動（envFrame 0）時，沒黏到牆就照舊落回窗台
+      if(sd){surfSet(sd);S.stickT=t;S.stickDur=cl?8+7*Math.random():0;for(let i=0;i<N;i++){PX[i]=X[i];PY[i]=Y[i]}sfxPlay('press',.3);clingStart(sd)}}}
   S.held=S.grab;
-  if(S.stickT>=0&&mat.life2>=.5&&!S.route&&!fingers.size&&t-S.stickT>1.6+Math.random()*.02){S.stickT=-1;routeStart(rtFromWall())}
+  if(S.stickT>t)S.stickT=t;   // 時鐘倒回：停在未來的黏住時間拉回現在
+  if(S.stickT>=0&&mat.life2>=.5&&!S.route&&!fingers.size&&t-S.stickT>(S.stickDur>0?S.stickDur:1.6+Math.random()*.02)){S.stickT=-1;clingEnd();routeStart(rtFromWall())}   // v2.36 黏牆 8 到 15 秒（stickDur），黏牆關著是 v2.30 的 1.6 秒
+  clingStep(dt);
   // 家：抓著時不管；在空中跟著身體；沿著走的方向由步態決定，另一個方向跟著身體
   if(!S.grab){if(S.air){HOMEX=cx;HOMEY=cy}else if(S.tanV){if(!S.lift)HOMEX=cx}else{HOMEY=cy;if(S.inBowl&&!ESC.on&&!S.route)HOMEX+=(g.bx-HOMEX)*(1-Math.exp(-dt/.3))}if(!S.route&&!S.tanV)HOMEX=sillClampX(HOMEX)}
   // 進碗、出碗（路線自己管換層）
@@ -1983,6 +2018,7 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   else if(!INTRO.on)INTRO.sq*=Math.exp(-dt/.08);
   // 被嚇跑：貼在牆上就掉下來，在碗裡就跳出去
   if(ESC.on&&S.tanV&&!S.grab){S.tanV=false;S.surf=null;S.gtx=0;S.gty=1;S.stickT=-1}
+  if(ESC.on&&CLING.on&&!S.grab){clingEnd();S.tanV=false;S.surf=null;S.gtx=0;S.gty=1;S.stickT=-1}   // v2.36：拉到想逃再放手，牠從牆上掉下來跑走（v2.18 的想逃照舊）
   if(ESC.on&&S.inBowl&&!S.grab&&!S.hop)sillHop(ESC.dx,false);
   walkStep(dt);
   if(S.route&&!S.grab)routeStep(dt);
@@ -2054,7 +2090,7 @@ function walkTier(n){return n>=WALK_BIG?2:n>=WALK_SMALL?1:0}
 function walkToday(){const d=new Date().toDateString();if(WALK.day!==d){WALK.day=d;WALK.dayN=0}}
 // 走夠了就出門回來一趟。走再多也只有一件，一天最多三件，走路才不會變成趕進度
 function walkCheck(){const S=SILL;if(!S.on||!S.g||S.grab||WALK.stuck)return false;walkToday();const tier=walkTier(WALK.bank);if(!tier||WALK.dayN>=WALK_DAY)return false;WALK.bank=0;WALK.dayN++;walkTrip(tier===2);walkSave();return true}
-function walkTrip(big){const S=SILL,g=S.g;WALK.hopN=0;if(S.route)routeEnd(true);S.hop=null;S.stickT=-1;GAIT.on=false;WANDER.moving=false;SLP.lastAny=t;ESC.on=false;   // v2.31：逃跑狀態留著的話，回來的路線第一步就被取消，牠會一直留在窗外（selftest 全程第四輪抓到）
+function walkTrip(big){const S=SILL,g=S.g;WALK.hopN=0;clingEnd();if(S.route)routeEnd(true);S.hop=null;S.stickT=-1;GAIT.on=false;WANDER.moving=false;SLP.lastAny=t;ESC.on=false;   // v2.31：逃跑狀態留著的話，回來的路線第一步就被取消，牠會一直留在窗外（selftest 全程第四輪抓到）
   let y1=-1e9,mx=0;for(const i of bnd)y1=Math.max(y1,Y[i]);for(let i=0;i<N;i++)mx+=X[i];mx/=N;
   const rm=REDUCED,sxw=q=>W/2+(q-W/2)/.8,tx=rm?Math.max(g.gx+R*.9,Math.min(g.jr-R*.9,g.jr-R*1.3)):Math.max(sxw(g.bx+g.bw*.5+R*.1),Math.min(sxw(g.jr+R*.15),sxw(g.jr-R*1.2))),ty=rm?g.bt:g.oy,dx=tx-mx,dy=ty-y1;   // v2.31 窗外是世界座標（鏡頭 0.8），範圍跟 sillClampX 的 out 一樣：放錯地方會被夾著走，回家的抬升 8 秒到不了就留在窗外（全程自測抓到）
   for(let i=0;i<N;i++){X[i]+=dx;PX[i]=X[i];Y[i]+=dy;PY[i]=Y[i]}CX+=dx;HOMEX=tx;HOMEY+=dy;globalC.xc+=dx;globalC.yc+=dy;S.px=0;S.py=0;   // 重心也要跟著搬：路線一開始就看它決定往哪走
@@ -2067,7 +2103,7 @@ function walkDrop(){const q=WALK.stuck;if(!q)return;WALK.stuck=null;const g=SILL
   WALK.fall.push({k:q.k,big:q.big,s,x:x0,y:y0,vx:(sx-x0)/T,vy,a:q.a,va:(Math.random()<.5?-1:1)*(3+3*Math.random()),ty,G,G0:G,b:0,na:Math.random()*.5-.25});sfxPlay('knock.dish',.22,1.3)}
 function walkLand(q){WALK.items.push({k:q.k,big:q.big,s:q.s,a:q.na});walkSave()}
 function walkStep(dt){const S=SILL,q=WALK.stuck;
-  if(WALK.hopN>0&&!S.route&&!S.air&&S.inBowl&&!INTRO.on&&!fingers.size&&t>=WALK.hopAt){WALK.hopN--;WALK.hopAt=t+.9;hop()}   // v2.32 回家小跳：落進碗、沒人碰才跳
+  if(WALK.hopN>0&&!S.route&&!S.air&&(S.inBowl||(noBowl()&&S.plane==='room'))&&!INTRO.on&&!fingers.size&&t>=WALK.hopAt){WALK.hopN--;WALK.hopAt=t+.9;hop()}   // v2.32 回家小跳：落進碗、沒人碰才跳
   if(q){let touched=false;for(const f of fingers.values())if((f.mode==='grab'||f.mode==='stroke')&&t-f.tDown>.1)touched=true;if(!fingers.size&&!S.route&&S.plane!=='out')q.idle+=dt;if(touched||q.idle>WALK_IDLE)walkDrop()}
   for(let k=WALK.fall.length-1;k>=0;k--){const f=WALK.fall[k];f.vy+=f.G*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.a+=f.va*dt;if(f.y>=f.ty&&f.vy>0){f.y=f.ty;if(f.b<1&&f.vy>R*1.5){f.vy*=-.28;f.vx=0;f.x=walkSlotX(f.s);f.va*=-.4;f.b++;sfxPlay('knock.dish',.14,1.5)}else{WALK.fall.splice(k,1);walkLand(f)}}}
   for(let k=WALK.leave.length-1;k>=0;k--){const o=WALK.leave[k];o.al-=dt/.5;o.y-=R*.25*dt;if(o.al<=0)WALK.leave.splice(k,1)}}
@@ -2141,7 +2177,7 @@ function shkLooseStep(dt){const L=SNW.loose;if(!L.length)return;const c=globalC;
     if(g){p.vy+=R*SILLG*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*1.2);
       if(p.x<g.l+3){p.x=g.l+3;p.vx=Math.abs(p.vx)*.4}else if(p.x>g.r-3){p.x=g.r-3;p.vx=-Math.abs(p.vx)*.4}
       const dx=p.x-g.bx,ad=Math.abs(dx);let fl=g.fl;p.inBowl=false;
-      if(ad<g.cav){fl=g.lip-3;p.inBowl=true}else if(ad<g.outer+3&&p.y>g.rim-8){p.x=g.bx+Math.sign(dx||1)*(g.outer+4);p.vx=Math.sign(dx||1)*Math.max(Math.abs(p.vx),R*.3)}
+      if(noBowl()){}else if(ad<g.cav){fl=g.lip-3;p.inBowl=true}else if(ad<g.outer+3&&p.y>g.rim-8){p.x=g.bx+Math.sign(dx||1)*(g.outer+4);p.vx=Math.sign(dx||1)*Math.max(Math.abs(p.vx),R*.3)}
       if(p.y>=fl){p.y=fl;if(p.vy>R*1.2){p.vy=-p.vy*.3;p.vx*=.6}else{p.vy=0;p.vx=0;p.rest=true}}}
     else{p.x+=p.vx*dt;p.y+=p.vy*dt;const d=Math.exp(-dt*2.5);p.vx*=d;p.vy*=d;p.x=Math.max(CX-W*.45,Math.min(CX+W*.45,p.x));p.y=Math.max(CY-H*.32,Math.min(CY+H*.32,p.y));if(Math.hypot(p.vx,p.vy)<R*.15)p.rest=true}}
   // 牠去撿：沒人碰、搖完 1.2 秒後
@@ -2288,7 +2324,7 @@ function propShadow(x,y,rx,ry,a){ctx.save();ctx.translate(x,y);ctx.scale(rx,ry);
 function drawDeco(){if(!(SILL.on&&SILL.g)||!(mat.props>=.5&&mat.props<1.5))return;const g=SILL.g,U=g.U;for(const [im,x] of [['peb',g.l+PROPDEF.peb.wd*U/2+2],['succ',g.r-PROPDEF.succ.wd*U/2-2]]){const k=propImg(im);if(!k)continue;const d=PROPDEF[im],w=d.wd*U,h=w*d.asp;propShadow(x,g.fl-2,w*.52,11*U,1);ctx.drawImage(k,x-w/2,g.fl-h,w,h)}}
 function drawProps(){const S=SILL,g=S.g;if(!g)return;for(const p of PROPS){if(p.gone||p.alpha<=.01)continue;const im=propImg(p.im);if(!im)continue;const near=Math.max(0,1-Math.abs(g.fl-(p.y+p.base))/(R*.8));if(near>0&&p.x>g.sl&&p.x<g.sr)propShadow(p.x,g.fl-2,p.w*.52*(1+.3*Math.abs(Math.sin(p.a))),11*g.U,near*p.alpha);
     ctx.save();ctx.globalAlpha=p.alpha;ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.drawImage(im,-p.ox,-p.oy,p.w,p.h);ctx.restore()}
-  const b=propImg('bowl');if(b){propShadow(g.bx,g.fl-2,g.bw*.52,11*g.U,1);ctx.drawImage(b,g.bx-g.bw/2,g.by,g.bw,g.bh)}}
+  const b=noBowl()?null:propImg('bowl');if(b){propShadow(g.bx,g.fl-2,g.bw*.52,11*g.U,1);ctx.drawImage(b,g.bx-g.bw/2,g.by,g.bw,g.bh)}}
 function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl!=='room'){if(pl==='out')ctx.drawImage(sc.wall,0,0,W,H);drawDeco();drawItems();drawProps()}else drawBowlFront()}drawLoose()}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外時的擺飾、走路的東西、碗；碗裡的碗前緣
 function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
   const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
