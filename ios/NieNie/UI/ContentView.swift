@@ -118,6 +118,8 @@ struct ContentView: View {
     private var bottomBar: some View {
         HStack(spacing: 8) {
             // v2.23 收集 (多米 11-02: all of them there from the start): four slimes; the material moved to the panel
+            // v2.33 一隻為主: hidden while the panel's 一隻為主 is 1
+            if controller.current.one < 0.5 {
             HStack(spacing: 2) {
                 ForEach(SlimeKind.allCases) { k in
                     let on = controller.slime == k
@@ -145,6 +147,7 @@ struct ContentView: View {
             .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("選史萊姆")
+            }
 
             Button {
                 controller.resetShape()

@@ -42,7 +42,8 @@ final class SlimeController: ObservableObject {
         var p: [SlimeMaterial: FeelParams] = [:]
         for m in SlimeMaterial.allCases { p[m] = m.defaults }
         params = p
-        let saved = SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey
+        // v2.33 一隻為主: always 芋圓 while 一隻為主 is on (the default); off, the slime chosen last time
+        let saved = SlimeMaterial.clay.defaults.one >= 0.5 ? SlimeKind.taro : (SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey)
         slime = saved; material = saved.material
         var start = saved.material.defaults
         saved.apply(&start)
@@ -50,6 +51,12 @@ final class SlimeController: ObservableObject {
         rig.reduceMotion = reduceMotion
         rig.onEvent = { [weak self] e in self?.handle(e) }
         rig.onGiftTap = { [weak self] in self?.walkAsk = true }
+        // v2.34 熟留下來: each slime's saved trust comes back before anything can store a 0 over it; wariness starts at 0
+        savedTrust = Self.trustLoad()
+        if start.trKeep >= 0.5 {
+            for (k, tr) in savedTrust { impressions[k] = (tr, 0) }
+            if let tr = savedTrust[saved] { rig.setImpression(trust: tr, wary: 0) }
+        }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
         syncAudio()
         rig.walkOpen()   // 走路: the second open leaves the gift stone
@@ -68,6 +75,7 @@ final class SlimeController: ObservableObject {
             self?.haptics.stopContinuous()
             self?.sound.stopAll()
             self?.motion.stopDeviceMotionUpdates()
+            self?.trustSave(force: true)   // v2.34: leaving, write the trust now
         }
         // v2.20: the impression lives for this run only; 10 min or more in the background and it is a first meeting again
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
@@ -75,7 +83,12 @@ final class SlimeController: ObservableObject {
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             guard let self, let at = self.backgroundAt else { return }
-            if Date().timeIntervalSince(at) >= 600 { self.rig.resetImpression(); self.impressions = [:] }
+            if Date().timeIntervalSince(at) >= 600 {
+                if self.current.trKeep >= 0.5 {   // v2.34: only the wariness goes; the trust stays
+                    self.rig.setImpression(trust: self.rig.impTrust, wary: 0)
+                    self.impressions = self.impressions.mapValues { (trust: $0.trust, wary: 0.0) }
+                } else { self.rig.resetImpression(); self.impressions = [:] }
+            }
             self.backgroundAt = nil
             self.walkReadSteps()   // 走路: what you walked while it was away
             self.startMotion()
@@ -186,6 +199,35 @@ final class SlimeController: ObservableObject {
         }
         lastBreathBeat = rig.breathBeat
         haptics.flush()
+        trustClock += dt
+        if trustClock >= 3 { trustClock = 0; trustSave(force: false) }   // v2.34: every 3 s, only when it changed
+    }
+    private var trustClock = 0.0
+
+    // MARK: - v2.34 熟留下來: trust per slime in UserDefaults ("nienie.imp", {"v":1,"tr":{"taro":0.55}}), same shape as the web's localStorage
+
+    private var savedTrust: [SlimeKind: Double] = [:]
+    private static func trustLoad() -> [SlimeKind: Double] {
+        guard let d = UserDefaults.standard.data(forKey: "nienie.imp"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              let tr = o["tr"] as? [String: Double] else { return [:] }
+        var out: [SlimeKind: Double] = [:]
+        for (k, v) in tr { if let s = SlimeKind(rawValue: k), v.isFinite { out[s] = max(0, min(1, v)) } }
+        return out
+    }
+    /// Writes when a slime's trust moved by more than 0.005 since the last write (force: on leaving, any change)
+    private func trustSave(force: Bool) {
+        guard current.trKeep >= 0.5 else { return }
+        var all = savedTrust
+        for (k, v) in impressions { all[k] = v.trust }
+        all[slime] = rig.impTrust
+        let moved = all.contains { k, v in abs(v - (savedTrust[k] ?? -1)) > (force ? 1e-6 : 0.005) }
+        guard moved else { return }
+        var tr: [String: Double] = [:]
+        for (k, v) in all { tr[k.rawValue] = (v * 1000).rounded() / 1000 }
+        guard let d = try? JSONSerialization.data(withJSONObject: ["v": 1, "tr": tr]) else { return }
+        UserDefaults.standard.set(d, forKey: "nienie.imp")
+        savedTrust = all
     }
     private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0, purrPhase = 0.0
     private var backgroundAt: Date?
@@ -295,7 +337,9 @@ final class SlimeController: ObservableObject {
         pushParams()
         activeSlot = nil
         rig.resetShape()
-        if let imp = impressions[k] { rig.setImpression(trust: imp.trust, wary: imp.wary) } else { rig.resetImpression() }
+        if let imp = impressions[k] { rig.setImpression(trust: imp.trust, wary: imp.wary) }
+        else if current.trKeep >= 0.5, let tr = savedTrust[k] { rig.setImpression(trust: tr, wary: 0) }   // v2.34
+        else { rig.resetImpression() }
         rig.startIntro()
         sound.press(intensity: 0.5)
     }
