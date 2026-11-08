@@ -22,6 +22,8 @@
   // 第一輪跟之後幾輪抽到的手抖不一樣（v2.16 到 v2.23 每版第一輪 T26 都是 3.25、之後 1.3 左右，就是這個）。跑 selftest 時音效那一幀改用真的亂數，跑完換回
   // 走路：測試不准碰使用者存的東西；窗框下緣的東西會擋手指，先清空
   WALK.noSave = true; WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null;
+  // v2.34 熟留下來：測試不准碰使用者存的熟（chooseSlime、切背景都會寫），跑完原樣還回去
+  IMPSV.noSave = true; const IMP0 = { tr: IMP.tr, w: IMP.w }, IMPS0 = JSON.stringify(IMPS);
   const realRandom0 = Math.random, sfxFrame0 = SFX && SFX.frame;
   if (SFX) SFX.frame = (...a) => { const r = Math.random; Math.random = realRandom0; try { return sfxFrame0.apply(SFX, a); } finally { Math.random = r; } };
   function ev(type, id, x, y) { cv.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch', isPrimary: id === 1 })); }
@@ -1145,6 +1147,7 @@
       && r.full.n === WALK_SLOTS && r.full.leaving === 1 && r.full.leaveEnd === 0 && r.full.oldestGone && !r.settle.stuck && r.settle.n === 1
       && r.gift.first === 0 && r.gift.second && r.gift.hit && !r.gift.off && r.gift.asked && r.gift.fing === 0 && r.gift.closed && r.gift.perm === 'no' && r.gift.kept === 1 && r.gift.third === 1
       && r.save.n === 1 && r.save.k === 'acorn' && r.save.opens === 5 && r.save.perm === 'ok' && r.save.bank === 123 && r.blue === false && r.draw === null;
+    clear();   // v2.32：走路測試留下的「今天 3 件」會讓後面的項目興奮（exLevel 看 WALK.dayN，休息變短、不睡），T48 第一次就被咬到，清掉
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   // T48 v2.31 搖晃沉澱（多米 11-07：互動改成搖手機，像雪花球）與散出來吃回來（第二種玩法）。搖三下就滿、第四下不會更多、牠在碗裡彈但不出碗、物理沒壞；放著約 30 秒沉澱清透（叮一聲、睜眼、發光，只清一次）；沉澱時慢呼吸、閉眼；沉到一半捏牠又濁回去；堆的形狀三種都會出現；亮粉都在身體裡；藍底也能搖；搖會叫醒；關掉就沒有
@@ -1182,9 +1185,62 @@
       && [r.eat, r.eatBlue].every(e => e.l0 >= 10 && e.rest0 >= 6 && e.out0 === e.l0 && e.left === 0 && e.sec < 50 && e.out === 0 && e.ding === 1 && e.glow > .6 && e.selfX === 0 && !e.nan) && r.eatSwitch.l0 >= 10 && r.eatSwitch.left === 0 && r.eatSwitch.out === 0;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T49 v2.32 興奮（多米 11-07：運動多牠就比較興奮；提案 興奮提案-暫定.md）。今天帶回 3 件 vs 0 件：藍底放著 90 秒休息少、走路幀數多、每一下衝得遠；休息時長直接抽 200 次比例 0.75／0.5；
+  // 回家進碗之後小跳兩下（0 件不跳、路線中途被打斷不跳）；抓著拉、放手的數字兩邊一樣（手感不動，差 3% 以內）；自動：今天 0、1 件 → 0，2 件 → .5，3 件 → 1
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, shake: 0 };
+    const clear = () => { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; WALK.bank = 0; WALK.dayN = 0; WALK.day = ''; WALK.opens = 0; WALK.perm = ''; WALK.hopN = 0; };
+    const fresh = (sd, over) => { Math.random = seeded(sd || 4901); clear(); mat = { ...SP, ...(over || {}) }; setup(); ESC.on = false; E2.tk.length = 0; E2.tkT = 0; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
+    // 藍底放著：休息佔幾成、走路（不算衝刺）時家每秒移幾 R、探了幾次
+    const idle = sec => { let rest = 0, n = 0, sn = 0, last = null, gf = 0, dist = 0, hx = HOMEX, hy = HOMEY; for (let k = 0; k < sec * 60; k++) { steps(1); n++; if (LIFE.st === 'rest') rest++; if (GAIT.on && !GAIT.dash) { gf++; dist += Math.hypot(HOMEX - hx, HOMEY - hy); } hx = HOMEX; hy = HOMEY; const s = LIFE.sns[LIFE.sns.length - 1]; if (s && s !== last) { last = s; sn++; } } return { rest: +(rest / n).toFixed(3), spd: gf ? +(dist / gf / R * 60).toFixed(3) : 0, gaitF: gf, sniffs: sn, selfX: selfX() }; };
+    fresh(4901, { sill: 0, excite: 0 }); r.calm = idle(90);
+    fresh(4901, { sill: 0, excite: 3 }); r.hyper = idle(90);
+    // 休息時長這根桿子直接量：同一串亂數各抽 200 次，平均要是平常的 0.75 倍（2 件）、0.5 倍（3 件）。放著 90 秒的休息比例會被偶爾的發呆十幾秒拉偏，不拿它比
+    const rd = ex => { fresh(4905, { sill: 0, excite: ex }); let sum = 0; for (let k = 0; k < 200; k++) sum += restDur(); return +(sum / 200).toFixed(3); };
+    r.restDur = [rd(0), rd(2), rd(3)];
+    // 回家進碗之後小跳：3 件跳兩下、0 件不跳；路線中途被打斷（手指一碰就是這個）也不跳
+    const trip = (ex, cut) => { fresh(4902, { excite: ex }); WALK.bank = 800; walkCheck(); let n = 0, hops = 0, was = false; while (SILL.route && n < 900) { steps(1); lastTouch = t; n++; if (cut && n === 30) routeEnd(true); } for (let k = 0; k < 300; k++) { steps(1); lastTouch = t; const on = INTRO.on && INTRO.mini; if (on && !was) hops++; was = on; } return { hops, inBowl: SILL.inBowl, left: WALK.hopN, selfX: selfX() }; };
+    r.hop3 = trip(3, false); r.hop0 = trip(0, false); r.hopCut = trip(3, true);
+    // 手感不動：同一個種子、同樣往右拉 2R 停 0.5 秒再放手，拉長、整團跟過去、放手 2 秒後剩多少，三個種子平均、兩邊差 3% 以內（眼睛關掉：眨眼抽亂數的時間點不同會把整串亂數錯開，同種子也走不同軌跡，量到 5% 雜訊；放手後不讓牠去探手指離開的地方，那條偽足的長度是亂數，量到過 8%）
+    const feel = ex => { const acc = { e1: 0, c1: 0, e2: 0, selfX: 0 }, each = []; for (const sd of [4903, 4906, 4907]) { fresh(sd, { sill: 0, excite: ex, eyes: 0 }); LIFE.st = 'rest'; LIFE.until = t + 1e4; const cx = globalC.xc, cy = globalC.yc; const ext = () => { let x1 = -1e9; for (const i of bnd) x1 = Math.max(x1, X[i]); return x1 - cx; }; ev('pointerdown', 1, cx, cy); steps(4); for (let k = 1; k <= 40; k++) { ev('pointermove', 1, cx + k * R * 2 / 40, cy); steps(1); } steps(30); acc.e1 += ext() / R; acc.c1 += (globalC.xc - cx) / R; ev('pointerup', 1, cx + R * 2, cy); for (let k = 0; k < 120; k++) { LIFE.att = null; LIFE.ask = null; steps(1); } acc.e2 += ext() / R; acc.selfX += selfX(); each.push(ext() / R); } return { e1: +(acc.e1 / 3).toFixed(3), c1: +(acc.c1 / 3).toFixed(3), e2: +(acc.e2 / 3).toFixed(3), sp: +(Math.max(...each) - Math.min(...each)).toFixed(3), selfX: acc.selfX }; };
+    r.feel0 = feel(0); r.feel3 = feel(3);
+    // 自動：照今天幾件
+    fresh(4904, { excite: -1 }); { const lv = []; for (const n of [0, 1, 2, 3]) { WALK.dayN = n; WALK.day = new Date().toDateString(); EXT = -9; lv.push(exLevel()); } r.auto = lv; }
+    res.T49_excite = r; restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    const near = (a, b, sp) => Math.abs(a - b) <= Math.max(.03 * Math.max(1, Math.abs(a), Math.abs(b)), sp || 0);   // 兩邊的差不能大於 3%，或不能大於同一級三個種子之間自己的差（雜訊底線：三輪量到同一級也差 1 到 4%）
+    res.PASS.excite = r.hyper.rest < r.calm.rest - .05 && r.hyper.spd > r.calm.spd * 1.12 && [r.calm, r.hyper].every(x => x.selfX === 0) && Math.abs(r.restDur[1] / r.restDur[0] - .75) < .03 && Math.abs(r.restDur[2] / r.restDur[0] - .5) < .03
+      && r.hop3.hops === 2 && r.hop3.inBowl && r.hop3.left === 0 && r.hop0.hops === 0 && r.hopCut.hops === 0 && r.hop3.selfX === 0
+      && near(r.feel0.e1, r.feel3.e1) && near(r.feel0.c1, r.feel3.c1) && near(r.feel0.e2, r.feel3.e2, Math.max(r.feel0.sp, r.feel3.sp)) && r.feel0.selfX === 0 && r.feel3.selfX === 0
+      && r.auto.join() === '0,0,0.5,1';
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T50 v2.33 一隻為主（多米 11-07：定位是陪伴寵物，只養一隻，留芋圓）。預設 one 1：底部那排四隻藏起來、一開始就是芋圓、芋圓的手感是黏土基準 v1；one 0 四隻回來。
+  // 四隻各自的材質、顏色、印象分開記這件事 T38 照樣量（collect），一隻為主不碰它
+  { const was = mat.one, el = document.getElementById('slimes'); mat.one = 1; oneSync(); const hid = el.style.display === 'none'; mat.one = 0; oneSync(); const shown = el.style.display !== 'none'; mat.one = was; oneSync();
+    res.T50_one = { hid, shown, presetOne: PRESETS.clay.one, def: SLIMES[2].id, defMat: SLIMES[2].mat, startIdx: PRESETS.clay.one >= .5 ? 2 : -1 };
+    res.PASS.one = hid && shown && PRESETS.clay.one === 1 && SLIMES[2].id === 'taro' && SLIMES[2].mat === 'clay';
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T51 v2.34 熟留下來（多米 11-07 定位：陪伴寵物要記得你）。熟存得進 localStorage、讀得回來、戒不存；背景 10 分鐘只歸零戒、熟留著，不到 10 分鐘什麼都不動；
+  // trKeep 0 回 v2.33 熟跟戒一起歸零；noSave 時不寫。用使用者的 key 量，量完原樣還回去
+  { const r = {}, LS0 = localStorage.getItem('nienie.imp'), id = SLIMES[SLIME].id, mat0 = mat;
+    try {
+      mat = { ...PRESETS.clay, imp: 1, trKeep: 1 }; IMP.tr = .62; IMP.w = .4; IMPSV.noSave = false; IMPSV.last = ''; impSave(true);
+      const o = JSON.parse(localStorage.getItem('nienie.imp') || 'null'); r.saved = o && o.tr ? o.tr[id] : null; r.savedW = o && o.w !== undefined;
+      for (const k in IMPS) delete IMPS[k]; IMP.tr = 0; impLoad(); r.loaded = IMPS[id] ? IMPS[id].tr : null; r.loadedW = IMPS[id] ? IMPS[id].w : null; r.live = IMP.tr;
+      IMP.tr = .62; IMP.w = .4; impBack(3e5); r.short = [IMP.tr, IMP.w];
+      impBack(7e5); r.bg = [IMP.tr, IMP.w];
+      mat = { ...mat, trKeep: 0 }; IMP.tr = .62; IMP.w = .4; impBack(7e5); r.off = [IMP.tr, IMP.w];
+      mat = { ...mat, trKeep: 1 }; IMPSV.noSave = true; IMPSV.last = ''; localStorage.setItem('nienie.imp', 'X'); IMP.tr = .3; impSave(true); r.noSave = localStorage.getItem('nienie.imp') === 'X';
+    } catch (e) { r.err = String(e); }
+    IMPSV.noSave = true; if (LS0 === null) localStorage.removeItem('nienie.imp'); else localStorage.setItem('nienie.imp', LS0); mat = mat0;
+    res.T51_trKeep = r;
+    res.PASS.trKeep = !r.err && r.saved === .62 && !r.savedW && r.loaded === .62 && r.loadedW === 0 && r.live === .62 && r.short[0] === .62 && r.short[1] === .4 && r.bg[0] === .62 && r.bg[1] === 0 && r.off[0] === 0 && r.off[1] === 0 && r.noSave;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
+  for (const k in IMPS) delete IMPS[k]; Object.assign(IMPS, JSON.parse(IMPS0)); IMP.tr = IMP0.tr; IMP.w = IMP0.w; IMPD.tr = IMP.tr; IMPD.w = IMP.w; IMPSV.noSave = false;   // v2.34：熟還回去
   if (SFX) SFX.frame = sfxFrame0;
   WALK.noSave = false; walkLoad();
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);

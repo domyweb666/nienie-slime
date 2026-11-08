@@ -1,0 +1,12 @@
+{
+ "muyu": [
+  "muyu-01.wav",
+  "muyu-02.wav",
+  "muyu-03.wav",
+  "muyu-04.wav",
+  "muyu-05.wav"
+ ],
+ "chant": "chant-loop.m4a",
+ "loop": 38.4,
+ "pad": 1.0
+}
