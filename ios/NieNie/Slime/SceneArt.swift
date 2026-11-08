@@ -7,7 +7,9 @@ import UIKit
 /// the pictures as on the web. Port of the web's `sceneFor`, `drawDeco`, `drawProps` (bowl only) and `bowlFront`.
 /// `sprite` draws the small things it brings back from a walk (走路: stone, leaf, petal, acorn, cap, feather), port of `walkSprite`.
 enum SceneArt {
-    struct Images { let sky: UIImage; let wall: UIImage; let props: UIImage; let bowlFront: UIImage }
+    struct Images { let sky: UIImage; let wall: UIImage; let props: UIImage; let bowlFront: UIImage; let bell: UIImage?; let teru: UIImage? }
+    /// v2.37 擺飾: widths in scene units (U), same table as the web's DECODEF; they do not grow with it
+    static let decoW: [String: Double] = ["cloth": 200, "candle": 56, "candleLit": 56, "books": 104, "jar": 60, "bell": 50, "teru": 54]
     private static var cache: [String: Images] = [:]
     private static var sprites: [String: UIImage] = [:]
     private static let night = UIColor(red: 38 / 255, green: 42 / 255, blue: 92 / 255, alpha: 0.62)
@@ -36,10 +38,10 @@ enum SceneArt {
     }
 
     /// kind 1 = day, 2 = night. nil when the pictures are missing from the bundle.
-    static func make(kind: Int, size: CGSize, g: SlimeRig.SillGeo) -> Images? {
-        let key = "\(kind)|\(size.width)|\(size.height)"
+    static func make(kind: Int, size: CGSize, g: SlimeRig.SillGeo, bowl: Bool = false, props oldProps: Bool = false, deco: Int = 1) -> Images? {
+        let key = "\(kind)|\(size.width)|\(size.height)|\(bowl)|\(oldProps)|\(deco)"
         if let c = cache[key] { return c }
-        guard let plate = asset("scene-plate"), let bowl = asset("scene-bowl"), let succ = asset("scene-succ"), let peb = asset("scene-peb") else { return nil }
+        guard let plate = asset("scene-plate"), let bowlIm = asset("scene-bowl"), let succ = asset("scene-succ"), let peb = asset("scene-peb") else { return nil }
         let isNight = kind == 2
         let W = Double(size.width), H = Double(size.height)
         let s = min(W / 860, H / 1130), off = H * 0.72 - 1177 * s, ox = (W - 992 * s) / 2
@@ -123,28 +125,61 @@ enum SceneArt {
                 ctx.drawRadialGradient(gr, startCenter: .zero, startRadius: 0, endCenter: .zero, endRadius: 1, options: [])
                 ctx.restoreGState()
             }
+            func put(_ name: String, _ x: Double, sink: Double = 0, tint: Bool = true) -> CGRect? {
+                guard let im = asset("scene-deco-" + name), let w0 = decoW[name] else { return nil }
+                let w = w0 * U, h = w * Double(im.size.height / im.size.width), y = fl + sink * U
+                shadow(x, fl - 2, w * 0.5, 9 * U)
+                let r = CGRect(x: x - w / 2, y: y - h, width: w, height: h)
+                (tint ? tinted(im, isNight) : im).draw(in: r)
+                return r
+            }
+            // v2.37 擺飾: the cloth under it, the candle on the left end (lit and untinted at night, a warm glow), books or the jar on the right end
+            if deco >= 1 {
+                _ = put("cloth", g.bx, sink: 6)
+                let cx = g.l + 56 * U / 2 + 8
+                if isNight, let r = put("candleLit", cx, tint: false) {
+                    let gx0 = Double(r.midX), gy0 = Double(r.maxY) - Double(r.height) * 0.78, rad = 150 * U
+                    let c0 = UIColor(red: 1, green: 190 / 255, blue: 110 / 255, alpha: 0.42).cgColor
+                    let c1 = UIColor(red: 1, green: 160 / 255, blue: 80 / 255, alpha: 0.16).cgColor
+                    let c2 = UIColor(red: 1, green: 150 / 255, blue: 70 / 255, alpha: 0).cgColor
+                    if let gr = CGGradient(colorsSpace: cs, colors: [c0, c1, c2] as CFArray, locations: [0, 0.35, 1]) {
+                        ctx.saveGState(); ctx.setBlendMode(.plusLighter)
+                        ctx.drawRadialGradient(gr, startCenter: CGPoint(x: gx0, y: gy0), startRadius: 0, endCenter: CGPoint(x: gx0, y: gy0), endRadius: rad, options: [])
+                        ctx.restoreGState()
+                    }
+                } else if !isNight { _ = put("candle", cx) }
+                if deco >= 2 { let n = deco >= 3 ? "jar" : "books"; _ = put(n, g.r - (decoW[n] ?? 100) * U / 2 - 8) }
+            }
+            guard oldProps || bowl else { return }
+            if oldProps {
             let pebW = 76 * U, pebH = pebW * 159 / 240, pebX = g.l + pebW / 2 + 2
             shadow(pebX, fl - 2, pebW * 0.52, 11 * U)
             tinted(peb, isNight).draw(in: CGRect(x: pebX - pebW / 2, y: fl - pebH, width: pebW, height: pebH))
             let sucW = 70 * U, sucH = sucW * 300 / 220, sucX = g.r - sucW / 2 - 2
             shadow(sucX, fl - 2, sucW * 0.52, 11 * U)
             tinted(succ, isNight).draw(in: CGRect(x: sucX - sucW / 2, y: fl - sucH, width: sucW, height: sucH))
+            }
+            if bowl {
             shadow(g.bx, fl - 2, g.bw * 0.52, 11 * U)
-            tinted(bowl, isNight).draw(in: CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh))
+            tinted(bowlIm, isNight).draw(in: CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh))
+            }
         }
 
         // the bowl's front half: the picture with its inside and everything above the rim cut away
-        let bs = bowl.size
-        let front = UIGraphicsImageRenderer(size: bs, format: format(scale: bowl.scale)).image { c in
+        let bs = bowlIm.size
+        let front = UIGraphicsImageRenderer(size: bs, format: format(scale: bowlIm.scale)).image { c in
             let ctx = c.cgContext
-            bowl.draw(at: .zero)
+            bowlIm.draw(at: .zero)
             ctx.setBlendMode(.clear)
             let ey = bs.height * 0.308, rx = bs.width * 0.424, ry = bs.height * 0.26
             ctx.fillEllipse(in: CGRect(x: bs.width / 2 - rx, y: ey - ry, width: 2 * rx, height: 2 * ry))
             ctx.fill(CGRect(x: 0, y: 0, width: bs.width, height: ey))
             if isNight { ctx.setBlendMode(.sourceAtop); night.setFill(); ctx.fill(CGRect(origin: .zero, size: bs)) }
         }
-        let out = Images(sky: sky, wall: wall, props: props, bowlFront: front)
+        // v2.37: the wind bell (deco 1+) and the teru teru bozu (deco 2+) hang from the frame's top; the view turns them about their top
+        let bell = deco >= 1 ? asset("scene-deco-bell").map { tinted($0, isNight) } : nil
+        let teru = deco >= 2 ? asset("scene-deco-teru").map { tinted($0, isNight) } : nil
+        let out = Images(sky: sky, wall: wall, props: props, bowlFront: front, bell: bell, teru: teru)
         cache[key] = out
         return out
     }

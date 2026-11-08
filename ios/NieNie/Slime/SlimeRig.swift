@@ -127,6 +127,15 @@ final class SlimeRig {
     private var builtScene = -1.0
     /// 0 blue (floating), 1 day, 2 night: what the view draws behind it
     var sceneKind: Int { Int(params.scene.rounded()) }
+    /// v2.35 拿掉碗 (多米 11-08): it lives in the middle of the sill; the bowl is not drawn, not in the way, nothing to fall into
+    var noBowl: Bool { sillOn && params.bowl < 0.5 }
+    /// v2.37 擺飾: the wind bell swings after a shake (amp in radians), decaying over a few seconds
+    private var decoKick = -99.0, decoDir = 1.0
+    func decoSwing(_ amp: Double) -> Double {
+        let u = t - decoKick
+        guard u >= 0, u < 6 else { return 0 }
+        return amp * decoDir * exp(-u / 1.1) * sin(u * 2 * .pi * 1.4)
+    }
 
     private struct Cluster {
         var idx: [Int]
@@ -1274,7 +1283,7 @@ final class SlimeRig {
         var grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         if sillOn, let g = sillG {   // v2.30: behind the bowl or outside, the bowl, the frame and the wall are in front of it; 走路: a tap on the gift stone asks instead of grabbing
             if sillPlane != .room {
-                if sx > g.bx - g.bw / 2 && sx < g.bx + g.bw / 2 && sy > g.by + g.bh * 0.1 && sy < g.fl { grab = false }
+                if !noBowl && sx > g.bx - g.bw / 2 && sx < g.bx + g.bw / 2 && sy > g.by + g.bh * 0.1 && sy < g.fl { grab = false }
                 if sillPlane == .out && !(sx > g.gx && sx < g.jr && sy > g.gy && sy < g.bt) { grab = false }
             }
             if !grab && allowed && walkGiftAt(sx, sy) { onGiftTap?(); return }
@@ -3008,10 +3017,10 @@ final class SlimeRig {
         for i in 0..<N { mx += X[i] }
         mx /= Double(N)
         for i in bnd { y1 = max(y1, Y[i]) }
-        let dx = g.bx - mx, dy = g.rim - R * 0.9 - y1
+        let dx = g.bx - mx, dy = (noBowl ? g.fl - R * 0.6 : g.rim - R * 0.9) - y1   // v2.35: no bowl, it drops onto the middle of the sill
         for i in 0..<N { X[i] += dx; PX[i] = X[i]; Y[i] += dy; PY[i] = Y[i] }
         cx = g.bx; homeX = g.bx; cy = H * 0.5; homeY = cy
-        sillAir = true; sillC = 0; sillInBowl = false; sillWant = true; sillGrab = false; sillHeld = false
+        sillAir = true; sillC = 0; sillInBowl = false; sillWant = !noBowl; sillGrab = false; sillHeld = false
         sillPX = 0; sillPY = 0; sillVX = 0; sillVY = 0; sillFall = 0; sillLastHome = t
         camZ = 1; camX = viewV.x; camY = viewV.y; introSq = 0
     }
@@ -3099,7 +3108,7 @@ final class SlimeRig {
             planeSet(.room)   // lifted: back in front of everything
         }
         // let go right over the bowl: it wants in; anywhere else it lands on the sill (the frame and the walls come with the next batch)
-        if sillHeld && !sillGrab && !sillInBowl { sillWant = abs(sillRelX - g.bx) < g.cav * 0.9 }
+        if sillHeld && !sillGrab && !sillInBowl { sillWant = !noBowl && abs(sillRelX - g.bx) < g.cav * 0.9 }
         sillHeld = sillGrab
         // home: not while grabbed; in the air it follows the body; on the ground y follows and, inside the bowl, x eases back to the middle
         if !sillGrab {
@@ -3158,6 +3167,10 @@ final class SlimeRig {
         if sillInBowl { if r < 0.16 { routeStart(rtOutFront(nil)) }; return }
         if sillPlane == .frame { routeStart(rtBackIn()); return }   // v2.31: it does not climb the frame by itself, it comes back in
         if sillPlane == .out { routeStart(rtComeBack()); return }
+        if noBowl, let g = sillG, abs(cx0 - g.bx) < R * 0.3 {   // v2.35: the middle is home; now and then a little walk
+            if r < 0.16, let x = floorWalkX(cx0), abs(x - cx0) > R * 0.3 { gaitTo(x, homeY, dash: false) }
+            return
+        }
         if r < 0.6 { routeStart(rtIntoFront()); return }
         if let x = floorWalkX(cx0), abs(x - cx0) > R * 0.3 { gaitTo(x, homeY, dash: false) }
     }
@@ -3179,6 +3192,7 @@ final class SlimeRig {
     /// Back in over the front edge: walk to the bowl, lift above the edge, it is inside now, drop.
     private func rtIntoFront() -> [RouteStep] {
         guard let g = sillG else { return [] }
+        if noBowl { return [.walk(surf: "floor", to: sillClampX(g.bx))] }   // v2.35: home is the middle of the sill
         return [.walk(surf: "floor", to: sillClampX(g.bx)), .sniff(a: -.pi / 2, L: 0.5, T: 0.7), .move(y: g.lip - 6), .plane(.room, inBowl: true), .drop(g: 0.8), .surf("bowl")]
     }
     /// Home from wherever it is: outside → over the ledge, up over the frame's bottom, then over the bowl's back edge; behind the bowl → over the back edge; on the sill → over the front edge.
@@ -3198,6 +3212,7 @@ final class SlimeRig {
     private func rtBackIn() -> [RouteStep] {
         guard let g = sillG else { return [] }
         let x = max(g.gx + R * 0.72, g.bx)
+        if noBowl { return [.walk(surf: "bar", to: x), .sniff(a: .pi / 2, L: 0.4, T: 0.6), .plane(.room, inBowl: false), .drop(g: 0.8), .surf("floor")] }   // v2.35: off the frame's bottom, down onto the sill
         return [.walk(surf: "bar", to: x), .sniff(a: -.pi / 2, L: 0.5, T: 0.7), .move(y: g.back - 3), .plane(.room, inBowl: true), .drop(g: 0.8), .surf("bowl")]
     }
     private func planeSet(_ pl: SillPlane) {
@@ -3311,7 +3326,8 @@ final class SlimeRig {
         guard sillHop == nil, !sillGrab, let g = sillG else { return }
         gaitOn = false; wanderMoving = false
         if sillRoute != nil { routeEnd(abort: true) }
-        var x = toBowl ? g.bx : sillClampX(tx), tb = toBowl
+        let tb0 = toBowl && !noBowl
+        var x = tb0 ? g.bx : sillClampX(tx), tb = tb0
         if !tb && sillInBowl && abs(x - g.bx) < g.outer + R * 0.9 { tb = true; x = g.bx }
         sillHop = SillHop(air: false, t: 0, tx: x, toBowl: tb)
         lifeSt = .rest; lifeUntil = t + 3
@@ -3408,6 +3424,7 @@ final class SlimeRig {
     }
     /// One shake of the phone; dx, dy is the screen direction the contents are flung relative to the phone.
     func shake(dx: Double, dy: Double) {
+        decoKick = t; decoDir = dx < 0 ? -1 : 1   // v2.37 the wind bell
         guard params.shake >= 0.5 else { return }
         let n = max(1, params.shakeN)
         snwLast = t
@@ -3590,7 +3607,7 @@ final class SlimeRig {
     private func walkLand(_ f: WalkFall) { walkItems.append(WalkItem(k: f.k, big: f.big, s: f.s, a: f.na, gift: false)); walkSave() }
     private func walkStep(_ dt: Double) {
         // v2.32 興奮: home, nobody touching, one or two little hops
-        if walkHopN > 0 && sillRoute == nil && !sillAir && sillInBowl && !introOn && fingers.isEmpty && t >= walkHopAt { walkHopN -= 1; walkHopAt = t + 0.9; hop() }
+        if walkHopN > 0 && sillRoute == nil && !sillAir && (sillInBowl || (noBowl && sillPlane == .room)) && !introOn && fingers.isEmpty && t >= walkHopAt { walkHopN -= 1; walkHopAt = t + 0.9; hop() }
         if var q = walkStuck {   // a finger on it knocks the thing off at once (whoever opens may be anxious, no waiting for the show); left alone it falls off by itself
             var touched = false
             for f in fingers.values where (f.mode == .grab || f.mode == .stroke) && t - f.tDown > 0.1 { touched = true }

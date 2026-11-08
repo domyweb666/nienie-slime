@@ -39,6 +39,7 @@ final class SlimeView: UIView {
     // v2.28 窗台: the room baked into pictures (sky; the wall with the window; the dish, the plant and the bowl) placed behind or in front of the body by plane,
     // the bowl's front half over it while it sits inside; 走路: the small things on the sill and the one stuck to it
     private let skyImgLayer = CALayer(), wallLayer = CALayer(), propsLayer = CALayer(), bowlFrontLayer = CALayer()
+    private let bellLayer = CALayer(), teruLayer = CALayer()   // v2.37 擺飾: hanging from the frame, turned about their top
     private let itemsGroup = CALayer(), stuckGroup = CALayer()
     // v2.31 搖晃沉澱: inside the body (in litGroup, under the eyes) the haze, the glitter by colour, the glow; the halo outside
     private let fogLayer = CAGradientLayer(), glowLayer = CAGradientLayer(), haloLayer = CAGradientLayer()
@@ -129,6 +130,7 @@ final class SlimeView: UIView {
         stuckGroup.isHidden = true; stuckGroup.zPosition = 1
         layer.addSublayer(stuckGroup)   // 走路: the thing stuck to it, over the body
         bowlFrontLayer.contentsGravity = .resize; bowlFrontLayer.isHidden = true; bowlFrontLayer.zPosition = 4
+        for l in [bellLayer, teruLayer] { l.contentsGravity = .resize; l.anchorPoint = CGPoint(x: 0.5, y: 0); l.isHidden = true; layer.addSublayer(l) }
         layer.addSublayer(bowlFrontLayer)   // v2.28 窗台: in front of the body and the eyes
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
@@ -442,16 +444,17 @@ final class SlimeView: UIView {
     /// 走路: the small things. The blue sky and the specks only while floating.
     private func updateScene() {
         let kind = rig.sceneKind
-        let all: [CALayer] = [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup, bowlFrontLayer]
+        let all: [CALayer] = [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup, bowlFrontLayer, bellLayer, teruLayer]
         guard kind > 0, let g = rig.sillG, bounds.width > 0, bounds.height > 0 else {
             for l in all { l.isHidden = true }
             skyLayer.isHidden = false
             for l in speckLayers { l.isHidden = false }
             return
         }
-        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))"
+        let p = rig.params, decoLv = Int(p.deco.rounded())
+        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))|\(rig.noBowl)|\(p.props >= 0.5)|\(decoLv)"
         if key != sceneKey {
-            guard let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g) else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
+            guard let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g, bowl: !rig.noBowl, props: p.props >= 0.5, deco: decoLv) else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
                 for l in all { l.isHidden = true }
                 skyLayer.isHidden = false
                 return
@@ -460,6 +463,14 @@ final class SlimeView: UIView {
             skyImgLayer.contents = imgs.sky.cgImage; wallLayer.contents = imgs.wall.cgImage; propsLayer.contents = imgs.props.cgImage
             bowlFrontLayer.contents = imgs.bowlFront.cgImage
             bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
+            for (l, im, x, w0) in [(bellLayer, imgs.bell, g.jr - 46 * g.U, 50.0), (teruLayer, imgs.teru, g.gx + 46 * g.U, 54.0)] {
+                l.contents = im?.cgImage
+                guard let im else { continue }
+                let w = w0 * g.U, h = w * Double(im.size.height / im.size.width)
+                l.setAffineTransform(.identity)
+                l.bounds = CGRect(x: 0, y: 0, width: w, height: h)
+                l.position = CGPoint(x: x, y: g.gy)
+            }
         }
         skyLayer.isHidden = true
         for l in speckLayers { l.isHidden = true }
@@ -470,7 +481,12 @@ final class SlimeView: UIView {
         wallLayer.zPosition = plane == .out ? 2 : -3
         propsLayer.zPosition = plane == .room ? -2 : 3
         itemsGroup.zPosition = plane == .room ? -1 : 3.5
-        bowlFrontLayer.isHidden = !(rig.sillInBowl && plane == .room)
+        bowlFrontLayer.isHidden = !(rig.sillInBowl && plane == .room) || rig.noBowl
+        // v2.37: the hanging two sit with the props (behind it on the sill, in front of it on the frame or outside); the bell swings after a shake
+        bellLayer.isHidden = bellLayer.contents == nil; teruLayer.isHidden = teruLayer.contents == nil
+        bellLayer.zPosition = propsLayer.zPosition; teruLayer.zPosition = propsLayer.zPosition
+        bellLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.decoSwing(0.22)))
+        teruLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.decoSwing(0.06)))
         let night = kind == 2
         place(rig.walkBackSprites, in: &itemLayers, group: itemsGroup, world: false, night: night)
         place(rig.walkWorldSprites, in: &stuckLayers, group: stuckGroup, world: true, night: night)
