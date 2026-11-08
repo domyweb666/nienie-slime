@@ -42,6 +42,15 @@
 - 網頁原因：`shkMotionInit` 放在 pointerdown，觸控的 pointerdown 不算使用者手勢，iOS 拒絕後 catch 記成 denied 就不再問。修：改由 window 的 pointerup（capture）呼叫，被拒時 perm 歸零下次再問。記憶裡「模擬器沒有加速度計所以不跳權限」可能其實是這個原因，沒驗。
 - commit 9ad8354，推了 swiftui-port，Actions run 42453630170 編譯檢查。TestFlight 沒發（要多米開口）；main 沒推（線上網頁還是舊的）。
 
+## ✅ 11-08 網頁 v2.34 熟留下來
+
+- 多米：「先繼續往下做」。做的是定位文件要改的三件事第一件。
+- `prototype/web/index.html`：`IMPSV`、`impLoad()`、`impSave(force)`、`impBack(away)`；熟（`IMP.tr`）每隻存 localStorage `nienie.imp`（`{v:1,tr:{taro:.55}}`），戒不存；`frame()` 每 3 秒有變才寫、visibilitychange 隱藏與 pagehide 強制寫；背景 10 分鐘 `impBack` 只歸零戒。面板 `trKeep` 預設 1，0 回 v2.33。開機時 `impLoad` 先把目前這隻的熟對進 `IMP.tr`，不然 chooseSlime 會先把 0 存回 IMPS。
+- selftest：開頭 `IMPSV.noSave = true` 並快照 IMP、IMPS，結尾還原；加 T51（存、讀、背景只歸零戒、trKeep 0、noSave 不寫，用使用者的 key 量完原樣還回）。
+- 預覽頁實測：熟設 0.55 推 5 秒 → localStorage 有 0.55 → 重新整理後 IMP.tr 0.55、戒 0、畫面上的熟 0.55。
+- selftest 52 項跑了七輪：六輪全過；第二輪只有 T48（搖晃沉澱）沒過，那輪沒存細節，加測四輪（沒過就存 T48 全部數字）都過，沒重現。T48 關著印象在測，不碰熟；v2.32 那時也掉過一次（當時歸因走路的 dayN 沒清）。懷疑是舊的時好時壞，原因沒查到。下次再掉，先存 `res.T48_shake` 全部數字再說。七輪跑完使用者存的熟（0.55）都沒被動到。
+- 注意：`.claude/launch.json` 的 web-proto 把埠寫死 8765，preview_start 會說它開在 8766，其實在 8765，直接開 8765。預覽視窗藏起來時 rAF 停，要驗每幀的東西得手動 `update(1/60)` 推。
+
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
 - 興奮做（多米 11-07 晚上）。用件數不用步數、只往上加、抓著時不動（我定，提案多米沒改）。
