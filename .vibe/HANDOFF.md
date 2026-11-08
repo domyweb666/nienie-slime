@@ -34,6 +34,14 @@
 - 網頁 v2.32 還沒推 main（推 main 用 worktree 只放 `prototype .uiux .vibe CLAUDE.md`）。
 - 舊帳沒變：吃回來留不留、build 106 步數讀幾天前、閘門 1 三個測試、CLAUDE.md 草稿 v2.24 到 v2.32、面板 402 寬排版、四隻收集留不留。
 
+## 🔧 11-08 多米回報：手機搖晃沒動作
+
+- 手機原因：`SlimeController` 在 willResignActive 停掉 CoreMotion，只在 willEnterForeground 重開。系統對話框（點石頭按「好」後的動作與健身權限、控制中心、通知橫幅）只會 resign、不進背景，所以停了就不再開。修：加 didBecomeActive 觀察者呼叫 `startMotion()`。
+- 面板讀數（hudText）多「晃動感測 開／關 兩秒內最大晃動／門檻」，下次搖沒反應看這行就知道是感測器關了還是門檻太高。
+- 門檻 shakeG 13 → 10（網頁三個 PRESETS、Swift FeelParams）。
+- 網頁原因：`shkMotionInit` 放在 pointerdown，觸控的 pointerdown 不算使用者手勢，iOS 拒絕後 catch 記成 denied 就不再問。修：改由 window 的 pointerup（capture）呼叫，被拒時 perm 歸零下次再問。記憶裡「模擬器沒有加速度計所以不跳權限」可能其實是這個原因，沒驗。
+- commit 9ad8354，推了 swiftui-port，Actions run 42453630170 編譯檢查。TestFlight 沒發（要多米開口）；main 沒推（線上網頁還是舊的）。
+
 ## 📌 關鍵決策（這次定下來的，下次別再爭論）
 
 - 興奮做（多米 11-07 晚上）。用件數不用步數、只往上加、抓著時不動（我定，提案多米沒改）。
