@@ -22,6 +22,8 @@
   // 第一輪跟之後幾輪抽到的手抖不一樣（v2.16 到 v2.23 每版第一輪 T26 都是 3.25、之後 1.3 左右，就是這個）。跑 selftest 時音效那一幀改用真的亂數，跑完換回
   // 走路：測試不准碰使用者存的東西；窗框下緣的東西會擋手指，先清空
   WALK.noSave = true; WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null;
+  // v2.34 熟留下來：測試不准碰使用者存的熟（chooseSlime、切背景都會寫），跑完原樣還回去
+  IMPSV.noSave = true; const IMP0 = { tr: IMP.tr, w: IMP.w }, IMPS0 = JSON.stringify(IMPS);
   const realRandom0 = Math.random, sfxFrame0 = SFX && SFX.frame;
   if (SFX) SFX.frame = (...a) => { const r = Math.random; Math.random = realRandom0; try { return sfxFrame0.apply(SFX, a); } finally { Math.random = r; } };
   function ev(type, id, x, y) { cv.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch', isPrimary: id === 1 })); }
@@ -1218,9 +1220,27 @@
     res.PASS.one = hid && shown && PRESETS.clay.one === 1 && SLIMES[2].id === 'taro' && SLIMES[2].mat === 'clay';
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T51 v2.34 熟留下來（多米 11-07 定位：陪伴寵物要記得你）。熟存得進 localStorage、讀得回來、戒不存；背景 10 分鐘只歸零戒、熟留著，不到 10 分鐘什麼都不動；
+  // trKeep 0 回 v2.33 熟跟戒一起歸零；noSave 時不寫。用使用者的 key 量，量完原樣還回去
+  { const r = {}, LS0 = localStorage.getItem('nienie.imp'), id = SLIMES[SLIME].id, mat0 = mat;
+    try {
+      mat = { ...PRESETS.clay, imp: 1, trKeep: 1 }; IMP.tr = .62; IMP.w = .4; IMPSV.noSave = false; IMPSV.last = ''; impSave(true);
+      const o = JSON.parse(localStorage.getItem('nienie.imp') || 'null'); r.saved = o && o.tr ? o.tr[id] : null; r.savedW = o && o.w !== undefined;
+      for (const k in IMPS) delete IMPS[k]; IMP.tr = 0; impLoad(); r.loaded = IMPS[id] ? IMPS[id].tr : null; r.loadedW = IMPS[id] ? IMPS[id].w : null; r.live = IMP.tr;
+      IMP.tr = .62; IMP.w = .4; impBack(3e5); r.short = [IMP.tr, IMP.w];
+      impBack(7e5); r.bg = [IMP.tr, IMP.w];
+      mat = { ...mat, trKeep: 0 }; IMP.tr = .62; IMP.w = .4; impBack(7e5); r.off = [IMP.tr, IMP.w];
+      mat = { ...mat, trKeep: 1 }; IMPSV.noSave = true; IMPSV.last = ''; localStorage.setItem('nienie.imp', 'X'); IMP.tr = .3; impSave(true); r.noSave = localStorage.getItem('nienie.imp') === 'X';
+    } catch (e) { r.err = String(e); }
+    IMPSV.noSave = true; if (LS0 === null) localStorage.removeItem('nienie.imp'); else localStorage.setItem('nienie.imp', LS0); mat = mat0;
+    res.T51_trKeep = r;
+    res.PASS.trKeep = !r.err && r.saved === .62 && !r.savedW && r.loaded === .62 && r.loadedW === 0 && r.live === .62 && r.short[0] === .62 && r.short[1] === .4 && r.bg[0] === .62 && r.bg[1] === 0 && r.off[0] === 0 && r.off[1] === 0 && r.noSave;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
+  for (const k in IMPS) delete IMPS[k]; Object.assign(IMPS, JSON.parse(IMPS0)); IMP.tr = IMP0.tr; IMP.w = IMP0.w; IMPD.tr = IMP.tr; IMPD.w = IMP.w; IMPSV.noSave = false;   // v2.34：熟還回去
   if (SFX) SFX.frame = sfxFrame0;
   WALK.noSave = false; walkLoad();
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
