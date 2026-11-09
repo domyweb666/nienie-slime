@@ -54,21 +54,81 @@
     pullV: null, rubV: null,
     // v2.21 背景音樂（多米 build 77：背景要放 lofi）：mode 0 音樂和音效、1 只有捏的聲音、2 全部靜音。bgmUrl 由呼叫端給（沒給就沒有音樂）
     mode: 0, bgmUrl: null, bgmVol: 0.25, bgmDuck: 0.6, bgmG: null, bgmSrc: null, bgmT: -1,
+    // v2.40 環境音（多米 11-09：背景音改成真實環境聲，下雨、木材燃燒）：amb 'rain'／'fire'／'lofi'。雨和柴火是「底＋零星事件」，
+    // 底是兩分鐘無縫循環，事件照 amb.json 的頻率隨機冒出來（大小、左右、音高每次不同），聽不出循環。lofi 照舊
+    // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
+    amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
   };
   // 一首可以無縫循環的 lofi（prototype/sfx-design/design_lofi.py，40 小節、76 BPM）。自己一條 gain 直接接輸出，不經過音效的 master；
   // 手指抓著時降到六成，讓捏的聲音在前面（0.4 秒慢慢降、1.2 秒慢慢回）。AAC 解碼後頭尾會多空白（2026-11-06 多米：循環有斷掉的聲音），檔案頭尾各多寫 1 秒週期內容，只循環中間那段，解碼器墊多少都接得上
   const BGM_LOOP = 5570526 / 44100, BGM_PAD = 1;   // 跟 design_lofi.py 印出來的格數一致
+  // v2.40：bgmG 是所有背景聲（環境音、lofi）共用的匯流排，模式和抓著時讓位都在這一條；底聲各自一條 gain 接上來，換場景時交叉淡化
   function startBgm() {
-    const c = S.ctx; if (!c || !S.bgmUrl || S.bgmG) return;
-    S.bgmG = c.createGain(); S.bgmG.gain.value = 0; S.bgmG.connect(c.destination);
-    fetch(S.bgmUrl).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(ab => c.decodeAudioData(ab)).then(b => {
-      const src = c.createBufferSource(); src.buffer = b; src.loop = true;
-      const ok = b.duration > BGM_LOOP + BGM_PAD;   // 舊檔或解碼失敗就退回整個檔案循環
-      if (ok) { src.loopStart = BGM_PAD; src.loopEnd = BGM_PAD + BGM_LOOP; }
-      src.connect(S.bgmG); src.start(0, ok ? BGM_PAD : 0); S.bgmSrc = src; S.bgmT = -1;
-    }).catch(() => {});
+    const c = S.ctx; if (!c || S.bgmG) return;
+    S.bgmG = c.createGain(); S.bgmG.gain.value = 0; S.bgmG.connect(c.destination); S.bgmT = -1;
+    S.setAmb(S.amb);
   }
-  function bgmTarget(grabbing) { return S.mode === 0 ? S.bgmVol * (grabbing ? S.bgmDuck : 1) : 0; }
+  // 環境音自己的亂數（不碰 Math.random）：selftest 用固定種子取代 Math.random 量物理，環境音的事件在背景一直抽，
+  // 會把整串亂數錯開，T49 同一個種子每輪結果都不一樣（11-09 量到休息比例 0.572 變 0.382 到 0.427）
+  let arndS = (Date.now() ^ 0x9E3779B9) >>> 0;
+  function arnd() { arndS = (arndS + 0x6D2B79F5) >>> 0; let t = arndS; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+  function ambLoad(url) {
+    if (!S.ambBuf[url]) S.ambBuf[url] = fetch(url).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(ab => S.ctx.decodeAudioData(ab)).catch(() => null);
+    return S.ambBuf[url];
+  }
+  function ambScene() { return S.ambMeta && S.ambMeta.scenes ? S.ambMeta.scenes[S.amb] : null; }
+  // 換環境音：舊的 0.4 秒淡出、新的 0.6 秒淡入；底聲從循環裡隨機一點開始，每次打開聽到的開頭不一樣
+  S.setAmb = function (name) {
+    S.amb = name; S.ambNext = {};
+    const c = S.ctx; if (!c || !S.bgmG) return;
+    if (S.ambSrc) { const src = S.ambSrc, g = S.ambSrcG; g.gain.setTargetAtTime(0, c.currentTime, 0.4); setTimeout(() => { try { src.stop(); } catch (_) {} }, 2500); }
+    S.ambSrc = null; S.ambSrcG = null;
+    let url, pad, len, vol;
+    const sc = ambScene();
+    if (name === 'lofi') { if (!S.bgmUrl) return; url = S.bgmUrl; pad = BGM_PAD; len = BGM_LOOP; vol = S.bgmVol; }
+    else if (sc) { url = S.base + sc.bed; pad = S.ambMeta.pad; len = sc.loopFrames / S.ambMeta.sr; vol = S.ambVol;
+      for (const k of Object.keys(sc.events)) for (const f of sc.events[k].files) ambLoad(S.base + f); }
+    else return;
+    const tok = ++S.ambTok;
+    ambLoad(url).then(b => {
+      if (!b || tok !== S.ambTok) return;
+      const src = c.createBufferSource(); src.buffer = b; src.loop = true;
+      const ok = b.duration > pad + len - 0.01;   // 舊檔或解碼失敗就退回整個檔案循環
+      if (ok) { src.loopStart = pad; src.loopEnd = pad + len; }
+      const g = c.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(vol, c.currentTime, 0.6);
+      src.connect(g); g.connect(S.bgmG); src.start(0, ok ? pad + (name === 'lofi' ? 0 : arnd() * len) : 0);
+      S.ambSrc = src; S.ambSrcG = g; if (name === 'lofi') S.bgmSrc = src;
+    });
+  };
+  // 零星事件：每一種照 perMin 的頻率（指數分布的間隔，不少於 minGap 秒）出現；burst 是一次連著幾顆（劈啪常常兩三顆一起）。
+  // 每顆隨機挑檔（不跟上一顆同一個）、音量在 gain 範圍裡、左右在 ±pan 裡、音高 ±4%。只在「環境音和音效」模式
+  function ambStep() {
+    const sc = ambScene(), c = S.ctx; if (!sc || S.mode !== 0 || !S.ambSrc) return;
+    const now = c.currentTime, gap = e => Math.max(e.minGap || 0, -Math.log(1 - arnd()) * 60 / Math.max(0.01, e.perMin));
+    for (const k of Object.keys(sc.events)) {
+      const e = sc.events[k];
+      if (S.ambNext[k] == null) { S.ambNext[k] = now + gap(e) * arnd() + 1; continue; }
+      if (now < S.ambNext[k]) continue;
+      S.ambNext[k] = now + gap(e);
+      const b = e.burst || [1, 1], n = b[0] + Math.floor(arnd() * (b[1] - b[0] + 1));
+      let at = now + 0.02;
+      for (let i = 0; i < n; i++) { ambOne(k, e, at); at += 0.05 + 0.15 * arnd(); }
+    }
+  }
+  function ambOne(k, e, at) {
+    const c = S.ctx; let i = Math.floor(arnd() * e.files.length);
+    if (e.files.length > 1 && i === S.ambLast[k]) i = (i + 1) % e.files.length;
+    S.ambLast[k] = i;
+    ambLoad(S.base + e.files[i]).then(buf => {
+      if (!buf || !S.bgmG) return;
+      const src = c.createBufferSource(); src.buffer = buf; src.playbackRate.value = 1 + (arnd() * 2 - 1) * 0.04;
+      const g = c.createGain(); g.gain.value = S.ambVol * (e.gain[0] + arnd() * (e.gain[1] - e.gain[0]));
+      let tail = g;
+      if (c.createStereoPanner && e.pan) { const p = c.createStereoPanner(); p.pan.value = (arnd() * 2 - 1) * e.pan; g.connect(p); tail = p; }
+      src.connect(g); tail.connect(S.bgmG); src.start(Math.max(at, c.currentTime));
+    });
+  }
+  function bgmTarget(grabbing) { return S.mode === 0 ? (grabbing ? S.bgmDuck : 1) : 0; }
 
   function normManifest(m) {
     const out = {};
@@ -83,6 +143,7 @@
 
   S.load = function (base) {
     S.base = base || 'sfx/';
+    fetch(S.base + 'amb.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(m => { S.ambMeta = m; if (S.ctx && S.bgmG && !S.ambSrc) S.setAmb(S.amb); }).catch(() => {});   // v2.40 環境音
     return fetch(S.base + 'manifest.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(m => { S.manifest = normManifest(m) }).catch(() => {});
   };
 
@@ -180,6 +241,7 @@
     S._wasGrab = grabbing;
     // 背景音樂的音量（模式、抓著時讓位）
     if (S.bgmG) { const bt = bgmTarget(grabbing); if (Math.abs(bt - S.bgmT) > 1e-4) { S.bgmG.gain.setTargetAtTime(bt, c.currentTime, bt < S.bgmT ? 0.4 : 1.2); S.bgmT = bt; } }
+    ambStep();   // v2.40 環境音的零星事件
     // 餘韻排程
     if (S.pending.length) { const now = c.currentTime; S.pending = S.pending.filter(e => { if (e.at <= now) { one(e.key, e.p); return false; } return true; }); }
     if (S.muted) return;

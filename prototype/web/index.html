@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.38</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.40</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -30,7 +30,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .mats button{border:0;background:transparent;border-radius:999px;padding:8px 9px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--ink)}
 .mats button i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .mats button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
-.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 146px);
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 184px);
   padding:8px 16px;border-radius:999px;background:#fff;border:2.5px solid var(--chip-line);font-size:14px;font-weight:700;
   transition:opacity .6s;pointer-events:none}
 .hint.off{opacity:0}
@@ -47,6 +47,25 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:#fff;border:2.5px solid var(--chip-line);border-radius:22px;
   padding:14px 16px 12px;display:grid;gap:10px;z-index:5}
 .tune.hidden{display:none}
+/* v2.39 手感調節台：蓋在上方天空，史萊姆留在下面邊調邊捏 */
+.feel{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);
+  max-height:48vh;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;background:rgba(255,255,255,.96);border:2.5px solid var(--chip-line);border-radius:20px;
+  padding:12px 14px 10px;display:grid;gap:8px;z-index:7;color:var(--ink)}
+.feel.hidden{display:none}
+.feel-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.feel-head b{font-size:17px}
+.feel h4{margin:6px 0 0;font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--ink-soft)}
+.feel label{display:grid;grid-template-columns:1fr auto;grid-template-areas:"name val" "hint hint" "range range" "ref ref";column-gap:8px;font-size:15px;font-weight:700}
+.feel label small{grid-area:hint;font-size:12px;font-weight:500;color:var(--ink-soft)}
+.feel label i{grid-area:ref;font-style:normal;font-size:11px;font-weight:600;color:var(--ink-soft)}
+.feel input[type=range]{grid-area:range;width:100%;accent-color:#2E3A2A;margin:4px 0 0;min-height:30px;touch-action:pan-x}
+.feel output{grid-area:val;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink-soft)}
+.feel-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.feel-row span{font-size:12px;font-weight:800;color:var(--ink-soft);margin-right:2px}
+.feel-row button,.feel-head button{min-height:36px;border-radius:999px;border:2px solid var(--chip-line);background:#fff;color:var(--ink);font:inherit;font-size:13px;font-weight:700;padding:4px 11px}
+.feel-row button[aria-pressed=true]{background:var(--chip-on);color:var(--chip-on-ink)}
+.feel-row button:disabled{opacity:.35}
+.feel-note{font-size:11.5px;color:var(--ink-soft);margin:0}
 .tune-head{display:flex;justify-content:space-between;align-items:baseline}
 .tune-head b{font-size:17px}.tune-head span{font-size:12px;font-weight:700;color:var(--ink-soft)}
 .tune label{display:grid;grid-template-columns:1fr auto;grid-template-areas:"name val" "hint hint" "range range";column-gap:8px;font-size:14px;font-weight:700}
@@ -70,12 +89,13 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>v2.38 <i id="v-fps" style="font-style:normal"></i></span></div>
+  <div class="brand" id="brand">捏捏<span>v2.40 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
 </div>
 
 <div class="view" id="view">
   <div class="vrow"><b>搖</b><span class="seg" data-k="shk"><button data-v="settle">沉澱</button><button data-v="eat">散出來吃回來</button></span></div>
+  <div class="vrow"><b>聲音</b><span class="seg" data-k="amb"><button data-v="rain">雨</button><button data-v="fire">柴火</button><button data-v="lofi">lofi</button></span></div>
   <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-toggle">收起</button></div>
 </div>
 
@@ -84,6 +104,17 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div class="bar bottom">
   <div class="mats" role="group" aria-label="史萊姆" id="slimes"></div>
   <button class="round" id="b-reset" title="回原形">↺</button>
+  <button class="round" id="b-feel" title="調手感" aria-controls="feel" aria-expanded="false" style="font-size:15px;font-weight:800">調</button>
+</div>
+
+<div class="feel hidden" id="feel" role="dialog" aria-label="手感調節台">
+  <div class="feel-head"><b>手感調節台</b><button id="feel-close">收起</button></div>
+  <div class="feel-row"><span>從哪個材質開始</span><button data-m="clay">黏土</button><button data-m="mochi">麻糬</button><button data-m="jelly">果凍</button></div>
+  <div id="feel-sliders"></div>
+  <div class="feel-row"><span>比較</span><button id="feel-sa">存成 A</button><button id="feel-sb">存成 B</button><button id="feel-ga" disabled>換到 A</button><button id="feel-gb" disabled>換到 B</button></div>
+  <div class="feel-row"><button id="feel-copy">複製數值給 Agent</button><button id="feel-def">回到預設</button></div>
+  <textarea id="feel-out" readonly rows="4" aria-label="手感數值" style="display:none;box-sizing:border-box;width:100%;font:12px/1.5 var(--ui);border:2px solid var(--chip-line);border-radius:12px;padding:6px 8px;color:var(--ink);-webkit-user-select:text;user-select:text"></textarea>
+  <p class="feel-note" id="feel-note">一次只動一條，捏一分鐘再決定。調過的數值會記在這支手機上，重新整理還在。</p>
 </div>
 
 <div class="tune hidden" id="tune">
@@ -675,7 +706,8 @@ function buildClusters(){
 }
 
 /* ---------- 聲音：分層音效（sfx/engine.js，v2 2026-11-01），物理參數決定每層多大聲、多高、多亮；沒有檔案就安靜 ---------- */
-const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lofi-loop.m4a'}   // v2.21：sfx/ 是 ASMR 版（v3），舊的 v2 在 sfx/v2/（試聽頁對照）
+function VIEW0AMB(){try{const v=JSON.parse(localStorage.getItem('nienie.view')||'{}');return ['rain','fire','lofi'].includes(v.amb)?v.amb:'rain'}catch(_){return 'rain'}}   // v2.40：SFX 比 VIEW 早建立，先從存的設定讀
+const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lofi-loop.m4a';SFX.amb=VIEW0AMB()}   // v2.21：sfx/ 是 ASMR 版（v3），舊的 v2 在 sfx/v2/（試聽頁對照）
 let sfxRubLevel=0;
 function sfxInit(){if(SFX)SFX.init()} // iOS 規定：要在第一次觸碰裡建立音訊
 function sfxPlay(kind,gain=1,rate=1){if(!SFX)return;if(kind==='press')SFX.press(gain);else if(kind==='release')SFX.release(gain);else if(kind==='pull')SFX.strand(gain);
@@ -684,7 +716,7 @@ function sfxRub(level){sfxRubLevel=level} // 真正的播放在每幀的 SFX.fra
 // v2.31 叮：沉澱清透那一刻。三個正弦（E6 為主）短起音、1.4 秒衰減，走音效的 master；全部靜音時不響
 function sfxDing(g){if(!SFX||!SFX.ctx||SFX.mode===2)return;const c=SFX.ctx,out=SFX.master||c.destination,t0=c.currentTime;for(const [f,v,d] of [[1318.5,1,1.4],[2637,.35,.9],[1975.5,.18,.6]]){const o=c.createOscillator(),ga=c.createGain();o.type='sine';o.frequency.value=f;ga.gain.setValueAtTime(0,t0);ga.gain.linearRampToValueAtTime(.16*g*v,t0+.008);ga.gain.exponentialRampToValueAtTime(.0005,t0+d);o.connect(ga);ga.connect(out);o.start(t0);o.stop(t0+d+.05)}}
 // v2.21：喇叭按鈕三段：音樂和音效 → 只有捏的聲音 → 全部靜音
-let SND=0;const SND_ICON=['🎵','🔈','🔇'],SND_NAME=['音樂和音效','只有捏的聲音','全部靜音'];
+let SND=0;const SND_ICON=['🎵','🔈','🔇'],SND_NAME=['環境音和音效','只有捏的聲音','全部靜音'];
 $('b-mute').addEventListener('click',()=>{SND=(SND+1)%3;if(SFX){SFX.init();SFX.setMode(SND)}const b=$('b-mute');b.setAttribute('aria-pressed',String(SND===2));b.textContent=SND_ICON[SND];b.title=SND_NAME[SND]});
 
 /* ---------- 手指 ---------- */
@@ -2263,7 +2295,7 @@ function shkMotionInit(){if(SNW.motion||typeof DeviceMotionEvent==='undefined')r
 
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
-const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle'};
+const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle',amb:'rain'};   // v2.40 amb：環境音 rain／fire／lofi（多米 11-09：背景改成真實環境聲）
 try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;if(o.shk==='eat'||o.shk==='settle')VIEW.shk=o.shk;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
 function viewOver(){const o={shakeMode:VIEW.shk==='eat'?1:0};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});return o}
 const JSKINS={
@@ -2391,7 +2423,7 @@ let fpsAcc=0,fpsN=0;function viewFps(dt){fpsAcc+=dt;fpsN++;if(fpsAcc>=.5){const 
 function viewSync(){const root=document.getElementById('view');root.classList.toggle('shut',!!VIEW.shut);document.getElementById('v-toggle').textContent=VIEW.shut?'切換':'收起';
   root.querySelectorAll('.seg').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(VIEW[k])===b.dataset.v)))});
   try{localStorage.setItem('nienie.view',JSON.stringify(VIEW))}catch(_){}}
-function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face)||('bg' in o&&(o.bg==='blue')!==(VIEW.bg==='blue'));Object.assign(VIEW,o);viewSync();if('shk' in o){mat.shakeMode=VIEW.shk==='eat'?1:0;if(!mat.shakeMode)shkAbsorb();syncSliders()}if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
+function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face)||('bg' in o&&(o.bg==='blue')!==(VIEW.bg==='blue'));Object.assign(VIEW,o);viewSync();if('amb' in o&&SFX){SFX.init();SFX.setAmb(VIEW.amb)}if('shk' in o){mat.shakeMode=VIEW.shk==='eat'?1:0;if(!mat.shakeMode)shkAbsorb();syncSliders()}if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
   if(VIEW.skin!=='flat'&&JEL.fail)hint('這支手機不支援果凍皮，先用平塗')}
 document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;viewSet({[g.dataset.k]:b.dataset.v})});
 document.getElementById('view').addEventListener('pointerdown',e=>e.stopPropagation());
@@ -2505,12 +2537,48 @@ const sl={};
 function oneSync(){const e=$('slimes');if(e)e.style.display=mat.one>=.5?'none':''}   // v2.33 一隻為主：底部四隻不顯示
 function syncSliders(){for(const k in sl){sl[k].inp.value=mat[k];sl[k].out.textContent=String(mat[k])}oneSync();dump()}
 function dump(){$('t-out').value=JSON.stringify({...mat,float:FLOAT})}
+// v2.39 手感調節台（多米 11-09：調出調節竿，用竿子調史萊姆屬性，好找出最佳手感）。隱藏面板有 170 幾條、手機排版會爆，這裡只放
+// 三種材質真正不一樣、捏得出差別的 9 條，每條直接對一個程式參數（範圍跟隱藏面板一樣），底下列三種材質的值當參考。
+// 存成 A／B 再來回換，用來盲比；數值記在這支手機的瀏覽器（localStorage nienie.feel），只是方便，壞了就回預設
+const FEEL=[['捏下去'],['alpha','軟硬','越右越硬，放手回得越快'],['pressSink','按下去沉多久','手指按著不動，凹下去要幾秒'],['lag','慢一拍','被抓的那塊跟手指差多少；越右越黏、越拖'],
+  ['捏完'],['yield','多用力才留形','越左輕輕捏就留下形狀，越右要捏很大力'],['creep','留形快慢','捏著的時候形狀被記住的速度；0 完全不留形'],['recover','回原形快慢','放著不動時慢慢變回原本的樣子；越左越久'],
+  ['放手'],['inertiaZ','晃幾下','放手後晃動停得多快；越左晃越多下'],['inertiaHz','晃多快','放手後每秒晃幾下'],
+  ['拉'],['slide','拉多長整隻跟著走','拉長到這個長度（幾個半徑），再拉整隻就被拖著走']];
+const FEELK=FEEL.filter(r=>r.length>1).map(r=>r[0]),FEELS={A:null,B:null},fsl={};
+const MATN={clay:'黏土',mochi:'麻糬',jelly:'果凍'};
+function feelPick(){const o={};for(const k of FEELK)o[k]=mat[k];return o}
+function feelSave(){try{localStorage.setItem('nienie.feel',JSON.stringify({base:curMat,v:feelPick(),A:FEELS.A,B:FEELS.B}))}catch(_){}}
+function feelSync(){for(const k of FEELK){fsl[k].inp.value=mat[k];fsl[k].out.textContent=String(+(+mat[k]).toFixed(3))}
+  for(const b of $('feel').querySelectorAll('[data-m]'))b.setAttribute('aria-pressed',String(b.getAttribute('data-m')===curMat));
+  $('feel-ga').disabled=!FEELS.A;$('feel-gb').disabled=!FEELS.B;syncSliders()}
+function feelApply(s){if(!s)return;if(s.base&&s.base!==curMat&&PRESETS[s.base])setMat(s.base);for(const k of FEELK)if(typeof s.v[k]==='number')mat[k]=s.v[k];feelSync();feelSave()}
+function feelNote(t){$('feel-note').textContent=t}
+(function buildFeel(){const host=$('feel-sliders'),rng={};for(const f of F)rng[f[0]]=f;
+  for(const row of FEEL){if(row.length===1){const h=document.createElement('h4');h.textContent=row[0];host.appendChild(h);continue}
+    const [key,name,hint]=row,r=rng[key],lab=document.createElement('label');
+    lab.innerHTML=`<span>${name}</span><output></output><small>${hint}</small><input type="range" min="${r[3]}" max="${r[4]}" step="${r[5]}" aria-label="${name}"><i>黏土 ${PRESETS.clay[key]}・麻糬 ${PRESETS.mochi[key]}・果凍 ${PRESETS.jelly[key]}</i>`;
+    const inp=lab.querySelector('input'),out=lab.querySelector('output');
+    inp.addEventListener('input',()=>{mat[key]=parseFloat(inp.value);out.textContent=inp.value;if(sl[key]){sl[key].inp.value=inp.value;sl[key].out.textContent=inp.value}dump();feelSave()});
+    host.appendChild(lab);fsl[key]={inp,out}}
+  const open=on=>{$('feel').classList.toggle('hidden',!on);$('b-feel').setAttribute('aria-expanded',String(on));if(on)feelSync()};
+  $('b-feel').addEventListener('click',()=>open($('feel').classList.contains('hidden')));$('feel-close').addEventListener('click',()=>open(false));
+  for(const b of $('feel').querySelectorAll('[data-m]'))b.addEventListener('click',()=>{setMat(b.getAttribute('data-m'));feelSync();feelSave();feelNote('換成'+MATN[curMat]+'的預設值。')});
+  const store=(s)=>{FEELS[s]={base:curMat,v:feelPick()};feelSync();feelSave();feelNote('現在的手感存成 '+s+'。')};
+  const go=(s)=>{feelApply(FEELS[s]);feelNote('換到 '+s+'（'+MATN[curMat]+'起點）。捏一分鐘再換另一個。')};
+  $('feel-sa').addEventListener('click',()=>store('A'));$('feel-sb').addEventListener('click',()=>store('B'));$('feel-ga').addEventListener('click',()=>go('A'));$('feel-gb').addEventListener('click',()=>go('B'));
+  $('feel-def').addEventListener('click',()=>{setMat(SLIMES[SLIME].mat);FEELS.A=FEELS.B=null;try{localStorage.removeItem('nienie.feel')}catch(_){}feelSync();feelNote('回到預設（'+MATN[curMat]+'），A、B 也清掉了。')});
+  $('feel-copy').addEventListener('click',()=>{const line=s=>MATN[s.base]+'起點：'+FEEL.filter(r=>r.length>1).map(r=>r[1]+' '+s.v[r[0]]+'（'+r[0]+'）').join('、');
+    let txt='手感調節台 v2.39\n現在 '+line({base:curMat,v:feelPick()});if(FEELS.A)txt+='\nA '+line(FEELS.A);if(FEELS.B)txt+='\nB '+line(FEELS.B);
+    const ok=()=>feelNote('複製好了，貼給 Agent 就行。'),bad=()=>{const o=$('feel-out');o.value=txt;o.style.display='';o.focus();o.select();feelNote('這個瀏覽器不讓直接複製，數值在上面的框裡：長按框裡的字，全選，拷貝。')};
+    try{navigator.clipboard?navigator.clipboard.writeText(txt).then(ok,bad):bad()}catch(_){bad()}})})();
+function feelLoad(){try{const s=JSON.parse(localStorage.getItem('nienie.feel')||'null');if(!s||!s.v)return;FEELS.A=s.A||null;FEELS.B=s.B||null;feelApply(s)}catch(_){}}
 
 viewSync();sceneLoad();hintT=setTimeout(()=>$('hint').classList.add('off'),5000);
 addEventListener('resize',()=>{setup()});
 walkLoad();walkOpen();
 if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission!=='function')shkMotionInit();   // v2.31 不用問權限的平台直接接；iOS 等第一次觸碰再問
 {let i=PRESETS.clay.one>=.5?2:0;try{const k=SLIMES.findIndex(s=>s.id===localStorage.getItem('nienie.slime'));if(k>=0&&PRESETS.clay.one<.5)i=k}catch(_){}chooseSlime(i,true,false)}   // v2.23：上次選的那隻；v2.33 一隻為主時永遠是芋圓
+feelLoad();   // v2.39 手感調節台調過的數值
 requestAnimationFrame(frame);
 </script>
 </body>
