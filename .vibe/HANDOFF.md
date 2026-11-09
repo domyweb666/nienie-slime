@@ -13,7 +13,7 @@
 
 ## 🚧 還沒做完 / 待決定
 
-- **v2.39、v2.40 還沒推**：多米還沒回「要不要推」。v2.40 的 Swift（`SlimeAudio.swift` 環境音、`ContentView` 長按選單）**沒編譯過**，推 swiftui-port 才會跑 CI。推之前建議跑一輪 selftest（這兩版沒動物理，但沒跑過）。
+- v2.39、v2.40：多米 11-09 說推。Swift 編譯通過；推前 selftest 抓到環境音亂數干擾 T49，已修（見「怎麼做事」）。
 - **環境音好不好聽只有多米能判斷**：Agent 聽不到，只量過接縫。照 `.vibe/標準清單.md` 最後一節戴耳機聽，特別是有沒有鳥叫、人聲、車聲、冷氣聲（程式量不出來）。事件頻率是 Agent 取的，在 `make_ambience.py` 的 perMin。
 - **手感調節台**：等多米在手機上調，按「複製數值給 Agent」貼回來，再寫成芋圓預設（`PRESETS.clay`、Swift `FeelParams`、`.uiux/04-手感/參數表-暫定.md` 三處一起改）。手機版沒做調節台。
 - **YouTube 參考清單**：等多米給 5 到 8 段「就是這個感覺」＋2 到 3 段「不要這種」（網址、秒數、一句話），不下載。
@@ -45,8 +45,8 @@
 
 ## ⏭️ 下一步從哪繼續
 
-1. 先問多米：v2.39、v2.40 要不要推。要推就：跑一輪 selftest（55 項）→ `git push origin swiftui-port`（看 iOS 編譯，`gh run list --branch swiftui-port`）→ 用 worktree 推 main（只帶 `prototype .uiux .vibe CLAUDE.md`，做法見下面）→ curl 線上頁確認版本號 v2.40。
-2. Swift 編譯失敗就照錯誤修 `SlimeAudio.swift` 的環境音段（最可能出事的：`scheduleSegment` 的參數、`AVAudioFile` 格式跟 `ambBed` 連線的 44.1 kHz 立體聲不合）。
+1. v2.40 已推（swiftui-port 編譯通過、GitHub Pages 線上 v2.40）。先問多米：戴耳機聽了雨和柴火嗎、調節台有沒有調出喜歡的值。要發 TestFlight 等他開口（workflow 手動勾 testflight，步驟在 `ios/README.md`）。
+2. 手機版環境音只編譯過、沒真機：發 TestFlight 後請多米長按喇叭按鈕試切換，聽底聲有沒有斷點（`scheduleSegment` 接續）、事件有沒有一直出（`ambBusy`）。
 3. 多米聽過環境音回報 → 調 `make_ambience.py`（換段落、頻率）重跑 `python make_ambience.py --ios`。
 4. 多米貼回調節台數值 → 寫成預設。
 5. 都沒回報就做聲音計畫第四步：用 8 段史萊姆候選切顆粒，做網頁顆粒引擎試聽頁（力道、拉伸滑桿），請多米戴耳機比新舊。
@@ -55,6 +55,7 @@
 
 - **量物理要照 app 的組法建 mat**：`{...PRESETS[SLIMES[SLIME].mat], seed, ...s.p, ...viewOver()}`。只套 `PRESETS.clay` 等於沒有窗台、沒有牆（這次第一輪就量錯）。selftest 的 VIEW 是舊的八條腿外形，新項目要自己加 `limbs: 0` 等。
 - 量測時每輪要把印象、心情歸零（`IMP.tr/w`、`MOOD`、`ESC.on`、`E2.tk`、`DENTS`、`PAIR.tearT`），不然上一輪的「戒」會讓牠逃跑，結果亂跳。
+- **背景一直跑的東西不准用 `Math.random`**：selftest 用固定種子換掉 `Math.random` 量物理，環境音事件在背景抽亂數，T49 同種子每輪結果都不同、偶爾不過（11-09 推 v2.40 前抓到，engine.js 的環境音改用自己的 `arnd()`）。新加的音效、動畫只要不是物理，都用自己的亂數。
 - 新功能預設開時，selftest 開頭第 47、48 行的 `PRESETS`、`P27`、`PSAVE` 三處都要關掉（v2.38 的六個開關已加）。
 - selftest 一輪約 5 分鐘，跑的時候頁面卡住、javascript_tool 每次都逾時；把結果存到 `window.__R3` 之類，在兩輪中間讀得到。
 - Freesound 下載：Claude 的瀏覽器點下載會存進 `C:\Users\fcharlie\Downloads`；一次觸發太多會被擋，一頁一個比較穩。下載前打開頁面確認授權連結是 `publicdomain/zero`。
