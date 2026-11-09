@@ -44,8 +44,8 @@
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
-  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, shake: 0, cling: 0 };
-  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], shake: 0, cling: 0 }; PSAVE[k].shake = 0; PSAVE[k].cling = 0; }   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
+  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
+  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -1316,6 +1316,36 @@
       && r.peel.small === r.peel.n0 && r.peel.dec >= 3 && r.peel.sq && r.peel.popped && r.peel.away > 1.5 && r.peel.selfX === 0 && !r.peel.nan
       && r.mid.on && r.mid.nRel < r.mid.n0 && r.mid.n === r.mid.nRel && r.mid.surf === 'rjamb' && r.mid.stuck && r.mid.selfX === 0
       && !r.off.stuck && !r.off.on && r.p0[0] === 1 && r.p0[1] === 1.5;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T54 v2.38 極限拉扯（多米 11-09：極限拉扯下變形還是會有 bug）。窗台上照 app 的預設（v2.38 的四個開關都開），四種拉到極限的拉法：
+  // 往右下角拉到窗台下面（拉力把家帶出房間，v2.37 壓成一條線、面積剩 9%）、猛扯到左上角停住再放手（v2.37 黏上窗框被塞進去、交叉留 1.4 秒）、
+  // 兩指往上下拉到畫面頂和底（v2.37 交叉、放手記住的形狀翻面）、拉到底再往回推過身體（v2.37 內部翻 440 個）。
+  // 外框全程零交叉、面積不掉到七成以下、放手 4 秒內部翻面剩 10 個以內、記住的形狀沒有翻面；四個開關關掉（v2.37）至少有兩種量得到壞掉；兩指拉太開會撕開；慢慢放在窗框旁邊照樣黏得上
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, eyes: 0, shake: 0 }, OFF38 = { flipMem: 0, pairMax: 0, tear: 0, homeClamp: 0, clingTidy: 0 };
+    const flips = (AX, AY) => { let f = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if ((AX[b] - AX[a]) * (AY[c] - AY[a]) - (AY[b] - AY[a]) * (AX[c] - AX[a]) <= 0) f++; } return f; };
+    // 照 app 的組法（芋圓、圓的外形、窗台）：selftest 的畫面是舊的八條腿（VIEW.body 'tent'），不換的話量到的是固定觸手
+    const fresh = (sd, over) => { Math.random = seeded(sd); PAIR.tearT = -9; PAIR.over = 0; IMP.tr = .3; IMP.w = 0; MOOD.c = 0; MOOD.a = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; mat = { ...SP, ...(over || {}) }; setup(); t = 0; lastTouch = -10; tLife = 0; relaxUntil = -1; WANDER.moving = false; WANDER.next = 1e9; steps(240); lastTouch = t; };
+    const hold = a => { a.still = true; return a; };
+    const paths = {
+      corner: (k, cx, cy) => { const sx = cx + R * .7, sy = cy, tx = W - 4, ty = H - 4; return k <= 90 ? [[1, sx + (tx - sx) * k / 90, sy + (ty - sy) * k / 90]] : k <= 180 ? hold([[1, tx, ty]]) : null; },
+      yank: (k, cx, cy) => { const sx = cx - R * .6, sy = cy - R * .2; return k <= 6 ? [[1, sx + (4 - sx) * k / 6, sy + (4 - sy) * k / 6]] : k <= 66 ? hold([[1, 4, 4]]) : null; },
+      twoVert: (k, cx, cy) => { const d = Math.min(1, k / 60), a = [[1, cx, cy - R * .5 - (cy - R * .5 - 4) * d], [2, cx, cy + R * .3 + (H - 4 - cy - R * .3) * d]]; return k <= 60 ? a : k <= 150 ? hold(a) : null; },
+      pullBack: (k, cx, cy) => { const sx = cx + R * .7, sy = cy, tx = W - 4, ty = H * .9; return k <= 50 ? [[1, sx + (tx - sx) * k / 50, sy + (ty - sy) * k / 50]] : k <= 120 ? [[1, tx + (4 - tx) * (k - 50) / 70, ty + (H * .15 - ty) * (k - 50) / 70]] : null; } };
+    const run = (kind, sd, over) => { fresh(sd, over); const cx = globalC.xc, cy = globalC.yc, fn = paths[kind], p0 = fn(0, cx, cy); for (const d of p0) ev('pointerdown', d[0], d[1], d[2]);
+      let crossF = 0, aMin = 9, nanF = 0, last = p0; const t0 = t; const look = () => { if (selfX()) crossF++; aMin = Math.min(aMin, area() / A0); if (!Number.isFinite(X[0] + Y[0])) nanF++; };
+      for (let k = 1; ; k++) { const q = fn(k, cx, cy); if (!q) break; last = q; for (const d of q) ev('pointermove', d[0], d[1], d[2]); steps(1); look(); }
+      const torn = PAIR.tearT >= t0; for (const d of last) ev('pointerup', d[0], d[1], d[2]); for (let j = 0; j < 240; j++) { steps(1); look(); }
+      return { crossF, area: +aMin.toFixed(3), flip4s: flips(X, Y), qFlip: flips(QX, QY), nan: nanF, torn, surf: SILL.surf }; };
+    r.on = {}; r.off = {}; for (const kind of Object.keys(paths)) { r.on[kind] = [run(kind, 5401), run(kind, 5402)]; r.off[kind] = run(kind, 5401, OFF38); }
+    // 慢慢放在右窗框旁邊照樣黏得上（扭著不黏只擋扭著、超出窗框的）：照 T53 的設定與放法，只多開 clingTidy
+    { Math.random = seeded(5201); PAIR.tearT = -9; mat = { ...P27.clay, cling: 1, clingTidy: 1, shake: 0, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, envFrame: 0 }; setup(); ESC.on = false; E2.tk.length = 0; E2.tkT = 0; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t;
+      const g = SILL.g, cx = globalC.xc, cy = globalC.yc, tx = g.jr - R * .6, ty = g.gy + R * .9; ev('pointerdown', 1, cx, cy); steps(3); for (let k = 1; k <= 70; k++) { ev('pointermove', 1, cx + (tx - cx) * k / 70, cy + (ty - cy) * k / 70); steps(1); } steps(50); ev('pointerup', 1, tx, ty); steps(3); r.cling = { surf: SILL.surf, on: CLING.on }; steps(120); }
+    res.T54_extreme = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    const good = a => a.crossF === 0 && a.area > .7 && a.flip4s <= 10 && a.qFlip === 0 && a.nan === 0;   // 放手 4 秒內部翻面量到 0 到 7 個（962 個裡），看不出來
+    const bad = a => a.crossF > 10 || a.area < .5 || a.qFlip > 0;
+    res.PASS.extreme = Object.values(r.on).every(v => v.every(good)) && Object.values(r.off).filter(bad).length >= 2
+      && r.on.twoVert.every(a => a.torn) && r.cling.surf === 'rjamb' && r.cling.on;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();

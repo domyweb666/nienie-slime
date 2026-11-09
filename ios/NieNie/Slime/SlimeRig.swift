@@ -572,6 +572,7 @@ final class SlimeRig {
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
         enum Mode { case grab, push, none, stroke }   // v2.26 F6 stroke: sliding over it, nothing pinned
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
+        var tgx = 0.0, tgy = 0.0, lagK = 1.0         // v2.38: this frame's target for (fx, fy) and the chase rate; chased after pairStep
         var rawX, rawY, lastRawX, lastRawY: Double   // real finger position (never a prediction)
         var predX = 0.0, predY = 0.0, hasPrediction = false, movedThisFrame = false
         var vx = 0.0, vy = 0.0                       // raw per-frame velocity of the real finger
@@ -921,6 +922,26 @@ final class SlimeRig {
     /// v2.29 防打結: every triangle whose area fell below `kp` of its rest area is pushed back open along the area's gradient.
     /// `grab` (the GRAB flags) lets the held particles move a quarter as much. One particle moves at most 0.4 spacing a call,
     /// so a triangle that flipped all the way does not fling the body. Port of the web's `meshGuard`.
+    /// v2.38: corners of flipped triangles (no memory there) and how many are flipped (is the remembered shape flipped). Web `flipMarks`, `flipCount`.
+    private func flipMarks(_ AX: [Double], _ AY: [Double]) -> [Bool] {
+        var b = [Bool](repeating: false, count: N)
+        var k = 0
+        while k + 2 < TRI.count {
+            let a = TRI[k], p = TRI[k + 1], c = TRI[k + 2]
+            if (AX[p] - AX[a]) * (AY[c] - AY[a]) - (AY[p] - AY[a]) * (AX[c] - AX[a]) <= 0 { b[a] = true; b[p] = true; b[c] = true }
+            k += 3
+        }
+        return b
+    }
+    private func flipCount(_ AX: [Double], _ AY: [Double]) -> Int {
+        var n = 0, k = 0
+        while k + 2 < TRI.count {
+            let a = TRI[k], p = TRI[k + 1], c = TRI[k + 2]
+            if (AX[p] - AX[a]) * (AY[c] - AY[a]) - (AY[p] - AY[a]) * (AX[c] - AX[a]) <= 0 { n += 1 }
+            k += 3
+        }
+        return n
+    }
     private func meshGuard(_ AX: inout [Double], _ AY: inout [Double], _ kp: Double, _ grab: [Bool]?) {
         let cap = h * 0.4
         let m = TRI.count
@@ -1833,8 +1854,7 @@ final class SlimeRig {
             // the finger keeps 0.35R off the walls: a held patch pressed flat against a wall crossed on release (4 of 6 trials)
             let mw = R * 0.35, wl = worldWalls   // the walls are in world points (the farthest view's edge)
             let tx = max(wl.l + mw, min(wl.r - mw, f.ax + ox + ex)), ty = max(wl.t + mw, min(wl.b - mw, f.ay + oy + ey))
-            let k = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
-            f.fx += (tx - f.fx) * k; f.fy += (ty - f.fy) * k
+            f.tgx = tx; f.tgy = ty; f.lagK = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1   // v2.38: the target first; chased after the two-finger limit (pairStep)
             if f.mode == .grab {
                 let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
                 f.stretch = st; f.ex = ex; f.ey = ey
@@ -1886,6 +1906,8 @@ final class SlimeRig {
             }
         }
 
+        pairStep(dt)   // v2.38 the limit between two fingers, and tearing
+        for f in fingers.values { f.fx += (f.tgx - f.fx) * f.lagK; f.fy += (f.tgy - f.fy) * f.lagK }
         strokeStep(dt)   // v2.26 F6
         dragStep(dt)   // v2.20 D1: home follows `drag` of the fingers' travel; how far the body itself is pulled open (sb); C3 slipping free
 
@@ -2709,8 +2731,11 @@ final class SlimeRig {
             // v2.16: the press push is a performance, taken off before remembering (turned into rest space). Kept, clay remembered
             // the pushed shape and the next step pushed again on top: the longer the hold the wider (measured: 1.5 s moved 48 pt, was 24)
             let pf = pressField(), gcs = clusters[gi].cs, gsn = clusters[gi].sn
+            // v2.38: a flipped triangle's three corners do not remember this frame (two fingers pulling up and down from the middle left 70-140 flipped
+            // triangles in the remembered shape, spikes 3 s after release; the ring-crossing check alone does not see them)
+            let bad: [Bool]? = mat.flipMem >= 0.5 ? flipMarks(X, Y) : nil
             if kc > 0 {
-                for i in 0..<N {
+                for i in 0..<N where !(bad?[i] ?? false) {
                     // compared with the performed reference EX, not Q: touched pseudopods hold still in mid-air, and against Q
                     // they were remembered as a mark (measured: a 1.5 s hold remembered 67 pt)
                     var rx = RX[i] / GW[i], ry = RY[i] / GW[i]
@@ -2729,7 +2754,7 @@ final class SlimeRig {
         } else {
             // crossed: relax at the v2.13 rate (0.3). With recover slowed to 0.05 the knot a 9R pull leaves in the tail stayed for
             // 12 s after release; relaxing shortens the strand and the knot comes undone
-            let kr = min(1, (mat.ringGuard > 0 && mat.recover < 0.3 && ringCrossed() ? 0.3 : mat.recover) * dt)
+            let kr = min(1, (mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.38: a flipped remembered shape too
             if kr > 0 {
                 for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
             }
@@ -3122,7 +3147,11 @@ final class SlimeRig {
                 for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]) }
                 let inFront = !noBowl && x0 < g.bx + g.bw / 2 && x1 > g.bx - g.bw / 2 && y1 > g.back + R * 0.5   // over the bowl it would vanish behind it
                 let sp = hypot(sillVX, sillVY)
-                let sd: String? = !inFront && sp < R * 2.5 && y1 < g.bt - R * 0.4 ? (x1 > g.jr - R * 0.3 ? "rjamb" : x0 < g.gx + R * 0.3 ? "ljamb" : y0 < g.gy + R * 0.3 ? "ceil" : nil) : nil
+                // v2.38: yanked to the top-left corner, held, let go: half of it was on the wall above the window (top 16 pt, the frame's inside top 214 pt)
+                // and sticking pushed all of it into the frame in one frame: crossed for 1.4 s, 47% of its area. Sticking out past the frame by 0.8R or crossed,
+                // it does not stick and drops to the sill as before. Flipped triangles do not count: a slow, normal placing has about 40
+                let messy: Bool = effParams.clingTidy >= 0.5 && (y0 < g.gy - R * 0.8 || x0 < g.gx - R * 0.8 || x1 > g.jr + R * 0.8 || ringCrossed())
+                let sd: String? = !inFront && !messy && sp < R * 2.5 && y1 < g.bt - R * 0.4 ? (x1 > g.jr - R * 0.3 ? "rjamb" : x0 < g.gx + R * 0.3 ? "ljamb" : y0 < g.gy + R * 0.3 ? "ceil" : nil) : nil
                 if let sd {   // v2.36: only sticking takes it onto the frame (it does not climb the frame by itself)
                     planeSet(.frame); surfSet(sd); sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1)
                     for i in 0..<N { PX[i] = X[i]; PY[i] = Y[i] }
@@ -4097,6 +4126,61 @@ final class SlimeRig {
     }
     /// Every frame: the offset eases toward `drag` of the travel (home moves, and the held home spring brings the body along);
     /// sb = how far the body itself is pulled open, used by the mood and the shake-off.
+    /// v2.38 極限拉扯 (多米 11-09). Each finger has its own stretch limit (maxPull), two fingers had none between them: pulled opposite ways the length doubled
+    /// (web: up and down to the screen edges, 9.1R, 0.04R at the thinnest, the remembered shape flipped 150 triangles, knotted after release).
+    /// Between two grabbing fingers: past 60% of pairMax it gets harder and harder; the fingers really apart past tearK × pairMax for 0.12 s
+    /// and it tears: the finger farther from the body lets go with the loudest pop and a strand.
+    private var pairOver = 0.0
+    private(set) var pairStretch = 0.0   // 0-1 of pairMax, for the sound
+    private func pairStep(_ dt: Double) {
+        pairStretch = 0
+        let mat = effParams
+        guard mat.pairMax > 0 else { pairOver = 0; return }
+        let gs = fingers.values.filter { $0.mode == .grab }
+        guard gs.count >= 2 else { pairOver = 0; return }
+        let Lp = mat.pairMax * R, kn = 0.6 * Lp, rest = Lp - kn
+        var worst: (Finger, Finger)? = nil, wr = 0.0
+        for i in 0..<gs.count {
+            for j in (i + 1)..<gs.count {
+                let a = gs[i], b = gs[j], dx = b.tgx - a.tgx, dy = b.tgy - a.tgy, d = hypot(dx, dy)
+                if d > kn {
+                    let d2 = kn + rest * tanh((d - kn) / rest), s = (d - d2) / 2 / d
+                    a.tgx += dx * s; a.tgy += dy * s; b.tgx -= dx * s; b.tgy -= dy * s
+                }
+                pairStretch = max(pairStretch, min(d, Lp) / Lp)
+                let raw = hypot(b.x - a.x, b.y - a.y) / Lp
+                if raw > wr { wr = raw; worst = (a, b) }
+            }
+        }
+        if mat.tear >= 0.5, let w = worst, wr > mat.tearK {
+            pairOver += dt
+            if pairOver >= 0.12 {
+                pairOver = 0
+                let c = clusters[gi], da = hypot(w.0.x - c.xc, w.0.y - c.yc), db = hypot(w.1.x - c.xc, w.1.y - c.yc)
+                tearFinger(da >= db ? w.0 : w.1)
+            }
+        } else { pairOver = 0 }
+    }
+    /// Tearing: an ordinary release (feel, trust, mood the same), the stretch counted full so the pop is the biggest; that finger holds nothing until lifted.
+    private func tearFinger(_ f: Finger) {
+        guard let id = fingers.first(where: { $0.value === f })?.key else { return }
+        f.stretch = max(f.stretch, 2)
+        release(id, quiet: false)
+        onEvent?(.pull(gain: 1, rate: 1))
+    }
+    /// v2.38 home may not be dragged out of the room. The pull (slide) has the whole body follow the finger's real position with no edge: pulled below
+    /// the sill or past the frame, home went with it and the finger's effective position counted from there, pressing the body into the corner
+    /// (web, pulled to the bottom right: 14 pt tall, 644 pt wide past the frame, 9% of its area, 700 flipped triangles). Home stays where the rest
+    /// shape still fits in the room (15% kept for the squash it already has); the clamped axis loses its speed so a release does not fling it.
+    private func dragClamp() {
+        guard effParams.homeClamp >= 0.5, sillOn, sillPlane == .room, sillG != nil else { return }
+        let w0 = worldWalls
+        var qb = -1e9, qt = 1e9, ql = 1e9, qr = -1e9
+        for i in bnd { qb = max(qb, Q0Y[i]); qt = min(qt, Q0Y[i]); ql = min(ql, Q0X[i]); qr = max(qr, Q0X[i]) }
+        let lx = w0.l - ql * 0.85 - homeX, hx = w0.r - qr * 0.85 - homeX, ly = w0.t - qt * 0.85 - homeY, hy = w0.b - qb * 0.85 - homeY
+        if lx < hx { if dragOX < lx { dragOX = lx; if dragVX < 0 { dragVX = 0 } } else if dragOX > hx { dragOX = hx; if dragVX > 0 { dragVX = 0 } } }
+        if ly < hy { if dragOY < ly { dragOY = ly; if dragVY < 0 { dragVY = 0 } } else if dragOY > hy { dragOY = hy; if dragVY > 0 { dragVY = 0 } } }
+    }
     private func dragStep(_ dt: Double) {
         if dragAvg().n == 0 {
             if dragGX != 0 || dragGY != 0 {
@@ -4122,6 +4206,7 @@ final class SlimeRig {
             let nx = dragOX + (g.x + dragBX - dragOX) * e, ny = dragOY + (g.y + dragBY - dragOY) * e
             dragVX = (nx - dragOX) / dt; dragVY = (ny - dragOY) / dt; dragOX = nx; dragOY = ny
         }
+        dragClamp()   // v2.38
         for f in fingers.values where f.mode == .grab { f.dragMax = max(f.dragMax, hypot(dragOX - dragBX, dragOY - dragBY)) }   // v2.22 E3: how far this grab led it
         for f in fingers.values where f.mode == .grab { f.sb = params.slide > 0 ? f.stretch : hypot(f.ex - (dragOX - dragBX), f.ey - (dragOY - dragBY)) / R }   // v2.21: the stretch already counts from where it followed to
         // C3: very wary, pulled open 1R or more for 1.5 s, the patch slips from the finger and it slinks off a little
@@ -4656,7 +4741,7 @@ final class SlimeRig {
     }
 
     /// Stretch (radii, tanh-limited) of the most-stretched grabbing finger: drives the strand loop's pitch, brightness and loudness.
-    var pullStretch: Double { fingers.values.filter { $0.mode == .grab }.map(\.stretch).max() ?? 0 }
+    var pullStretch: Double { max(fingers.values.filter { $0.mode == .grab }.map(\.stretch).max() ?? 0, pairStretch * effParams.pairMax / 2) }   // v2.38: two fingers pulling apart count as a pull too (web PAIR.stR)
 
     /// Any finger holding the body (not pushing from outside).
     var isGrabbing: Bool { fingers.values.contains { $0.mode == .grab } }

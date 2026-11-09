@@ -79,6 +79,13 @@ struct FeelParams: Equatable, Codable {
     var breathDeep: Double = 0        // 1: a grab held over 10 s makes the next 20 s breathe deeper and slower (候選 23c)
     var pinchSquish: Double = 1       // 1: squish events when two grabbing fingers close in (提案第 24 條)
     var slip: Double = 0              // 1: pulling past 1.2× maxPull for 120 ms slips out of the fingers (候選 25)
+    // v2.38 極限拉扯 (多米 11-09: extreme pulls still break). Web `pairStep`, `dragClamp`, `flipMarks`, the cling `messy` check
+    var pairMax: Double = 4.5         // two grabbing fingers at most this many R apart, harder from 60% of it; 0 = v2.37 (no limit between fingers: pulled opposite ways it went 9R and knotted)
+    var tear: Double = 1              // 1: the fingers really pulled apart past tearK × pairMax for 0.12 s, the one farther from the body lets go (it tears), loudest pop
+    var tearK: Double = 1.3
+    var flipMem: Double = 1           // 1: a flipped triangle's corners do not remember that frame; a remembered shape with flips relaxes at 0.3 (like a crossing)
+    var homeClamp: Double = 1         // 1: the drag offset may not take home out of the room (v2.37: pulled below the sill it was pressed into a 17 pt line, 9% of its area)
+    var clingTidy: Double = 1         // 1: let go sticking out past the window by 0.8R or crossed, it does not stick to the frame
     var stick: Double = 0             // seconds a slow lift keeps holding before the release (候選 26: 0.1)
     var localArea: Double = 1         // area pressure weighted towards the fingers (候選 27, on since v2.26 F7; 0 before)
     var homeFrac: Double = 0.40       // home height as a fraction of the screen (候選 33: 0.46)
@@ -536,6 +543,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.afterglow, name: "放手餘韻（秒）", hint: "放手後幾秒內阻尼從 0.975 回到設定值，多晃一下；0 關，候選 22 是 0.25", range: 0...0.6, step: 0.05),
         TuneField(key: \.pinchSquish, name: "兩指捏 squish", hint: "1：兩指靠近到起始距離 60% 發一次，之後每再縮 15% 一次（第 24 條）", range: 0...1, step: 1),
         TuneField(key: \.slip, name: "拉太遠滑脫", hint: "1：拉超過上限 1.2 倍持續 0.12 秒就脫手（候選 25）", range: 0...1, step: 1),
+        TuneField(key: \.pairMax, name: "兩指拉開上限（v2.38）", hint: "兩根抓著的手指之間最多拉開幾個半徑，到六成開始越來越拉不動；0 回 v2.37（兩指沒有上限，往反方向拉會拉到 9 個半徑打結）", range: 0...12, step: 0.1),
+        TuneField(key: \.tear, name: "拉太開撕開（v2.38）", hint: "1：兩指實際拉開超過上限的撕開門檻倍、持續 0.12 秒，離身體遠的那根脫手，最重的放手音；0 只有軟上限", range: 0...1, step: 1),
+        TuneField(key: \.tearK, name: "撕開門檻（v2.38）", hint: "手指實際拉開到兩指上限的幾倍才撕開", range: 1...2.5, step: 0.05),
+        TuneField(key: \.flipMem, name: "翻面不記形（v2.38）", hint: "1：身體裡翻面的地方不記形，記住的形狀有翻面時照 0.3 退；0 回 v2.37", range: 0...1, step: 1),
+        TuneField(key: \.homeClamp, name: "家不准拖出房間（v2.38）", hint: "1：整隻被拖著走時，家夾在房間裡；0 回 v2.37（往窗台下面拉，整隻被壓成一條線）", range: 0...1, step: 1),
+        TuneField(key: \.clingTidy, name: "扭著不黏牆（v2.38）", hint: "1：放手時身體超出窗框 0.8 個半徑、或外框交叉，就不黏窗框；0 回 v2.37", range: 0...1, step: 1),
         TuneField(key: \.stick, name: "放手黏連（秒）", hint: "慢抬手時抓取多保持幾秒；0 關，候選 26 是 0.1", range: 0...0.2, step: 0.02),
         TuneField(key: \.localArea, name: "局部面積壓力", hint: "面積壓力往手指附近集中的程度；0 全身平均，候選 27 是 1", range: 0...2, step: 0.1),
 
