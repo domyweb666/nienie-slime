@@ -1,0 +1,149 @@
+{
+ "version": 1,
+ "sr": 44100,
+ "pad": 1.0,
+ "scenes": {
+  "rain": {
+   "bed": "amb-rain-bed.m4a",
+   "loopFrames": 5292000,
+   "events": {
+    "gust": {
+     "files": [
+      "amb-rain-gust-01.m4a",
+      "amb-rain-gust-02.m4a",
+      "amb-rain-gust-03.m4a",
+      "amb-rain-gust-04.m4a"
+     ],
+     "perMin": 1.5,
+     "gain": [
+      0.35,
+      0.7
+     ],
+     "pan": 0.35,
+     "minGap": 12
+    },
+    "drip": {
+     "files": [
+      "amb-rain-drip-01.wav",
+      "amb-rain-drip-02.wav",
+      "amb-rain-drip-03.wav",
+      "amb-rain-drip-04.wav",
+      "amb-rain-drip-05.wav",
+      "amb-rain-drip-06.wav",
+      "amb-rain-drip-07.wav",
+      "amb-rain-drip-08.wav"
+     ],
+     "perMin": 7,
+     "gain": [
+      0.25,
+      0.6
+     ],
+     "pan": 0.7,
+     "minGap": 1.5
+    },
+    "tap": {
+     "files": [
+      "amb-rain-tap-01.wav",
+      "amb-rain-tap-02.wav",
+      "amb-rain-tap-03.wav",
+      "amb-rain-tap-04.wav",
+      "amb-rain-tap-05.wav",
+      "amb-rain-tap-06.wav",
+      "amb-rain-tap-07.wav",
+      "amb-rain-tap-08.wav",
+      "amb-rain-tap-09.wav",
+      "amb-rain-tap-10.wav"
+     ],
+     "perMin": 10,
+     "gain": [
+      0.2,
+      0.55
+     ],
+     "pan": 0.8,
+     "minGap": 0.4,
+     "burst": [
+      1,
+      3
+     ]
+    },
+    "thunder": {
+     "files": [
+      "amb-rain-thunder-01.m4a"
+     ],
+     "perMin": 0.12,
+     "gain": [
+      0.4,
+      0.7
+     ],
+     "pan": 0.2,
+     "minGap": 300
+    }
+   },
+   "src": {
+    "bed": 399072,
+    "gust": 869851,
+    "tap": 869851,
+    "drip": 592345,
+    "thunder": 158692
+   }
+  },
+  "fire": {
+   "bed": "amb-fire-bed.m4a",
+   "loopFrames": 5292000,
+   "events": {
+    "crack": {
+     "files": [
+      "amb-fire-crack-01.wav",
+      "amb-fire-crack-02.wav",
+      "amb-fire-crack-03.wav",
+      "amb-fire-crack-04.wav",
+      "amb-fire-crack-05.wav",
+      "amb-fire-crack-06.wav",
+      "amb-fire-crack-07.wav",
+      "amb-fire-crack-08.wav",
+      "amb-fire-crack-09.wav",
+      "amb-fire-crack-10.wav",
+      "amb-fire-crack-11.wav",
+      "amb-fire-crack-12.wav",
+      "amb-fire-crack-13.wav",
+      "amb-fire-crack-14.wav"
+     ],
+     "perMin": 16,
+     "gain": [
+      0.2,
+      0.65
+     ],
+     "pan": 0.45,
+     "minGap": 0.25,
+     "burst": [
+      1,
+      4
+     ]
+    },
+    "settle": {
+     "files": [
+      "amb-fire-settle-01.wav",
+      "amb-fire-settle-02.wav",
+      "amb-fire-settle-03.wav",
+      "amb-fire-settle-04.wav"
+     ],
+     "perMin": 0.8,
+     "gain": [
+      0.45,
+      0.8
+     ],
+     "pan": 0.25,
+     "minGap": 25
+    }
+   },
+   "src": {
+    "bed": 501417,
+    "crack": [
+     370938,
+     563766
+    ],
+    "settle": 484338
+   }
+  }
+ }
+}

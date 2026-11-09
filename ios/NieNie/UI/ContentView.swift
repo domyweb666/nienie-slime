@@ -110,8 +110,16 @@ struct ContentView: View {
                     .frame(width: 46, height: 46)
             }
             .buttonStyle(ChipStyle(circle: true))
-            .accessibilityLabel(["音樂和音效", "只有捏的聲音", "全部靜音"][controller.soundMode])
-            .accessibilityHint("點一下換下一種")
+            // v2.40 環境音: long press to choose rain, a wood fire or lofi
+            .contextMenu {
+                Picker("背景聲音", selection: $controller.ambience) {
+                    Text("雨").tag("rain")
+                    Text("柴火").tag("fire")
+                    Text("lofi").tag("lofi")
+                }
+            }
+            .accessibilityLabel(["環境音和音效", "只有捏的聲音", "全部靜音"][controller.soundMode])
+            .accessibilityHint("點一下換下一種，長按選雨、柴火或 lofi")
         }
     }
 

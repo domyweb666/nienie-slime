@@ -11,7 +11,9 @@ protocol SlimeSoundSource: AnyObject {
     var pullMax: Double { get set }      // loudest the stretching-strand loop gets
     var rubMax: Double { get set }       // loudest the rub loop gets (the rub level passed to frame is already scaled by it)
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
-    var music: Double { get set }        // v2.21 background lofi volume, 0 = off
+    var music: Double { get set }        // v2.21 background volume (lofi; v2.40 rain and fire too), 0 = off
+    /// v2.40 環境音: "rain", "fire" or "lofi" (web `SFX.setAmb`).
+    func setAmbience(_ name: String)
     /// Finger landed. `intensity` 0...1 (the controller folds in contact size).
     func press(intensity: Double)
     /// Stretched past another step: one strand snaps.
@@ -48,6 +50,27 @@ final class SlimeAudio: SlimeSoundSource {
     var music = 0.0 { didSet { bgmTarget = -1 } }
     private var bgm: AVAudioPlayer?
     private var bgmTarget = -1.0
+
+    // ---- v2.40 環境音 (多米 11-09: the background becomes real ambience, rain or a wood fire). Port of the web engine's `setAmb`/`ambStep`.
+    // A bed (`amb-<scene>-bed.m4a`, a 120 s seamless loop with 1 s of the loop's own content padded at each end against the AAC priming)
+    // streamed from disk by one player node, scheduling the looped middle again whenever a segment is consumed, so one is always queued;
+    // and events (taps, drips, gusts, thunder; crackles, settling logs) from `amb.json`, each at its own rate (exponential gaps, at least
+    // minGap s, sometimes a burst of 2-4), random take, gain within its range, pan within ±pan. They all go through one mixer whose
+    // volume follows `music` × ambRatio, ducking to 0.6 while held. lofi stays on the AVAudioPlayer above.
+    private var ambName = "rain"
+    private var ambMeta: [String: Any]?
+    private let ambMix = AVAudioMixerNode()
+    private let ambBed = AVAudioPlayerNode()
+    private var ambEvents: [AVAudioPlayerNode] = []
+    private var ambBusy: [Double] = []   // when each event player is free again (isPlaying stays true after a buffer ends)
+    private var ambBank: [String: AVAudioPCMBuffer] = [:]
+    private var ambFile: AVAudioFile?
+    private var ambTok = 0
+    private var ambNext: [String: Double] = [:]
+    private var ambLast: [String: Int] = [:]
+    private var ambQueue: [(at: Double, kind: String)] = []
+    private var ambLevel = 0.0
+    private let ambRatio = 1.6   // web ambVol 0.4 against lofi's 0.25: the rain bed plays about −32 dBFS, a press about −34 (ASMR: the slime in front)
 
     // ---- the table (keep in step with engine.js) ----
     private struct Play { var gain: Double; var rate: Double; var lowpass: Double; var delay = 0.0; var deco = false }
@@ -122,6 +145,21 @@ final class SlimeAudio: SlimeSoundSource {
         }
         attach(pullVoice)
         attach(rubVoice)
+        engine.attach(ambMix)
+        engine.connect(ambMix, to: engine.mainMixerNode, format: nil)
+        ambMix.outputVolume = 0
+        engine.attach(ambBed)
+        engine.connect(ambBed, to: ambMix, format: AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2))
+        for _ in 0..<6 {
+            let p = AVAudioPlayerNode()
+            engine.attach(p)
+            engine.connect(p, to: ambMix, format: format)   // mono, so pan places it
+            ambEvents.append(p)
+            ambBusy.append(0)
+        }
+        if let url = Bundle.main.url(forResource: "amb", withExtension: "json"), let d = try? Data(contentsOf: url) {
+            ambMeta = try? JSONSerialization.jsonObject(with: d) as? [String: Any]
+        }
         applyVolume()
         engine.prepare()
         loadBank()
@@ -140,10 +178,12 @@ final class SlimeAudio: SlimeSoundSource {
             self?.pullVoice.playing = false
             self?.rubVoice.playing = false
             self?.startEngine()
+            if let self { self.setAmbience(self.ambName) }   // the player nodes were stopped
         }
         nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.startEngine()
             self?.bgmTarget = -1   // the next frame starts the music again (fading in)
+            if let self, !self.ambBed.isPlaying { self.setAmbience(self.ambName) }
         }
     }
 
@@ -202,6 +242,7 @@ final class SlimeAudio: SlimeSoundSource {
             return inBuf
         }
         guard let converter = AVAudioConverter(from: inFormat, to: format) else { return nil }
+        converter.downmix = true   // v2.40: the ambience's stereo events fold to mono (both channels, not just the left)
         let outFrames = AVAudioFrameCount(Double(frames) * format.sampleRate / inFormat.sampleRate) + 1024
         guard let outBuf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: outFrames) else { return nil }
         var consumed = false
@@ -307,8 +348,9 @@ final class SlimeAudio: SlimeSoundSource {
     func frame(dt rawDt: Double, rub: Double, stretch rawStretch: Double, grabbing: Bool) {
         let dt = Self.clamp(rawDt, 0.001, 0.1)
         let stretch = grabbing ? rawStretch : 0
+        ambFrame(dt: dt, grabbing: grabbing)   // v2.40
         if let p = bgm {
-            let target = music * (grabbing ? 0.6 : 1)
+            let target = ambName == "lofi" ? music * (grabbing ? 0.6 : 1) : 0
             if abs(target - bgmTarget) > 0.005 {
                 if target > 0 && !p.isPlaying { p.play() }
                 p.setVolume(Float(target), fadeDuration: target < bgmTarget ? 0.4 : 1.2)
@@ -372,6 +414,7 @@ final class SlimeAudio: SlimeSoundSource {
     func stopAll() {
         pending.removeAll()
         bgm?.pause(); bgmTarget = -1
+        ambTok += 1; ambBed.stop(); for p in ambEvents { p.stop() }; ambBusy = ambBusy.map { _ in 0 }; ambQueue.removeAll(); ambNext.removeAll(); ambLevel = 0; ambMix.outputVolume = 0
         for v in [pullVoice, rubVoice] where v.playing {
             v.player.stop()
             v.playing = false
@@ -380,5 +423,92 @@ final class SlimeAudio: SlimeSoundSource {
         st = 0
         stV = 0
         wasGrabbing = false
+    }
+
+    // MARK: - v2.40 環境音
+
+    private var ambScene: [String: Any]? { (ambMeta?["scenes"] as? [String: Any])?[ambName] as? [String: Any] }
+
+    func setAmbience(_ name: String) {
+        ambName = name
+        ambTok += 1
+        ambNext.removeAll(); ambQueue.removeAll()
+        ambBed.stop()
+        bgmTarget = -1
+        guard let sc = ambScene, let bedName = sc["bed"] as? String,
+              let url = Bundle.main.url(forResource: (bedName as NSString).deletingPathExtension, withExtension: (bedName as NSString).pathExtension),
+              let file = try? AVAudioFile(forReading: url) else { ambFile = nil; return }
+        ambFile = file
+        // events: decoded once, mono 48k like the slime's samples
+        if let evs = sc["events"] as? [String: Any] {
+            for case let e as [String: Any] in evs.values {
+                for case let f as String in (e["files"] as? [Any] ?? []) where ambBank[f] == nil {
+                    if let u = Bundle.main.url(forResource: (f as NSString).deletingPathExtension, withExtension: (f as NSString).pathExtension), let b = load(u) { ambBank[f] = b }
+                }
+            }
+        }
+        startEngine()
+        guard engine.isRunning else { return }
+        let sr = (ambMeta?["sr"] as? Double) ?? 44_100
+        let pad = AVAudioFramePosition(((ambMeta?["pad"] as? Double) ?? 1) * file.processingFormat.sampleRate)
+        let loop = AVAudioFramePosition(Double((sc["loopFrames"] as? Int) ?? 0) * file.processingFormat.sampleRate / sr)
+        guard loop > 0, pad + loop <= file.length else { return }
+        // the first segment starts somewhere in the loop, so each opening sounds different
+        let first = AVAudioFramePosition(Double.random(in: 0..<1) * Double(loop))
+        let tok = ambTok
+        ambBed.scheduleSegment(file, startingFrame: pad + first, frameCount: AVAudioFrameCount(loop - first), at: nil, completionHandler: nil)
+        scheduleBedLoop(file, pad: pad, loop: loop, tok: tok)
+        ambBed.play()
+    }
+
+    /// One more full loop, and when it is consumed the next, so a segment is always queued (gapless).
+    private func scheduleBedLoop(_ file: AVAudioFile, pad: AVAudioFramePosition, loop: AVAudioFramePosition, tok: Int) {
+        ambBed.scheduleSegment(file, startingFrame: pad, frameCount: AVAudioFrameCount(loop), at: nil, completionHandler: { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, tok == self.ambTok else { return }
+                self.scheduleBedLoop(file, pad: pad, loop: loop, tok: tok)
+            }
+        })
+    }
+
+    private func ambFrame(dt: Double, grabbing: Bool) {
+        let scene = ambName != "lofi" && ambFile != nil
+        let target = scene && !muted ? music * ambRatio * (grabbing ? 0.6 : 1) : 0
+        ambLevel += (target - ambLevel) * (1 - exp(-dt / (target < ambLevel ? 0.4 : 1.2)))
+        ambMix.outputVolume = Float(ambLevel)
+        guard scene, target > 0, ambBed.isPlaying, let evs = ambScene?["events"] as? [String: Any] else { return }
+        let t = now
+        for (k, v) in evs {
+            guard let e = v as? [String: Any] else { continue }
+            let perMin = max(0.01, (e["perMin"] as? Double) ?? 1), minGap = (e["minGap"] as? Double) ?? 0
+            let gap = { max(minGap, -log(1 - Double.random(in: 0..<1)) * 60 / perMin) }
+            guard let next = ambNext[k] else { ambNext[k] = t + gap() * Double.random(in: 0..<1) + 1; continue }
+            if t < next { continue }
+            ambNext[k] = t + gap()
+            let b = (e["burst"] as? [Int]) ?? [1, 1]
+            let n = b[0] + Int.random(in: 0...max(0, b[1] - b[0]))
+            var at = t
+            for _ in 0..<n { ambQueue.append((at: at, kind: k)); at += 0.05 + 0.15 * Double.random(in: 0..<1) }
+        }
+        let due = ambQueue.filter { $0.at <= t }
+        ambQueue.removeAll { $0.at <= t }
+        for d in due { if let e = evs[d.kind] as? [String: Any] { ambOne(d.kind, e) } }
+    }
+
+    private func ambOne(_ kind: String, _ e: [String: Any]) {
+        guard let files = e["files"] as? [String], !files.isEmpty else { return }
+        var i = Int.random(in: 0..<files.count)
+        if files.count > 1 && i == ambLast[kind] { i = (i + 1) % files.count }
+        ambLast[kind] = i
+        let t = now
+        guard let buf = ambBank[files[i]], let j = ambBusy.firstIndex(where: { $0 <= t }) else { return }   // all six busy: skip this one
+        let p = ambEvents[j]
+        ambBusy[j] = t + Double(buf.frameLength) / format.sampleRate + 0.05
+        p.stop()
+        let g = (e["gain"] as? [Double]) ?? [0.5, 0.5], pan = (e["pan"] as? Double) ?? 0
+        p.volume = Float(g[0] + Double.random(in: 0..<1) * (g[1] - g[0]))
+        p.pan = Float(Double.random(in: -1...1) * pan)
+        p.scheduleBuffer(buf, at: nil, options: [], completionHandler: nil)
+        p.play()
     }
 }

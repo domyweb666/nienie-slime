@@ -17,6 +17,10 @@ final class SlimeController: ObservableObject {
     @Published private(set) var params: [SlimeMaterial: FeelParams]
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2; syncAudio() } }
+    /// v2.40 環境音: "rain", "fire" or "lofi", kept in UserDefaults (long press the speaker button to choose)
+    @Published var ambience = UserDefaults.standard.string(forKey: "nienie.amb") ?? "rain" {
+        didSet { UserDefaults.standard.set(ambience, forKey: "nienie.amb"); sound.setAmbience(ambience) }
+    }
     @Published private(set) var reduceMotion = UIAccessibility.isReduceMotionEnabled
     /// Blind-test slots (3-4 做法五): two saved parameter sets, switched by number only, kept in UserDefaults.
     @Published private(set) var activeSlot: Int?
@@ -59,6 +63,7 @@ final class SlimeController: ObservableObject {
         }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
         syncAudio()
+        sound.setAmbience(ambience)   // v2.40 環境音, once at launch
         rig.walkOpen()   // 走路: the second open leaves the gift stone
         walkReadSteps()
         startMotion()   // v2.31 搖晃沉澱
