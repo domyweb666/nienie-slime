@@ -44,8 +44,8 @@
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
-  const P1 = { ...PRESETS.clay, ...OFF24 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
-  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
+  const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
+  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -1346,6 +1346,25 @@
     const bad = a => a.crossF > 10 || a.area < .5 || a.qFlip > 0;
     res.PASS.extreme = Object.values(r.on).every(v => v.every(good)) && Object.values(r.off).filter(bad).length >= 2
       && r.on.twoVert.every(a => a.torn) && r.cling.surf === 'rjamb' && r.cling.on;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T55 v2.41 大腦（多米 11-14：像真實世界的動物，有牠自己的一套行為邏輯）。窗台上照 app 的預設（芋圓、熟 0.7），舊項目一律關大腦。
+  // a 放著不碰 300 秒：醒著的時間裡休息佔 0.35 到 0.75、有張望有走、睏高了會睡、睡飽自己醒（v2.40 睡了不會自己醒）、沒有 0.5 秒內就換事情、想動不會一直滿格；
+  // b 喘（跑完、被大力拉）那一下：睏漲、想動退；c 睏 0.9 開始：15 秒內就睡；睏 0 開始：60 秒內不睡；d brain 0：需求不動、不會自己醒（回 v2.40）
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    const run = (over, sec, pre) => { Math.random = seeded(55); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 55, naps: 0, selfWake: 0 }); if (pre) pre();
+      const c = {}; let short = 0, last = '', lastI = 0, eTop = 0, n = 0, napAt = -1;
+      for (let i = 0; i < sec * 60; i++) { update(DT); const a = BRAIN.act; c[a] = (c[a] || 0) + 1; if (a !== last) { if (last && i - lastI < 30) short++; last = a; lastI = i; } if (BRAIN.e > .98) eTop++; if (napAt < 0 && SLP.on) napAt = +(i / 60).toFixed(1); n++; }
+      const awake = n - (c['睡覺'] || 0), fr = k => +((c[k] || 0) / Math.max(1, awake)).toFixed(3), [sx, cr] = classify();
+      return { rest: fr('休息'), look: fr('張望'), go: fr('走'), greet: fr('來找你'), sleep: +((c['睡覺'] || 0) / n).toFixed(3), naps: BRAIN.naps, selfWake: BRAIN.selfWake, napAt, short, eTop: +(eTop / n).toFixed(3), z: +BRAIN.z.toFixed(3), selfX: sx + cr, area: +(area() / A0).toFixed(3) }; };
+    r.a = run({}, 300);
+    { Math.random = seeded(55); mat = { ...SP }; setup(); t = 0; lastTouch = -10; tLife = 0; steps(30); const z0 = BRAIN.z, e0 = BRAIN.e; BRX.exert = .8; update(DT); r.b = { dz: +(BRAIN.z - z0).toFixed(3), de: +(BRAIN.e - e0).toFixed(3) }; }
+    r.cTired = run({}, 15, () => { BRAIN.z = .9; });
+    r.cFresh = run({}, 60, () => { BRAIN.z = 0; });
+    r.d = run({ brain: 0 }, 60);
+    res.T55_brain = r; log.splice(0); restoreClock(clock); E4.count = e4c; E4.lastT = e4t; mat = { ...PRESETS.clay }; setup();
+    res.PASS.brain = r.a.rest >= .35 && r.a.rest <= .75 && r.a.look > .03 && r.a.go > .03 && r.a.naps >= 1 && r.a.selfWake >= 1 && r.a.short === 0 && r.a.eTop < .3 && r.a.selfX === 0
+      && r.b.dz > .1 && r.b.de < -.1 && r.cTired.naps === 1 && r.cTired.napAt >= 0 && r.cFresh.naps === 0 && r.d.naps === 0 && r.d.selfWake === 0 && Math.abs(r.d.z - .3) < 1e-9;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();

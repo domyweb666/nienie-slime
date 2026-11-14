@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>捏捏史萊姆｜形狀匹配原型 v2.40</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.41</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -89,7 +89,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>v2.40 <i id="v-fps" style="font-style:normal"></i></span></div>
+  <div class="brand" id="brand">捏捏<span>v2.41 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
 </div>
 
@@ -198,9 +198,9 @@ const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  mochi:{clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  clay: {clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  jelly:{brain:1,brainHud:0,brAwakeT:300,brSleepT:90,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  mochi:{brain:1,brainHud:0,brAwakeT:300,brSleepT:90,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  clay: {brain:1,brainHud:0,brAwakeT:300,brSleepT:90,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
 };
 const F=[
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
@@ -212,6 +212,10 @@ const F=[
   ['grabR','抓取範圍（×半徑）','一指抓到多大一塊',.2,.8,.01],
   ['dent','點一下留凹痕','1：按到身體就出現凹痕（左上一彎陰影），放手跟回原形同速淡掉；拉開 0.4R 以上算拉，凹痕收掉；0 關（v2.14）',0,1,1],
   ['dentSize','凹痕大小（×半徑）','凹痕最大半徑；v2.26 0.5，手指接觸面的 1.5 到 2 倍，手指外面看得到一圈（v2.25 0.3，整個在手指底下）',.1,.9,.01],
+  ['brain','大腦 v2.41','1（多米 11-14）：五個需求（睏、好奇、想被摸、怕、想動）一直在漲落，牠每做完一件事就做最強那個需求的事；跑完比較快睡、睡飽自己醒、想被摸了才來找你。0 回 v2.40（擲骰子決定、40 秒沒人碰就睡、睡了不會自己醒）',0,1,1],
+  ['brainHud','牠在想什麼','1：畫面下方顯示五條需求、牠現在在做什麼、為什麼選這件事。只給你對答案用，正式畫面不顯示',0,1,1],
+  ['brAwakeT','醒著多久會睏（秒）','沒人碰、沒跑的情況下，睏從 0 漲到滿要幾秒；20 秒沒人碰以後漲兩倍快，夜晚背景 1.5 倍',60,900,10],
+  ['brSleepT','睡多久睡飽（秒）','睏從滿退到 0 要睡幾秒；睡飽牠自己醒',20,300,5],
   ['envRoam','牠自己出門','窗台上牠自己爬出碗、爬窗框、跨出窗外的機率倍數（v2.30）；0 就一直待在原地',0,2,.1],
   ['catPush','牠自己推擺飾','像貓一樣伸偽足慢慢推擺飾、邊推邊看你的機率倍數（v2.30）；0 關（v2.31 預設，擺飾拿掉了）',0,2,.1],
   ['shake','搖晃沉澱 v2.31','1：搖手機牠在碗裡彈一下、肚子裡的亮粉揚起來變霧；放著不動約 30 秒沉澱，清透、發光、睜眼、叮一聲；捏牠也會攪起一點（多米 11-07：像雪花球，動了會濁、靜了會清）；0 關',0,1,1],
@@ -634,7 +638,7 @@ function setup(){
   Object.assign(STK,{ox:0,oy:0,vx:0,vy:0,g:0,last:-9,said:false,pet:false});TRAIL.length=0;
   fingers.clear();GRAB.fill(0);lastShape={seed:mat.seed,floppy:mat.floppy,limbs:mat.limbs,bodySize:mat.bodySize,dens:mat.dens};
   BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;BR.jw=0;BR.lift=0;POD.list=[];POD.clock=0;POD.next=.5;POD.E=[];POD.shift=0;FLAT.on=false;{const v=viewV();CAM.z=1;CAM.x=v.x;CAM.y=v.y;FOL.x=v.x;FOL.y=v.y;FOL.vx=0;FOL.vy=0;FOL.chase=false}INTRO.on=false;INTRO.sq=0;IV.s=1;IV.ox=0;IV.oy=0;Object.assign(MOOD,{c:0,a:0,strain:0,strainMax:0,scare:0,cowerUntil:-9,happyT:-9,wagT:-9,taps:[],tugX:0,tugY:0});ESC.on=false;PURR=0;PINCH.a=-1;PINCH.b=-1;DENTS.length=0;shkReset();
-  Object.assign(LIFE,{st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0,arrT:-9,arrOff:0});Object.assign(GAIT,{on:false,k:1,off:0,v:0});Object.assign(FLN,{at:-9,t0:-9,amp:0,H:1,s:1,last:0});Object.assign(SHK,{at:-9,t0:-9,amp:0,th:0});Object.assign(BRX,{exert:0,sighNext:-1,sighCyc:-1,pauseUntil:-9,ampX:1});STR.k=1;PSM[0]=1;PSM[1]=0;PSM[2]=0;PSM[3]=1;LB=1;   // v2.19
+  brainReset();Object.assign(LIFE,{st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0,arrT:-9,arrOff:0});Object.assign(GAIT,{on:false,k:1,off:0,v:0});Object.assign(FLN,{at:-9,t0:-9,amp:0,H:1,s:1,last:0});Object.assign(SHK,{at:-9,t0:-9,amp:0,th:0});Object.assign(BRX,{exert:0,sighNext:-1,sighCyc:-1,pauseUntil:-9,ampX:1});STR.k=1;PSM[0]=1;PSM[1]=0;PSM[2]=0;PSM[3]=1;LB=1;   // v2.19
   Object.assign(DRAG,{ox:0,oy:0,vx:0,vy:0,bx:0,by:0,gx:0,gy:0,slipT:0});LURE.on=false;LURE.sn=null;LIFE.ask=null;E4.on=false;E4.wait=-1;Object.assign(E2,{leanT:-9,nuzT0:-1,nuzO:0,nuzSaid:false,tkT:0,gigNext:0,nudgeT:-9});E2.tk.length=0;   // v2.22（E2、E4 的計時也歸零：時鐘倒回去時，留著的 gigNext 會讓它一直等不到下一次咯咯笑）：INTRO.sq 也要歸零：開心小跳跳到一半被 setup 打斷，壓扁量會一直留著，參考形狀永遠被撐開（量過 −0.053，T28 放手 2 秒剩 0.76，原本 0.89）   // v2.20：重建時手指直接清掉、不經過放手，偏移不歸零的話家會一直歪（量過：舊測試跟著歪，T31 按住 3 秒移 61 點，原本 30）
   CAMR.st=0;CAMR.until=-9;E2.leanO=0;eyeSetup();EYE.pose=null;EYE.cx=0;EYE.cy=0;EYE.ck=1;Object.assign(SLP,{on:false,k:0,askAt:-9,nearT:0});Object.assign(ECHO,{st:'idle',i:0,joyUntil:-9});ECHO.taps.length=0;SWIM.on=false;   // v2.23
   {let A=0;const n=bnd.length;for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];A+=X[a]*Y[b]-X[b]*Y[a]}A0=Math.abs(A)/2}
@@ -1311,6 +1315,59 @@ function startSniff(a,Lr,T1,T2,T3){cutSniffs();const s={a,L:Lr,t0:t,T1,T2,T3,cut
 // 基準線是平常的牠，只往上加；只撥沒碰時的行為（休息、走路、張望、E4、呼嚕、眼睛、回家小跳），抓著時手感那套不看它。走得少不會難過
 let EXN=0,EXT=-9;
 function exLevel(){const f=mat.excite==null?-1:mat.excite;let n;if(f>=0)n=f;else{if(t-EXT>1||EXT>t){EXT=t;walkToday();EXN=WALK.dayN}n=EXN}return n>=3?1:n>=2?.5:0}
+/* ---------- v2.41 大腦（多米 11-14：像真實世界的動物，有牠自己的一套行為邏輯）。五個需求一直在漲落，牠每做完一件事（休息到時間）就做最強那個需求的事。
+   第 1 片只接管現有的休息、張望、走、睡、來找你，不加新動作；心情、記性在後面的片。提案 .uiux/04-手感/大腦提案-暫定.md；面板 brain 0 回 v2.40。
+   z 睏、q 好奇、s 想被摸、f 怕（就是戒，加上當下被嚇的量）、e 想動，都是 0 到 1。亂數用自己的 brnd()，不動 Math.random 的順序（selftest 用固定種子量物理）。 ---------- */
+const BRAIN={z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:0,seed:20261114,hudAt:0,naps:0,selfWake:0};
+const BRon=()=>mat.life2>=.5&&mat.brain>=.5;
+function brnd(){BRAIN.seed=(Math.imul(BRAIN.seed,1664525)+1013904223)>>>0;return BRAIN.seed/4294967296}
+function brainReset(){Object.assign(BRAIN,{z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:t})}   // 每次打開、換一隻都從同一個起點：跟你離開多久無關
+function brainStep(dt,engaged){const B=BRAIN;if(!BRon()){if(B.hudOn)brainHud(false);return}
+  const cl=v=>Math.max(0,Math.min(1,v)),idleT=t-Math.max(lastTouch,SLP.lastAny),pz=mat.restMul||1;
+  B.f=cl(Math.max(IMP.w,MOOD.scare));
+  if(SLP.on){B.z-=dt/mat.brSleepT;B.e+=dt/90}   // 睡覺：睏退掉，力氣回來
+  else{B.z+=dt/mat.brAwakeT*pz*(idleT>20?2:1)*(VIEW.bg==='night'?1.5:1);
+    if(LIFE.st==='rest'&&!engaged){B.q+=dt/BR_Q;B.e+=dt/(BR_E*pz)*(1+exLevel())}}   // 閒著：越來越想找點事、越來越想動（今天你走很多路時更快）
+  const ex=BRX.exert;if(ex>B.ex0+.05){B.z+=.25*(ex-B.ex0);B.e-=.3*(ex-B.ex0)}B.ex0=ex;   // 喘（跑完、逃完、被大力拉）：累一點、沒那麼想動
+  if(engaged){B.s-=dt/(MOOD.c>.2?4:10);B.q-=dt/8}   // 被你碰著：想被摸退掉（輕揉退得快），注意力在你手上
+  else if(!SLP.on&&!document.hidden)B.s+=dt/45*IMP.tr/(mat.e4Mul||1);   // 沒被碰：熟的才會想你；芋圓怕生，不熟時幾乎不漲
+  B.z=cl(B.z);B.q=cl(B.q);B.s=cl(B.s);B.e=cl(B.e);
+  if(SLP.on&&B.z<=.02&&idleT>3){B.selfWake++;wake(false,true)}   // 睡飽了自己醒（v2.40 要你碰牠才醒）
+  if(brainAtHome())B.homeAt=t;
+  B.act=SLP.on?'睡覺':ESC.on?'逃跑':engaged?'被你碰著':E4.on?'來找你':LURE.on?'注意你的手指':ECHO.st!=='idle'?'回你的節奏':LIFE.st==='look'?'張望':(LIFE.st==='go'||LIFE.st==='arrive'||GAIT.on||(SILL.on&&SILL.route))?'走':'休息';
+  brainHud(mat.brainHud>=.5)}
+const BR_Q=30,BR_E=90,BR_GO=.5,BR_REST=.35,BR_NAMES={rest:'休息',look:'張望',go:'走',sleep:'睡覺',greet:'來找你'};
+function sleepOK(){return IV3('sleep')&&!SLP.on&&LIFE.st==='rest'&&!fingers.size&&!E4.on&&ECHO.st==='idle'&&!SWIM.on&&!(SNW.cloud>.03)&&!SNW.loose.length}
+function e4OK(){return IV3('e4')&&!E4.on&&IMP.tr>.5&&E4.count<3+Math.round(2*exLevel())&&t-E4.lastT>40&&!fingers.size&&t-lastTouch>6}
+// 休息到時間：五個需求各算一個分數（怕會壓住睡、來找你、走，推高張望），最高的贏；都不到 0.35 就繼續休息。分數接近時加一點亂數挑
+function brainPick(canGo){const B=BRAIN,n=()=>(brnd()-.5)*.16,calm=1-B.f,idleT=t-Math.max(lastTouch,SLP.lastAny);
+  const c=[['rest',BR_REST,'都不高',0],['look',B.q+.3*B.f+n(),'好奇',B.q],['go',canGo?B.e*(1-.5*B.z)*(1-.5*B.f)+n():-1,'想動',B.e],
+    ['sleep',sleepOK()&&idleT>8&&B.z>.5?B.z*calm+n():-1,'睏',B.z],['greet',e4OK()?B.s*calm+n():-1,'想被摸',B.s]];
+  let b=c[0];for(const x of c)if(x[1]>b[1])b=x;B.want=b[0];B.why=b[0]==='rest'?'五個都不高，繼續休息':b[2]+' '+b[3].toFixed(2)+' 最高，'+BR_NAMES[b[0]];return b[0]}
+// 窗台上：家是窗台正中間的布墊。v2.40 閒著每 10 秒自動走回中間；大腦開著時改成牠自己決定：想動就沿著窗台走到別的地方待著，睏了先走回布墊再睡，沒事做又離家 20 秒以上才慢慢走回去
+function brainAtHome(){const S=SILL;return !S.on||!S.g||(S.plane==='room'&&Math.abs(globalC.xc-S.g.bx)<R*.3)}
+function brainSillFree(){const S=SILL;return !S.grab&&!S.air&&!S.hop&&!S.route&&S.stickT<0&&!ESC.on}
+function brainGoHome(){if(!brainSillFree())return false;const r=rtHome();if(!r)return false;SILL.lastHome=t;routeStart(r);return true}
+function brainGo(dir){const B=BRAIN,S=SILL;
+  if(S.on&&S.plane==='room'&&!S.inBowl){if(brainSillFree()){const cx=globalC.xc;let x=null;
+      for(let k=0;k<6;k++){const c=floorWalkX(cx);if(c==null||Math.abs(c-cx)<R*.45)continue;x=c;if(dir==null||(Math.cos(dir)>0)===(c>cx))break}   // 有探過就往探的那一邊走
+      if(x!=null)gaitTo(x,HOMEY,false)}}
+  else goStart(dir==null?null:dir+(Math.random()-.5)*.35);
+  if(GAIT.on||WANDER.moving||(S.on&&S.route))B.e=Math.max(0,B.e-BR_GO);else{LIFE.st='rest';LIFE.until=t+restDur()}}   // 真的出發了才算動過
+function brainRest(canGo){const B=BRAIN,w=brainPick(canGo),away=SILL.on&&!brainAtHome();
+  if(w==='sleep'){if(away&&brainGoHome())B.why+='（先走回布墊）';else if(away)LIFE.until=t+1;else{B.naps++;SLP.on=true;LIFE.st='sleep';cutSniffs()}}
+  else if(w==='greet')LIFE.until=t+.3;   // 下一幀 e4Step 接手
+  else if(w==='look')Object.assign(LIFE,{st:'look',looks:1+(B.q>.7?1:0),noGo:false,until:t});
+  else if(w==='go')brainGo(null);
+  else if(away&&t-B.homeAt>20&&brainGoHome())B.why='五個都不高，走回布墊';
+  else LIFE.until=t+restDur()}
+function brainGoAfterLook(){const B=BRAIN;return B.e*(1-.5*B.z)*(1-.5*B.f)+(brnd()-.5)*.16>BR_REST}   // 探完要不要走過去：看想不想動（v2.40 是六成五）
+function brainHud(on){const B=BRAIN;if(typeof document==='undefined')return;let d=document.getElementById('brain-hud');
+  if(!on){if(d)d.style.display='none';B.hudOn=false;return}
+  const now=performance.now();if(B.hudOn&&now-B.hudAt<200)return;B.hudAt=now;B.hudOn=true;
+  if(!d){d=document.createElement('div');d.id='brain-hud';d.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 20px);z-index:40;pointer-events:none;font:12px/1.5 system-ui,sans-serif;color:#2E2350;background:rgba(255,255,255,.82);border-radius:10px;padding:8px 10px;width:200px;white-space:nowrap';document.body.appendChild(d)}
+  d.style.display='';const bar=(n,v)=>'<div style="display:flex;align-items:center;gap:6px"><span style="width:44px;flex:none">'+n+'</span><span style="flex:1;height:6px;background:#E4DDF5;border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:'+Math.round(v*100)+'%;background:#7A63D0"></i></span><span style="width:28px;flex:none;text-align:right">'+v.toFixed(2)+'</span></div>';
+  d.innerHTML=bar('睏',B.z)+bar('好奇',B.q)+bar('想被摸',B.s)+bar('怕',B.f)+bar('想動',B.e)+'<div style="margin-top:4px">在做：'+B.act+'</div><div style="opacity:.75;white-space:normal">上次決定：'+(B.why||'還沒決定')+'</div>'}
 function restDur(){if(!LV('lifeRest'))return .8+2.2*Math.random();   // lifeRest 關：v2.18 的停 0.8 到 3 秒
   let d=2.5+3.5*Math.random();if(Math.random()<.2)d+=5+6*Math.random();   // 多半 3 到 5 秒，偶爾發呆十幾秒
   return d*(mat.restMul||1)*(1-.5*exLevel())*(1+.5*Math.max(0,MOOD.c))*(1-.5*Math.max(MOOD.a,MOOD.scare))*(IV2('impC5')?1-.4*IMP.w:1)}   // v2.20 C5：戒的時候少休息、多張望   // 舒服休息久一點，緊張短一點
@@ -1380,7 +1437,7 @@ function lifeStep(dt,idle,engaged){
   if(!free)return;
   if(SLP.on){const lf=IV2('impC1')||IV2('impC2')?lureFinger():null;SLP.nearT=lf?SLP.nearT+dt:0;if(SLP.nearT>1.2)wake(false);return}   // v2.23 B2：睡著什麼都不決定；手指放旁邊 1.2 秒慢慢醒
   if(ECHO.st!=='idle')return;   // v2.23 C6：在聽你的節奏、在回你：停在原地
-  if(LIFE.st==='rest'&&sleepTry())return;
+  if(LIFE.st==='rest'&&!BRon()&&sleepTry())return;   // v2.41 大腦開著：睡不睡由 brainRest 決定
   const lured=lureStep(dt);   // v2.20 C1 C2：手指放在旁邊時交給 lureStep
   const e4=!lured&&e4Step(dt);   // v2.22 E4：熟的時候一陣子沒碰，游到前面跟你打招呼
   // v2.20 C4 討摸：往你手指離開的地方伸偽足，離得遠就挪過去
@@ -1389,11 +1446,12 @@ function lifeStep(dt,idle,engaged){
     if(d>R*1.6)gaitTo(a.x-dx/d*R*1.1,a.y-dy/d*R*1.1,false);else Object.assign(LIFE,{st:'look',looks:0,noGo:true,lastDir:ang,until:t+2.8})}
   if(!lured&&!e4){
   if(LIFE.st==='rest'&&t>=LIFE.until){
-    if(restOn&&(Math.random()<.85||!canGo))Object.assign(LIFE,{st:'look',looks:1+(Math.random()<.45+.35*exLevel()?1:0),noGo:false,until:t});
+    if(BRon())brainRest(canGo);   // v2.41
+    else if(restOn&&(Math.random()<.85||!canGo))Object.assign(LIFE,{st:'look',looks:1+(Math.random()<.45+.35*exLevel()?1:0),noGo:false,until:t});
     else if(canGo)goStart(null);else LIFE.until=t+restDur()}
   if(LIFE.st==='look'&&t>=LIFE.until){
-    if(LIFE.looks>0){LIFE.looks--;const a=pickDir(),s=startSniff(a,mat.podLen*(.75+.35*Math.random()),1.2,.5+Math.random(),.8);LIFE.lastDir=a;LIFE.until=t+s.T1+s.T2+s.T3+.3+.5*Math.random()}
-    else if(!LIFE.noGo&&canGo&&Math.random()<.65)goStart(LIFE.lastDir+(Math.random()-.5)*.35);
+    if(LIFE.looks>0){LIFE.looks--;if(BRon())BRAIN.q=Math.max(0,BRAIN.q-.25);const a=pickDir(),s=startSniff(a,mat.podLen*(.75+.35*Math.random()),1.2,.5+Math.random(),.8);LIFE.lastDir=a;LIFE.until=t+s.T1+s.T2+s.T3+.3+.5*Math.random()}
+    else if(!LIFE.noGo&&canGo&&(BRon()?brainGoAfterLook():Math.random()<.65)){if(BRon())brainGo(LIFE.lastDir);else goStart(LIFE.lastDir+(Math.random()-.5)*.35)}
     else{LIFE.st='rest';LIFE.until=t+restDur()}}
   }
   if(LIFE.st==='go'&&!GAIT.on&&WANDER.moving){   // 沒開一縮一衝：v2.18 的平滑滑過去（回家彈簧拖著）
@@ -1437,8 +1495,8 @@ function e2Step(dt){if(!IV3('e2')){E2.nuzT0=-1;return}
 // E4：熟（0.5 以上）、10 到 20 秒沒碰、這次打開不到 3 次、上次 40 秒以前：游到畫面靠前的地方（螢幕中間偏下），揮一下偽足、「嗯～嗯」，回去休息。碰它就停
 function e4Step(dt){if(!IV3('e4')){E4.on=false;return false}
   if(!E4.on){if(E4.wait<0)E4.wait=(10+10*Math.random())*(mat.e4Mul||1);
-    if(!(IMP.tr>.5&&E4.count<3+Math.round(2*exLevel())&&t-lastTouch>E4.wait&&t-E4.lastT>40&&!fingers.size&&LIFE.st==='rest'))return false;
-    const v=viewV(),q=toWorld(W/2,v.y+H*.12),dx=q.x-globalC.xc,dy=q.y-globalC.yc,d=Math.hypot(dx,dy);Object.assign(E4,{on:true,ph:'go',t0:t,x:q.x,y:q.y});
+    if(!(IMP.tr>.5&&E4.count<3+Math.round(2*exLevel())&&(BRon()?BRAIN.want==='greet':t-lastTouch>E4.wait)&&t-E4.lastT>40&&!fingers.size&&LIFE.st==='rest'))return false;
+    const v=viewV(),q=toWorld(W/2,v.y+H*.12),dx=q.x-globalC.xc,dy=q.y-globalC.yc,d=Math.hypot(dx,dy);Object.assign(E4,{on:true,ph:'go',t0:t,x:q.x,y:q.y});if(BRon()){BRAIN.want='';BRAIN.s=Math.max(0,BRAIN.s-.6)}
     if(d>R*.6)gaitTo(q.x,q.y,d>R*4);else{E4.ph='wave';E4.t0=t;MOOD.wagT=t;voice('hello',.8)}
     return true}
   if(fingers.size){E4.on=false;E4.wait=-1;return false}
@@ -1534,8 +1592,8 @@ function drawEyes(col){if(!(mat.eyes>=.5)||!EYE.L.length)return;
 function sleepTry(){if(!IV3('sleep')||SLP.on)return false;
   if(t-Math.max(lastTouch,SLP.lastAny)<40||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03||SNW.loose.length)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
   SLP.on=true;LIFE.st='sleep';cutSniffs();return true}
-function wake(sharp){if(!SLP.on)return;SLP.on=false;SLP.wakeT=t;SLP.nearT=0;LIFE.st='rest';LIFE.until=t+1.5+Math.random();EYE.blinkT=t;
-  if(sharp){FLN.at=t+.05;FLN.pre='rest';FLN.boost=1.6}SLP.askAt=t+(sharp?.45:.3)}
+function wake(sharp,self){if(!SLP.on)return;SLP.on=false;SLP.wakeT=t;SLP.nearT=0;LIFE.st='rest';LIFE.until=t+1.5+Math.random();EYE.blinkT=t;
+  if(sharp){FLN.at=t+.05;FLN.pre='rest';FLN.boost=1.6}if(!self)SLP.askAt=t+(sharp?.45:.3)}
 function sleepStep(dt){if(!IV3('sleep')&&SLP.on)wake(false);
   if(SLP.on)for(const f of fingers.values())if(t-f.hitT<.05){wake(true);break}   // 從外面推進來碰到它
   SLP.k+=((SLP.on?1:0)-SLP.k)*(1-Math.exp(-dt/(SLP.on?1.6:.25)));if(SLP.k<1e-3&&!SLP.on)SLP.k=0;
@@ -1582,7 +1640,7 @@ function impLoad(){if(!(PRESETS.clay.trKeep>=.5))return;try{const o=JSON.parse(l
 function impSave(force){if(IMPSV.noSave||!(mat.trKeep>=.5)||!(mat.imp>=.5))return;if(!force&&t-IMPSV.at<3&&IMPSV.at<=t)return;IMPSV.at=t;   // IMPSV.at>t：時鐘倒回，照寫
   IMPS[SLIMES[SLIME].id]={tr:IMP.tr,w:IMP.w};const o={};for(const k in IMPS)o[k]=+IMPS[k].tr.toFixed(3);const s=JSON.stringify({v:1,tr:o});if(s===IMPSV.last)return;IMPSV.last=s;try{localStorage.setItem('nienie.imp',s)}catch(_){}}
 // 回到前景：離開超過 10 分鐘，戒歸零；熟留下來關掉時（trKeep 0）跟 v2.33 一樣熟也歸零
-function impBack(away){if(!(away>6e5))return;if(mat.trKeep>=.5)Object.assign(IMP,{w:0,has:false,askUntil:-9});else impReset()}
+function impBack(away){if(!(away>6e5))return;brainReset();if(mat.trKeep>=.5)Object.assign(IMP,{w:0,has:false,askUntil:-9});else impReset()}
 impLoad();
 /* ---------- v2.20 拖著走（D1）、凹痕退快（D2）、印象與它對你的反應（C1 到 C5） ---------- */
 // 跟手幾成：D1 的 drag；C3 熟的跟得多、戒的跟得少；扯到想逃時跟得少（輕輕拖會跟、用力扯會抵抗）
@@ -1862,6 +1920,7 @@ function update(dt){
   e1Step();e2Step(dt);   // v2.22
   sleepStep(dt);echoStep(dt);   // v2.23 B2 睡著、C6 節奏
   if(SILL.on)sillStepPre();
+  brainStep(dt,engaged);   // v2.41 大腦：需求漲落
   if(mat.life2>=.5)lifeStep(dt,idle,engaged);   // v2.19：休息／張望／出發／到了＋一縮一衝＋縮一下、甩一甩＋探（lifeRest、lifeGait 都關時照 v2.18 的走走停停）
   else if(L>.5&&mat.wander>0&&!INTRO.on&&!ESC.on&&t>MOOD.cowerUntil){
     if(!WANDER.moving&&t>WANDER.next){WANDER.sx=HOMEX;WANDER.sy=HOMEY;let sp=1;
@@ -2096,7 +2155,7 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   // v2.31 只跟碗互動：留在窗外（回家路線半路失敗）2 秒就再回一次
   if(!S.grab&&S.plane==='out'&&!(mat.envFrame>=.5)&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&t-S.lastHome>2){S.lastHome=t;routeStart(rtHome())}
   // 在外面閒一陣子就回碗
-  if(!S.grab&&!S.inBowl&&!S.air&&!S.hop&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&S.stickT<0&&t-lastTouch>25&&t-S.lastHome>10&&mat.envRoam>0){S.lastHome=t;routeStart(rtHome())}}
+  if(!S.grab&&!S.inBowl&&!S.air&&!S.hop&&!S.route&&!GAIT.on&&!ESC.on&&!fingers.size&&LIFE.st==='rest'&&S.stickT<0&&t-lastTouch>25&&t-S.lastHome>10&&mat.envRoam>0&&!BRon()){S.lastHome=t;routeStart(rtHome())}}
 
 /* 擺飾：凸多邊形的剛體。粒子碰到被推出去，反過來推擺飾；擺飾有重量、會倒、會滾，手指抓得起來。超出窗台兩端就掉下去，約 20 秒後回來；倒著放 25 秒也回原位 */
 const PROPS=[],PROP_MU=.55,PROP_PUSH=1.3,PROPDEF={
