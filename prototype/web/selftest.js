@@ -1367,6 +1367,27 @@
       && r.b.dz > .1 && r.b.de < -.1 && r.cTired.naps === 1 && r.cTired.napAt >= 0 && r.cFresh.naps === 0 && r.d.naps === 0 && r.d.selfWake === 0 && Math.abs(r.d.z - .3) < 1e-9;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T56 v2.42 心情與前兆（大腦第 2 片）。窗台上照 app 的預設（芋圓、熟 0.7）。
+  // a 開心那一下心情 +0.12 上下、戒漲 0.3 心情掉 0.3 以上、心情差時怕跟著高；b 被戳：心情好朝你傾過來搖偽足、縮得小，心情差往反方向傾、縮得大；
+  // c 心情 0.9 放 300 秒退到 0.45 到 0.7（半衰 300 秒，退回 0.1）；d 前兆：睏 0.9 開始，先「想睡了」1.5 秒以上才睡；brPre 0 馬上睡；
+  // e mood 0：心情固定 0.15、被戳的倍數 1（回 v2.41）
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    const fresh = over => { Math.random = seeded(56); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 56, naps: 0, selfWake: 0 }); brainReset(); steps(60); };
+    const poke = () => { E2.leanS = 0; MOOD.wagT = -9; e2Release({ tDown: t - .1, stretch: 0, fx: globalC.xc + R, fy: globalC.yc }); return { lean: E2.leanS, wag: MOOD.wagT > t, fl: +brainFlinch().toFixed(2) }; };
+    fresh({}); { const m0 = BRAIN.m; MOOD.happyT = t; steps(1); r.happyD = +(BRAIN.m - m0).toFixed(3); const m1 = BRAIN.m; IMP.w += .3; steps(1); r.waryD = +(BRAIN.m - m1).toFixed(3); IMP.w = 0; BRAIN.m = -.6; steps(1); r.fBad = +BRAIN.f.toFixed(2); }
+    fresh({}); BRAIN.m = .6; r.pokeGood = poke(); BRAIN.m = -.6; r.pokeBad = poke();
+    fresh({}); BRAIN.m = .9; steps(300 * 60); r.after300 = +BRAIN.m.toFixed(3);
+    const nap = over => { fresh(over); BRAIN.z = .9; let preAt = -1, napAt = -1; for (let i = 0; i < 20 * 60 && napAt < 0; i++) { steps(1); if (preAt < 0 && BRAIN.pre && BRAIN.pre.k === 'sleep') preAt = i / 60; if (SLP.on) napAt = i / 60; } return { preAt: +preAt.toFixed(2), napAt: +napAt.toFixed(2) }; };
+    r.pre = nap({}); r.preOff = nap({ brPre: 0 });
+    fresh({ mood: 0 }); BRAIN.m = .9; steps(2); r.off = { m: BRAIN.m, fl: brainFlinch(), poke: poke() };
+    res.T56_mood = r; log.splice(0); restoreClock(clock); E4.count = e4c; E4.lastT = e4t; mat = { ...PRESETS.clay }; setup();
+    res.PASS.mood = r.happyD > .1 && r.happyD < .14 && r.waryD < -.3 && r.fBad > .15
+      && r.pokeGood.lean === 1 && r.pokeGood.wag && r.pokeGood.fl < .9 && r.pokeBad.lean === -1 && !r.pokeBad.wag && r.pokeBad.fl > 1.2
+      && r.after300 > .45 && r.after300 < .7
+      && r.pre.preAt >= 0 && r.pre.napAt - r.pre.preAt >= 1.5 && r.pre.napAt - r.pre.preAt < 3 && r.preOff.preAt < 0 && r.preOff.napAt >= 0
+      && r.off.m === .15 && r.off.fl === 1 && r.off.poke.lean === 1 && !r.off.poke.wag;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）
