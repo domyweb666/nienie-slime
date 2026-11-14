@@ -1,6 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
-   用法：瀏覽器開 index.html（用手機尺寸較準，例如 375×812），DevTools console 把這整個檔案貼上執行；
+   用法：瀏覽器開 index.html，視窗固定 393×852（各項門檻是在這個尺寸定的；375×812 時 T42 亂捏觸手的黏土放手動能量到 38.8、門檻 12，會不過，2026-11-14），DevTools console 把這整個檔案貼上執行；
    或用 Claude 的 javascript_tool 直接跑。結果印在 console 並回傳，最後一欄 PASS 全 true 才算過。
    每次改演算法都跑（CLAUDE.md 硬規則）。
 
