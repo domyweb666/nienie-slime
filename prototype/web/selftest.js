@@ -1422,7 +1422,7 @@
   // e 蠟燭推倒：躺在窗台上（沒掉下去）、火熄；27 秒後回原位站正、火亮
   // f 風鈴：點一下晃 0.05 到 0.7 弧度、至少叮一聲、15 秒後停在正中；搖一下會動；抓著往左拖 70 點，下端跟到左邊（角度大於 0.4）
   // g 全部弄亂以後放 60 秒：沒有東西停在半空、沒有 NaN
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, bg0 = VIEW.bg, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, bg0 = VIEW.bg, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1, decoBody: 0 };
     const fresh = over => { Math.random = seeded(58); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; Object.assign(BRAIN, { seed: 58, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); log.splice(0); };
     const up = p => Math.abs(Math.atan2(Math.sin(p.a), Math.cos(p.a))), tapAt = (id, x, y) => { ev('pointerdown', id, x, y); steps(3); ev('pointerup', id, x, y); };
     const heard = k => log.filter(a => a[0] === k).length, home = p => !p.gone && p.alpha > .99 && up(p) < .02 && Math.hypot(p.x - p.hx, p.y - p.hy) < 1.5;
@@ -1447,6 +1447,30 @@
       && r.tip.lit0 && r.tip.lying > 1 && r.tip.onSill && !r.tip.lit && r.tip.home && r.tip.litAgain
       && r.bell.max > .05 && r.bell.max < .7 && r.bell.dings >= 1 && r.bell.still && r.bell.shake > .5 && r.bell.drag > .4 && r.bell.freed
       && r.mess.nan === 0 && r.mess.air === 0 && r.mess.bodyNan === 0 && r.mess.selfX === 0;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T59 v2.45 擺飾變真第 2 片：牠帶動東西，東西不推牠。窗台上照 app 的預設（芋圓、擺飾 1）。
+  // a 不推牠：同一個種子、同一串手指動作（把牠甩向罐子），「牠碰得到擺飾」開和關，牠每個點的位置差不到 1 點（11-15 實量：開跟關差 0.006 到 0.08，同樣開著跑兩次也差 0.02，甩那一下會把本來就有的極小誤差放大，每次放大多少不一定；東西真的推到牠的話會差好幾點）；開著那次罐子被撞走（倒、移開 30 點以上或掉下去），關著那次罐子沒動
+  // b 牠那一塊每秒 20 點：罐子不動；每秒 100 點：罐子被帶走 3 點以上，蠟燭（比較重）被帶得比罐子少；c 每秒 300 點：罐子倒、掉或移 15 點以上，蠟燭也被帶動，但沒罐子多（量的是過程中最遠、最歪的時候）
+  // d 把牠拖去碰風鈴：風鈴晃超過 0.1 弧度、至少叮一聲；e 放著 60 秒：沒有 NaN、沒有東西停在半空、牠沒打結
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1, decoBody: 1, decoPush: 1 };
+    const fresh = over => { Math.random = seeded(59); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; Object.assign(BRAIN, { seed: 59, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); log.splice(0); };
+    const up = q => Math.abs(Math.atan2(Math.sin(q.a), Math.cos(q.a))), heard = k => log.filter(a => a[0] === k).length;
+    const throwR = () => { const gx = globalC.xc, gy = globalC.yc; ev('pointerdown', 1, gx, gy); steps(3); for (let i = 1; i <= 10; i++) { ev('pointermove', 1, gx + i * 14, gy); steps(1); } ev('pointerup', 1, gx + 140, gy); steps(180); };
+    // 牠在家時坐在布墊上，底比蠟燭頂還高；離開布墊才會落到窗台面，下面直接把牠放到窗台面
+    // 只測「帶動」這個機制：身體不跑物理，整團平移蓋住那件東西，再用固定速度往外移，看東西被帶走多少（拖牠的話，身體跟手指的落後會讓速度對不上，量不準）
+    const carry = (k, v, n) => { fresh({}); const q = PROPS[k], dir = k ? 1 : -1, sh = dir * 85; let bot = -1e9; for (let i = 0; i < N; i++) bot = Math.max(bot, Y[i]); const dn = SILL.g.fl - 2 - bot; for (let i = 0; i < N; i++) { X[i] += sh; PX[i] += sh; Y[i] += dn; PY[i] += dn; } decoBody(1 / 60); let mv = 0, tl = 0; const see = () => { if (!q.gone) { mv = Math.max(mv, Math.abs(q.x - q.hx)); tl = Math.max(tl, up(q)); } }; for (let f = 0; f < n; f++) { for (let i = 0; i < N; i++) { X[i] += dir * v / 60; PX[i] += dir * v / 60; } decoBody(1 / 60); for (let u = 0; u < 4; u++) propsStep(1 / 240); see(); } for (let f = 0; f < 90; f++) { decoBody(1 / 60); for (let u = 0; u < 4; u++) propsStep(1 / 240); see(); } return { mv: +mv.toFixed(1), up: +tl.toFixed(2), gone: q.gone }; };
+    fresh({}); throwR();   // 先空跑一次（見 T58）
+    fresh({ decoBody: 0 }); throwR(); const X0 = Float64Array.from(X), Y0 = Float64Array.from(Y); { const J = PROPS[1]; r.off = { moved: +Math.abs(J.x - J.hx).toFixed(1), up: +up(J).toFixed(2), gone: J.gone }; }
+    fresh({}); throwR(); { let d = 0; for (let i = 0; i < N; i++) d = Math.max(d, Math.abs(X[i] - X0[i]), Math.abs(Y[i] - Y0[i])); const J = PROPS[1]; r.on = { bodyDiff: d, moved: +Math.abs(J.x - J.hx).toFixed(1), up: +up(J).toFixed(2), gone: J.gone, sound: heard('knock.glass') }; }
+    r.jar20 = carry(1, 20, 30); r.jar100 = carry(1, 100, 12); r.can100 = carry(0, 100, 12); r.jar300 = carry(1, 300, 4); r.can300 = carry(0, 300, 4);
+    fresh({}); { const B = HANG.bell, gx = globalC.xc, gy = globalC.yc; let mx = 0; ev('pointerdown', 3, gx, gy); for (let i = 1; i <= 40; i++) { ev('pointermove', 3, gx + (B.x - gx) * i / 40, gy + (B.y + B.h * .8 - gy) * i / 40); steps(1); mx = Math.max(mx, Math.abs(B.a)); } for (let i = 0; i < 60; i++) { steps(1); mx = Math.max(mx, Math.abs(B.a)); } ev('pointerup', 3, B.x, B.y + B.h * .8); steps(120); r.bell = { max: +mx.toFixed(2), dings: heard('knock.bell') }; }
+    { steps(60 * 60); let nan = 0, air = 0; for (const q of PROPS) { if (![q.x, q.y, q.a, q.vx, q.vy, q.va].every(isFinite)) nan++; if (!q.gone && !q.held && q.y + q.base < SILL.g.fl - 3 && Math.abs(q.vy) < 1 && up(q) < .02) air++; } if (!isFinite(HANG.bell.a)) nan++; let bn = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) bn++; r.idle = { nan, air, bodyNan: bn, selfX: selfX() }; }
+    res.T59_decoBody = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    res.PASS.decoBody = r.on.bodyDiff < 1 && (r.on.gone || r.on.up > 1 || r.on.moved > 30) && !r.off.gone && r.off.moved < 1 && r.off.up < .02
+      && r.jar20.mv < 1.5 && r.jar20.up < .05 && r.jar100.mv > 3 && r.can100.mv < r.jar100.mv && (r.jar300.gone || r.jar300.up > 1 || r.jar300.mv > 15) && (r.can300.gone || r.can300.up > .05 || r.can300.mv > 2) && (r.jar300.gone || r.can300.mv < r.jar300.mv)
+      && r.bell.max > .1 && r.bell.dings >= 1
+      && r.idle.nan === 0 && r.idle.air === 0 && r.idle.bodyNan === 0 && r.idle.selfX === 0;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();
