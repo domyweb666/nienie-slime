@@ -53,8 +53,15 @@
   // 固定亂數＋歸零時鐘，T11、T12 用：結果可重現。setup() 不重設時鐘；時鐘動過要還原，不然上一輪 T2 的 relaxUntil 留在未來，下一輪的記形會被當成「揉回原形」
   function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const realRandom = Math.random;
+  // 2026-11-16：整份測試不再用真的亂數。原本 T1 到 T10、T13 到 T16、T43、T44 沒有固定種子，每一項結束（restoreClock）又換回真的亂數；這些項目留下來的狀態（眨眼、休息、走路的計時）setup() 不會清，
+  // 後面有固定種子的項目抽亂數的時間點就被錯開，每輪數字都不一樣（十輪量到 T49 的衝刺速度比 1.11 到 1.38、門檻 1.12，十輪掉一次）。現在每次換亂數都換成下一個固定種子，同一個起點跑出來的數字每輪一樣。
+  // 想換一組亂數找問題：跑之前設 window.SELFTEST_SEED = 任何整數。
+  const SEED0 = (window.SELFTEST_SEED | 0) || 20261116; let seedN = 0; const reseed = () => { Math.random = seeded(SEED0 + (seedN++) * 7919); }; reseed();
   const saveClock = () => ({ t, lastTouch, nextTwitch, tLife, relaxUntil, wNext: WANDER.next, wMoving: WANDER.moving });
-  function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; Math.random = realRandom; }
+  function restoreClock(c) { ({ t, lastTouch, nextTwitch, tLife, relaxUntil } = c); WANDER.next = c.wNext; WANDER.moving = c.wMoving; reseed(); }
+  // 時鐘也從固定的起點開始：蠕動、呼吸照時鐘算，T1 不歸零時鐘，每輪開跑時 t 不同，第一項的數字就不同（固定亂數之後第 3、4 輪 T1 第一幀位移還是 8.49 對 8.92）。跑完還回去
+  const clock00 = saveClock(), misc00 = { specialUntil, releaseCount, nextSpecial, ph: BR.phase, tl: BR.tlPrev };
+  t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = 5;
   function resetAligned(wanderNext, over) { mat = { ...PRESETS.clay, emo: 0, life2: 0, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; specialUntil = -1; releaseCount = 0; nextSpecial = 0; BR.phase = 0; BR.tlPrev = 0; WANDER.moving = false; WANDER.next = wanderNext; steps(60); }
 
   // T1 輕按 0.1 秒：第一幀要動；12 秒後不留痕（2026-11-01 黏土改成約 10 秒退）
@@ -1479,6 +1486,8 @@
   for (const k in IMPS) delete IMPS[k]; Object.assign(IMPS, JSON.parse(IMPS0)); IMP.tr = IMP0.tr; IMP.w = IMP0.w; IMPD.tr = IMP.tr; IMPD.w = IMP.w; IMPSV.noSave = false;   // v2.34：熟還回去
   if (SFX) SFX.frame = sfxFrame0;
   WALK.noSave = false; walkLoad();
+  restoreClock(clock00); ({ specialUntil, releaseCount, nextSpecial } = misc00); BR.phase = misc00.ph; BR.tlPrev = misc00.tl;
+  Math.random = realRandom;   // 跑完把真的亂數還給 app
   sfxPlay = origPlay; window.requestAnimationFrame = realRAF; requestAnimationFrame(frame);
   console.log(JSON.stringify(res, null, 1));
   return res;
