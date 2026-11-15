@@ -44,8 +44,8 @@
   // 三種材質都換（舊項目也用果凍、麻糬的預設）
   // v2.23：新功能（黏液 v2.23、眼睛、睡著、節奏、游過來）舊項目一律關；T35 到 T37 用 P0（v2.23 關），T38 用 P1（全開）
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
-  const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
-  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
+  const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
+  const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
   // 兩指捏的手指按到身體外面，只有一指抓到）。2026-11-01 v2.14 發現，之前連跑過是遊走剛好停著
   function reset() { mat = { ...PRESETS.clay, emo: 0, life2: 0 }; setup();   // emo 0：情緒（逃跑、閃開）會把身體移走，回歸測試量的是物理；情緒在 T33 測；life2 0：v2.19 活物感另外在 T34 測
@@ -1412,6 +1412,41 @@
       && r.side < -.5 && r.offer.leans >= 1 && r.offer.left
       && r.decay[0] === .8 && Math.abs(r.decay[1] + .133) < .001 && r.decay[2] === 0
       && r.off.same && r.off.side === -.8 && r.off.leans === 0 && r.off.homeMid;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T58 v2.44 擺飾變真第 1 片（多米 11-15：跟環境物件互動）。窗台上照 app 的預設（芋圓、擺飾 1）。
+  // a 開關：decoReal 0 沒有東西、風鈴不是擺錘；1 有蠟燭和玻璃罐，放 5 秒不動
+  // b 不推牠：同一個種子放 20 秒，開和關牠每個點的位置差不到千分之一點（這一片東西碰不到牠；11-15 實量差 0.00000009 點）
+  // c 點罐子：晃 0.05 到 0.6 弧度、有玻璃聲、2 秒後站正；d 罐子大力一推：掉下窗台、聽得到落地、22 秒內回原位站正
+  // h 手指抓的是按到的那一點：抓罐子上面往左推 40 點會倒；捏著倒掉的罐子上端提起來再放下，它站正；抓下面往左拖 30 點是平移（歪不到 0.25 弧度）
+  // e 蠟燭推倒：躺在窗台上（沒掉下去）、火熄；27 秒後回原位站正、火亮
+  // f 風鈴：點一下晃 0.05 到 0.7 弧度、至少叮一聲、15 秒後停在正中；搖一下會動；抓著往左拖 70 點，下端跟到左邊（角度大於 0.4）
+  // g 全部弄亂以後放 60 秒：沒有東西停在半空、沒有 NaN
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, bg0 = VIEW.bg, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1 };
+    const fresh = over => { Math.random = seeded(58); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; Object.assign(BRAIN, { seed: 58, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); log.splice(0); };
+    const up = p => Math.abs(Math.atan2(Math.sin(p.a), Math.cos(p.a))), tapAt = (id, x, y) => { ev('pointerdown', id, x, y); steps(3); ev('pointerup', id, x, y); };
+    const heard = k => log.filter(a => a[0] === k).length, home = p => !p.gone && p.alpha > .99 && up(p) < .02 && Math.hypot(p.x - p.hx, p.y - p.hy) < 1.5;
+    fresh({}); steps(20 * 60);   // 先空跑一次：前一項留下來的狀態會讓第一次跟之後幾次差 3、4 點（同樣的設定跑兩次也差），比的是第二次以後
+    fresh({ decoReal: 0 }); r.off = { n: PROPS.length, bell: HANG.bell.on }; steps(20 * 60); const X0 = Float64Array.from(X), Y0 = Float64Array.from(Y);
+    fresh({}); r.on = { ims: PROPS.map(q => q.im).join(), bell: HANG.bell.on, teru: HANG.teru.on }; steps(5 * 60); r.rest = PROPS.every(home); steps(15 * 60); { let d = 0; for (let i = 0; i < N; i++) d = Math.max(d, Math.abs(X[i] - X0[i]), Math.abs(Y[i] - Y0[i])); r.bodyDiff = d; }
+    fresh({}); { const J = PROPS[1]; tapAt(1, J.x + 14, J.y); let mx = 0; for (let i = 0; i < 120; i++) { steps(1); mx = Math.max(mx, up(J)); } r.tap = { max: +mx.toFixed(3), glass: heard('knock.glass'), home: home(J), mode: fingers.size }; }
+    { const J = PROPS[1]; log.splice(0); J.va = 12; J.lastHit = t; let gone = false, back = null; for (let i = 0; i < 22 * 60; i++) { steps(1); if (J.gone) gone = true; else if (gone && back == null && J.alpha >= 1) back = +(i / 60).toFixed(1); } r.fall = { gone, back, sound: heard('knock.glass'), home: home(J) }; }
+    fresh({}); { const J = PROPS[1], x0 = J.x, y0 = J.y - 25; ev('pointerdown', 4, x0, y0); steps(2); for (let i = 1; i <= 20; i++) { ev('pointermove', 4, x0 - 2 * i, y0); steps(1); } steps(20); ev('pointerup', 4, x0 - 40, y0); steps(120); r.push = { lying: +up(J).toFixed(2), onSill: !J.gone };
+      J.x = 330; J.y = SILL.g.fl - 30; J.a = 1.57; J.vx = J.vy = J.va = 0; J.lastHit = t; steps(60); const c = Math.cos(J.a), sn = Math.sin(J.a), gx = J.x + sn * 26, gy = J.y - c * 26; ev('pointerdown', 5, gx, gy); steps(2); const held = !!J.held; for (let i = 1; i <= 40; i++) { ev('pointermove', 5, gx - 20 * i / 40, gy - 70 * i / 40); steps(1); } steps(30); for (let i = 1; i <= 20; i++) { ev('pointermove', 5, gx - 20, gy - 70 + 40 * i / 20); steps(1); } ev('pointerup', 5, gx - 20, gy - 30); steps(120); r.fix = { held, up: +up(J).toFixed(3), onSill: !J.gone && Math.abs(J.y + J.base - SILL.g.fl) < 2 };
+      const x1 = J.x, y1 = J.y + 18; ev('pointerdown', 6, x1, y1); steps(2); let mx = 0; for (let i = 1; i <= 30; i++) { ev('pointermove', 6, x1 - i, y1); steps(1); mx = Math.max(mx, up(J)); } ev('pointerup', 6, x1 - 30, y1); steps(60); r.slide = { tilt: +mx.toFixed(2), moved: +(x1 - J.x).toFixed(0) }; }
+    { const C = PROPS[0]; VIEW.bg = 'night'; steps(4 * 60); const lit0 = t - C.upT > 3; C.va = 15; C.lastHit = t; steps(120); r.tip = { lit0, lying: +up(C).toFixed(2), onSill: !C.gone && C.y < SILL.g.fl, lit: t - C.upT > 3 }; steps(27 * 60); r.tip.home = home(C); steps(4 * 60); r.tip.litAgain = t - C.upT > 3; VIEW.bg = bg0; }
+    fresh({}); { const B = HANG.bell; tapAt(2, B.x - 8, B.y + B.h * .6); let mx = 0; for (let i = 0; i < 180; i++) { steps(1); mx = Math.max(mx, Math.abs(B.a)); } const dings = heard('knock.bell'); steps(15 * 60); r.bell = { max: +mx.toFixed(3), dings, still: B.a === 0 && B.va === 0 };
+      shkShake(1, 0); steps(6); r.bell.shake = +Math.abs(B.va).toFixed(2); steps(15 * 60);
+      ev('pointerdown', 3, B.x, B.y + B.h * .7); steps(2); for (let i = 1; i <= 10; i++) { ev('pointermove', 3, B.x - i * 7, B.y + B.h * .7); steps(1); } steps(20); r.bell.drag = +B.a.toFixed(2); ev('pointerup', 3, B.x - 70, B.y + B.h * .7); steps(2); r.bell.freed = B.held == null; }
+    { const J = PROPS[1], C = PROPS[0]; J.va = 12; C.va = -15; C.vx = -R; J.lastHit = C.lastHit = t; HANG.bell.va = 5; steps(60 * 60); let nan = 0, air = 0; for (const q of PROPS) { if (![q.x, q.y, q.a, q.vx, q.vy, q.va].every(isFinite)) nan++; if (!q.gone && !q.held && q.y + q.base < SILL.g.fl - 3 && Math.abs(q.vy) < 1 && up(q) < .02) air++; } if (!isFinite(HANG.bell.a)) nan++; let bn = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) bn++; r.mess = { nan, air, bodyNan: bn, selfX: selfX() }; }
+    res.T58_deco = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
+    res.PASS.deco = r.off.n === 0 && !r.off.bell && r.on.ims === 'd_candle,d_jar' && r.on.bell && !r.on.teru && r.rest && r.bodyDiff < .001
+      && r.tap.max > .05 && r.tap.max < .6 && r.tap.glass >= 1 && r.tap.home && r.tap.mode === 0
+      && r.fall.gone && r.fall.back != null && r.fall.sound >= 1 && r.fall.home
+      && r.push.lying > 1 && r.push.onSill && r.fix.held && r.fix.up < .05 && r.fix.onSill && r.slide.tilt < .25 && r.slide.moved > 20
+      && r.tip.lit0 && r.tip.lying > 1 && r.tip.onSill && !r.tip.lit && r.tip.home && r.tip.litAgain
+      && r.bell.max > .05 && r.bell.max < .7 && r.bell.dings >= 1 && r.bell.still && r.bell.shake > .5 && r.bell.drag > .4 && r.bell.freed
+      && r.mess.nan === 0 && r.mess.air === 0 && r.mess.bodyNan === 0 && r.mess.selfX === 0;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();

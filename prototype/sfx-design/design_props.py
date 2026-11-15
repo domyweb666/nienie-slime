@@ -1,5 +1,6 @@
 # 擺飾的聲音（2026-11-06，環境互動）：陶盆、石頭盤碰到木頭窗台或互撞的那一聲。
 # 用法：python -I design_props.py <輸出資料夾> [manifest.json 路徑]
+# 2026-11-15 加玻璃（蠟燭杯、玻璃罐）、書、風鈴。
 # 跟 design_sfx.py v3 同一個方向：不刺耳、起音別太硬、低通、峰值壓低。陶器短促、悶一點，石頭盤多一點清脆的小顆粒。
 import json
 import os
@@ -62,6 +63,27 @@ def dish(rng):
     return finish(x, 0.003, -16, 3200)
 
 
+def glass(rng):
+    # 玻璃杯、玻璃罐碰到木頭（2026-11-15 擺飾變真第 1 片）：短的悶咚加一點玻璃的亮，亮的那層壓得很低、很快收掉
+    x, t = partials(rng, 0.26, [210, 880, 1760, 2640], [0.03, 0.05, 0.035, 0.02], [0.9, 0.5, 0.28, 0.1])
+    noise = rng.standard_normal(len(x)) * np.exp(-t / 0.005) * 0.18
+    return finish(x + noise, 0.004, -17, 3400)
+
+
+def book(rng):
+    # 書堆在木頭上滑一下、頓一下：只有低的悶聲和一點紙的沙
+    x, t = partials(rng, 0.2, [95, 180, 330], [0.05, 0.035, 0.02], [1.0, 0.6, 0.25])
+    noise = lowpass(rng.standard_normal(len(x)), 1800) * np.exp(-t / 0.03) * 0.5
+    return finish(x + noise, 0.006, -16, 1500)
+
+
+def bell(rng):
+    # 玻璃風鈴的叮：起音軟（8 毫秒）、餘音約一秒、峰值比撞擊聲再低一截。四個音高略不同，連著響不會像同一顆
+    f = rng.uniform(1480, 1720)
+    x, t = partials(rng, 1.3, [f, f * 2.02, f * 2.71, f * 3.6], [0.42, 0.25, 0.14, 0.07], [1.0, 0.3, 0.16, 0.05], jitter=0.004)
+    return finish(x, 0.008, -21, 4200)
+
+
 def save(path, x):
     with wave.open(path, 'wb') as w:
         w.setnchannels(1)
@@ -74,7 +96,8 @@ def main():
     out = sys.argv[1]
     rng = np.random.default_rng(20261106)
     names = {'pot': [], 'dish': []}
-    for kind, fn in (('pot', pot), ('dish', dish)):
+    names.update({'glass': [], 'book': [], 'bell': []})
+    for kind, fn in (('pot', pot), ('dish', dish), ('glass', glass), ('book', book), ('bell', bell)):   # 新的接在後面，前面兩種的亂數順序不變
         for k in range(1, 5):
             name = f'prop-{kind}-{k:02d}.wav'
             save(os.path.join(out, name), fn(rng))

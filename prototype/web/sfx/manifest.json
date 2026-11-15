@@ -159,6 +159,24 @@
       "prop-dish-02.wav",
       "prop-dish-03.wav",
       "prop-dish-04.wav"
+    ],
+    "glass": [
+      "prop-glass-01.wav",
+      "prop-glass-02.wav",
+      "prop-glass-03.wav",
+      "prop-glass-04.wav"
+    ],
+    "book": [
+      "prop-book-01.wav",
+      "prop-book-02.wav",
+      "prop-book-03.wav",
+      "prop-book-04.wav"
+    ],
+    "bell": [
+      "prop-bell-01.wav",
+      "prop-bell-02.wav",
+      "prop-bell-03.wav",
+      "prop-bell-04.wav"
     ]
   }
 }
