@@ -1329,10 +1329,10 @@
   // 往右下角拉到窗台下面（拉力把家帶出房間，v2.37 壓成一條線、面積剩 9%）、猛扯到左上角停住再放手（v2.37 黏上窗框被塞進去、交叉留 1.4 秒）、
   // 兩指往上下拉到畫面頂和底（v2.37 交叉、放手記住的形狀翻面）、拉到底再往回推過身體（v2.37 內部翻 440 個）。
   // 外框全程零交叉、面積不掉到七成以下、放手 4 秒內部翻面剩 10 個以內、記住的形狀沒有翻面；四個開關關掉（v2.37）至少有兩種量得到壞掉；兩指拉太開會撕開；慢慢放在窗框旁邊照樣黏得上
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, eyes: 0, shake: 0 }, OFF38 = { flipMem: 0, pairMax: 0, tear: 0, homeClamp: 0, clingTidy: 0 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, eyes: 0, shake: 0, decoReact: 0 }, OFF38 = { flipMem: 0, pairMax: 0, tear: 0, homeClamp: 0, clingTidy: 0 };
     const flips = (AX, AY) => { let f = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if ((AX[b] - AX[a]) * (AY[c] - AY[a]) - (AY[b] - AY[a]) * (AX[c] - AX[a]) <= 0) f++; } return f; };
     // 照 app 的組法（芋圓、圓的外形、窗台）：selftest 的畫面是舊的八條腿（VIEW.body 'tent'），不換的話量到的是固定觸手
-    const fresh = (sd, over) => { Math.random = seeded(sd); PAIR.tearT = -9; PAIR.over = 0; IMP.tr = .3; IMP.w = 0; MOOD.c = 0; MOOD.a = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; mat = { ...SP, ...(over || {}) }; setup(); t = 0; lastTouch = -10; tLife = 0; relaxUntil = -1; WANDER.moving = false; WANDER.next = 1e9; steps(240); lastTouch = t; };
+    const fresh = (sd, over) => { Math.random = seeded(sd); PAIR.tearT = -9; PAIR.over = 0; IMP.tr = .3; IMP.w = 0; MOOD.c = 0; MOOD.a = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; mat = { ...SP, ...(over || {}) }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; WANDER.moving = false; WANDER.next = 1e9; SLP.on = false; SLP.k = 0; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; LIFE.sns.length = 0; Object.assign(BRAIN, { seed: 54 }); brainReset(); steps(240); lastTouch = t; };   // 11-16：大腦、休息計時、睡著也歸零。原本不歸零，這一項的數字跟「上一個開著大腦的項目留下什麼」有關：只跑 T54 兩次，第二次 twoVert 多 1 幀交叉（v2.45 也一樣）
     const hold = a => { a.still = true; return a; };
     const paths = {
       corner: (k, cx, cy) => { const sx = cx + R * .7, sy = cy, tx = W - 4, ty = H - 4; return k <= 90 ? [[1, sx + (tx - sx) * k / 90, sy + (ty - sy) * k / 90]] : k <= 180 ? hold([[1, tx, ty]]) : null; },
@@ -1359,7 +1359,7 @@
   // T55 v2.41 大腦（多米 11-14：像真實世界的動物，有牠自己的一套行為邏輯）。窗台上照 app 的預設（芋圓、熟 0.7），舊項目一律關大腦。
   // a 放著不碰 300 秒：醒著的時間裡休息佔 0.35 到 0.75、有張望有走、睏高了會睡、睡飽自己醒（v2.40 睡了不會自己醒）、沒有 0.5 秒內就換事情、想動不會一直滿格；
   // b 喘（跑完、被大力拉）那一下：睏漲、想動退；c 睏 0.9 開始：15 秒內就睡；睏 0 開始：60 秒內不睡；d brain 0：需求不動、不會自己醒（回 v2.40）
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, decoReact: 0 };
     const run = (over, sec, pre) => { Math.random = seeded(55); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 55, naps: 0, selfWake: 0 }); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; if (pre) pre();
       const c = {}; let short = 0, last = '', lastI = 0, eTop = 0, n = 0, napAt = -1;
       for (let i = 0; i < sec * 60; i++) { update(DT); const a = BRAIN.act; c[a] = (c[a] || 0) + 1; if (a !== last) { if (last && i - lastI < 30) short++; last = a; lastI = i; } if (BRAIN.e > .98) eTop++; if (napAt < 0 && SLP.on) napAt = +(i / 60).toFixed(1); n++; }
@@ -1379,7 +1379,7 @@
   // a 開心那一下心情 +0.12 上下、戒漲 0.3 心情掉 0.3 以上、心情差時怕跟著高；b 被戳：心情好朝你傾過來搖偽足、縮得小，心情差往反方向傾、縮得大；
   // c 心情 0.9 放 300 秒退到 0.45 到 0.7（半衰 300 秒，退回 0.1）；d 前兆：睏 0.9 開始，先「想睡了」1.5 秒以上才睡；brPre 0 馬上睡；
   // e mood 0：心情固定 0.15、被戳的倍數 1（回 v2.41）
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, decoReact: 0 };
     const fresh = over => { Math.random = seeded(56); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 56, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); };
     const poke = () => { E2.leanS = 0; MOOD.wagT = -9; e2Release({ tDown: t - .1, stretch: 0, fx: globalC.xc + R, fy: globalC.yc }); return { lean: E2.leanS, wag: MOOD.wagT > t, fl: +brainFlinch().toFixed(2) }; };
     fresh({}); { const m0 = BRAIN.m; MOOD.happyT = t; steps(1); r.happyD = +(BRAIN.m - m0).toFixed(3); const m1 = BRAIN.m; IMP.w += .3; steps(1); r.waryD = +(BRAIN.m - m1).toFixed(3); IMP.w = 0; BRAIN.m = -.6; steps(1); r.fBad = +BRAIN.f.toFixed(2); }
@@ -1400,7 +1400,7 @@
   // a 開心那一下所在那格 +0.1、戒漲 0.3 那格掉 0.4 以上；b 最左邊那格 0.8、睏 0.9：走到左邊才睡（v2.42 在正中間睡）；
   // c 正中間那格 -0.8：放 120 秒待在那格的時間不到三成五、而且不到對照的一半（11-15 實量：都是 0 時 0.87，-0.8 時 0.22。那 0.22 是開頭還沒走開的 8 秒，加上一次「來找你」把牠帶回畫面正中間、打完招呼又待了十幾秒才走）；d 記你：從左邊放手 12 次 side 小於 -0.5，放 120 秒至少一次把左邊靠過來（「來找你」先關掉：兩個搶同一個需求，來找你還有額度時靠過來大約四次才贏一次，120 秒排不到。「想被摸」直接給 0.9：分頁不在前面時它不漲，瀏覽器面板收著那輪會量到 0 次）；
   // e 隔兩天：喜歡的不動、-0.8 剩 -0.13、-0.2 歸零；f brMem 0：那格不動、家在正中間、不靠過來
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, decoReact: 0 };
     const fresh = (over, cells, side) => { Math.random = seeded(57); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 57, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = (cells || [0, 0, 0, 0, 0]).slice(); BMEM.side = side || 0; BMEM.leans = 0; BMEM.offerAt = -99; BMEM.dirty = false; steps(60); };
     const mid = () => memCellAt(SILL.g.bx);
     fresh({}); { const k = memCellAt(globalC.xc); MOOD.happyT = t; steps(2); const a = BMEM.cell[k]; IMP.w += .3; steps(2); r.learn = { k, happy: +a.toFixed(3), scare: +(BMEM.cell[k] - a).toFixed(3) }; IMP.w = 0; }
@@ -1429,7 +1429,7 @@
   // e 蠟燭推倒：躺在窗台上（沒掉下去）、火熄；27 秒後回原位站正、火亮
   // f 風鈴：點一下晃 0.05 到 0.7 弧度、至少叮一聲、15 秒後停在正中；搖一下會動；抓著往左拖 70 點，下端跟到左邊（角度大於 0.4）
   // g 全部弄亂以後放 60 秒：沒有東西停在半空、沒有 NaN
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, bg0 = VIEW.bg, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1, decoBody: 0 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, bg0 = VIEW.bg, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1, decoBody: 0, decoReact: 0 };
     const fresh = over => { Math.random = seeded(58); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; Object.assign(BRAIN, { seed: 58, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); log.splice(0); };
     const up = p => Math.abs(Math.atan2(Math.sin(p.a), Math.cos(p.a))), tapAt = (id, x, y) => { ev('pointerdown', id, x, y); steps(3); ev('pointerup', id, x, y); };
     const heard = k => log.filter(a => a[0] === k).length, home = p => !p.gone && p.alpha > .99 && up(p) < .02 && Math.hypot(p.x - p.hx, p.y - p.hy) < 1.5;
@@ -1460,7 +1460,7 @@
   // a 不推牠：同一個種子、同一串手指動作（把牠甩向罐子），「牠碰得到擺飾」開和關，牠每個點的位置差不到 1 點（11-15 實量：開跟關差 0.006 到 0.08，同樣開著跑兩次也差 0.02，甩那一下會把本來就有的極小誤差放大，每次放大多少不一定；東西真的推到牠的話會差好幾點）；開著那次罐子被撞走（倒、移開 30 點以上或掉下去），關著那次罐子沒動
   // b 牠那一塊每秒 20 點：罐子不動；每秒 100 點：罐子被帶走 3 點以上，蠟燭（比較重）被帶得比罐子少；c 每秒 300 點：罐子倒、掉或移 15 點以上，蠟燭也被帶動，但沒罐子多（量的是過程中最遠、最歪的時候）
   // d 把牠拖去碰風鈴：風鈴晃超過 0.1 弧度、至少叮一聲；e 放著 60 秒：沒有 NaN、沒有東西停在半空、牠沒打結
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1, decoBody: 1, decoPush: 1 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, deco: 1, decoReal: 1, decoBody: 1, decoPush: 1, decoReact: 0 };
     const fresh = over => { Math.random = seeded(59); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; Object.assign(BRAIN, { seed: 59, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); log.splice(0); };
     const up = q => Math.abs(Math.atan2(Math.sin(q.a), Math.cos(q.a))), heard = k => log.filter(a => a[0] === k).length;
     const throwR = () => { const gx = globalC.xc, gy = globalC.yc; ev('pointerdown', 1, gx, gy); steps(3); for (let i = 1; i <= 10; i++) { ev('pointermove', 1, gx + i * 14, gy); steps(1); } ev('pointerup', 1, gx + 140, gy); steps(180); };
@@ -1478,6 +1478,36 @@
       && r.jar20.mv < 1.5 && r.jar20.up < .05 && r.jar100.mv > 3 && r.can100.mv < r.jar100.mv && (r.jar300.gone || r.jar300.up > 1 || r.jar300.mv > 15) && (r.can300.gone || r.can300.up > .05 || r.can300.mv > 2) && (r.jar300.gone || r.can300.mv < r.jar300.mv)
       && r.bell.max > .1 && r.bell.dings >= 1
       && r.idle.nan === 0 && r.idle.air === 0 && r.idle.bodyNan === 0 && r.idle.selfX === 0;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T60 v2.46 擺飾變真第 3 片：牠知道東西動了。窗台上照 app 的預設（芋圓、熟 0.7、擺飾 1）。T58、T59 把 decoReact 關掉，數字跟 v2.45 一樣。
+  // a 開關：decoReact 0 時把罐子推下去，牠沒看、沒嚇；b 嚇和習慣：開著連推三次，第一次怕漲 0.2 到 0.46、有縮一下，之後每次不到前一次的六成
+  // c 嚇醒：睡著時蠟燭倒下，半秒內醒；d 看：點一下罐子，牠看過去、好奇漲 0.1 以上；好奇 0.7 時點風鈴，牠伸偽足探
+  // e 蠟燭：夜晚家在蠟燭那一側（離正中間 20 點以上），60 秒內牠走到家；白天家回正中間
+  // f 推：好奇 0.9、心情 0.5 時 14 秒內牠去推一件東西，東西倒、掉或挪 20 點以上，牠沒被嚇；推過 2 次、或開關關掉就不推
+  // g 放著 60 秒：沒有 NaN、牠沒打結
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, bg0 = VIEW.bg, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, envRoam: 0, deco: 1, decoReal: 1, decoBody: 1, decoPush: 1, decoReact: 1, decoCat: 1, decoScare: 1 };
+    const fresh = over => { Math.random = seeded(60); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; Object.assign(BRAIN, { seed: 60, naps: 0, selfWake: 0 }); brainReset(); for (const k in DR.n) DR.n[k] = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); log.splice(0); };
+    const up = q => Math.abs(Math.atan2(Math.sin(q.a), Math.cos(q.a))), calm = () => { BRAIN.z = 0; BRAIN.e = 0; BRAIN.q = .2; LIFE.st = 'rest'; LIFE.until = t + 999; };   // 測反應時牠待在原地休息
+    const shove = q => { q.va = q.im === 'd_candle' ? 15 : 12; q.lastHit = t; q.fingT = t; let sc = 0, fl = 0; for (let i = 0; i < 180; i++) { steps(1); sc = Math.max(sc, MOOD.scare); fl = Math.max(fl, 1 - FLN.s); } return { amt: DR.last ? +DR.last.amt.toFixed(3) : 0, sc: +sc.toFixed(3), fl: +fl.toFixed(3) }; };
+    fresh({ decoReact: 0 }); calm(); { const J = PROPS[1]; const s = shove(J); r.off = { scare: DR.n.scare, look: DR.n.look, sc: s.sc, fell: J.gone || up(J) > 1 }; }
+    fresh({}); calm(); { const J = PROPS[1]; r.hab = []; for (let k = 0; k < 3; k++) { calm(); r.hab.push(shove(J)); calm(); steps(26 * 60); } r.habN = DR.n.scare; }
+    fresh({}); calm(); { const C = PROPS[0]; BRAIN.z = .9; SLP.on = true; LIFE.st = 'sleep'; steps(240); const k0 = SLP.k; C.va = 15; C.lastHit = t; C.fingT = t; let woke = -1; for (let i = 0; i < 120; i++) { steps(1); if (!SLP.on && woke < 0) woke = i; } r.wake = { k0: +k0.toFixed(2), woke, n: DR.n.wake }; }
+    fresh({}); calm(); { const J = PROPS[1], B = HANG.bell, q0 = BRAIN.q; ev('pointerdown', 1, J.x + 14, J.y); steps(3); ev('pointerup', 1, J.x + 14, J.y); steps(2); r.look = { n: DR.n.look, dq: +(BRAIN.q - q0).toFixed(3), eye: DR.lookT > t, scare: DR.n.scare }; steps(300);
+      calm(); BRAIN.q = .7; LIFE.until = t + 5; ev('pointerdown', 2, B.x - 8, B.y + B.h * .6); steps(3); ev('pointerup', 2, B.x - 8, B.y + B.h * .6); let sn = 0; for (let i = 0; i < 90; i++) { steps(1); sn = Math.max(sn, LIFE.sns.length); } r.probe = { n: DR.n.probe, sn }; }
+    fresh({}); { const g = SILL.g; VIEW.bg = 'night'; steps(5 * 60); const hx = memHomeX(); let at = -1; for (let i = 0; i < 60 * 60 && at < 0; i++) { steps(1); if (Math.abs(globalC.xc - hx) < R * .35) at = +(i / 60).toFixed(1); } VIEW.bg = 'day'; steps(2); r.candle = { shift: +(g.bx - hx).toFixed(1), at, day: +(g.bx - memHomeX()).toFixed(1) }; VIEW.bg = bg0; }
+    fresh({}); { const go = () => { BRAIN.q = .9; BRAIN.m = .5; BRAIN.z = 0; BRAIN.e = 0; LIFE.st = 'rest'; LIFE.until = t + .1; }; go(); const ok0 = drCatOK(); let mv = 0, tl = 0, gone = false; for (let i = 0; i < 14 * 60; i++) { steps(1); for (const q of PROPS) { if (q.gone) gone = true; else { mv = Math.max(mv, Math.abs(q.x - q.hx)); tl = Math.max(tl, up(q)); } } }
+      r.cat = { ok0, n: DR.n.cat, fall: DR.n.catFall, mv: +mv.toFixed(0), up: +tl.toFixed(2), gone, scare: DR.n.scare }; steps(30 * 60); DR.catT = -99; go(); DR.cats = 2; r.cat.capped = !drCatOK(); DR.cats = 0; r.cat.again = drCatOK(); mat.decoCat = 0; r.cat.off = !drCatOK(); mat.decoCat = 1; }
+    { calm(); LIFE.until = t + 1; steps(60 * 60); let nan = 0, bn = 0; for (const q of PROPS) if (![q.x, q.y, q.a, q.vx, q.vy, q.va].every(isFinite)) nan++; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) bn++; r.idle = { nan, bodyNan: bn, selfX: selfX() }; }
+    res.T60_decoReact = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();   // calm() 把「休息到什麼時候」設在很久以後；不還原的話下一輪 T54 的牠一直不動，數字跟第一輪不同（11-16 量到第二輪起 twoVert 多 2 幀交叉）
+    res.PASS.decoReact = r.off.scare === 0 && r.off.look === 0 && r.off.sc < .01 && r.off.fell
+      && r.hab[0].amt > .2 && r.hab[0].amt < .46 && r.hab[0].fl > .05 && r.hab[1].amt < r.hab[0].amt * .6 && r.hab[2].amt < r.hab[1].amt * .6 && r.habN === 3
+      && r.wake.k0 > .8 && r.wake.woke >= 0 && r.wake.woke < 30 && r.wake.n === 1
+      && r.look.n === 1 && r.look.dq >= .1 && r.look.eye && r.look.scare === 0 && r.probe.n === 1 && r.probe.sn >= 1
+      && r.candle.shift > 20 && r.candle.at >= 0 && Math.abs(r.candle.day) < 1
+      && r.cat.ok0 && r.cat.n === 1 && r.cat.fall >= 1 && (r.cat.gone || r.cat.up > 1 || r.cat.mv > 20) && r.cat.scare === 0 && r.cat.capped && r.cat.again && r.cat.off
+      && r.idle.nan === 0 && r.idle.bodyNan === 0 && r.idle.selfX === 0;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   draw();
