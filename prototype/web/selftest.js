@@ -1348,12 +1348,12 @@
       && r.on.twoVert.every(a => a.torn) && r.cling.surf === 'rjamb' && r.cling.on;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
-  const BMEM0 = { cell: BMEM.cell.slice(), side: BMEM.side }; BMEM.cell = [0, 0, 0, 0, 0, 0]; BMEM.side = 0;   // v2.43：T55 到 T57 不帶使用者存的記性，T57 結尾還回去
+  const BMEM0 = { cell: BMEM.cell.slice(), side: BMEM.side }; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0;   // v2.43：T55 到 T57 不帶使用者存的記性，T57 結尾還回去
   // T55 v2.41 大腦（多米 11-14：像真實世界的動物，有牠自己的一套行為邏輯）。窗台上照 app 的預設（芋圓、熟 0.7），舊項目一律關大腦。
   // a 放著不碰 300 秒：醒著的時間裡休息佔 0.35 到 0.75、有張望有走、睏高了會睡、睡飽自己醒（v2.40 睡了不會自己醒）、沒有 0.5 秒內就換事情、想動不會一直滿格；
   // b 喘（跑完、被大力拉）那一下：睏漲、想動退；c 睏 0.9 開始：15 秒內就睡；睏 0 開始：60 秒內不睡；d brain 0：需求不動、不會自己醒（回 v2.40）
   { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
-    const run = (over, sec, pre) => { Math.random = seeded(55); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 55, naps: 0, selfWake: 0 }); BMEM.cell = [0, 0, 0, 0, 0, 0]; BMEM.side = 0; if (pre) pre();
+    const run = (over, sec, pre) => { Math.random = seeded(55); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 55, naps: 0, selfWake: 0 }); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; if (pre) pre();
       const c = {}; let short = 0, last = '', lastI = 0, eTop = 0, n = 0, napAt = -1;
       for (let i = 0; i < sec * 60; i++) { update(DT); const a = BRAIN.act; c[a] = (c[a] || 0) + 1; if (a !== last) { if (last && i - lastI < 30) short++; last = a; lastI = i; } if (BRAIN.e > .98) eTop++; if (napAt < 0 && SLP.on) napAt = +(i / 60).toFixed(1); n++; }
       const awake = n - (c['睡覺'] || 0), fr = k => +((c[k] || 0) / Math.max(1, awake)).toFixed(3), [sx, cr] = classify();
@@ -1373,7 +1373,7 @@
   // c 心情 0.9 放 300 秒退到 0.45 到 0.7（半衰 300 秒，退回 0.1）；d 前兆：睏 0.9 開始，先「想睡了」1.5 秒以上才睡；brPre 0 馬上睡；
   // e mood 0：心情固定 0.15、被戳的倍數 1（回 v2.41）
   { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
-    const fresh = over => { Math.random = seeded(56); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 56, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); };
+    const fresh = over => { Math.random = seeded(56); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 56, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; steps(60); };
     const poke = () => { E2.leanS = 0; MOOD.wagT = -9; e2Release({ tDown: t - .1, stretch: 0, fx: globalC.xc + R, fy: globalC.yc }); return { lean: E2.leanS, wag: MOOD.wagT > t, fl: +brainFlinch().toFixed(2) }; };
     fresh({}); { const m0 = BRAIN.m; MOOD.happyT = t; steps(1); r.happyD = +(BRAIN.m - m0).toFixed(3); const m1 = BRAIN.m; IMP.w += .3; steps(1); r.waryD = +(BRAIN.m - m1).toFixed(3); IMP.w = 0; BRAIN.m = -.6; steps(1); r.fBad = +BRAIN.f.toFixed(2); }
     fresh({}); BRAIN.m = .6; r.pokeGood = poke(); BRAIN.m = -.6; r.pokeBad = poke();
@@ -1391,24 +1391,24 @@
 
   // T57 v2.43 記性（大腦第 3 片）。窗台上照 app 的預設（芋圓、熟 0.7）。測試不准碰使用者存的記性（IMPSV.noSave 擋存檔，BMEM 跑完還回去）。
   // a 開心那一下所在那格 +0.1、戒漲 0.3 那格掉 0.4 以上；b 最左邊那格 0.8、睏 0.9：走到左邊才睡（v2.42 在正中間睡）；
-  // c 正中間那格 -0.8：放 120 秒待在那格的時間不到兩成（都是 0 時過半）；d 記你：從左邊放手 12 次 side 小於 -0.5，放 120 秒至少一次把左邊靠過來；
+  // c 正中間那格 -0.8：放 120 秒待在那格的時間不到三成五、而且不到對照的一半（11-15 實量：都是 0 時 0.87，-0.8 時 0.22。那 0.22 是開頭還沒走開的 8 秒，加上一次「來找你」把牠帶回畫面正中間、打完招呼又待了十幾秒才走）；d 記你：從左邊放手 12 次 side 小於 -0.5，放 120 秒至少一次把左邊靠過來（「來找你」先關掉：兩個搶同一個需求，來找你還有額度時靠過來大約四次才贏一次，120 秒排不到。「想被摸」直接給 0.9：分頁不在前面時它不漲，瀏覽器面板收著那輪會量到 0 次）；
   // e 隔兩天：喜歡的不動、-0.8 剩 -0.13、-0.2 歸零；f brMem 0：那格不動、家在正中間、不靠過來
   { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
-    const fresh = (over, cells, side) => { Math.random = seeded(57); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 57, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = (cells || [0, 0, 0, 0, 0, 0]).slice(); BMEM.side = side || 0; BMEM.leans = 0; BMEM.offerAt = -99; BMEM.dirty = false; steps(60); };
+    const fresh = (over, cells, side) => { Math.random = seeded(57); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 57, naps: 0, selfWake: 0 }); brainReset(); BMEM.cell = (cells || [0, 0, 0, 0, 0]).slice(); BMEM.side = side || 0; BMEM.leans = 0; BMEM.offerAt = -99; BMEM.dirty = false; steps(60); };
     const mid = () => memCellAt(SILL.g.bx);
     fresh({}); { const k = memCellAt(globalC.xc); MOOD.happyT = t; steps(2); const a = BMEM.cell[k]; IMP.w += .3; steps(2); r.learn = { k, happy: +a.toFixed(3), scare: +(BMEM.cell[k] - a).toFixed(3) }; IMP.w = 0; }
     const napAt = (over, cells) => { fresh(over, cells); BRAIN.z = .9; let x = null; for (let i = 0; i < 30 * 60 && x == null; i++) { steps(1); if (SLP.on) x = globalC.xc; } return x == null ? null : +((x - SILL.g.bx) / R).toFixed(2); };
-    r.napFav = napAt({}, [.8, 0, 0, 0, 0, 0]); r.napOff = napAt({ brMem: 0 }, [.8, 0, 0, 0, 0, 0]);
+    r.napFav = napAt({}, [.8, 0, 0, 0, 0]); r.napOff = napAt({ brMem: 0 }, [.8, 0, 0, 0, 0]);
     const stay = cells => { fresh({}, cells); const m = mid(); let c = 0, n = 0; for (let i = 0; i < 120 * 60; i++) { steps(1); n++; if (SILL.plane === 'room' && memCellAt(globalC.xc) === m) c++; } return +(c / n).toFixed(3); };
-    r.stayCtrl = stay([0, 0, 0, 0, 0, 0]); { const c = [0, 0, 0, 0, 0, 0]; c[mid()] = -.8; r.stayAvoid = stay(c); }
+    r.stayCtrl = stay([0, 0, 0, 0, 0]); { const c = [0, 0, 0, 0, 0]; c[mid()] = -.8; r.stayAvoid = stay(c); }
     fresh({}); for (let i = 0; i < 12; i++) memTouch({ ax: globalC.xc - R * .8 }); r.side = +BMEM.side.toFixed(3);
-    { const sd = BMEM.side; fresh({}, null, sd); steps(120 * 60); r.offer = { leans: BMEM.leans, left: Math.abs(E2.leanA - Math.PI) < 1e-9 }; }
-    r.decay = memDecay({ cell: [.8, -.8, -.2, 0, 0, 0], side: .5 }, 2).cell.map(v => +v.toFixed(3));
-    fresh({ brMem: 0 }, [.8, 0, 0, 0, 0, 0], -.8); { const k = memCellAt(globalC.xc), a = BMEM.cell[k]; MOOD.happyT = t; steps(2); memTouch({ ax: globalC.xc + R }); steps(60 * 60); r.off = { same: BMEM.cell[k] === a, side: BMEM.side, leans: BMEM.leans, homeMid: Math.abs(memHomeX() - SILL.g.bx) < 1e-9 }; }
+    { const sd = BMEM.side; fresh({}, null, sd); E4.count = 99; BRAIN.s = .9; steps(120 * 60); r.offer = { leans: BMEM.leans, left: Math.abs(E2.leanA - Math.PI) < 1e-9 }; }
+    r.decay = memDecay({ cell: [.8, -.8, -.2, 0, 0], side: .5 }, 2).cell.map(v => +v.toFixed(3));
+    fresh({ brMem: 0 }, [.8, 0, 0, 0, 0], -.8); { const k = memCellAt(globalC.xc), a = BMEM.cell[k]; MOOD.happyT = t; steps(2); memTouch({ ax: globalC.xc + R }); steps(60 * 60); r.off = { same: BMEM.cell[k] === a, side: BMEM.side, leans: BMEM.leans, homeMid: Math.abs(memHomeX() - SILL.g.bx) < 1e-9 }; }
     res.T57_mem = r; log.splice(0); restoreClock(clock); E4.count = e4c; E4.lastT = e4t; BMEM.cell = BMEM0.cell; BMEM.side = BMEM0.side; BMEM.dirty = false; mat = { ...PRESETS.clay }; setup();
     res.PASS.mem = Math.abs(r.learn.happy - .1) < .01 && r.learn.scare < -.4
       && r.napFav != null && r.napFav < -.5 && r.napOff != null && Math.abs(r.napOff) < .3
-      && r.stayCtrl > .5 && r.stayAvoid < .2
+      && r.stayCtrl > .5 && r.stayAvoid < .35 && r.stayAvoid < r.stayCtrl * .5
       && r.side < -.5 && r.offer.leans >= 1 && r.offer.left
       && r.decay[0] === .8 && Math.abs(r.decay[1] + .133) < .001 && r.decay[2] === 0
       && r.off.same && r.off.side === -.8 && r.off.leans === 0 && r.off.homeMid;

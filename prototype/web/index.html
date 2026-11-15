@@ -219,7 +219,7 @@ const F=[
   ['mood','心情 v2.42','1（多米 11-14）：牠有一個幾分鐘才慢慢變的心情。被揉到呼嚕、探到東西、你照牠的節奏回牠會變好；被扯、被嚇、睡著被吵醒會變差。心情好：好奇和想動漲得快、身體挺一點、看你的時候眼睛笑、步子大、被戳會朝你傾過來搖偽足。心情差：容易怕、身體扁一點、眼睛睜大、少走動、被戳會退開縮得更大。只活在這一次打開。0 回 v2.41',0,1,1],
   ['moodHalf','心情多久退一半（秒）','沒事的時候心情慢慢回到普通偏好，這是退一半要的秒數',30,900,10],
   ['brPre','換事情前的前兆 v2.42','1：要睡之前先瞇眼、嘆一口氣，約 2 秒後才睡；要來找你之前先看你一眼。0 回 v2.41（決定了馬上做）',0,1,1],
-  ['brMem','記性 v2.43','1（多米 11-14）：牠記得窗台上哪裡被摸得舒服、哪裡被嚇過，也記得你常從哪一邊摸牠。喜歡的那格牠會回去休息、睡覺；被嚇過的那格牠繞開。熟了以後，牠沒事時會把你常摸的那邊靠過來。喜歡的留到明天，討厭的三天退完。0 回 v2.42（家固定在窗台正中間）。「牠在想什麼」開著時看得到六格',0,1,1],
+  ['brMem','記性 v2.43','1（多米 11-14）：牠記得窗台上哪裡被摸得舒服、哪裡被嚇過，也記得你常從哪一邊摸牠。喜歡的那格牠會回去休息、睡覺；被嚇過的那格牠繞開。熟了以後，牠沒事時會把你常摸的那邊靠過來。喜歡的留到明天，討厭的三天退完。0 回 v2.42（家固定在窗台正中間）。「牠在想什麼」開著時看得到五格',0,1,1],
   ['brAwakeT','醒著多久會睏（秒）','沒人碰、沒跑的情況下，睏從 0 漲到滿要幾秒；20 秒沒人碰以後漲兩倍快，夜晚背景 1.5 倍',60,900,10],
   ['brSleepT','睡多久睡飽（秒）','睏從滿退到 0 要睡幾秒；睡飽牠自己醒',20,300,5],
   ['envRoam','牠自己出門','窗台上牠自己爬出碗、爬窗框、跨出窗外的機率倍數（v2.30）；0 就一直待在原地',0,2,.1],
@@ -1330,18 +1330,18 @@ const BRon=()=>mat.life2>=.5&&mat.brain>=.5;
 const MDon=()=>BRon()&&mat.mood>=.5,BRM=()=>MDon()?BRAIN.m:0,BRMS=()=>MDon()?BRAIN.mS:0;   // v2.42 心情（關著時一律當 0）
 function brnd(){BRAIN.seed=(Math.imul(BRAIN.seed,1664525)+1013904223)>>>0;return BRAIN.seed/4294967296}
 function brainReset(){Object.assign(BRAIN,{m:.15,mS:.15,pre:null,ev:{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:t})}   // 每次打開、換一隻都從同一個起點：跟你離開多久無關
-// v2.43 記性（大腦第 3 片）。記地方：窗台從左到右六格，每格 -1（被嚇過）到 1（被摸得舒服）。記你：side -1（你常摸左邊）到 1（右邊）。
+// v2.43 記性（大腦第 3 片）。記地方：窗台從左到右五格（原本六格，家剛好落在第 3、4 格的交界，在家被嚇會記到隔壁那格；五格時家在正中間那格的中央），每格 -1（被嚇過）到 1（被摸得舒服）。記你：side -1（你常摸左邊）到 1（右邊）。
 // 喜歡的跨天留著，討厭的三天退完（存在瀏覽器 nienie.brain，跟熟一樣每 3 秒有變才寫）。擺飾的記性等擺飾變成真的物體（第 4 片）。
-const BMEM={cell:[0,0,0,0,0,0],side:0,ev:{h:-9,w:0,sc:0},dirty:false,at:-9,leans:0,ts:0};
+const BMEM={cell:[0,0,0,0,0],side:0,ev:{h:-9,w:0,sc:0},dirty:false,at:-9,leans:0,ts:0};
 const MMon=()=>BRon()&&mat.brMem>=.5&&SILL.on&&!!SILL.g;
-function memCellAt(x){const g=SILL.g;return Math.max(0,Math.min(5,Math.floor((x-g.l)/(g.r-g.l)*6)))}
-function memCellX(k){const g=SILL.g,lo=g.l+R*.9,hi=g.r-R*.9;return Math.max(lo,Math.min(hi,g.l+(g.r-g.l)*(k+.5)/6))}
+function memCellAt(x){const g=SILL.g;return Math.max(0,Math.min(4,Math.floor((x-g.l)/(g.r-g.l)*5)))}
+function memCellX(k){const g=SILL.g,lo=g.l+R*.9,hi=g.r-R*.9;return Math.max(lo,Math.min(hi,g.l+(g.r-g.l)*(k+.5)/5))}
 function memAdd(k,d){BMEM.cell[k]=Math.max(-1,Math.min(1,BMEM.cell[k]+d));BMEM.dirty=true}
-function memFav(){let b=-1,bv=.3;for(let k=0;k<6;k++)if(BMEM.cell[k]>bv){bv=BMEM.cell[k];b=k}return b}   // 最喜歡的那格（要超過 0.3 才算有）
+function memFav(){let b=-1,bv=.3;for(let k=0;k<5;k++)if(BMEM.cell[k]>bv){bv=BMEM.cell[k];b=k}return b}   // 最喜歡的那格（要超過 0.3 才算有）
 function memHomeX(){const g=SILL.g;if(!MMon())return g.bx;const k=memFav();if(k>=0)return memCellX(k);
   if(BMEM.cell[memCellAt(g.bx)]>=-.3)return g.bx;   // 沒有特別喜歡的：家在正中間的布墊
   const c=memCellAt(globalC.xc);if(BMEM.cell[c]>=-.3)return globalC.xc;   // 布墊那格被嚇過：現在待的地方不討厭就待著
-  let b=c,bd=9;for(let j=0;j<6;j++)if(BMEM.cell[j]>=-.3&&Math.abs(j-c)<bd){bd=Math.abs(j-c);b=j}return memCellX(b)}
+  let b=c,bd=9;for(let j=0;j<5;j++)if(BMEM.cell[j]>=-.3&&Math.abs(j-c)<bd){bd=Math.abs(j-c);b=j}return memCellX(b)}
 function memDecay(o,days){return{cell:o.cell.map(v=>v<0?Math.min(0,v+days/3):v),side:o.side}}   // 討厭的三天退完，喜歡的不動
 function brainMem(dt){const E=BMEM.ev;if(!MMon()||SILL.plane!=='room'){E.h=MOOD.happyT;E.w=IMP.w;E.sc=MOOD.scare;return}
   const k=memCellAt(globalC.xc);
@@ -1353,7 +1353,7 @@ function brainMem(dt){const E=BMEM.ev;if(!MMon()||SILL.plane!=='room'){E.h=MOOD.
 function memTouch(f){if(!MMon()||MOOD.strainMax>.15)return;const sx=Math.max(-1,Math.min(1,(f.ax-globalC.xc)/R));BMEM.side+=(sx-BMEM.side)*.15;BMEM.dirty=true}   // 放手時記：這次是從哪一邊摸的（扯的不算）
 function memSave(force){if(IMPSV.noSave||!BMEM.dirty)return;if(!force&&t-BMEM.at<3&&BMEM.at<=t)return;BMEM.at=t;BMEM.dirty=false;
   try{localStorage.setItem('nienie.brain',JSON.stringify({id:SLIMES[SLIME].id,cell:BMEM.cell.map(v=>+v.toFixed(3)),side:+BMEM.side.toFixed(3),ts:Date.now()}))}catch(_){}}
-function memLoad(){try{const o=JSON.parse(localStorage.getItem('nienie.brain')||'null');if(!o||!Array.isArray(o.cell)||o.cell.length!==6||o.id!==SLIMES[SLIME].id)return;
+function memLoad(){try{const o=JSON.parse(localStorage.getItem('nienie.brain')||'null');if(!o||!Array.isArray(o.cell)||o.cell.length!==5||o.id!==SLIMES[SLIME].id)return;
     const d=memDecay({cell:o.cell.map(v=>isFinite(+v)?Math.max(-1,Math.min(1,+v)):0),side:isFinite(+o.side)?Math.max(-1,Math.min(1,+o.side)):0},Math.max(0,(Date.now()-(+o.ts||0))/864e5));
     BMEM.cell=d.cell;BMEM.side=d.side}catch(_){}}
 // 想被摸、熟、而且記得你常摸哪邊：把那一邊靠過來、伸一下偽足、看你（跟「來找你」搶同一個需求，15 秒內不重複）
