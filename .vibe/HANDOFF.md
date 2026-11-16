@@ -21,6 +21,8 @@ selftest 393×852 三輪：63 項三輪全過。T62 三輪數字相同（往下�
 
 **多米 11-16 晚上說：現在先不要重跑測試。** 他看到整份回歸測試一輪一輪重跑、等了很久。在他說恢復之前：不跑三輪，整份最多跑一輪；改動小就只跑相關的那一項（切行的跑法在下面）。回報時講明白只跑了什麼。
 
+**build 131 已上傳 TestFlight**（11-16 深夜，多米開口發的）：swiftui-port 推到 `73810c7`，編譯一次就過，v2.49 的水在這版，多米還沒回報。下面寫 v2.49「Swift 沒編譯過、沒推；build 129 裡沒有這版」的地方以這行為準。
+
 **build 129 已上傳 TestFlight**（2026-11-16 晚上，多米開口發的）：swiftui-port 推到 `2625266`，雲端編譯一次就過，v2.47 和 v2.48 都在這版。多米還沒回報。下面寫「手機版沒編譯過、沒推、沒發」的地方以這行為準。
 
 **v2.49 看得出是水（11-16 晚上，多米說接著做水份）**：網頁 `jelRender` 把畫布上的背景縮成貼圖 `JEL.tBG` 給著色器折射、照厚度吸色；`drawCaustic`、`drawBubbles`。Swift：`JellySkin.setBackground`（場景換的時候把 sky、wall、props 三張烤成一張）、`JellySkin.metal` 的 `k4` 和 `BG`、`SlimeView.drawWater`（氣泡與聚光的圖層）、`SlimeRig.bubbleView`、`restsOnSill`。Swift 沒編譯過、沒推；build 129 裡沒有這版。只跑了 T61、T62，整份回歸沒跑（多米說先不要重跑）。驗收在 `標準清單.md` 最後一節。
