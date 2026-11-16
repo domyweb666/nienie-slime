@@ -46,6 +46,7 @@ final class SlimeView: UIView {
     // v2.28 果凍皮: the body as a lit jelly on Metal, under litGroup (the glitter and the eyes stay Core Animation); the blush with it
     private let jelly = JellySkin()
     private let blushLayers = [CAGradientLayer(), CAGradientLayer()]
+    private let bubbleRing = CAShapeLayer(), bubbleDot = CAShapeLayer(), causticShade = CAGradientLayer(), causticLight = CAGradientLayer()   // v2.49 water: bubbles inside it, gathered light under it
     private let glitLayers = [CAShapeLayer(), CAShapeLayer(), CAShapeLayer(), CAShapeLayer()]
     private let glitColors: [UIColor] = [UIColor(red: 1, green: 224 / 255, blue: 138 / 255, alpha: 1), .white, UIColor(red: 1, green: 195 / 255, blue: 214 / 255, alpha: 1), UIColor(red: 190 / 255, green: 240 / 255, blue: 230 / 255, alpha: 1)]
     private var itemLayers: [CALayer] = [], stuckLayers: [CALayer] = []
@@ -115,6 +116,13 @@ final class SlimeView: UIView {
         litGroup.addSublayer(highlightLayer)
         for l in [fogLayer, glowLayer, haloLayer] { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true }
         if let j = jelly { j.layer.zPosition = -0.5; j.layer.isHidden = true; layer.addSublayer(j.layer) }
+        for l in [causticShade, causticLight] { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.zPosition = -0.6; l.isHidden = true; layer.addSublayer(l) }
+        causticShade.colors = [UIColor(red: 70 / 255, green: 60 / 255, blue: 50 / 255, alpha: 0.16).cgColor, UIColor(red: 70 / 255, green: 60 / 255, blue: 50 / 255, alpha: 0).cgColor]
+        causticLight.colors = [UIColor(red: 1, green: 252 / 255, blue: 240 / 255, alpha: 0.75).cgColor, UIColor(red: 1, green: 250 / 255, blue: 235 / 255, alpha: 0.35).cgColor, UIColor(red: 1, green: 250 / 255, blue: 235 / 255, alpha: 0).cgColor]
+        causticLight.locations = [0, 0.5, 1]
+        bubbleRing.fillColor = UIColor(white: 1, alpha: 0.10).cgColor; bubbleRing.strokeColor = UIColor(white: 1, alpha: 0.62).cgColor
+        bubbleDot.fillColor = UIColor(white: 1, alpha: 0.9).cgColor; bubbleDot.strokeColor = nil
+        for l in [bubbleRing, bubbleDot] { l.zPosition = -0.4; l.isHidden = true; layer.addSublayer(l) }
         for l in blushLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; litGroup.addSublayer(l) }
         litGroup.addSublayer(fogLayer)
         for (k, l) in glitLayers.enumerated() { l.fillColor = glitColors[k].cgColor; litGroup.addSublayer(l) }
@@ -449,6 +457,7 @@ final class SlimeView: UIView {
             for l in all { l.isHidden = true }
             skyLayer.isHidden = false
             for l in speckLayers { l.isHidden = false }
+            jelly?.setBackground(key: "none", images: [])   // v2.49: no room behind it, so no water skin (the v2.48 one)
             return
         }
         let p = rig.params, decoLv = Int(p.deco.rounded())
@@ -461,6 +470,7 @@ final class SlimeView: UIView {
             }
             sceneKey = key
             skyImgLayer.contents = imgs.sky.cgImage; wallLayer.contents = imgs.wall.cgImage; propsLayer.contents = imgs.props.cgImage
+            jelly?.setBackground(key: key, images: [imgs.sky.cgImage, imgs.wall.cgImage, imgs.props.cgImage].compactMap { $0 })   // v2.49: the room behind it, for the water skin to bend
             bowlFrontLayer.contents = imgs.bowlFront.cgImage
             bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
             for (l, im, x, w0) in [(bellLayer, imgs.bell, g.jr - 46 * g.U, 50.0), (teruLayer, imgs.teru, g.gx + 46 * g.U, 54.0)] {
@@ -511,6 +521,31 @@ final class SlimeView: UIView {
     }
 
     private var jellyOn: Bool { jelly != nil && rig.params.skin >= 0.5 }
+    /// v2.49 看得出是水: the bubbles inside it and the gathered light under it (web: drawBubbles, drawCaustic). Core Animation layers, no implicit animation (the caller's transaction turns it off).
+    private func drawWater(body: CGPath, z: Double) {
+        let p = rig.params, on = p.water > 0 && p.wet >= 0.5
+        let bubs = on ? rig.bubbleView : []
+        if bubs.isEmpty { bubbleRing.isHidden = true; bubbleDot.isHidden = true } else {
+            let ring = CGMutablePath(), dot = CGMutablePath()
+            var lw = 0.6
+            for b in bubs {
+                let c = rig.toScreen(b.x, b.y), r = b.r * z
+                ring.addEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2))
+                let dr = r * 0.2
+                dot.addEllipse(in: CGRect(x: c.x - r * 0.38 - dr, y: c.y - r * 0.38 - dr, width: dr * 2, height: dr * 2))
+                lw = max(lw, r * 0.22)
+            }
+            bubbleRing.path = ring; bubbleRing.lineWidth = lw; bubbleDot.path = dot
+            bubbleRing.isHidden = false; bubbleDot.isHidden = false
+        }
+        let box = body.boundingBoxOfPath
+        if on && p.caustic > 0 && rig.restsOnSill && !box.isNull && box.width > 1 {
+            let w = Double(box.width) * 0.5, cx = Double(box.midX), by = Double(box.maxY), R = rig.R * z, k = Float(min(1.5, p.caustic))
+            causticShade.bounds = CGRect(x: 0, y: 0, width: w * 2.1, height: R * 0.17); causticShade.position = CGPoint(x: cx, y: by - R * 0.015); causticShade.opacity = min(1, k)
+            causticLight.bounds = CGRect(x: 0, y: 0, width: w * 1.24, height: R * 0.10); causticLight.position = CGPoint(x: cx + w * 0.22, y: by - R * 0.01); causticLight.opacity = min(1, k)
+            causticShade.isHidden = false; causticLight.isHidden = false
+        } else { causticShade.isHidden = true; causticLight.isHidden = true }
+    }
     /// v2.28 果凍皮: the Metal skin instead of the flat fill, outline, highlight, dents and trail (those stay for the flat control); the blush under the eyes.
     private func drawJelly(body: CGPath, z: Double) {
         let on = jellyOn
@@ -520,6 +555,7 @@ final class SlimeView: UIView {
         guard on, let j = jelly else {
             jelly?.layer.isHidden = true
             for l in blushLayers { l.isHidden = true }
+            for l in [bubbleRing, bubbleDot, causticShade, causticLight] as [CALayer] { l.isHidden = true }
             return
         }
         j.layer.isHidden = false
@@ -533,7 +569,9 @@ final class SlimeView: UIView {
         }
         let hz = rig.haze
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
-                 skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: rig.params.wet >= 0.5), round: rig.params.round)
+                 skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: rig.params.wet >= 0.5), round: rig.params.round,
+                 water: rig.params.water, refr: rig.params.refr, absorb: rig.params.absorb)
+        drawWater(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
         if let e = rig.eyeView {
             let S = e.size * z, l = rig.toScreen(e.lx, e.ly), r = rig.toScreen(e.rx, e.ry), a = atan2(r.y - l.y, r.x - l.x)

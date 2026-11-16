@@ -267,6 +267,12 @@ struct FeelParams: Equatable, Codable {
     var round: Double = 1.3           // the jelly skin's outline is cut from the blurred mask: sharp corners become round heads, concave corners join like water; the number scales the corner size (1 is about 0.07R). 0 = the particle outline (v2.46)
     var glit: Double = 0              // 0: no glitter drawn inside it and no haze when handled (多米 11-16: 粉末去掉); a shake still bounces it and slows its breath. 1 = v2.46
     var wet: Double = 1               // 1: the wet skin (clearer, a larger sharper highlight, a second small one, a rim of light). 0 = skin A (v2.46)
+    // v2.49 看得出是水 (多米 11-16: it should read as made of water, 95% water). Needs wet 1 and a room behind it.
+    var water: Double = 1             // 1: what is behind it shows through its body, bent; thin places almost colourless, the thick part takes its colour. 0 = the v2.48 skin
+    var refr: Double = 0.3            // how far the background seen through it shifts (in radii); most at the edge
+    var absorb: Double = 0.68         // 0 the whole of it like clear water; 1 a strong colour in the middle
+    var caustic: Double = 1           // sitting, a patch of gathered light under it and a faint ring of shade; 0 off
+    var bubbles: Double = 6           // small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -644,6 +650,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.envRoam, name: "牠自己出門", hint: "窗台上牠自己爬出碗、在窗台上走、爬回碗的機率倍數（v2.30）；0 就一直待在原地", range: 0...2, step: 0.1, section: "活物感"),
         TuneField(key: \.round, name: "外框圓角 v2.47", hint: "果凍皮的外框用模糊過的遮罩切：尖角變圓頭、凹進去的地方像水一樣連起來。數字是圓角大小的倍數（1 約 0.07 個半徑）；0 關（v2.46，照粒子外框畫）", range: 0...2.5, step: 0.1, section: "外形"),
         TuneField(key: \.glit, name: "肚子裡的亮粉 v2.47", hint: "0（多米 11-16：身體裡的粉末去掉）：不畫亮粉，摸牠也不會變霧；搖手機牠照樣彈、照樣慢呼吸。1 回 v2.46", range: 0...1, step: 1, section: "外形"),
+        TuneField(key: \.water, name: "看得出是水 v2.49", hint: "（多米 11-16：要看得出來是由水份組成的）1：身體後面的窗框、窗台透過牠看得到而且被彎曲，薄的地方幾乎沒顏色；0 回 v2.48 的皮。要「水潤」開著才有", range: 0...1, step: 0.1),
+        TuneField(key: \.refr, name: "水把後面的東西彎多少 v2.49", hint: "透過身體看到的背景偏移多少（×半徑），邊緣彎最多", range: 0...0.6, step: 0.02),
+        TuneField(key: \.absorb, name: "厚的地方多有顏色 v2.49", hint: "0 整隻像清水；1 中間很濃", range: 0...1, step: 0.05),
+        TuneField(key: \.caustic, name: "底下的聚光 v2.49", hint: "坐著時底下一塊聚起來的亮光和一圈淡影；0 關", range: 0...1.5, step: 0.1),
+        TuneField(key: \.bubbles, name: "身體裡的氣泡幾顆 v2.49", hint: "黏在身體裡、跟著被擠開；0 沒有", range: 0...12, step: 1),
         TuneField(key: \.wet, name: "水潤 v2.47", hint: "1（多米 11-16：要很有水份的感覺）：更透、亮點更大更銳、多一顆小亮點、邊緣一圈反光；0 回 v2.46 的皮", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.skin, name: "皮", hint: "1 果凍 A 清透（多米 11-07 定）：看得到肚子裡的亮粉在沉；亮粉揚起來時往奶凍混。0 平塗（舊畫法，沒有 Metal 的手機也用這個）", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.scene, name: "背景", hint: "0 藍：懸空（舊行為一條都不變）；1 白天、2 夜晚：窗台上有重力，牠坐在正中間的碗裡，石頭盤和盆栽只是圖（v2.28 窗台，v2.31 碗回中間）", range: 0...2, step: 1, section: "外形"),

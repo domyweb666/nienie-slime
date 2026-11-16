@@ -3827,6 +3827,33 @@ final class SlimeRig {
         snwGlow *= exp(-dt / 2.2)
     }
     /// v2.31: how clouded and how aglow it is, for the jelly skin's colour (0 when the shake is off)
+    /// v2.49 the small bubbles inside it: a few interior particles picked by index alone (no random draw), each bobbing slowly. Screen-space is the view's job. Web `drawBubbles`.
+    private var bubN = 0, bubNb = 0, bubList: [(i: Int, r: Double, ph: Double)] = []
+    var bubbleView: [(x: Double, y: Double, r: Double)] {
+        let nb = Int(params.bubbles.rounded())
+        guard params.water > 0, params.wet >= 0.5, nb > 0, N > 0, BIDX.count == N, TID.count == N else { return [] }
+        if bubN != N || bubNb != nb {
+            bubN = N; bubNb = nb; bubList = []
+            var cand: [Int] = []
+            for i in 0..<N where BIDX[i] < 0 && TID[i] < 0 && hypot(Q0X[i], Q0Y[i]) < R * 0.72 { cand.append(i) }
+            var k = 0
+            while k < nb && !cand.isEmpty {
+                let j = (k * 2654435761 + 97) % cand.count
+                let pick = cand.remove(at: j)
+                bubList.append((i: pick, r: 0.022 + 0.03 * Double((k * 37) % 11) / 10, ph: Double(k) * 1.9))
+                k += 1
+            }
+        }
+        var out: [(x: Double, y: Double, r: Double)] = []
+        for b in bubList where b.i < N {
+            let bx: Double = X[b.i] + sin(t * 0.5 + b.ph) * R * 0.012, by: Double = Y[b.i] + sin(t * 0.8 + b.ph * 1.7) * R * 0.02
+            out.append((x: bx, y: by, r: R * b.r))
+        }
+        return out
+    }
+    /// v2.49: it is resting on the sill or in the bowl (something under it for the gathered light to fall on)
+    var restsOnSill: Bool { sillOn && sillC > 0 }
+
     var haze: (cloud: Double, glow: Double) { params.shake >= 0.5 && params.glit >= 0.5 ? (snwCloud, snwGlow) : (0, 0) }   // v2.47 glit 0: no glitter, so no haze either
     /// What the view draws inside the body: the haze, every bit between its place in the pile (clear) and where it hangs (cloudy), the glow. World points.
     var glitterView: GlitterView? {

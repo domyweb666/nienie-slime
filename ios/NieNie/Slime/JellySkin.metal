@@ -38,6 +38,7 @@ struct LightU {
     float4 k1;           // glow, line, nk, shin
     float4 k2;           // s0, s1, spec, sheen
     float4 k3;           // arc, rnd (v2.47: threshold on the small blur for the outline, 0 = the mask), wet (v2.47)
+    float4 k4;           // v2.49: water (0 = the v2.48 skin), refr (how far the background bends, in radii), absorb (how much the thick part takes its colour)
 };
 
 static float H1(float2 uv, texture2d<float> B1, sampler sm, constant LightU& u) {
@@ -51,7 +52,7 @@ static float H1(float2 uv, texture2d<float> B1, sampler sm, constant LightU& u) 
     return h;
 }
 
-fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]], texture2d<float> B1 [[texture(1)]], texture2d<float> B2 [[texture(2)]],
+fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]], texture2d<float> B1 [[texture(1)]], texture2d<float> B2 [[texture(2)]], texture2d<float> BG [[texture(3)]],
                          sampler sm [[sampler(0)]], constant LightU& u [[buffer(0)]]) {
     float2 v = in.uv, res = u.resRpxN.xy;
     float rpx = u.resRpxN.z;
@@ -76,6 +77,18 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     col += u.cGlow.rgb * smoothstep(0.0, 0.7, tr) * (0.25 + 0.75 * fres) * glow;
     float a = mix(aEdge, aCore, thick);
     float4 c = float4(col * a, a);
+    // v2.49 看得出是水 (多米 11-16: it should read as made of water, 95% water): what is behind it shows through, bent (most at the edge, like looking
+    // through a drop); thin places are almost colourless, only the thick part takes its colour; a band of light gathers inside the far edge; the rim reflects the sky
+    float water = u.k4.x;
+    if (water > 0.0) {
+        float2 ro = float2(-n.x, n.y) * rpx * u.k4.y / res * (0.3 + 0.7 * thick);   // n's y runs up, the texture's down
+        float3 bg = BG.sample(sm, v + ro).rgb;
+        float3 T = mix(float3(1.0), u.cCore.rgb, clamp(thick * u.k4.z + 0.05, 0.0, 1.0));
+        float3 w = bg * T + u.cGlow.rgb * smoothstep(0.15, 0.8, tr) * (0.2 + 0.8 * fres) * glow * 0.5;
+        w *= 1.0 - 0.16 * smoothstep(0.2, 0.55, fres) * (1.0 - smoothstep(0.55, 0.9, fres));
+        w = mix(w, float3(0.95, 0.98, 1.0), fres * 0.3);
+        c = mix(c, float4(w, 1.0), water);
+    }
     c = mix(c, float4(u.cLine.rgb, 1.0), (1.0 - smoothstep(0.5, 0.66, b1)) * line);
     float nh = max(dot(n, Hv), 0.0);
     c.rgb += float3(pow(nh, shin * 0.22) * sheen * (1.0 - thick * 0.4)) * c.a;
@@ -84,7 +97,7 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     if (wet > 0.0) {
         float3 H2 = normalize(normalize(float3(-0.26, 0.46, 0.9)) + float3(0.0, 0.0, 1.0));
         c = mix(c, float4(1.0), smoothstep(0.5, 0.8, pow(max(dot(n, H2), 0.0), shin * 2.2)) * 0.75 * wet);
-        c.rgb += float3(fres * 0.30 * wet) * c.a;
+        c.rgb += float3(fres * 0.30 * wet * (1.0 - 0.6 * water)) * c.a;
     }
     // the bright arc: along the contour just inside the outline, only the part facing the light; it follows a pull or a squash, thin places lose it
     float2 g2 = float2(B1.sample(sm, v + float2(e.x, 0.0)).r - B1.sample(sm, v - float2(e.x, 0.0)).r,
