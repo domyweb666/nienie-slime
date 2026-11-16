@@ -72,6 +72,8 @@ final class SlimeRig {
     private(set) var bnd: [Int] = []     // boundary particle indices, in ring order
     private var bndL: [Double] = []      // rest distance between ring neighbours
     private var bndL2: [Double] = []     // rest distance between ring particles two apart (no folding back)
+    /// v2.48: each edge's rest length; what the hard limits pushed the held particles back by this substep (the finger gives way by it); who a wall or the sill stopped; the remembered shape's longest edge (times rest)
+    private var EDL: [Double] = [], SLX: [Double] = [], SLY: [Double] = [], HIT: [Bool] = [], QSTR = 1.0
     private var EDG: [Int] = [], EDEG: [Double] = [], EDSX: [Double] = [], EDSY: [Double] = []   // v2.47: the mesh's edges (two indices an edge, each once), how many meet at each particle, scratch for memSmoothStep
     private var TRI: [Int] = [], TRA: [Double] = []   // v2.29 防打結: the rest shape's triangle mesh (3 indices a triangle) and each rest area
     // v2.28 窗台 (多米 11-06): gravity, a sill to stand on, a bowl in the middle to sit in; v2.31 the bowl centred, the props pictures only.
@@ -573,6 +575,7 @@ final class SlimeRig {
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
         enum Mode { case grab, push, none, stroke }   // v2.26 F6 stroke: sliding over it, nothing pinned
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
+        var slx = 0.0, sly = 0.0, slLX = Double.nan, slLY = Double.nan   // v2.48 手指讓: how far the effective position has given way to the limits, and last frame's x, y (moving back takes it up again)
         var tgx = 0.0, tgy = 0.0, lagK = 1.0         // v2.38: this frame's target for (fx, fy) and the chase rate; chased after pairStep
         var rawX, rawY, lastRawX, lastRawY: Double   // real finger position (never a prediction)
         var predX = 0.0, predY = 0.0, hasPrediction = false, movedThisFrame = false
@@ -929,6 +932,60 @@ final class SlimeRig {
             k += 3
         }
         EDG = ed; EDEG = deg; EDSX = [Double](repeating: 0, count: n); EDSY = [Double](repeating: 0, count: n)
+        var el: [Double] = []
+        el.reserveCapacity(ed.count / 2)
+        var e = 0
+        while e + 1 < ed.count { el.append(hypot(Q0X[ed[e]] - Q0X[ed[e + 1]], Q0Y[ed[e]] - Q0Y[ed[e + 1]])); e += 2 }
+        EDL = el; SLX = [Double](repeating: 0, count: n); SLY = [Double](repeating: 0, count: n); HIT = [Bool](repeating: false, count: n); QSTR = 1
+    }
+
+    /// v2.48 every bit of the body has hard limits (多米 11-16: pulled about it often "breaks", past some range it twitches, knots, turns into irregular spikes;
+    /// fix it at the source). Each mesh edge may be at most `hi` and at least `lo` times its rest length. The pull used to pile onto the few particles by the
+    /// finger (measured: edges at 12 to 35 times rest, their neighbours at 1): those few are the spike, the whisker, the flipped triangles. With a limit, once
+    /// the ones by the finger are full the next ones stretch, the whole strand lengthens evenly, and past that the whole body is dragged along.
+    /// `live`: the live body (X, Y): held particles move less on a stretch (capGrabW) and fully on a squeeze (capPushW), a particle a wall stopped last substep
+    /// hardly moves on a squeeze, corrections carry no velocity (capVel), squeeze corrections on held particles are summed for the finger to give way by,
+    /// and a wall sucker pulled past the limit lets go. Port of the web's `strainStep`. Returns whether anything was over.
+    private func strainStep(_ AX: inout [Double], _ AY: inout [Double], _ lo: Double, _ hi: Double, _ live: Bool, _ mat: FeelParams) -> Bool {
+        let m = EDG.count
+        guard m > 0, EDL.count * 2 == m, SLX.count == N, HIT.count == N else { return false }
+        let gw: Double = mat.capGrabW, gp: Double = mat.capPushW, kv: Double = 1 - mat.capVel
+        let pins: Bool = live && clingOn && clingAX.count == N
+        var any = false
+        var e = 0, k = 0
+        while e + 1 < m {
+            let i = EDG[e], j = EDG[e + 1]
+            let dx: Double = AX[j] - AX[i], dy: Double = AY[j] - AY[i]
+            let d: Double = (dx * dx + dy * dy).squareRoot(), r: Double = EDL[k]
+            e += 2; k += 1
+            let tg: Double = d > r * hi ? r * hi : (d < r * lo ? r * lo : 0)
+            if tg == 0 || d < 1e-9 { continue }
+            any = true
+            var pi = false, pj = false
+            if pins {
+                pi = !clingAX[i].isNaN; pj = !clingAX[j].isNaN
+                // the suckers give way too: both ends pinned and still over, or a pinned end pulled to 1.3 times the limit, and that sucker lets go
+                if (pi && pj) || ((pi || pj) && d > r * hi * 1.3) { clingFree(pi ? i : j) }
+            }
+            let sq: Bool = d < tg
+            let gi: Bool = live && GRAB[i], gj: Bool = live && GRAB[j]
+            var wi: Double = gi ? (sq ? gp : gw) : (pi ? gw : 1)
+            var wj: Double = gj ? (sq ? gp : gw) : (pj ? gw : 1)
+            if sq && live { if HIT[i] { wi *= 0.05 }; if HIT[j] { wj *= 0.05 } }
+            let ws: Double = wi + wj
+            if ws < 1e-9 { continue }
+            let q: Double = (d - tg) / d / ws
+            let ix: Double = dx * q * wi, iy: Double = dy * q * wi, jx: Double = -dx * q * wj, jy: Double = -dy * q * wj
+            AX[i] += ix; AY[i] += iy; AX[j] += jx; AY[j] += jy
+            if live {
+                if kv > 0 { PX[i] += ix * kv; PY[i] += iy * kv; PX[j] += jx * kv; PY[j] += jy * kv }   // the last position moves along: the correction leaves no velocity
+                if sq {
+                    if gi { SLX[i] += ix; SLY[i] += iy }
+                    if gj { SLX[j] += jx; SLY[j] += jy }
+                }
+            }
+        }
+        return any
     }
 
     /// v2.47 the remembered shape smooths its own spikes (like surface tension). Memory is per particle: the few under the finger are pulled much farther than
@@ -976,9 +1033,15 @@ final class SlimeRig {
         }
         return n
     }
-    private func meshGuard(_ AX: inout [Double], _ AY: inout [Double], _ kp: Double, _ grab: [Bool]?) {
+    @discardableResult
+    private func meshGuard(_ AX: inout [Double], _ AY: inout [Double], _ kp: Double, _ grab: [Bool]?, _ limits: FeelParams? = nil) -> Bool {
         let cap = h * 0.4
         let m = TRI.count
+        // v2.48 (`limits`, the live body with stretchCap on): held particles give way fully (capPushW), a particle a wall stopped hardly moves,
+        // the correction leaves no velocity, and what the held ones were pushed by is summed for the finger to give way by
+        let cp: Bool = limits != nil && SLX.count == N && HIT.count == N
+        let gq: Double = cp ? (limits?.capPushW ?? 1) : 0.25, kv: Double = cp ? 1 - (limits?.capVel ?? 0) : 0
+        var any = false
         var t = 0
         while t + 2 < m {
             let a = TRI[t], b = TRI[t + 1], c = TRI[t + 2]
@@ -989,7 +1052,10 @@ final class SlimeRig {
                 let gax = 0.5 * (by - cy), gay = 0.5 * (cx - bx)
                 let gbx = 0.5 * (cy - ay), gby = 0.5 * (ax - cx)
                 let gcx = 0.5 * (ay - by), gcy = 0.5 * (bx - ax)
-                let wa: Double = (grab?[a] ?? false) ? 0.25 : 1, wb: Double = (grab?[b] ?? false) ? 0.25 : 1, wc: Double = (grab?[c] ?? false) ? 0.25 : 1
+                any = true
+                let ha: Bool = grab?[a] ?? false, hb: Bool = grab?[b] ?? false, hc: Bool = grab?[c] ?? false
+                var wa: Double = ha ? gq : 1, wb: Double = hb ? gq : 1, wc: Double = hc ? gq : 1
+                if cp { if HIT[a] { wa *= 0.05 }; if HIT[b] { wb *= 0.05 }; if HIT[c] { wc *= 0.05 } }
                 let ga = gax * gax + gay * gay, gb = gbx * gbx + gby * gby, gc = gcx * gcx + gcy * gcy
                 let den: Double = wa * ga + wb * gb + wc * gc
                 if den >= 1e-9 {
@@ -999,10 +1065,18 @@ final class SlimeRig {
                     AX[a] += lam * wa * gax; AY[a] += lam * wa * gay
                     AX[b] += lam * wb * gbx; AY[b] += lam * wb * gby
                     AX[c] += lam * wc * gcx; AY[c] += lam * wc * gcy
+                    if cp {
+                        let ax1: Double = lam * wa * gax, ay1: Double = lam * wa * gay, bx1: Double = lam * wb * gbx, by1: Double = lam * wb * gby, cx1: Double = lam * wc * gcx, cy1: Double = lam * wc * gcy
+                        if kv > 0 { PX[a] += ax1 * kv; PY[a] += ay1 * kv; PX[b] += bx1 * kv; PY[b] += by1 * kv; PX[c] += cx1 * kv; PY[c] += cy1 * kv }
+                        if ha { SLX[a] += ax1; SLY[a] += ay1 }
+                        if hb { SLX[b] += bx1; SLY[b] += by1 }
+                        if hc { SLX[c] += cx1; SLY[c] += cy1 }
+                    }
                 }
             }
             t += 3
         }
+        return any
     }
 
     private func buildClusters() {
@@ -1887,7 +1961,20 @@ final class SlimeRig {
             }
             // the finger keeps 0.35R off the walls: a held patch pressed flat against a wall crossed on release (4 of 6 trials)
             let mw = R * 0.35, wl = worldWalls   // the walls are in world points (the farthest view's edge)
-            let tx = max(wl.l + mw, min(wl.r - mw, f.ax + ox + ex)), ty = max(wl.t + mw, min(wl.b - mw, f.ay + oy + ey))
+            let tx = max(wl.l + mw, min(wl.r - mw, f.ax + ox + ex + f.slx)), ty = max(wl.t + mw, min(wl.b - mw, f.ay + oy + ey + f.sly))   // v2.48: plus how far it has given way
+            // v2.48: the finger moving back the way it gave takes that much up again; the rest fades over 2 s
+            if f.slx != 0 || f.sly != 0 {
+                let l: Double = hypot(f.slx, f.sly)
+                if l < 0.01 {
+                    f.slx = 0; f.sly = 0
+                } else if !f.slLX.isNaN {
+                    let ux: Double = f.slx / l, uy: Double = f.sly / l
+                    let back: Double = max(0, (f.x - f.slLX) * ux + (f.y - f.slLY) * uy)
+                    let nl: Double = max(0, l - back) * exp(-dt / 2)
+                    f.slx = ux * nl; f.sly = uy * nl
+                }
+            }
+            f.slLX = f.x; f.slLY = f.y
             f.tgx = tx; f.tgy = ty; f.lagK = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1   // v2.38: the target first; chased after the two-finger limit (pairStep)
             if f.mode == .grab {
                 let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
@@ -2104,7 +2191,7 @@ final class SlimeRig {
             if mat.emo >= 0.5 && !clusters.isEmpty {
                 let ga = atan2(clusters[gi].sn, clusters[gi].cs), rm = reduceMotion ? 0.5 : 1.0
                 // wanting away: two pseudopods on the far side reach out (bending to and fro, clawing), with the strain
-                if strain > 0.02 {
+                if strain > 0.02 && mat.struggle >= 0.5 {   // v2.48 struggle 0: no clawing pods while pulled
                     let aw = atan2(-pullDY, -pullDX) - ga
                     for sd in [-1.0, 1.0] {
                         podE.append((cos(aw + sd * 0.5), sin(aw + sd * 0.5), R * 0.42 * strain * rm, 0.22, sd * 0.5 * sin(t * 7 + sd)))
@@ -2285,6 +2372,7 @@ final class SlimeRig {
         }
         // 2 fingers (GWT: how much each particle is held this substep, for grabHold in shape matching)
         for i in 0..<N { GWT[i] = 0 }
+        if SLX.count == N { for i in 0..<N { SLX[i] = 0; SLY[i] = 0 } }
         for f in fingers.values {
             if f.mode == .grab {
                 // the patch follows the finger and, while pressed, spreads away from it (squashes flat)
@@ -2325,7 +2413,7 @@ final class SlimeRig {
         if mat.emo >= 0.5 {
             let cp = max(0, moodC), hp = t >= happyT ? max(0, 1 - (t - happyT) / 2) : 0, cw = t < cowerUntil ? 1 : max(0, 1 - (t - cowerUntil) / 0.6)
             posX = (1 + 0.05 * cp) * (1 - 0.04 * hp) * (1 - 0.06 * cw); posY = (1 - 0.06 * cp) * (1 + 0.07 * hp) * (1 - 0.06 * cw)
-            trm = R * 0.016 * min(1, moodStrain + moodScare) * (reduceMotion ? 0.5 : 1)
+            trm = R * 0.016 * min(1, moodStrain + moodScare) * (reduceMotion ? 0.5 : 1) * mat.tremble   // v2.48 tremble 0: no shiver when pulled or poked (it read as broken)
         }
         if shkT0 > 0 && t >= shkT0 && t < shkT0 + 0.6 { trm += R * 0.025 * shkAmp * exp(-(t - shkT0) / 0.2) * (reduceMotion ? 0.5 : 1) }   // v2.19 shaking off: the outline trembles too
         if iv3(mat.e3) { posX *= 1 - 0.02 * impShownTrust + 0.04 * impShownWary; posY *= 1 + 0.05 * impShownTrust - 0.06 * impShownWary }   // v2.22 E3: trusting rounder, taller; wary flatter
@@ -2376,11 +2464,15 @@ final class SlimeRig {
                 QDX[i] += QVX[i] * dt; QDY[i] += QVY[i] * dt
             }
         }
+        // v2.48: the pseudopods fade as the remembered shape is stretched (longest edge 1.25 to 1.85 times rest). They are worked out for a round blob; on top of a
+        // stretched shape that part was stretched 2.5 times again (measured: memory 2.4 times, the reference shape 5.5, a spike toward where the finger left)
+        let podU: Double = max(0, min(1, (QSTR - 1.25) / 0.6))
+        let podK: Double = mat.stretchCap > 0 ? 1 - podU * podU * (3 - 2 * podU) : 1
         for i in 0..<N {
             var ex: Double = inertiaOn ? QDX[i] : QX[i], ey: Double = inertiaOn ? QDY[i] : QY[i]
             // pseudopods: a Gaussian along direction a pushes the outer ring out (the inside less, by (r/Rb)², so the whole
             // field is a smooth map), minus podShift all round so the area stays; bend swings the outer part sideways
-            if !podE.isEmpty {
+            if !podE.isEmpty && podK > 0 {
                 let r = hypot(ex, ey)
                 if r > 1e-6 {
                     let c1 = ex / r, s1 = ey / r, rn = min(1.6, (r / Rb) * (r / Rb))
@@ -2390,6 +2482,7 @@ final class SlimeRig {
                         dr += q.amp * g * rn; dtn += q.bend * q.amp * g * rn * rn
                     }
                     dr -= podShift * rn
+                    dr *= podK; dtn *= podK
                     ex += c1 * dr - s1 * dtn; ey += s1 * dr + c1 * dtn
                 }
             }
@@ -2548,7 +2641,14 @@ final class SlimeRig {
         //    so a tentacle pushed root-to-tip could fold over itself; the rungs keep each edge on its own side and the
         //    axis links keep advancing (the fold was the axis turning 180° within one link)
         if mat.tentRung > 0 { tentacleRungs(mat) }
-        if mat.noFlip > 0 { meshGuard(&X, &Y, mat.noFlip, GRAB) }   // v2.29 防打結: before the walls, so the collisions have the last word and it does not sink into the floor
+        if mat.stretchCap > 0 && !EDG.isEmpty {   // v2.48: the hard limits, a few rounds together with the no-flip guard
+            let rounds = max(1, Int(mat.capIter))
+            for _ in 0..<rounds {
+                let a: Bool = strainStep(&X, &Y, mat.capLo, mat.stretchCap, true, mat)
+                let b: Bool = mat.noFlip > 0 ? meshGuard(&X, &Y, mat.noFlip, GRAB, mat) : false
+                if !a && !b { break }
+            }
+        } else if mat.noFlip > 0 { meshGuard(&X, &Y, mat.noFlip, GRAB) }   // v2.29 防打結: before the walls, so the collisions have the last word and it does not sink into the floor
         // 4 home (float), bounds
         let hx = homeX + tugX + dragOX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY + tugY + dragOY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
@@ -2561,8 +2661,10 @@ final class SlimeRig {
         let hcp: Double = mat.homeCap > 0 ? mat.homeCap * h / max(mat.homeCap * h, hypot(dx0, dy0) * kh) : 1   // v2.29 homeCap: dragged along, the whole body moves at most half a spacing a substep, so the ring beside the finger is not sheared open
         let dx = dx0 * hcp, dy = dy0 * hcp
         let wl = worldWalls, padT = wl.t, padB = wl.b, padL = wl.l, padR = wl.r   // walls: the edge of the farthest view (world)
+        let slipOn: Bool = mat.stretchCap > 0 && mat.capSlip > 0 && SLX.count == N && HIT.count == N
         for i in 0..<N {
             if !GRAB[i] { if hxOn { X[i] += dx * kh }; if hyOn { Y[i] += dy * kh } }   // hopping in, up and down is gravity and the floor's
+            let bx0: Double = X[i], by0: Double = Y[i]
             if sillOn, let g = sillG { sillHit(i, g) }   // v2.28 窗台: the bowl and the sill
             if introOn && Y[i] > introFloor { Y[i] = introFloor; PX[i] += (X[i] - PX[i]) * 0.45 }   // intro floor: it really lands, squashes, wobbles
             if flatOn && Y[i] > flatFloor { Y[i] = flatFloor; PY[i] = Y[i] }   // the invisible table: no sinking, no bounce, free to slide
@@ -2579,8 +2681,29 @@ final class SlimeRig {
                 if X[i] < padL { X[i] = padL }
                 if X[i] > padR { X[i] = padR }
             }
+            if HIT.count == N {   // v2.48: what the sill, the floor and the walls pushed a held particle back by counts too; who they stopped is not pushed into them next substep
+                let mx: Double = X[i] - bx0, my: Double = Y[i] - by0
+                if slipOn && GRAB[i] { SLX[i] += mx; SLY[i] += my }
+                HIT[i] = abs(mx) + abs(my) > 1e-4
+            }
         }
-        if mat.ringGuard > 0 { ringGuard(); ringUnkink() }   // no boundary through boundary, little knots straightened; after the walls
+        if mat.ringGuard > 0 { ringGuard(mat.stretchCap > 0 ? 1 - mat.capVel : 0); ringUnkink() }   // no boundary through boundary, little knots straightened; after the walls
+        // v2.48 手指讓: however far the limits (cannot squeeze further, cannot flip, the sill, the walls) pushed the held patch back, the finger's effective
+        // position gives way by capSlip times that. The patch used to follow the finger at 95%: dragged into the body or onto the sill, the limits pushed it
+        // back every substep and the finger pulled it in again (measured: the top pulled down 2R, 18 points of jump a frame and 59 triangles flipped; 0.9 and 1 with this)
+        if slipOn {
+            for f in fingers.values where f.mode == .grab && !f.mem.isEmpty {
+                var sx = 0.0, sy = 0.0, sw = 0.0
+                for m in f.mem { sx += SLX[m.i] * m.w; sy += SLY[m.i] * m.w; sw += m.w }
+                if sw > 0 {
+                    let gx: Double = sx / sw * mat.capSlip, gy: Double = sy / sw * mat.capSlip
+                    f.slx += gx; f.sly += gy
+                    let l: Double = hypot(f.slx, f.sly), top: Double = R * 2
+                    if l > top { f.slx *= top / l; f.sly *= top / l }
+                    f.fx += gx; f.fy += gy
+                }
+            }
+        }
     }
 
     private func rotateFree(by ang: Double, around cx: Double, _ cy: Double) {
@@ -2810,6 +2933,19 @@ final class SlimeRig {
         if mat.tentMem > 0 { restFix(mat) }
         tentRest(dt, mat)
         if mat.memSmooth > 0 { memSmoothStep(dt, mat.memSmooth) }   // v2.47
+        if mat.memCap > 0 && !EDG.isEmpty {   // v2.48: the remembered shape keeps to its own limits
+            for _ in 0..<3 { if !strainStep(&QX, &QY, mat.capLo, mat.memCap, false, mat) { break } }
+        }
+        if EDL.count * 2 == EDG.count {   // the remembered shape's longest edge, times rest (the pseudopods fade by it)
+            var mq = 1.0, e = 0, k = 0
+            while e + 1 < EDG.count {
+                let i = EDG[e], j = EDG[e + 1], ddx: Double = QX[i] - QX[j], ddy: Double = QY[i] - QY[j]
+                let l: Double = (ddx * ddx + ddy * ddy) / (EDL[k] * EDL[k])
+                if l > mq { mq = l }
+                e += 2; k += 1
+            }
+            QSTR = mq.squareRoot()
+        }
         if mat.noFlip > 0 { meshGuard(&QX, &QY, max(mat.noFlip, 0.3), nil) }   // v2.29: the remembered shape may not flip either (measured: 102 triangles flipped after rough pulling, and it never came undone)
         var mx = 0.0, my = 0.0
         for i in 0..<N { mx += QX[i]; my += QY[i] }
@@ -3027,7 +3163,7 @@ final class SlimeRig {
         }
     }
 
-    private func ringGuard() {
+    private func ringGuard(_ rkv: Double = 0) {
         let nb = bnd.count, dm = h * 0.45, far = dm * 4
         for k in 0..<nb {
             let p = bnd[k], xp = X[p], yp = Y[p]
@@ -3053,9 +3189,15 @@ final class SlimeRig {
                 if Self.segX(X[pm], Y[pm], xp, yp, xa, ya, xb, yb) || Self.segX(xp, yp, X[pn], Y[pn], xa, ya, xb, yb) { continue }
                 let nx = -ey / l * side, ny = ex / l * side, push = dm - cur
                 let wp = GRAB[p] ? 0.3 : 1.0, wa = GRAB[a] ? 0.3 : 1.0, wb = GRAB[b] ? 0.3 : 1.0, ws = wp + wa * (1 - u) + wb * u
-                X[p] += nx * push * wp / ws; Y[p] += ny * push * wp / ws
-                X[a] -= nx * push * wa * (1 - u) / ws; Y[a] -= ny * push * wa * (1 - u) / ws
-                X[b] -= nx * push * wb * u / ws; Y[b] -= ny * push * wb * u / ws
+                let mp: Double = push * wp / ws, ma: Double = push * wa * (1 - u) / ws, mb: Double = push * wb * u / ws
+                X[p] += nx * mp; Y[p] += ny * mp
+                X[a] -= nx * ma; Y[a] -= ny * ma
+                X[b] -= nx * mb; Y[b] -= ny * mb
+                if rkv > 0 {   // v2.48: the correction leaves no velocity
+                    PX[p] += nx * mp * rkv; PY[p] += ny * mp * rkv
+                    PX[a] -= nx * ma * rkv; PY[a] -= ny * ma * rkv
+                    PX[b] -= nx * mb * rkv; PY[b] -= ny * mb * rkv
+                }
             }
         }
     }

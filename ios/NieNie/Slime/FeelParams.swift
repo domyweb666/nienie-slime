@@ -252,6 +252,18 @@ struct FeelParams: Equatable, Codable {
     var pressPull: Double = 1         // 1: the press spread fades once the finger has pulled away from where it landed (0.15R to 0.6R). Measured: pulled 3R and held still, the patch under the finger was still spread 0.3R (the grab radius), tearing it: 18 flipped triangles, the guard pushing 5 pt back every frame. 0 = v2.46
     var dragCalm: Double = 1          // 1: the spring the whole body follows the finger on is damped more from 1R of travel, no overshoot from 3R (pulled 3.5R it ran 60 pt past and came back, jumping for a second with the hand still). 0 = v2.46
     var memSmooth: Double = 4         // the remembered shape smooths its own spikes (like surface tension): how much of a one-particle detail goes a second; long pulls and flat spreads barely move. 0 = off (v2.46)
+    // v2.48 (多米 11-16: pulled about it often "breaks": past some range it twitches, knots, turns into irregular spikes; fix it at the source).
+    // Measured with the web's fuzz.js (random pulls, two fingers, scrubs, stirs from fixed seeds), four sources, each fixed where it starts:
+    var stretchCap: Double = 3        // every mesh edge of the live body is at most this many times its rest length: once the ones by the finger are full the next ones stretch (they used to reach 12 to 35 times); 0 off (v2.47)
+    var memCap: Double = 2.4          // the same limit for the remembered shape (keep it under stretchCap); 0 off
+    var capLo: Double = 0.4           // and at least this much of its rest length
+    var capIter: Double = 4           // rounds a substep, together with the no-flip guard; stops early when nothing is over
+    var capSlip: Double = 4           // 手指讓: the finger's effective position gives way by this many times what the limits, the sill and the walls pushed the held patch back; 0 off
+    var capVel: Double = 0            // 0: the corrections move the last position along and leave no velocity; 1: they keep it (and bounce against shape matching)
+    var capGrabW: Double = 0.2        // how much a held particle moves when its edge is at the stretch limit (the other end is 1)
+    var capPushW: Double = 1          // how much a held particle moves when its edge is squeezed to the limit or its triangle is about to flip
+    var tremble: Double = 0           // 0: no shiver when pulled or poked (it read as broken); 1 = v2.47
+    var struggle: Double = 0          // 0: no clawing pseudopods while pulled; 1 = v2.47. The squint, the protest sound and the tug back stay
     var round: Double = 1.3           // the jelly skin's outline is cut from the blurred mask: sharp corners become round heads, concave corners join like water; the number scales the corner size (1 is about 0.07R). 0 = the particle outline (v2.46)
     var glit: Double = 0              // 0: no glitter drawn inside it and no haze when handled (多米 11-16: 粉末去掉); a shake still bounces it and slows its breath. 1 = v2.46
     var wet: Double = 1               // 1: the wet skin (clearer, a larger sharper highlight, a second small one, a rim of light). 0 = skin A (v2.46)
@@ -582,6 +594,16 @@ struct TuneField: Identifiable {
         TuneField(key: \.pressPull, name: "拉開了就不攤 v2.47", hint: "1（多米 11-16：拉一拉變尖、拉太長會抽動）：手指離開落點 0.15R 起，按壓的「往外攤開」淡掉，0.6R 淡完；0 回 v2.46（拉長按著不動，手指底下那塊被撕開、一直跳）", range: 0...1, step: 1),
         TuneField(key: \.dragCalm, name: "拉得遠就不衝過頭 v2.47", hint: "1：整隻跟著手指走的那條彈簧，要跟的距離 1R 起阻尼加大、3R 以上不過衝（原本拉 3.5R 整隻衝過去 60 點再退回來，手沒動牠自己跳一秒）；0 回 v2.46", range: 0...1, step: 1),
         TuneField(key: \.memSmooth, name: "留下的形狀抹圓 v2.47", hint: "記住的形狀裡，刺和細鬚每秒消掉多少（4：一根刺約 0.3 秒變圓頭；整條拉長、整片壓扁這種大形狀幾乎不動）；0 關（v2.46）", range: 0...12, step: 0.5),
+        TuneField(key: \.stretchCap, name: "每一小塊最多拉幾倍 v2.48", hint: "（多米 11-16：拉一拉就破圖，要從源頭解決）身體網格的每條邊最長拉到原形的幾倍。拉滿了就輪到旁邊的拉，整條平均變長；0 關（v2.47）", range: 0...5, step: 0.25),
+        TuneField(key: \.memCap, name: "記住的形狀最多拉幾倍 v2.48", hint: "記住的形狀每條邊最長是原形的幾倍（要比上一條小）；0 關", range: 0...4, step: 0.2),
+        TuneField(key: \.capLo, name: "每一小塊最多壓到幾成 v2.48", hint: "每條邊最短壓到原形的幾成", range: 0.1...0.9, step: 0.05),
+        TuneField(key: \.capIter, name: "上下限每小步做幾輪 v2.48", hint: "跟防翻面一起做幾輪；沒有超過的就提早停", range: 1...8, step: 1),
+        TuneField(key: \.capSlip, name: "手指讓多少 v2.48", hint: "被抓的那塊被上下限、窗台、牆擋回來多少，手指的有效位置就退多少的幾倍；0 關", range: 0...8, step: 0.5),
+        TuneField(key: \.capVel, name: "上下限的修正留多少速度 v2.48", hint: "0：修正不留速度；1：留著（會來回彈）", range: 0...1, step: 0.25),
+        TuneField(key: \.capGrabW, name: "拉滿時被抓的那塊讓多少 v2.48", hint: "邊拉到上限時，被手指抓著的那顆動多少（另一顆是 1）", range: 0...1, step: 0.05),
+        TuneField(key: \.capPushW, name: "擠滿時被抓的那塊讓多少 v2.48", hint: "邊壓到下限、三角形快翻面時，被手指抓著的那顆動多少", range: 0...1, step: 0.05),
+        TuneField(key: \.tremble, name: "被扯會發抖 v2.48", hint: "0：被扯、被戳時輪廓不再發抖（多米 11-16：拉太長莫名抽動，像壞掉）；1 回 v2.47", range: 0...1, step: 1),
+        TuneField(key: \.struggle, name: "被扯會扒 v2.48", hint: "0：被扯時不再往反方向伸兩條偽足扒；1 回 v2.47", range: 0...1, step: 1),
         TuneField(key: \.inertiaDrag, name: "拖動的慣性", hint: "抓著拖時整團加速度反過來推參考形狀，離手指越遠推越多；0 關", range: 0...6, step: 0.1),
         TuneField(key: \.dragSpring, name: "拖到停會衝過頭", hint: "整團跟手指用帶慣性的彈簧（阻尼比，0.5 衝過頭約一成六，越小衝越多）；0 回 v2.24", range: 0...1, step: 0.05),
         TuneField(key: \.dragHz, name: "整團跟上的快慢", hint: "上面那條彈簧每秒幾下", range: 0.5...4, step: 0.1),

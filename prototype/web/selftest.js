@@ -46,7 +46,8 @@
   // v2.24：舊項目與 T35 到 T38 一律回 v2.23（OFF24：身體 0.22、舊鏡頭、舊幅度、舊揉的門檻），v2.24 只在 T39 測（用 PSAVE 全開）
   // v2.47（多米 11-16 手機錄影）：舊項目量的是 v2.46 的手感，一律用舊數字：拉開了就不攤、拉得遠不衝過頭、記形抹圓都關，黏土的軟硬、慢一拍、按下去沉多久用調節台之前的值。
   // 換掉 PRESETS 本身，後面的 P1、P27、PSAVE、P27R 都從這裡來；PRE47 是真正的預設值，T61 用，跑完還給 PRESETS
-  const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
+  // v2.48：每一小塊的上下限、手指讓、被扯不發抖不扒，舊項目一律關（量的是原本的行為），只在 T62 開
+  const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
@@ -1522,7 +1523,7 @@
   // 同樣的拉法把三個修正關掉（pressPull、dragCalm、memSmooth 0）當對照，跳動至少是開著的 3 倍（量到 0.84 到 2.64 對 0.05 到 0.16）；
   // 放手 2 秒後面積回 1±0.08、沒有 NaN、外框不交叉；連拉六次（照錄影的玩法）放手後記住的形狀沒有翻面
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
-    const SP = { ...PRE47.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };
+    const SP = { ...PRE47.clay, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };   // v2.48 的上下限關著：這一項量的是 v2.47 那三個修正
     const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
     const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
     const ext = (dx, dy) => { let b = -1, bv = -1e9; for (const i of bnd) { const v = (X[i] - globalC.xc) * dx + (Y[i] - globalC.yc) * dy; if (v > bv) { bv = v; b = i; } } return b; };
@@ -1544,6 +1545,26 @@
       && r.six.qFlips === 0 && r.six.selfX === 0 && r.six.nan === 0 && Math.abs(r.six.area - 1) < .08;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
+  // T62 v2.48 每一小塊的硬上下限與手指讓（多米 11-16：常常拉一拉就破圖，超出某個範圍就抽搐打結、變成不規則的尖；要從源頭解決）。用真正的預設值在窗台上，對照是把 stretchCap、memCap 關掉（v2.47）：
+  // a 抓頭頂往下壓 2R 按著 2 秒（把那塊拖進身體、壓向窗台）：每幀跳動平均小於 3 點、真的翻過去的三角形不超過 8 個；對照的跳動至少 3 倍（量到 18 對 0.9、翻 59 對 1）
+  // b 抓頭頂往上拉 3R 按著 2 秒：網格的邊最長不超過原形的 3.6 倍（對照超過 5 倍，量到 9.3）；放手 2 秒後參考形狀（記形加偽足）最長的邊不超過 3 倍（對照超過 4 倍，量到 5.5：偽足疊在拉長的形狀上）、
+  //   記住的形狀不超過 2.6 倍、沒有翻面、沒有 NaN；c 拉長還是留得住：放手 2 秒後記住的形狀高度至少 2.3R
+  // 更廣的量法是 fuzz.js（固定種子的亂捏，30 組約一分鐘），不在這裡跑
+  { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
+    const SP = { ...PRE47.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 }, OFF = { stretchCap: 0, memCap: 0 };
+    const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(62); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 62 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const inv = () => { let n = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if (.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < -.02 * TRA[k / 3]) n++; } return n; };
+    const strain = (AX, AY) => { let m = 0; for (let e = 0, k = 0; e < EDG.length; e += 2, k++) { const i = EDG[e], j = EDG[e + 1], l = Math.hypot(AX[i] - AX[j], AY[i] - AY[j]) / EDL[k]; if (l > m) m = l; } return +m.toFixed(2); };
+    const jit = n => { let js = 0, jm = 0, im = 0, sm = 0, vx = null, vy = null, cnt = 0; for (let s = 0; s < n; s++) { const x0 = Float64Array.from(X), y0 = Float64Array.from(Y); steps(1); let ax = 0, ay = 0; for (let i = 0; i < N; i++) { ax += X[i] - x0[i]; ay += Y[i] - y0[i]; } ax /= N; ay /= N; const nx = new Float64Array(N), ny = new Float64Array(N); let j = 0; for (let i = 0; i < N; i++) { nx[i] = X[i] - x0[i] - ax; ny[i] = Y[i] - y0[i] - ay; if (vx) { const d = Math.hypot(nx[i] - vx[i], ny[i] - vy[i]); if (d > j) j = d; } } vx = nx; vy = ny; if (s > 20) { js += j; cnt++; if (j > jm) jm = j; } im = Math.max(im, inv()); if (s > 60) sm = Math.max(sm, strain(X, Y)); } return { mean: +(js / cnt).toFixed(2), max: +jm.toFixed(1), inv: im, strain: sm }; };
+    const pull = (over, ang, dist) => { fresh(over); const c = globalC, [sx, sy] = scr(c.xc, c.yc - R * .6), ex = sx + Math.cos(ang) * R * dist, ey = sy + Math.sin(ang) * R * dist; ev('pointerdown', 1, sx, sy); steps(4); for (let s = 1; s <= 10; s++) { ev('pointermove', 1, sx + (ex - sx) * s / 10, sy + (ey - sy) * s / 10); steps(1); } const o = jit(120); ev('pointerup', 1, ex, ey); steps(120);
+      let nan = 0, q0 = 1e9, q1 = -1e9; for (let i = 0; i < N; i++) { if (!isFinite(X[i]) || !isFinite(Y[i])) nan++; q0 = Math.min(q0, QY[i]); q1 = Math.max(q1, QY[i]); } return { ...o, exStrain: strain(EX, EY), qStrain: strain(QX, QY), qFlips: flipCount(QX, QY), qH: +((q1 - q0) / R).toFixed(2), nan }; };
+    r.downOn = pull({}, Math.PI / 2, 2); r.downOff = pull(OFF, Math.PI / 2, 2); r.upOn = pull({}, -Math.PI / 2, 3); r.upOff = pull(OFF, -Math.PI / 2, 3);
+    res.T62_limits = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    res.PASS.limits = r.downOn.mean < 3 && r.downOn.inv <= 8 && r.downOff.mean > r.downOn.mean * 3 && r.downOn.nan === 0
+      && r.upOn.strain <= 3.6 && r.upOff.strain > 5 && r.upOn.exStrain <= 3 && r.upOff.exStrain > 4 && r.upOn.qStrain <= 2.6 && r.upOn.qFlips === 0 && r.upOn.nan === 0 && r.upOn.qH >= 2.3;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去
