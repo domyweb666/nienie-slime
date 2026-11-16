@@ -40,6 +40,7 @@ struct ContentView: View {
         _showHint = State(initialValue: UserDefaults.standard.integer(forKey: "launchCount") < 3)
     }
     @State private var showTune = false
+    @State private var showFeel = false
     @State private var hintText = "捏它、拉它、揉它。放著不管它也會自己動"
     @State private var hintGen = 0
 
@@ -50,13 +51,19 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 topBar
+                // v2.39 手感調節台: over the sky, the slime stays squishable below it
+                if showFeel {
+                    FeelDesk(isPresented: $showFeel)
+                        .padding(.top, 10)
+                        .transition(.opacity)
+                }
                 Text(hintText)
                     .font(.rounded(14))
                     .foregroundStyle(Palette.ink)
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .background(Capsule().fill(.white).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
                     .padding(.top, 14)
-                    .opacity(showHint ? 1 : 0)
+                    .opacity(showHint && !showFeel ? 1 : 0)
                     .allowsHitTesting(false)
                 Spacer(minLength: 0)
                 if showTune {
@@ -94,7 +101,7 @@ struct ContentView: View {
             .foregroundStyle(Palette.ink)
             .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: 1.2) {
-                withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showTune.toggle() }
+                withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showTune.toggle(); if showTune { showFeel = false } }
             }
             .accessibilityAddTraits(.isHeader)
             .accessibilityAction(named: "調手感") { showTune.toggle() }
@@ -168,6 +175,16 @@ struct ContentView: View {
             .accessibilityLabel("揉回原形")
 
             Spacer(minLength: 0)
+
+            // v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方)
+            Button {
+                withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showFeel.toggle(); if showFeel { showTune = false } }
+            } label: {
+                Text("調").font(.rounded(18, .heavy))
+                    .frame(width: 46, height: 46)
+            }
+            .buttonStyle(ChipStyle(circle: true))
+            .accessibilityLabel(showFeel ? "收起手感調節台" : "打開手感調節台")
         }
     }
 

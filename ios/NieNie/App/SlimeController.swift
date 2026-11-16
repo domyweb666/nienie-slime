@@ -62,6 +62,7 @@ final class SlimeController: ObservableObject {
             if let tr = savedTrust[saved] { rig.setImpression(trust: tr, wary: 0) }
         }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
+        feelLoad()   // v2.39 手感調節台: last time's numbers
         syncAudio()
         sound.setAmbience(ambience)   // v2.40 環境音, once at launch
         rig.walkOpen()   // 走路: the second open leaves the gift stone
@@ -394,6 +395,113 @@ final class SlimeController: ObservableObject {
         pushParams()
         activeSlot = nil
         rig.bump(1)
+    }
+
+    // MARK: - v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方，我自己調試看怎樣手感最好)
+
+    /// One saved feel: the material it started from and the nine knobs. Same shape as the web's localStorage "nienie.feel".
+    struct FeelSnap: Codable, Equatable {
+        var base: String
+        var v: [String: Double]
+    }
+    private struct FeelStore: Codable {
+        var base: String
+        var v: [String: Double]
+        var A: FeelSnap?
+        var B: FeelSnap?
+    }
+    private static let feelKey = "nienie.feel"
+    @Published private(set) var feelA: FeelSnap?
+    @Published private(set) var feelB: FeelSnap?
+
+    private func feelPick() -> FeelSnap {
+        let p = current
+        var v: [String: Double] = [:]
+        for k in FeelKnob.all { v[k.id] = p[keyPath: k.key] }
+        return FeelSnap(base: material.rawValue, v: v)
+    }
+
+    private func feelSave() {
+        let s = FeelStore(base: material.rawValue, v: feelPick().v, A: feelA, B: feelB)
+        if let d = try? JSONEncoder().encode(s) { UserDefaults.standard.set(d, forKey: Self.feelKey) }
+    }
+
+    /// Lay a saved feel over the material's numbers: switch to its material first, then the nine knobs.
+    private func feelApply(_ s: FeelSnap) {
+        if let m = SlimeMaterial(rawValue: s.base), m != material { material = m }
+        var p = current
+        for k in FeelKnob.all { if let x = s.v[k.id], x.isFinite { p[keyPath: k.key] = min(k.range.upperBound, max(k.range.lowerBound, x)) } }
+        params[material] = p
+        pushParams()
+        activeSlot = nil
+    }
+
+    /// At launch: the numbers 多米 left on the desk last time come back (called from init).
+    func feelLoad() {
+        guard let d = UserDefaults.standard.data(forKey: Self.feelKey),
+              let s = try? JSONDecoder().decode(FeelStore.self, from: d) else { return }
+        feelA = s.A; feelB = s.B
+        feelApply(FeelSnap(base: s.base, v: s.v))
+    }
+
+    func feelBinding(_ k: FeelKnob) -> Binding<Double> {
+        Binding(
+            get: { self.current[keyPath: k.key] },
+            set: { v in
+                var p = self.current
+                p[keyPath: k.key] = v
+                self.params[self.material] = p
+                self.pushParams()
+                self.activeSlot = nil
+                self.feelSave()
+            }
+        )
+    }
+
+    /// 從哪個材質開始: that material's own numbers.
+    func feelStartFrom(_ m: SlimeMaterial) {
+        material = m
+        params[m] = m.defaults
+        pushParams()
+        activeSlot = nil
+        rig.bump(1)
+        feelSave()
+    }
+
+    func feelStore(_ slot: String) {
+        if slot == "A" { feelA = feelPick() } else { feelB = feelPick() }
+        feelSave()
+    }
+
+    func feelGo(_ slot: String) {
+        guard let s = slot == "A" ? feelA : feelB else { return }
+        feelApply(s)
+        rig.bump(1)
+        feelSave()
+    }
+
+    /// 回到預設: this slime's own material at its default numbers, A and B cleared.
+    func feelDefaults() {
+        material = slime.material
+        for m in SlimeMaterial.allCases { params[m] = m.defaults }
+        feelA = nil; feelB = nil
+        UserDefaults.standard.removeObject(forKey: Self.feelKey)
+        pushParams()
+        activeSlot = nil
+        rig.bump(1)
+    }
+
+    /// Same text as the web's 複製數值給 Agent.
+    var feelText: String {
+        func line(_ s: FeelSnap) -> String {
+            let m = SlimeMaterial(rawValue: s.base)?.name ?? s.base
+            let parts = FeelKnob.all.map { k in "\(k.name) \(FeelKnob.fmt(s.v[k.id] ?? 0))（\(k.id)）" }
+            return "\(m)起點：" + parts.joined(separator: "、")
+        }
+        var t = "手感調節台 v2.39（手機）\n現在 " + line(feelPick())
+        if let a = feelA { t += "\nA " + line(a) }
+        if let b = feelB { t += "\nB " + line(b) }
+        return t
     }
 
     // MARK: - Blind-test slots
