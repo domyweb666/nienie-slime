@@ -1342,7 +1342,7 @@ function exLevel(){const f=mat.excite==null?-1:mat.excite;let n;if(f>=0)n=f;else
    推：熟 0.5 以上、心情 0.2 以上、好奇 0.6 以上，休息到時間時跟其他需求一起比（drCatOK、drCat）。走到東西旁邊、看你、伸偽足，偽足伸出去六成以後東西每秒往窗台邊挪 0.2R（約 21 點）。一次打開最多 2 次、隔 45 秒。牠推下去的不嚇，開心一下。 */
 const DR={hab:{},lookT:-9,lx:0,ly:0,cats:0,catT:-99,catLast:'',push:null,last:null,n:{look:0,probe:0,scare:0,wake:0,cat:0,catFall:0}};
 const DRon=()=>DREAL()&&BRon()&&mat.decoReact>=.5;
-function drReset(){Object.assign(DR,{hab:{},lookT:-9,cats:0,catT:-99,catLast:'',push:null,last:null})}
+function drReset(){Object.assign(DR,{hab:{},wideT:null,lookT:-9,cats:0,catT:-99,catLast:'',push:null,last:null})}
 function drRecent(v,T){return v!=null&&t>=v&&t-v<T}   // 時鐘被倒回去（重建、自測）時，留在未來的時間戳不算
 function drSelf(o){return drRecent(o.selfT,1.2)&&!drRecent(o.fingT,1.2)}
 function drLook(o,dq,x,y){if(!DRon()||SLP.on||drSelf(o)||drRecent(o.catT,3)||drRecent(o.lookAt,1.5))return;o.lookAt=t;
@@ -1352,8 +1352,8 @@ function drCrash(p,base){if(!DRon()||!p.deco||drRecent(p.crashAt,4))return;p.cra
   if(drRecent(p.catT,4)){DR.n.catFall++;MOOD.happyT=t;voice('happy',.6);EYE.user=t+1.4;return}
   const n=DR.hab[p.im]||0,d=Math.hypot(p.x-globalC.xc,Math.min(p.y,SILL.g.fl)-globalC.yc),near=Math.max(.5,Math.min(1,1-.5*(d-R)/(2*R))),
     amt=base*near*Math.pow(.5,n)*(drSelf(p)?.5:1)*(mat.decoScare==null?1:mat.decoScare);DR.hab[p.im]=n+1;DR.last={im:p.im,amt,n};
-  for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'||f.mode==='push'){DR.n.heldSkip=(DR.n.heldSkip||0)+1;return}
-  if(t>=lastTouch&&t-lastTouch<1){DR.n.heldSkip=(DR.n.heldSkip||0)+1;return}   // 剛放手 1 秒內也不嚇：身體還在彈回來   // 被你抓著、摸著的時候不嚇：注意力在你手上。嚇到會發抖、縮、心情掉，都會改到被拉長的身體（selftest T54 抓到：拖到右下角撞掉罐子，面積從 0.8 掉到 0.46）
+  let held=t>=lastTouch&&t-lastTouch<1;for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'||f.mode==='push')held=true;
+  if(held){DR.hab[p.im]=n;DR.n.heldSkip=(DR.n.heldSkip||0)+1;if(amt>=.02){DR.wideT=t;EYE.pulse=t}return}   // 多米 11-16：這時候只睜大眼 0.8 秒（只改眼睛怎麼畫，身體、怕、心情、習慣都不動）   // 剛放手 1 秒內也不嚇：身體還在彈回來   // 被你抓著、摸著的時候不嚇：注意力在你手上。嚇到會發抖、縮、心情掉，都會改到被拉長的身體（selftest T54 抓到：拖到右下角撞掉罐子，面積從 0.8 掉到 0.46）
   if(amt<.02)return;DR.n.scare++;MOOD.scare=Math.min(1,MOOD.scare+amt);BMEM.ev.sc=Math.max(BMEM.ev.sc,MOOD.scare);
   if(SLP.on){if(amt>=.08){DR.n.wake++;wake(true)}}else{FLN.at=t+.12;FLN.pre=LIFE.st==='rest'?'rest':'go';FLN.boost=1+amt;EYE.pulse=t+.12}
   DR.lookT=t+1.6;DR.lx=p.x;DR.ly=Math.min(p.y,SILL.g.fl)}
@@ -1658,7 +1658,7 @@ function eyeStep(dt){if(!(mat.eyes>=.5)||!EYE.L.length)return;
   if(SNW.k>.02&&!g)open=Math.min(open,1-.85*SNW.k*Math.min(1,Math.max(0,(SNW.cloud-.06)/.3)));   // v2.31 沉澱時閉著眼帶你呼吸，清了才睜開
   {const u=t-FLN.t0;if(FLN.amp>.02&&u>=0&&u<.22&&ECHO.st!=='play')open=Math.min(open,.3)}
   if(BRAIN.pre&&BRAIN.pre.k==='sleep'&&BRon())open=Math.min(open,.45);   // v2.42 前兆：要睡了，眼睛半閉
-  if(IMP.w>.5||MOOD.scare>.3||t-SLP.wakeT<.8||BRM()<-.35)wide=1.18;
+  if(IMP.w>.5||MOOD.scare>.3||t-SLP.wakeT<.8||BRM()<-.35||(DRon()&&drRecent(DR.wideT,.8)))wide=1.18;
   {const u=t-EYE.pulse;if(u>=0&&u<.15)wide*=1+.15*Math.sin(Math.PI*u/.15)}
   if(mode==='open'&&t>=EYE.nextBlink&&!SLP.on){EYE.blinkT=t;EYE.nextBlink=t+(Math.random()<.2?.32:(2+4*Math.random())*(1-.3*exLevel()))}
   {const u=t-EYE.blinkT,b=u<0?1:u<.07?1-u/.07:u<.11?0:u<.21?(u-.11)/.1:1;

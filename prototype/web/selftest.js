@@ -1498,6 +1498,9 @@
     fresh({}); { const g = SILL.g; VIEW.bg = 'night'; steps(5 * 60); const hx = memHomeX(); let at = -1; for (let i = 0; i < 60 * 60 && at < 0; i++) { steps(1); if (Math.abs(globalC.xc - hx) < R * .35) at = +(i / 60).toFixed(1); } VIEW.bg = 'day'; steps(2); r.candle = { shift: +(g.bx - hx).toFixed(1), at, day: +(g.bx - memHomeX()).toFixed(1) }; VIEW.bg = bg0; }
     fresh({}); { const go = () => { BRAIN.q = .9; BRAIN.m = .5; BRAIN.z = 0; BRAIN.e = 0; LIFE.st = 'rest'; LIFE.until = t + .1; }; go(); const ok0 = drCatOK(); let mv = 0, tl = 0, gone = false; for (let i = 0; i < 14 * 60; i++) { steps(1); for (const q of PROPS) { if (q.gone) gone = true; else { mv = Math.max(mv, Math.abs(q.x - q.hx)); tl = Math.max(tl, up(q)); } } }
       r.cat = { ok0, n: DR.n.cat, fall: DR.n.catFall, mv: +mv.toFixed(0), up: +tl.toFixed(2), gone, scare: DR.n.scare }; steps(30 * 60); DR.catT = -99; go(); DR.cats = 2; r.cat.capped = !drCatOK(); DR.cats = 0; r.cat.again = drCatOK(); mat.decoCat = 0; r.cat.off = !drCatOK(); mat.decoCat = 1; }
+    // h 抓著牠的時候罐子掉下去（多米 11-16：只睜大眼）：怕、縮、心情、習慣都沒動，只有睜大眼的記號亮起來；放手 2 秒後再推一次，照第一次的量嚇到
+    fresh({}); calm(); { const J = PROPS[1], gx = globalC.xc, gy = globalC.yc, m0 = BRAIN.m; ev('pointerdown', 7, gx, gy); steps(20); const fl0 = FLN.t0; J.va = 12; J.lastHit = t; J.fingT = t; let sc = 0; for (let i = 0; i < 120; i++) { steps(1); sc = Math.max(sc, MOOD.scare); }
+      r.held = { fell: J.gone || up(J) > 1, scare: DR.n.scare, sc: +sc.toFixed(3), flinch: FLN.t0 !== fl0, wide: DR.wideT != null, hab: DR.hab.d_jar || 0, dm: +(BRAIN.m - m0).toFixed(3) }; ev('pointerup', 7, gx, gy); calm(); steps(26 * 60); calm(); r.held.after = shove(J).amt; }
     { calm(); LIFE.until = t + 1; steps(60 * 60); let nan = 0, bn = 0; for (const q of PROPS) if (![q.x, q.y, q.a, q.vx, q.vy, q.va].every(isFinite)) nan++; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) bn++; r.idle = { nan, bodyNan: bn, selfX: selfX() }; }
     res.T60_decoReact = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();   // calm() 把「休息到什麼時候」設在很久以後；不還原的話下一輪 T54 的牠一直不動，數字跟第一輪不同（11-16 量到第二輪起 twoVert 多 2 幀交叉）
@@ -1507,6 +1510,7 @@
       && r.look.n === 1 && r.look.dq >= .1 && r.look.eye && r.look.scare === 0 && r.probe.n === 1 && r.probe.sn >= 1
       && r.candle.shift > 20 && r.candle.at >= 0 && Math.abs(r.candle.day) < 1
       && r.cat.ok0 && r.cat.n === 1 && r.cat.fall >= 1 && (r.cat.gone || r.cat.up > 1 || r.cat.mv > 20) && r.cat.scare === 0 && r.cat.capped && r.cat.again && r.cat.off
+      && r.held.fell && r.held.scare === 0 && r.held.sc < .01 && !r.held.flinch && r.held.wide && r.held.hab === 0 && r.held.after > .2
       && r.idle.nan === 0 && r.idle.bodyNan === 0 && r.idle.selfX === 0;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
