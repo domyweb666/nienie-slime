@@ -132,7 +132,7 @@ struct FeelParams: Equatable, Codable {
     var skin: Double = 1
     var envRoam: Double = 1           // v2.30: how often it leaves the bowl by itself and walks the sill (0 = it stays put)
     // v2.31 搖晃沉澱 (多米 11-07: 互動改成搖手機, like a snow globe: shake it up, then wait for it to settle). One rule for the whole app: moved, it clouds; still, it clears.
-    var shake: Double = 1             // 1: a shake bounces it in the bowl and stirs the glitter inside it up into a haze; left alone about settleT s it clears, glows, opens its eyes, dings; a pinch stirs a little too. 0 off
+    var shake: Double = 0             // 1: a shake bounces it in the bowl and stirs the glitter inside it up into a haze; left alone about settleT s it clears, glows, opens its eyes, dings; a pinch stirs a little too. 0 off
     var shakeN: Double = 3            // this many shakes and all the glitter is up; harder shaking adds nothing
     var settleT: Double = 30          // seconds from fully clouded to fully clear when nothing touches it
     var calmBreathT: Double = 10      // its breath period while the glitter settles (10 s = 6 a minute), taking you down with it
