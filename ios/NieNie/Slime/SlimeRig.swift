@@ -72,6 +72,7 @@ final class SlimeRig {
     private(set) var bnd: [Int] = []     // boundary particle indices, in ring order
     private var bndL: [Double] = []      // rest distance between ring neighbours
     private var bndL2: [Double] = []     // rest distance between ring particles two apart (no folding back)
+    private var EDG: [Int] = [], EDEG: [Double] = [], EDSX: [Double] = [], EDSY: [Double] = []   // v2.47: the mesh's edges (two indices an edge, each once), how many meet at each particle, scratch for memSmoothStep
     private var TRI: [Int] = [], TRA: [Double] = []   // v2.29 防打結: the rest shape's triangle mesh (3 indices a triangle) and each rest area
     // v2.28 窗台 (多米 11-06): gravity, a sill to stand on, a bowl in the middle to sit in; v2.31 the bowl centred, the props pictures only.
     // Port of the web's SILL for the room plane only: the window frame, the outside and the climbing routes come with the next batch.
@@ -917,6 +918,39 @@ final class SlimeRig {
             area.append(abs(s))
         }
         TRI = tri; TRA = area
+        // v2.47: the edges, each once, for memSmoothStep
+        var seen = Set<Int>(), ed: [Int] = [], deg = [Double](repeating: 0, count: n)
+        var k = 0
+        while k + 2 < tri.count {
+            for (a, b) in [(tri[k], tri[k + 1]), (tri[k + 1], tri[k + 2]), (tri[k + 2], tri[k])] {
+                let key = a < b ? a * 100000 + b : b * 100000 + a
+                if seen.insert(key).inserted { ed.append(a); ed.append(b); deg[a] += 1; deg[b] += 1 }
+            }
+            k += 3
+        }
+        EDG = ed; EDEG = deg; EDSX = [Double](repeating: 0, count: n); EDSY = [Double](repeating: 0, count: n)
+    }
+
+    /// v2.47 the remembered shape smooths its own spikes (like surface tension). Memory is per particle: the few under the finger are pulled much farther than
+    /// their neighbours and a spike or a thin whisker stays after the release (多米's phone video, 11-16). Every frame the offset from the rest shape is smoothed
+    /// twice over the mesh, once toward the neighbours' mean and once back by as much: only detail that differs a lot between neighbours goes, a whole pulled
+    /// strand or a flat spread barely moves. `rate` (memSmooth) is how much of that detail goes a second. Port of the web's `memSmoothStep`.
+    private func memSmoothStep(_ dt: Double, _ rate: Double) {
+        let m = EDG.count
+        guard m > 0, EDEG.count == N, EDSX.count == N, EDSY.count == N else { return }
+        let lam: Double = min(0.45, (rate * dt).squareRoot())
+        for pass in 0..<2 {
+            for i in 0..<N { EDSX[i] = 0; EDSY[i] = 0 }
+            var e = 0
+            while e + 1 < m {
+                let i = EDG[e], j = EDG[e + 1]
+                let dx: Double = (QX[j] - Q0X[j]) - (QX[i] - Q0X[i]), dy: Double = (QY[j] - Q0Y[j]) - (QY[i] - Q0Y[i])
+                EDSX[i] += dx; EDSY[i] += dy; EDSX[j] -= dx; EDSY[j] -= dy
+                e += 2
+            }
+            let k: Double = pass == 0 ? lam : -lam
+            for i in 0..<N where EDEG[i] > 0 { QX[i] += k * EDSX[i] / EDEG[i]; QY[i] += k * EDSY[i] / EDEG[i] }
+        }
     }
 
     /// v2.29 防打結: every triangle whose area fell below `kp` of its rest area is pushed back open along the area's gradient.
@@ -1874,7 +1908,11 @@ final class SlimeRig {
                     let pr = max(0, min(1, (f.radius - f.r0) / 8))
                     f.prS += (pr - f.prS) * (1 - exp(-dt / 0.05))
                 }
-                let target = R * (mat.pressBase + mat.pressHold * f.hold + 0.15 * mat.pressRadiusGain * f.prS)
+                // v2.47 pressPull: pulled away, the spread fades (0.15R to 0.6R from where the finger landed). The spread is for a press; on a long pull held still it tore the grabbed patch
+                let pulled: Double = max(st, hypot(f.rawX - f.ax, f.rawY - f.ay) / R)
+                let pq: Double = mat.pressPull >= 0.5 ? max(0, min(1, (pulled - 0.15) / 0.45)) : 0
+                let pressFade: Double = 1 - pq * pq * (3 - 2 * pq)
+                let target: Double = R * (mat.pressBase + mat.pressHold * f.hold + 0.15 * mat.pressRadiusGain * f.prS) * pressFade
                 if !f.pressOn {
                     f.press = target * mat.pressFirst
                     f.pressOn = true
@@ -2771,6 +2809,7 @@ final class SlimeRig {
         }
         if mat.tentMem > 0 { restFix(mat) }
         tentRest(dt, mat)
+        if mat.memSmooth > 0 { memSmoothStep(dt, mat.memSmooth) }   // v2.47
         if mat.noFlip > 0 { meshGuard(&QX, &QY, max(mat.noFlip, 0.3), nil) }   // v2.29: the remembered shape may not flip either (measured: 102 triangles flipped after rough pulling, and it never came undone)
         var mx = 0.0, my = 0.0
         for i in 0..<N { mx += QX[i]; my += QY[i] }
@@ -3646,10 +3685,10 @@ final class SlimeRig {
         snwGlow *= exp(-dt / 2.2)
     }
     /// v2.31: how clouded and how aglow it is, for the jelly skin's colour (0 when the shake is off)
-    var haze: (cloud: Double, glow: Double) { params.shake >= 0.5 ? (snwCloud, snwGlow) : (0, 0) }
+    var haze: (cloud: Double, glow: Double) { params.shake >= 0.5 && params.glit >= 0.5 ? (snwCloud, snwGlow) : (0, 0) }   // v2.47 glit 0: no glitter, so no haze either
     /// What the view draws inside the body: the haze, every bit between its place in the pile (clear) and where it hangs (cloudy), the glow. World points.
     var glitterView: GlitterView? {
-        guard params.shake >= 0.5, !snwGlit.isEmpty, !clusters.isEmpty else { return nil }
+        guard params.shake >= 0.5, params.glit >= 0.5, !snwGlit.isEmpty, !clusters.isEmpty else { return nil }
         let c = clusters[gi]
         var by = -1e9
         for i in bnd { by = max(by, Y[i]) }
@@ -4198,7 +4237,11 @@ final class SlimeRig {
         let g = dragTarget(), e = 1 - exp(-dt / (params.slide > 0 ? 0.2 : 0.25))
         // v2.25 F4: a first-order follow stops dead with the finger and never overshoots; on a spring with inertia, drag it and stop and the whole body runs past a little and comes back
         if params.inertiaHz > 0 && params.dragSpring > 0 {
-            let w: Double = 2 * Double.pi * params.dragHz, zz: Double = 2 * (reduceMotion ? max(params.dragSpring, 0.9) : params.dragSpring) * w
+            // v2.47 dragCalm: a long pull does not run past. The spring overshoots about 16%: 0.16R on a 1R pull, 60 pt on 3.5R, the body jumping for a second with the hand still
+            let far: Double = max(0, min(1, (hypot(g.x, g.y) / R - 1) / 2))
+            let farS: Double = far * far * (3 - 2 * far)
+            let zs: Double = params.dragCalm >= 0.5 ? params.dragSpring + max(0, 1 - params.dragSpring) * farS : params.dragSpring
+            let w: Double = 2 * Double.pi * params.dragHz, zz: Double = 2 * (reduceMotion ? max(zs, 0.9) : zs) * w
             dragVX += (w * w * (g.x + dragBX - dragOX) - zz * dragVX) * dt
             dragVY += (w * w * (g.y + dragBY - dragOY) - zz * dragVY) * dt
             dragOX += dragVX * dt; dragOY += dragVY * dt

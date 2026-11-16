@@ -37,7 +37,7 @@ struct LightU {
     float4 k0;           // aEdge, aCore, amb, dif
     float4 k1;           // glow, line, nk, shin
     float4 k2;           // s0, s1, spec, sheen
-    float4 k3;           // arc
+    float4 k3;           // arc, rnd (v2.47: threshold on the small blur for the outline, 0 = the mask), wet (v2.47)
 };
 
 static float H1(float2 uv, texture2d<float> B1, sampler sm, constant LightU& u) {
@@ -57,8 +57,9 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     float rpx = u.resRpxN.z;
     float aEdge = u.k0.x, aCore = u.k0.y, amb = u.k0.z, dif = u.k0.w;
     float glow = u.k1.x, line = u.k1.y, nk = u.k1.z, shin = u.k1.w;
-    float s0 = u.k2.x, s1 = u.k2.y, spec = u.k2.z, sheen = u.k2.w, arc = u.k3.x;
-    float m = M.sample(sm, v).r, cov = smoothstep(0.18, 0.82, m);
+    float s0 = u.k2.x, s1 = u.k2.y, spec = u.k2.z, sheen = u.k2.w, arc = u.k3.x, rnd = u.k3.y, wet = u.k3.z;
+    // v2.47 rnd: the outline from the blurred mask, so sharp corners and thin spikes round off and concave corners join like water
+    float m = M.sample(sm, v).r, cov = rnd > 0.0 ? smoothstep(rnd - 0.05, rnd + 0.05, B1.sample(sm, v).r) : smoothstep(0.18, 0.82, m);
     if (cov <= 0.0) return float4(0.0);
     float2 e = 2.0 / res, E = 8.0 / res;
     float gx = (H1(v + float2(e.x, 0.0), B1, sm, u) - H1(v - float2(e.x, 0.0), B1, sm, u)) / 4.0
@@ -79,6 +80,12 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     float nh = max(dot(n, Hv), 0.0);
     c.rgb += float3(pow(nh, shin * 0.22) * sheen * (1.0 - thick * 0.4)) * c.a;
     c = mix(c, float4(1.0), smoothstep(s0, s1, pow(nh, shin)) * spec);
+    // v2.47 水潤: a second small highlight beside the main one, a rim of light along the edge
+    if (wet > 0.0) {
+        float3 H2 = normalize(normalize(float3(-0.26, 0.46, 0.9)) + float3(0.0, 0.0, 1.0));
+        c = mix(c, float4(1.0), smoothstep(0.5, 0.8, pow(max(dot(n, H2), 0.0), shin * 2.2)) * 0.75 * wet);
+        c.rgb += float3(fres * 0.30 * wet) * c.a;
+    }
     // the bright arc: along the contour just inside the outline, only the part facing the light; it follows a pull or a squash, thin places lose it
     float2 g2 = float2(B1.sample(sm, v + float2(e.x, 0.0)).r - B1.sample(sm, v - float2(e.x, 0.0)).r,
                        -(B1.sample(sm, v + float2(0.0, e.y)).r - B1.sample(sm, v - float2(0.0, e.y)).r));

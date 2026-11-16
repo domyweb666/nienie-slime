@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>捏捏史萊姆｜形狀匹配原型 v2.46</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.47</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -91,7 +91,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>v2.46 <i id="v-fps" style="font-style:normal"></i></span></div>
+  <div class="brand" id="brand">捏捏<span>v2.47 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
 </div>
 
@@ -194,17 +194,26 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    - 音效（v2 分層，2026-11-01）：sfx/engine.js 讀 sfx/manifest.json。按、放手各拆 body／wet／air 三層，依力道決定哪幾層響、多大聲、多高、多亮；
      拉是連續的黏絲 loop（拉越長越高越亮、拉越快越大聲）加細絲斷裂；揉是 loop（拉遠了讓位給拉絲）；放手後有餘韻（小氣泡或嘶）。
      對應表在 .uiux/04-手感/音效參數對應-暫定.md，Swift 的 SlimeAudio 照同一張表。沒有檔案就安靜
+   - v2.47（多米 11-16 手機錄影 build 127：拉一拉有些地方變尖、拉太長莫名抽動、粉末去掉、要有水份；黏土起點改成他在手機調節台調的數字）：
+     pressPull 拉開了就不攤（抽動和尖的主因：拉長按著不動時手指底下那塊還在往外攤 0.3R）；dragCalm 拉得遠整隻就不衝過頭（拉 3.5R 時衝過去 60 點再退回來的那一下）；memSmooth 記住的形狀把刺和細鬚抹圓；round 外框用模糊遮罩切成圓角；
+     glit 0 不畫亮粉、摸牠不變霧；wet 水潤的皮（JSKINS.W）；黏土 alpha 0.18、pressSink 0.2、lag 0.22。量法在 selftest T61
    ========================================================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS={
-  jelly:{brain:1,brainHud:0,brAwakeT:300,brSleepT:90,mood:1,brPre:1,moodHalf:300,brMem:1,decoReal:1,decoBody:1,decoPush:1,decoReact:1,decoCat:1,decoScare:1,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  mochi:{brain:1,brainHud:0,brAwakeT:300,brSleepT:90,mood:1,brPre:1,moodHalf:300,brMem:1,decoReal:1,decoBody:1,decoPush:1,decoReact:1,decoCat:1,decoScare:1,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
-  clay: {brain:1,brainHud:0,brAwakeT:300,brSleepT:90,mood:1,brPre:1,moodHalf:300,brMem:1,decoReal:1,decoBody:1,decoPush:1,decoReact:1,decoCat:1,decoScare:1,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.40,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.12,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.8,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  jelly:{pressPull:1,dragCalm:1,memSmooth:4,round:1.3,glit:0,wet:1,brain:1,brainHud:0,brAwakeT:300,brSleepT:90,mood:1,brPre:1,moodHalf:300,brMem:1,decoReal:1,decoBody:1,decoPush:1,decoReact:1,decoCat:1,decoScare:1,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.34,inertiaHz:3.2,inertiaZ:.16,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.986,yield:1.5,creep:0,  recover:1,   grabR:.36,maxPull:1.6,lag:.05,wGlobal:.12,cSpace:.3,cRad:.42,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.5,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.04,pressSpread:.06,pressSink:.2,pressBounce:.3,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.6,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  mochi:{pressPull:1,dragCalm:1,memSmooth:4,round:1.3,glit:0,wet:1,brain:1,brainHud:0,brAwakeT:300,brSleepT:90,mood:1,brPre:1,moodHalf:300,brMem:1,decoReal:1,decoBody:1,decoPush:1,decoReact:1,decoCat:1,decoScare:1,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.28,inertiaHz:2.6,inertiaZ:.26,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.966,yield:.14,creep:.9, recover:.18, grabR:.32,maxPull:1.8,lag:.08,wGlobal:.10,cSpace:.3,cRad:.45,upright:.004,anchor:4,areaGain:.6,gripRot:3,life:1, seed:7,floppy:.55,drift:.16,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:.2,dwellHi:.6,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:0,nearMem:0,memMax:1.1,grabHold:0,grabK:.55,nearR:1.58,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.05,pressSpread:.08,pressSink:.45,pressBounce:.6,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:.9,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
+  clay: {pressPull:1,dragCalm:1,memSmooth:4,round:1.3,glit:0,wet:1,brain:1,brainHud:0,brAwakeT:300,brSleepT:90,mood:1,brPre:1,moodHalf:300,brMem:1,decoReal:1,decoBody:1,decoPush:1,decoReact:1,decoCat:1,decoScare:1,clingTidy:1,homeClamp:1,flipMem:1,pairMax:4.5,tear:1,tearK:1.3,one:1,trKeep:1,cling:1,excite:-1,shake:1,shakeMode:0,spillN:12,shakeN:3,settleT:30,calmBreathT:10,stirRate:.12,shakeKick:1,shakeG:10,glitN:150,envFrame:0,props:0,bowl:0,deco:1,envRoam:1,catPush:0,noFlip:.15,gripUp:.004,homeCap:.5,fingerSolid:.2,softWall:1,alpha:.18,inertiaHz:3,inertiaZ:.3,inertiaCarry:.6,inertiaDrag:3,dragSpring:.5,dragHz:1.4,strokeV:400,strokeT:.08,strokeStop:60,strokeCarry:.2,strokePush:30,strokeFric:20,dentTrail:.5,hiStretch:1,beta:0,damp:.940,yield:.05,creep:6,  recover:.05,  grabR:.32,maxPull:7,lag:.22,wGlobal:.08,cSpace:.3,cRad:.45,upright:.002,anchor:4,areaGain:.5,gripRot:3,life:.8,seed:7,floppy:.6,drift:.14,wriggle:.05,wander:.5,pressBase:.12,pressHold:.18,pressHoldTime:.6,pressRise:.06,pressFirst:.5,dwellLo:0,dwellHi:.1,idleFreeze:0,specialEvery:0,tentRung:.5,tentAxis:0,tail:.12,homeK:.02,afterglow:0,breathT:3.8,breathShape:0,breathDeep:0,pinchSquish:1,slip:0,stick:0,localArea:1,homeFrac:.4,inkVar:0,morph:1,limbs:8,tentSlip:.6,tentBump:.8,moodColor:.8,pods:2,idlePace:.45,bodySize:.3,podLen:.6,jelly:1,jellyT:3,jellyAmp:.06,jellyLift:.08,tentMem:1,nearMem:1,memMax:5,grabHold:.85,grabK:1.2,nearR:3,ringGuard:1,pressFlat:0,flatMin:.3,zoomMin:0,camFill:.85,camCenter:1,grabReach:1,dent:1,dentSize:.5,press2:1,intro:1,camFollow:1,followZone:.65,followStop:.35,emo:1,flee:1,purr:1,followSpeed:1.4,dash:.25,specks:1,pressArea:.06,pressSpread:.10,pressSink:.2,pressBounce:1,dens:12,life2:1,lifeRest:1,lifeGait:1,lifeHeld:1,lifeFlinch:1,lifeBreath:1,lifeAttend:1,shadow:0,heldBreath:.75,restWrig:.3,flinchAmp:.1,slide:1.5,drag:.35,dentFade:.6,imp:1,impC1:1,impC2:1,impC3:1,impC4:1,impC5:1,e1:1,e2:1,e3:1,e4:1,eyes:0,sleep:1,echo:1,introSwim:1,restMul:1,voicePitch:1,eyeSize:1,trRate:1,wRate:1,e4Mul:1,camGrip:1,camPad:.2,pressLocal:1,leanMove:.11,leanAmp:.28,nuzAmp:.12,gazeAmp:.18,dodge:.22,rubSpeed:12,tickRev:6,tickSeg:48,tickFree:6,reachV:1},
 };
 const F=[
+  ['pressPull','拉開了就不攤 v2.47','1（多米 11-16：拉一拉變尖、拉太長會抽動）：手指離開落點 0.15R 起，按壓的「往外攤開」淡掉，0.6R 淡完；0 回 v2.46（拉長按著不動，手指底下那塊被撕開、一直跳）',0,1,1],
+  ['dragCalm','拉得遠就不衝過頭 v2.47','1：整隻跟著手指走的那條彈簧，要跟的距離 1R 起阻尼加大、3R 以上不過衝（原本拉 3.5R 整隻衝過去 60 點再退回來，手沒動牠自己跳一秒）；0 回 v2.46',0,1,1],
+  ['memSmooth','留下的形狀抹圓 v2.47','記住的形狀裡，刺和細鬚每秒消掉多少（4：一根刺約 0.3 秒變圓頭；整條拉長、整片壓扁這種大形狀幾乎不動）；0 關（v2.46）',0,12,.5],
+  ['round','外框圓角 v2.47','果凍皮的外框用模糊過的遮罩切：尖角變圓頭、凹進去的地方像水一樣連起來。數字是圓角大小的倍數（1 約 0.07 個半徑）；0 關（v2.46，照粒子外框畫）',0,2.5,.1],
+  ['glit','肚子裡的亮粉 v2.47','0（多米 11-16：身體裡的粉末去掉）：不畫亮粉，摸牠也不會變霧；搖手機牠照樣彈、照樣慢呼吸。1 回 v2.46',0,1,1],
+  ['wet','水潤 v2.47','1（多米 11-16：要很有水份的感覺）：更透、亮點更大更銳、多一顆小亮點、邊緣一圈反光；0 回 v2.46 的皮',0,1,1],
   ['alpha','回彈硬度','越大越快回去、越硬',.05,.8,.01],
   ['beta','線性柔軟','越大越能壓扁拉長（面積守恆）',0,1,.01],
   ['damp','晃動阻尼','越小放手晃越久',.85,.999,.001],
@@ -659,7 +668,7 @@ function setup(){
 
 // v2.29 防打結（多米 11-06：拉扯時常常打結。量到：亂拉時 960 個小三角形最多 602 個翻面，放手 3 秒還翻著；記住的形狀也翻了 102 個）。
 // 粒子之間原本只有距離限制，只知道遠近不知道方向，內部整片翻過去也不會被擋。靜止形狀先切成三角網，每個三角形面積不能小於靜止的 noFlip 倍，翻不過去就打不了結
-let TRI=new Int32Array(0),TRA=new Float64Array(0);
+let TRI=new Int32Array(0),TRA=new Float64Array(0),EDG=new Int32Array(0),EDL=new Float64Array(0),EDEG=new Float64Array(0),EDSX=null,EDSY=null;
 function buildMesh(){const n=N,xs=new Float64Array(n+3),ys=new Float64Array(n+3);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(let i=0;i<n;i++){xs[i]=Q0X[i];ys[i]=Q0Y[i];x0=Math.min(x0,xs[i]);x1=Math.max(x1,xs[i]);y0=Math.min(y0,ys[i]);y1=Math.max(y1,ys[i])}
   const d=Math.max(x1-x0,y1-y0)*20;xs[n]=x0-d;ys[n]=y0-d;xs[n+1]=x1+d;ys[n+1]=y0-d;xs[n+2]=(x0+x1)/2;ys[n+2]=y1+d;
   const circ=(a,b,c)=>{const ax=xs[a],ay=ys[a],bx=xs[b],by=ys[b],cx=xs[c],cy=ys[c],D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by)),A=ax*ax+ay*ay,B=bx*bx+by*by,C=cx*cx+cy*cy,ux=(A*(by-cy)+B*(cy-ay)+C*(ay-by))/D,uy=(A*(cx-bx)+B*(ax-cx)+C*(bx-ax))/D;return{a,b,c,ux,uy,r:(ax-ux)**2+(ay-uy)**2}};
@@ -668,7 +677,16 @@ function buildMesh(){const n=N,xs=new Float64Array(n+3),ys=new Float64Array(n+3)
     T=keep;for(const e of E.values())if(e)T.push(circ(e[0],e[1],i))}
   const nb=bnd.length,inRing=(x,y)=>{let c=false;for(let i=0,j=nb-1;i<nb;j=i++){const ax=Q0X[bnd[i]],ay=Q0Y[bnd[i]],bx=Q0X[bnd[j]],by=Q0Y[bnd[j]];if((ay>y)!==(by>y)&&x<(bx-ax)*(y-ay)/(by-ay)+ax)c=!c}return c};
   const tri=[],area=[];for(const q of T){if(q.a>=n||q.b>=n||q.c>=n)continue;const mx=(xs[q.a]+xs[q.b]+xs[q.c])/3,my=(ys[q.a]+ys[q.b]+ys[q.c])/3;if(!inRing(mx,my))continue;const s=.5*((xs[q.b]-xs[q.a])*(ys[q.c]-ys[q.a])-(ys[q.b]-ys[q.a])*(xs[q.c]-xs[q.a]));if(Math.abs(s)<1e-6)continue;if(s>0)tri.push(q.a,q.b,q.c);else tri.push(q.a,q.c,q.b);area.push(Math.abs(s))}
-  TRI=Int32Array.from(tri);TRA=Float64Array.from(area)}
+  TRI=Int32Array.from(tri);TRA=Float64Array.from(area);
+  // v2.47 網格的邊（每條一次）與每顆的鄰居數：記住的形狀抹平尖角（memSmooth）用
+  {const seen=new Set(),ed=[],el=[];EDEG=new Float64Array(n);for(let k=0;k<tri.length;k+=3)for(const [a,b] of [[tri[k],tri[k+1]],[tri[k+1],tri[k+2]],[tri[k+2],tri[k]]]){const key=a<b?a*100000+b:b*100000+a;if(seen.has(key))continue;seen.add(key);ed.push(a,b);el.push(Math.hypot(Q0X[a]-Q0X[b],Q0Y[a]-Q0Y[b]));EDEG[a]++;EDEG[b]++}
+    EDG=Int32Array.from(ed);EDL=Float64Array.from(el);EDSX=new Float64Array(n);EDSY=new Float64Array(n)}}
+/* v2.47 記住的形狀自己把尖角抹平（像水的表面張力）。記形是每顆粒子各記各的，手指附近幾顆被拉得特別遠，放手後就留一根刺、一條細鬚（錄影裡的樣子）。
+   每幀把「離原形的偏移」在網格上抹兩次（一次往鄰居平均靠、一次反向推回同樣多）：只有相鄰粒子差很多的細節會消掉，整條拉長、整片壓扁這種大形狀幾乎不動。
+   memSmooth 是細節每秒消掉多少（4：一根刺約 0.3 秒變圓頭；拳頭大的形狀十幾秒才看得出變化）；0 關 */
+function memSmoothStep(dt){const E=EDG,m=E.length,lam=Math.min(.45,Math.sqrt(mat.memSmooth*dt)),SX=EDSX,SY=EDSY;
+  for(let pass=0;pass<2;pass++){SX.fill(0);SY.fill(0);for(let e=0;e<m;e+=2){const i=E[e],j=E[e+1],dx=(QX[j]-Q0X[j])-(QX[i]-Q0X[i]),dy=(QY[j]-Q0Y[j])-(QY[i]-Q0Y[i]);SX[i]+=dx;SY[i]+=dy;SX[j]-=dx;SY[j]-=dy}
+    const k=pass?-lam:lam;for(let i=0;i<N;i++){const dg=EDEG[i];if(dg>0){QX[i]+=k*SX[i]/dg;QY[i]+=k*SY[i]/dg}}}}
 // 把面積太小或翻面的三角形撐回來（沿面積的梯度推三個頂點）。useW：被手指抓著的那幾顆少動。一顆一次最多動 cap，整個翻掉的三角形才不會一下把人彈飛
 // v2.38 翻面的三角形：flipMarks 標出頂點（不記形用），flipCount 數幾個（記住的形狀有沒有翻）
 function flipMarks(AX,AY){const T=TRI,B=new Uint8Array(N);for(let k=0,m=T.length;k<m;k+=3){const a=T[k],b=T[k+1],c=T[k+2];if((AX[b]-AX[a])*(AY[c]-AY[a])-(AY[b]-AY[a])*(AX[c]-AX[a])<=0){B[a]=1;B[b]=1;B[c]=1}}return B}
@@ -1207,6 +1225,7 @@ function plasticity(dt){
   // 記住的形狀也不能對折：觸手有記形時（tentMem），參考形狀也過一次橫檔與中軸（同第 41 條，規則一樣、沒有手指權重）
   if(mat.tentMem>0)restFix();
   tentRest(dt,grabs);
+  if(mat.memSmooth>0&&EDG.length)memSmoothStep(dt);   // v2.47 記住的形狀抹平尖角
   if(mat.noFlip>0)meshGuard(QX,QY,Math.max(mat.noFlip,.3),false);   // v2.29 記住的形狀也不能翻面（量過：亂拉後記住的形狀翻了 102 個三角形，放手解不開）
   // 參考形狀重新置中，避免慢慢漂
   let mx=0,my=0;for(let i=0;i<N;i++){mx+=QX[i];my+=QY[i]}mx/=N;my/=N;
@@ -1795,7 +1814,9 @@ function dragStep(dt){const n=dragAvg()[2];
   DRAG.gx=0;DRAG.gy=0;
   const [gx,gy]=dragTarget(),a=1-Math.exp(-dt/(mat.slide>0?.2:.25));   // 整團有重量：0.2 秒跟上，猛一扯那一下先被拉長
   // v2.25 F4：一階低通手一停就貼上去，不會衝過頭；改成帶慣性的彈簧，拖到一半停，整隻衝過頭一點再退回來
-  if(mat.inertiaHz>0&&mat.dragSpring>0){const w=2*Math.PI*mat.dragHz,zz=2*(REDUCED?Math.max(mat.dragSpring,.9):mat.dragSpring)*w;DRAG.vx+=(w*w*(gx+DRAG.bx-DRAG.ox)-zz*DRAG.vx)*dt;DRAG.vy+=(w*w*(gy+DRAG.by-DRAG.oy)-zz*DRAG.vy)*dt;DRAG.ox+=DRAG.vx*dt;DRAG.oy+=DRAG.vy*dt}
+  // v2.47 dragCalm：拉得遠就不衝過頭。這條彈簧衝過頭約 16%，拉 1R 是 0.16R 的小晃；拉到 3.5R 整隻衝過去 60 點再退回來，手沒動牠自己上下跳一秒（多米 11-16：拉太長莫名抽動）。
+  // 整隻要跟的距離 1R 起阻尼加大，3R 以上不過衝（阻尼比 1）；0 回 v2.46
+  if(mat.inertiaHz>0&&mat.dragSpring>0){const w=2*Math.PI*mat.dragHz,far=Math.max(0,Math.min(1,(Math.hypot(gx,gy)/R-1)/2)),zs=mat.dragCalm>=.5?mat.dragSpring+Math.max(0,1-mat.dragSpring)*far*far*(3-2*far):mat.dragSpring,zz=2*(REDUCED?Math.max(zs,.9):zs)*w;DRAG.vx+=(w*w*(gx+DRAG.bx-DRAG.ox)-zz*DRAG.vx)*dt;DRAG.vy+=(w*w*(gy+DRAG.by-DRAG.oy)-zz*DRAG.vy)*dt;DRAG.ox+=DRAG.vx*dt;DRAG.oy+=DRAG.vy*dt}
   else{const nx=DRAG.ox+(gx+DRAG.bx-DRAG.ox)*a,ny=DRAG.oy+(gy+DRAG.by-DRAG.oy)*a;DRAG.vx=(nx-DRAG.ox)/dt;DRAG.vy=(ny-DRAG.oy)/dt;DRAG.ox=nx;DRAG.oy=ny}
   dragClamp();   // v2.38
   for(const f of fingers.values())if(f.mode==='grab')f.dragMax=Math.max(f.dragMax||0,Math.hypot(DRAG.ox-DRAG.bx,DRAG.oy-DRAG.by));   // v2.22 E3：這一抓把它拖了多遠
@@ -1913,7 +1934,10 @@ function update(dt){
     if(f.mode==='grab'){const st=Math.hypot(ex,ey)/R;f.ex=ex;f.ey=ey;const step=Math.floor(st*2.5);f.stretch=st;if(step>f.step&&st>.35)sfxPlay('pull',Math.min(1,.4+st/2),1-.08*Math.min(1,st/1.5));f.step=Math.max(f.step,step);
       // 按壓（接觸點先凹）：按下那幀先到目標的 pressFirst，之後用 pressRise 補完；按住不動（慢於每秒一個半徑）再慢慢攤深
       const still=Math.hypot(f.vxS,f.vyS)<R;f.hold=Math.max(0,Math.min(1,f.hold+(still?dt/Math.max(.05,mat.pressHoldTime):-dt/.3)));
-      const target=R*(mat.pressBase+mat.pressHold*f.hold);
+      // v2.47 拉開了就不再攤（多米 11-16 錄影：拉一拉變尖、拉太長會抽動）：攤開是給「按」用的。量到拉 3R 按著不動時，手指底下那塊還被往外攤 0.3R（跟抓取半徑一樣大），
+      // 等於一邊拉一邊撕：三角形翻 18 個、防翻面每幀推回 5 點，手沒動它一直跳。手指離開落點 0.15R 開始淡、0.6R 淡完；pressPull 0 回 v2.46
+      const pulled=Math.max(st,Math.hypot(f.x-f.ax,f.y-f.ay)/R),pq=mat.pressPull>=.5?Math.max(0,Math.min(1,(pulled-.15)/.45)):0;
+      const target=R*(mat.pressBase+mat.pressHold*f.hold)*(1-pq*pq*(3-2*pq));
       if(!f.pressOn){f.press=target*mat.pressFirst;f.pressOn=true}else f.press+=(target-f.press)*(1-Math.exp(-dt/Math.max(.005,mat.pressRise)))}
   }
   pairStep(dt);   // v2.38 兩指之間的軟上限與撕開
@@ -2487,7 +2511,7 @@ function shkStep(dt){if(SNW.last-t>1)SNW.last=-9;if(SNW.lastVoice-t>1)SNW.lastVo
   if(!SNW.cleared&&SNW.cloud<.03&&calm){SNW.cleared=true;if(SNW.wasCloudy){SNW.wasCloudy=false;SNW.glow=1;SNW.clearT=t;EYE.pulse=t;EYE.blinkT=t-.1;if(SLP.on)wake(false);sfxPlay('ding',.5)}}
   SNW.glow*=Math.exp(-dt/2.2)}
 // 畫：只畫在身體裡。濁：一層白霧（中下方最濃）＋懸著的亮粉慢慢飄；清：亮粉堆在底部（坐在碗裡時堆在碗口看得到的地方），清的那一刻整團發光
-function drawGlitter(P){if(!(mat.shake>=.5)||!SNW.glit.length)return;const G=SNW.glit,c=globalC,cl=SNW.cloud;if(!c)return;let by=-1e9;for(const p of P)if(p[1]>by)by=p[1];by-=R*.06;if(SILL.on&&SILL.inBowl&&SILL.g)by=Math.min(by,SILL.g.lip-R*.04);
+function drawGlitter(P){if(!(mat.shake>=.5)||!(mat.glit>=.5)||!SNW.glit.length)return;const G=SNW.glit,c=globalC,cl=SNW.cloud;if(!c)return;let by=-1e9;for(const p of P)if(p[1]>by)by=p[1];by-=R*.06;if(SILL.on&&SILL.inBowl&&SILL.g)by=Math.min(by,SILL.g.lip-R*.04);
   const pr=1/Math.max(.2,CAM.z);
   ctx.save();jelPath(ctx,P);ctx.clip();
   if(cl>.01){const g=ctx.createRadialGradient(c.xc,c.yc+R*.1,R*.1,c.xc,c.yc+R*.1,R*1.05);g.addColorStop(0,`rgba(255,255,255,${(.42*cl).toFixed(3)})`);g.addColorStop(1,`rgba(255,255,255,${(.12*cl).toFixed(3)})`);ctx.fillStyle=g;ctx.fillRect(c.xc-R*1.6,c.yc-R*1.6,R*3.2,R*3.2)}
@@ -2509,11 +2533,12 @@ const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle',amb:'rain'
 try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;if(o.shk==='eat'||o.shk==='settle')VIEW.shk=o.shk;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
 function viewOver(){const o={shakeMode:VIEW.shk==='eat'?1:0};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});return o}
 const JSKINS={
-  A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92},
-  B:{kEdge:.50,kCore:.16,aEdge:.86,aCore:.97,amb:.88,dif:.20,glow:.46,line:.26,nk:.90,shin:320,s0:.42,s1:.68,spec:.80,sheen:.10,arc:.88},
-  C:{kEdge:.22,kCore:.10,aEdge:1,aCore:1,amb:.76,dif:.38,glow:.16,line:.10,nk:.72,shin:9,s0:.35,s1:1.15,spec:.34,sheen:.05,arc:0}};
+  A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92,wet:0},
+  W:{kEdge:.50,kCore:.30,aEdge:.44,aCore:.66,amb:.88,dif:.26,glow:.80,line:.34,nk:1.05,shin:260,s0:.34,s1:.60,spec:.96,sheen:.20,arc:1,wet:1},   // v2.47 水潤（多米 11-16）：A 再透一點、亮一點
+  B:{kEdge:.50,kCore:.16,aEdge:.86,aCore:.97,amb:.88,dif:.20,glow:.46,line:.26,nk:.90,shin:320,s0:.42,s1:.68,spec:.80,sheen:.10,arc:.88,wet:0},
+  C:{kEdge:.22,kCore:.10,aEdge:1,aCore:1,amb:.76,dif:.38,glow:.16,line:.10,nk:.72,shin:9,s0:.35,s1:1.15,spec:.34,sheen:.05,arc:0,wet:0}};
 // v2.31 皮：平常 A 清透；亮粉揚起來時照濁度往 B 奶凍混（霧霧的）；沉澱清了那一刻多一點發光
-function jelSkin(){const a=JSKINS[VIEW.skin]||JSKINS.A;if(!(mat.shake>=.5)||(SNW.cloud<=.001&&SNW.glow<=.001))return a;const b=JSKINS.B,o={},c=Math.min(1,SNW.cloud);for(const k in a)o[k]=a[k]+(b[k]-a[k])*c;o.glow=Math.min(1,o.glow+.5*SNW.glow);o.sheen+=.1*SNW.glow;o.kEdge+=.15*SNW.glow;return o}
+function jelSkin(){let a=JSKINS[VIEW.skin]||JSKINS.A;if(mat.wet>=.5&&a===JSKINS.A)a=JSKINS.W;if(!(mat.shake>=.5)||!(mat.glit>=.5)||(SNW.cloud<=.001&&SNW.glow<=.001))return a;const b=JSKINS.B,o={},c=Math.min(1,SNW.cloud);for(const k in a)o[k]=a[k]+(b[k]-a[k])*c;o.glow=Math.min(1,o.glow+.5*SNW.glow);o.sheen+=.1*SNW.glow;o.kEdge+=.15*SNW.glow;return o}
 const JEL={gl:null,c:null,m:null,mc:null,fail:false,w:0,h:0,dpr:0};
 function jelInit(){if(JEL.fail)return false;const c=document.createElement('canvas'),gl=c.getContext('webgl2',{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false});
   if(!gl){JEL.fail=true;return false}
@@ -2525,9 +2550,9 @@ void main(){float sum=0.,w=0.;int N=int(ceil(s*2.6));for(int i=-N;i<=N;i++){floa
   FS=`#version 300 es
 precision highp float;in vec2 v;out vec4 o;
 uniform sampler2D M,B1,B2;uniform vec2 res;uniform float rpx;uniform vec4 uD[6];uniform int nD;
-uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc;
+uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc,rnd,wet;
 float H1(vec2 uv){float h=.45*smoothstep(0.,1.,texture(B1,uv).r);vec2 px=uv*res;for(int i=0;i<nD;i++){vec2 q=(px-uD[i].xy)/uD[i].z;h-=uD[i].w*.24*exp(-dot(q,q)*1.6);}return h;}
-void main(){float m=texture(M,v).r,cov=smoothstep(.18,.82,m);if(cov<=0.){o=vec4(0.);return;}
+void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05,rnd+.05,texture(B1,v).r):smoothstep(.18,.82,m);if(cov<=0.){o=vec4(0.);return;}   /* v2.47 rnd：外框改用模糊過的遮罩切，尖角、細刺自己變圓，凹進去的地方像水一樣連起來 */
   vec2 e=2./res,E=8./res;float gx=(H1(v+vec2(e.x,0.))-H1(v-vec2(e.x,0.)))/4.+.55*(texture(B2,v+vec2(E.x,0.)).r-texture(B2,v-vec2(E.x,0.)).r)/16.,gy=(H1(v+vec2(0.,e.y))-H1(v-vec2(0.,e.y)))/4.+.55*(texture(B2,v+vec2(0.,E.y)).r-texture(B2,v-vec2(0.,E.y)).r)/16.;
   vec3 n=normalize(vec3(-gx*rpx*nk,-gy*rpx*nk,1.)),L=normalize(vec3(-.5,.72,.9)),Hv=normalize(L+vec3(0.,0.,1.));
   float b1=texture(B1,v).r,b2=texture(B2,v).r,thick=smoothstep(.08,.8,b2),fres=pow(1.-n.z,2.);
@@ -2537,6 +2562,8 @@ void main(){float m=texture(M,v).r,cov=smoothstep(.18,.82,m);if(cov<=0.){o=vec4(
   c=mix(c,vec4(cLine,1.),(1.-smoothstep(.5,.66,b1))*line);
   float nh=max(dot(n,Hv),0.);c.rgb+=vec3(pow(nh,shin*.22)*sheen*(1.-thick*.4))*c.a;
   c=mix(c,vec4(1.),smoothstep(s0,s1,pow(nh,shin))*spec);
+  /* v2.47 水潤：主亮點旁邊多一顆小亮點，邊緣一圈反光 */
+  if(wet>0.){vec3 H2=normalize(normalize(vec3(-.26,.46,.9))+vec3(0.,0.,1.));c=mix(c,vec4(1.),smoothstep(.5,.8,pow(max(dot(n,H2),0.),shin*2.2))*.75*wet);c.rgb+=vec3(fres*.30*wet)*c.a;}
   /* 亮弧：沿著外框內側的等高線走，只留朝光那一段；拉長、壓扁時自己跟著變形，細的地方自動沒有 */
   vec2 g2=vec2(texture(B1,v+vec2(e.x,0.)).r-texture(B1,v-vec2(e.x,0.)).r,texture(B1,v+vec2(0.,e.y)).r-texture(B1,v-vec2(0.,e.y)).r);float gl2=length(g2);
   if(gl2>1e-5&&arc>0.){float wd=.05*smoothstep(.70,.97,dot(-g2/gl2,normalize(vec2(-.62,.78))));if(wd>.002)c=mix(c,vec4(1.),(1.-smoothstep(wd*.55,wd,abs(b1-.90)))*arc);}
@@ -2546,7 +2573,7 @@ void main(){float m=texture(M,v).r,cov=smoothstep(.18,.82,m);if(cov<=0.){o=vec4(
   const q=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
   JEL.float=!!(gl.getExtension('EXT_color_buffer_float')||gl.getExtension('EXT_color_buffer_half_float'));gl.disable(gl.BLEND);
   JEL.uB={};for(const n of ['t','d','s'])JEL.uB[n]=gl.getUniformLocation(JEL.pB,n);
-  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
+  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc','rnd','wet'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
   JEL.tM=gl.createTexture();JEL.params(gl,JEL.tM);
   JEL.gl=gl;JEL.c=c;JEL.mc=document.createElement('canvas');JEL.m=JEL.mc.getContext('2d',{willReadFrequently:false});JEL.w=0;
   c.addEventListener('webglcontextlost',e=>{e.preventDefault();JEL.gl=null});
@@ -2578,7 +2605,7 @@ function jelRender(P,tr,col){const gl=JEL.gl,m=JEL.m,sk=jelSkin(),k=1/DPR,zoom=M
   const area=(w,h)=>{const sx=w/W,sy=h/H,X1=Math.floor(x0*sx),Y1=Math.floor((H-y1)*sy);gl.scissor(X1,Y1,Math.ceil(x1*sx)-X1+1,Math.ceil((H-y0)*sy)-Y1+1)};
   gl.enable(gl.SCISSOR_TEST);
   const blur=(src,dst,dx,dy,sg)=>{gl.bindFramebuffer(gl.FRAMEBUFFER,dst.f);gl.viewport(0,0,dst.w,dst.h);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);area(dst.w,dst.h);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(JEL.uB.t,0);gl.uniform2f(JEL.uB.d,dx,dy);gl.uniform1f(JEL.uB.s,sg);gl.drawArrays(gl.TRIANGLES,0,3)};
-  gl.useProgram(JEL.pB);const s1=Math.max(.6,rpx*.07/2),s2=Math.max(.6,rpx*.42/8);
+  gl.useProgram(JEL.pB);const s1=Math.max(.6,rpx*.07/2)*(mat.round>0?mat.round:1),s2=Math.max(.6,rpx*.42/8);
   blur(JEL.tM,JEL.h1,1/JEL.h1.w,0,s1);blur(JEL.h1.tx,JEL.h2,0,1/JEL.h2.h,s1);blur(JEL.tM,JEL.q1,1/JEL.q1.w,0,s2);blur(JEL.q1.tx,JEL.q2,0,1/JEL.q2.h,s2);
   // 3. 打光
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,JEL.c.width,JEL.c.height);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);area(JEL.c.width,JEL.c.height);
@@ -2588,7 +2615,7 @@ function jelRender(P,tr,col){const gl=JEL.gl,m=JEL.m,sk=jelSkin(),k=1/DPR,zoom=M
   gl.uniform4fv(U.uD,ds);gl.uniform1i(U.nD,nd);
   const b=jelColor(tint(col('--body'))),sh=jelColor(tint(col('--shade'),true)),ln=jelColor(col('--line'));
   gl.uniform3fv(U.cEdge,jelMix(b,[1,1,1],sk.kEdge));gl.uniform3fv(U.cCore,jelMix(b,sh,sk.kCore));gl.uniform3fv(U.cLine,jelMix(sh,ln,.35));gl.uniform3fv(U.cGlow,jelMix(b,[1,1,1],.3));
-  for(const n of ['aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc'])gl.uniform1f(U[n],sk[n]);
+  for(const n of ['aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc'])gl.uniform1f(U[n],sk[n]);gl.uniform1f(U.rnd,mat.round>0?.46:0);gl.uniform1f(U.wet,sk.wet||0);
   gl.drawArrays(gl.TRIANGLES,0,3);gl.disable(gl.SCISSOR_TEST)}
 function drawBlush(P){if(!VIEW.face||!EYE.L.length)return;const pz=EYE.pose||(eyePose(1/60),EYE.pose),lx=pz[0],ly=pz[1],rx=pz[2],ry=pz[3],a=Math.atan2(ry-ly,rx-lx),S=R*(mat.eyeSize||1);ctx.save();jelPath(ctx,P);ctx.clip();
   for(const [x0,y0,sd] of [[lx,ly,-1],[rx,ry,1]]){const x=x0+Math.cos(a)*sd*S*.23,y=y0+Math.sin(a)*sd*S*.23+S*.11;ctx.save();ctx.translate(x,y);ctx.scale(S*.13,S*.08);const g=ctx.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,'rgba(255,132,150,.72)');g.addColorStop(.55,'rgba(255,132,150,.42)');g.addColorStop(1,'rgba(255,132,150,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();ctx.restore()}ctx.restore()}

@@ -9,17 +9,19 @@ import UIKit
 final class JellySkin {
     let layer = CAMetalLayer()
     struct Dent { var x, y, r, d: Float }
-    struct Skin { var kEdge, kCore, aEdge, aCore, amb, dif, glow, line, nk, shin, s0, s1, spec, sheen, arc: Float }
+    struct Skin { var kEdge, kCore, aEdge, aCore, amb, dif, glow, line, nk, shin, s0, s1, spec, sheen, arc: Float; var wet: Float = 0 }
     /// The web's JSKINS: A clear (多米 11-07), B milky (what A becomes while the glitter clouds it)
     static let skinA = Skin(kEdge: 0.45, kCore: 0.42, aEdge: 0.52, aCore: 0.80, amb: 0.86, dif: 0.24, glow: 0.60, line: 0.38, nk: 0.95, shin: 320, s0: 0.42, s1: 0.66, spec: 0.85, sheen: 0.12, arc: 0.92)
+    /// v2.47 水潤 (多米 11-16: it should look full of water): A, clearer and brighter, with the shader's second highlight and rim of light. The web's JSKINS.W
+    static let skinW = Skin(kEdge: 0.50, kCore: 0.30, aEdge: 0.44, aCore: 0.66, amb: 0.88, dif: 0.26, glow: 0.80, line: 0.34, nk: 1.05, shin: 260, s0: 0.34, s1: 0.60, spec: 0.96, sheen: 0.20, arc: 1, wet: 1)
     static let skinB = Skin(kEdge: 0.50, kCore: 0.16, aEdge: 0.86, aCore: 0.97, amb: 0.88, dif: 0.20, glow: 0.46, line: 0.26, nk: 0.90, shin: 320, s0: 0.42, s1: 0.68, spec: 0.80, sheen: 0.10, arc: 0.88)
     /// A toward B by `cloud`, a little brighter by `glow` (web: jelSkin)
-    static func skin(cloud: Double, glow: Double) -> Skin {
-        let a = skinA, b = skinB, c = Float(min(1, max(0, cloud))), g = Float(min(1, max(0, glow)))
+    static func skin(cloud: Double, glow: Double, wet: Bool = false) -> Skin {
+        let a = wet ? skinW : skinA, b = skinB, c = Float(min(1, max(0, cloud))), g = Float(min(1, max(0, glow)))
         func m(_ x: Float, _ y: Float) -> Float { x + (y - x) * c }
         var o = Skin(kEdge: m(a.kEdge, b.kEdge), kCore: m(a.kCore, b.kCore), aEdge: m(a.aEdge, b.aEdge), aCore: m(a.aCore, b.aCore), amb: m(a.amb, b.amb), dif: m(a.dif, b.dif),
                      glow: m(a.glow, b.glow), line: m(a.line, b.line), nk: m(a.nk, b.nk), shin: m(a.shin, b.shin), s0: m(a.s0, b.s0), s1: m(a.s1, b.s1), spec: m(a.spec, b.spec),
-                     sheen: m(a.sheen, b.sheen), arc: m(a.arc, b.arc))
+                     sheen: m(a.sheen, b.sheen), arc: m(a.arc, b.arc), wet: m(a.wet, b.wet))
         o.glow = min(1, o.glow + 0.5 * g); o.sheen += 0.1 * g; o.kEdge += 0.15 * g
         return o
     }
@@ -76,7 +78,8 @@ final class JellySkin {
     }
 
     /// One frame. `path` is the body in screen points; `rpx` the body radius in points on screen; colours already tinted by mood and impression.
-    func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin) {
+    /// v2.47 `round`: the outline is cut from the small blur instead of the mask (sharp corners round off, concave ones join); it scales that blur. 0 = the mask's own edge.
+    func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin, round: Double = 0) {
         guard let mask, let h1, let h2, let q1, let q2, let ctx = maskCtx, let data = ctx.data else { return }
         // 1 the mask
         ctx.setFillColor(gray: 0, alpha: 1)
@@ -87,7 +90,7 @@ final class JellySkin {
         mask.replace(region: MTLRegionMake2D(0, 0, W, H), mipmapLevel: 0, withBytes: data, bytesPerRow: ctx.bytesPerRow)
         guard let cmd = queue.makeCommandBuffer(), let drawable = layer.nextDrawable() else { return }
         // 2 the blurs: small for the edge, large for the inner shading
-        let s1 = Float(max(0.6, rpx * 0.07 / 2)), s2 = Float(max(0.6, rpx * 0.42 / 8))
+        let s1 = Float(max(0.6, rpx * 0.07 / 2) * (round > 0 ? round : 1)), s2 = Float(max(0.6, rpx * 0.42 / 8))
         func blur(_ src: MTLTexture, _ dst: MTLTexture, _ dx: Float, _ dy: Float, _ s: Float) {
             let rp = MTLRenderPassDescriptor()
             rp.colorAttachments[0].texture = dst
@@ -121,7 +124,7 @@ final class JellySkin {
         u.append(SIMD4<Float>(skin.aEdge, skin.aCore, skin.amb, skin.dif))
         u.append(SIMD4<Float>(skin.glow, skin.line, skin.nk, skin.shin))
         u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec, skin.sheen))
-        u.append(SIMD4<Float>(skin.arc, 0, 0, 0))
+        u.append(SIMD4<Float>(skin.arc, round > 0 ? 0.46 : 0, skin.wet, 0))
         let rp = MTLRenderPassDescriptor()
         rp.colorAttachments[0].texture = drawable.texture
         rp.colorAttachments[0].loadAction = .clear

@@ -533,7 +533,7 @@ final class SlimeView: UIView {
         }
         let hz = rig.haze
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
-                 skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow))
+                 skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: rig.params.wet >= 0.5), round: rig.params.round)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
         if let e = rig.eyeView {
             let S = e.size * z, l = rig.toScreen(e.lx, e.ly), r = rig.toScreen(e.rx, e.ry), a = atan2(r.y - l.y, r.x - l.x)

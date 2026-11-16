@@ -248,6 +248,13 @@ struct FeelParams: Equatable, Codable {
     var introSwim: Double = 1         // the cold start (and a slime switch): it swims in from off the right edge, looks at you, waves, says hello. 0: the v2.17 hops
     // v2.23 personality (set by the chosen slime, see SlimeKind): rest length, voice pitch, eye size, how fast trust and wariness grow, how soon it visits
     var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
+    // v2.47 (多米 11-16, phone video of build 127: pulled about, some places turn sharp; pulled too long it twitches; take the powder out; it should look full of water)
+    var pressPull: Double = 1         // 1: the press spread fades once the finger has pulled away from where it landed (0.15R to 0.6R). Measured: pulled 3R and held still, the patch under the finger was still spread 0.3R (the grab radius), tearing it: 18 flipped triangles, the guard pushing 5 pt back every frame. 0 = v2.46
+    var dragCalm: Double = 1          // 1: the spring the whole body follows the finger on is damped more from 1R of travel, no overshoot from 3R (pulled 3.5R it ran 60 pt past and came back, jumping for a second with the hand still). 0 = v2.46
+    var memSmooth: Double = 4         // the remembered shape smooths its own spikes (like surface tension): how much of a one-particle detail goes a second; long pulls and flat spreads barely move. 0 = off (v2.46)
+    var round: Double = 1.3           // the jelly skin's outline is cut from the blurred mask: sharp corners become round heads, concave corners join like water; the number scales the corner size (1 is about 0.07R). 0 = the particle outline (v2.46)
+    var glit: Double = 0              // 0: no glitter drawn inside it and no haze when handled (多米 11-16: 粉末去掉); a shake still bounces it and slows its breath. 1 = v2.46
+    var wet: Double = 1               // 1: the wet skin (clearer, a larger sharper highlight, a second small one, a rim of light). 0 = skin A (v2.46)
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -305,13 +312,15 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
         case .clay:
             // clay remembers at once, tentacles too; the mark relaxes slowly: half in about 15 s (v2.14, 多米 build 59: it sprang back
             // too fast; v2.8 to v2.13 recover 0.3, about 10 s)
-            p = FeelParams(alpha: 0.40, damp: 0.940, yield: 0.05, creep: 6, recover: 0.05, grabR: 0.32, maxPull: 7,
-                           lag: 0.12, wGlobal: 0.08, cSpace: 0.3, cRad: 0.45, upright: 0.002, anchor: 4,
+            // 多米 11-16, tuned on the phone's feel desk (v2.39): alpha 0.40 → 0.18, lag 0.12 → 0.22, pressSink 0.8 → 0.2; the other six knobs he left where they were
+            p = FeelParams(alpha: 0.18, damp: 0.940, yield: 0.05, creep: 6, recover: 0.05, grabR: 0.32, maxPull: 7,
+                           lag: 0.22, wGlobal: 0.08, cSpace: 0.3, cRad: 0.45, upright: 0.002, anchor: 4,
                            areaGain: 0.5, gripRot: 3, life: 0.8, drift: 0.14, wriggle: 0.05, wander: 0.5,
                            floppy: 0.6, seed: 7)
             // free sculpting (多米 2026-11-01: pull it long, spread it flat like dough)
             p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 5; p.grabHold = 0.85   // v2.15: pull 7R, remember 5R (past about 8.5R long it shook; v2.13 20 and 12, v2.12 8 and 4)
             p.grabK = 1.2; p.nearR = 3   // pressFlat off since v2.12 (多米: take it out)
+            p.pressSink = 0.2   // 多米 11-16 (0.8 before)
         }
         return p
     }
@@ -570,6 +579,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.inertiaHz, name: "回彈每秒幾下", hint: "放手、甩、拖到一半停時整團晃的快慢；3 約 0.17 秒彈完第一下；0 回 v2.24（33 毫秒彈完）", range: 0...6, step: 0.1),
         TuneField(key: \.inertiaZ, name: "回彈阻尼比", hint: "越小晃越多下（果凍 0.16、麻糬 0.26、黏土 0.3）", range: 0.05...1, step: 0.01),
         TuneField(key: \.inertiaCarry, name: "放手帶多少速度", hint: "放手那一刻身體相對重心的速度帶進回彈的比例", range: 0...1, step: 0.05),
+        TuneField(key: \.pressPull, name: "拉開了就不攤 v2.47", hint: "1（多米 11-16：拉一拉變尖、拉太長會抽動）：手指離開落點 0.15R 起，按壓的「往外攤開」淡掉，0.6R 淡完；0 回 v2.46（拉長按著不動，手指底下那塊被撕開、一直跳）", range: 0...1, step: 1),
+        TuneField(key: \.dragCalm, name: "拉得遠就不衝過頭 v2.47", hint: "1：整隻跟著手指走的那條彈簧，要跟的距離 1R 起阻尼加大、3R 以上不過衝（原本拉 3.5R 整隻衝過去 60 點再退回來，手沒動牠自己跳一秒）；0 回 v2.46", range: 0...1, step: 1),
+        TuneField(key: \.memSmooth, name: "留下的形狀抹圓 v2.47", hint: "記住的形狀裡，刺和細鬚每秒消掉多少（4：一根刺約 0.3 秒變圓頭；整條拉長、整片壓扁這種大形狀幾乎不動）；0 關（v2.46）", range: 0...12, step: 0.5),
         TuneField(key: \.inertiaDrag, name: "拖動的慣性", hint: "抓著拖時整團加速度反過來推參考形狀，離手指越遠推越多；0 關", range: 0...6, step: 0.1),
         TuneField(key: \.dragSpring, name: "拖到停會衝過頭", hint: "整團跟手指用帶慣性的彈簧（阻尼比，0.5 衝過頭約一成六，越小衝越多）；0 回 v2.24", range: 0...1, step: 0.05),
         TuneField(key: \.dragHz, name: "整團跟上的快慢", hint: "上面那條彈簧每秒幾下", range: 0.5...4, step: 0.1),
@@ -608,6 +620,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.shakeG, name: "搖的門檻（公尺／秒²）", hint: "手機加速度超過這個算搖了一下；躺著輕輕晃也要搖得到，走路、拿起手機不會誤觸", range: 6...25, step: 0.5, section: "活物感"),
         TuneField(key: \.glitN, name: "亮粉顆數", hint: "肚子裡幾顆", range: 40...300, step: 10, section: "活物感"),
         TuneField(key: \.envRoam, name: "牠自己出門", hint: "窗台上牠自己爬出碗、在窗台上走、爬回碗的機率倍數（v2.30）；0 就一直待在原地", range: 0...2, step: 0.1, section: "活物感"),
+        TuneField(key: \.round, name: "外框圓角 v2.47", hint: "果凍皮的外框用模糊過的遮罩切：尖角變圓頭、凹進去的地方像水一樣連起來。數字是圓角大小的倍數（1 約 0.07 個半徑）；0 關（v2.46，照粒子外框畫）", range: 0...2.5, step: 0.1, section: "外形"),
+        TuneField(key: \.glit, name: "肚子裡的亮粉 v2.47", hint: "0（多米 11-16：身體裡的粉末去掉）：不畫亮粉，摸牠也不會變霧；搖手機牠照樣彈、照樣慢呼吸。1 回 v2.46", range: 0...1, step: 1, section: "外形"),
+        TuneField(key: \.wet, name: "水潤 v2.47", hint: "1（多米 11-16：要很有水份的感覺）：更透、亮點更大更銳、多一顆小亮點、邊緣一圈反光；0 回 v2.46 的皮", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.skin, name: "皮", hint: "1 果凍 A 清透（多米 11-07 定）：看得到肚子裡的亮粉在沉；亮粉揚起來時往奶凍混。0 平塗（舊畫法，沒有 Metal 的手機也用這個）", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.scene, name: "背景", hint: "0 藍：懸空（舊行為一條都不變）；1 白天、2 夜晚：窗台上有重力，牠坐在正中間的碗裡，石頭盤和盆栽只是圖（v2.28 窗台，v2.31 碗回中間）", range: 0...2, step: 1, section: "外形"),
         TuneField(key: \.fingerSolid, name: "手指是實心的（×半徑）", hint: "抓著拖過身體時，沒被抓到的部分被手指推開，不會被穿過去（v2.29 0.2；0 關）", range: 0...0.5, step: 0.01),
