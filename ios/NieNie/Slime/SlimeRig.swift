@@ -13,6 +13,7 @@ enum SlimeEvent {
     case nudge                               // v2.20 C1: it reached your resting finger (one soft tap); v2.22 E2: it pushed back at your finger
     case voice(kind: String, gain: Double, rate: Double)   // v2.22 E1: one of its small sounds; rate from the impression
     case beat                                // v2.23 C6: one beat of it answering your rhythm (a soft tap)
+    case fx(kind: String, gain: Double, delay: Double)   // v2.50 場景聲 (AI samples, manifest fx.<kind>)
     case land(gain: Double)                  // v2.28 窗台: it landed on the sill or in the bowl after a fall or a hop
     case ding(gain: Double)                  // v2.31 搖晃沉澱: the glitter has settled, it is clear again
 }
@@ -318,6 +319,7 @@ final class SlimeRig {
                        size: R * params.eyeSize, spread: max(0.8, min(1.3, hypot(r.x - l.x, r.y - l.y) / eyeD0)), mode: eyeMode)
     }
     // B2 sleep: k eases 0...1 (1.6 s falling asleep, 0.25 s waking); lastAny = the last touch anywhere (a tap on empty space counts)
+    private var slpSnoreAt = 0.0   // v2.50 next sleeping breath sound
     private var slpOn = false, slpK = 0.0, slpLastAny = -99.0, slpWakeT = -9.0, slpAskAt = -9.0, slpNearT = 0.0, flBoost = 1.0
     // C6 echo: st 0 idle, 1 listening, 2 answering; beats = offsets from t0; prev = the rhythm it answered last (you repeating it = happy)
     private var echoTaps: [Double] = [], echoSt = 0, echoX = 0.0, echoY = 0.0, echoBeats: [Double] = [], echoI = 0, echoT0 = 0.0
@@ -457,7 +459,7 @@ final class SlimeRig {
             if introPT > introTair * 0.5 && y1 >= introFloor - 0.5 {
                 introPh = .land; introPT = 0; introSq = 0
                 if introN > 1 { introU = min(1, Double(introK + 1) / Double(introN)) }
-                onEvent?(.press(gain: 0.15 + 0.45 * ivS))
+                onEvent?(.fx(kind: "land", gain: 0.25 + 0.5 * ivS, delay: 0))
             }
         case .land:
             if introPT >= (introK + 1 >= introN ? 0.3 : 0.08) {
@@ -2136,7 +2138,7 @@ final class SlimeRig {
                 if sighNext < 0 { sighNext = t + 30 + Double.random(in: 0..<60) }
                 let ex = exert, cyc = Int(floor(brPhase))
                 T *= (1 + 0.15 * Self.vnoise(77, brPhase * 0.9)) * (1 - 0.5 * ex); brAmpX = 1 - 0.3 * ex
-                if sighCyc < 0 && t > sighNext && ex < 0.2 && lifeSt != .go { sighCyc = cyc + 1 }
+                if sighCyc < 0 && t > sighNext && ex < 0.2 && lifeSt != .go { sighCyc = cyc + 1; if !slpOn { onEvent?(.fx(kind: "sigh", gain: 0.45, delay: 0)) } }
                 if cyc == sighCyc { T *= 1.6; brAmpX *= 1.8 }
                 else if sighCyc >= 0 && cyc > sighCyc { sighCyc = -1; pauseUntil = t + 1; sighNext = t + 30 + Double.random(in: 0..<60) }
             }
@@ -3307,7 +3309,7 @@ final class SlimeRig {
             }
         }
         if wasAir && !sillAir && !sillGrab {   // landed
-            if sillFall > R * 2.5 { onEvent?(.land(gain: min(0.9, 0.2 + sillFall / (R * 16)))) }
+            if sillFall > R * 2.5 { onEvent?(.fx(kind: "land", gain: min(0.9, 0.25 + sillFall / (R * 14)), delay: 0)) }
             if hopAir { sillHop = nil }
             sillWant = false; sillFall = 0; sillLastHome = max(sillLastHome, t - 8)
             if sillRoute == nil { lifeSt = .rest; lifeUntil = t + 1 + Double.random(in: 0..<1); if sillSurf == nil { sillSurf = sillPlane == .frame ? "bar" : (sillPlane == .out ? "ledge" : (sillInBowl ? "bowl" : "floor")) } }
@@ -3458,6 +3460,7 @@ final class SlimeRig {
         clingOn = true; clingSide = side; clingT0 = t; clingN0 = 0; clingN = 0; clingAcc = 0; clingSaid = false
         clingAX = Array(repeating: .nan, count: N); clingAY = clingAX
         eyeUser = t + 1.5
+        onEvent?(.fx(kind: "cling", gain: 0.6, delay: 0))   // v2.50 it splats onto the frame
     }
     private func clingEnd() {
         clingOn = false; clingN = 0
@@ -3522,6 +3525,7 @@ final class SlimeRig {
         if clingN <= max(2, Int((Double(clingN0) * 0.25).rounded(.up))) {   // pulled off: the rest let go at once, one heavy pop
             clingEnd()
             onEvent?(.release(gain: 0.95, rate: 0.95, special: true))
+            onEvent?(.fx(kind: "unstick", gain: 0.9, delay: 0))   // v2.50 the suction letting go
             voice("poke")
         }
     }
@@ -4122,7 +4126,13 @@ final class SlimeRig {
         return ((gaitDash ? 0.62 : 1.1) * (rm ? 2 : 1), (gaitDash ? 0.15 : 0.25) * (rm ? 2 : 1), (gaitDash ? 0.24 : 0.35) * (rm ? 2 : 1),
                 (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1) * (1 + 0.3 * exLevel()), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))
     }
+    /// v2.50 場景聲: one per stroke. Climbing (a climb route, lifting itself, on the frame) sounds like climbing, otherwise crawling on the sill.
+    private func gaitSfx() {
+        if gaitClimb || (sillOn && (sillTanV || sillPlane == .frame)) { onEvent?(.fx(kind: "climb", gain: 0.5, delay: 0)) }
+        else { onEvent?(.fx(kind: "crawl", gain: gaitDash ? 0.55 : 0.4, delay: 0)) }
+    }
     private func strokeStart(_ K: (P: Double, c: Double, tau: Double, sd: Double, kA: Double)) {
+        gaitSfx()
         if sillOn { if sillTanV { gaitTX = homeX } else { gaitTY = homeY; if sillRoute == nil { gaitTX = sillClampX(gaitTX) } } }   // v2.28 窗台: along the sill; v2.30 or straight up and down while it lifts itself
         let dx = gaitTX - homeX, dy = gaitTY - homeY, rem = hypot(dx, dy)
         gaitH = atan2(dy, dx) + Double.random(in: -0.21..<0.21)   // each stroke veers a little (±12°): a curved path, speed and heading change together
@@ -4376,6 +4386,7 @@ final class SlimeRig {
         release(id, quiet: false)
         onEvent?(.pull(gain: 1, rate: 1))
         onEvent?(.voice(kind: "tear", gain: 1, rate: 1))   // v2.50 the rip (AI sample, manifest voice.tear; silent without the file)
+        onEvent?(.fx(kind: "drip", gain: 0.6, delay: 0.35))   // v2.50 the torn-off bit drips
     }
     /// v2.38 home may not be dragged out of the room. The pull (slide) has the whole body follow the finger's real position with no edge: pulled below
     /// the sill or past the frame, home went with it and the finger's effective position counted from there, pressing the body into the corner
@@ -4860,7 +4871,7 @@ final class SlimeRig {
     private func wake(_ sharp: Bool) {
         guard slpOn else { return }
         slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1); eyeBlinkT = t
-        if sharp { flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
+        if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
         slpAskAt = t + (sharp ? 0.45 : 0.3)
     }
     private func sleepStep(_ dt: Double) {
@@ -4868,6 +4879,11 @@ final class SlimeRig {
         if slpOn, fingers.values.contains(where: { t - $0.hitT < 0.05 }) { wake(true) }   // a finger pushed in from outside touched it
         slpK += ((slpOn ? 1 : 0) - slpK) * (1 - exp(-dt / (slpOn ? 1.6 : 0.25)))
         if slpK < 1e-3 && !slpOn { slpK = 0 }
+        // v2.50 sleeping breaths, one every 4 to 7 s
+        if slpOn && slpK > 0.8 {
+            if slpSnoreAt <= 0 { slpSnoreAt = t + 1 + Double.random(in: 0..<2) }
+            else if t >= slpSnoreAt { slpSnoreAt = t + 4 + Double.random(in: 0..<3); onEvent?(.fx(kind: "snore", gain: 0.5, delay: 0)) }
+        } else { slpSnoreAt = 0 }
         if slpAskAt > 0 && t >= slpAskAt { slpAskAt = -9; voiceLast = -9; voice("ask", 0.6); eyeUser = t + 1.2 }
     }
     /// C6: 2 to 8 taps on empty space, each 0.12–1.2 s apart; when you stop (1.4× the longest gap, at least 0.8 s) it looks where you
@@ -4921,7 +4937,7 @@ final class SlimeRig {
     private func swimIntro(_ side: Double) {
         let rm = reduceMotion, dx = (rm ? R * 1.6 : W / 2 + R * 1.9) * side, dy = rm ? 0 : -H * 0.06
         moveHome(dx, dy, 1.0 / 60); wanderVX = 0; wanderVY = 0
-        swimOn = true; swimT0 = t; lastTouch = t - 3
+        swimOn = true; swimT0 = t; lastTouch = t - 3; onEvent?(.fx(kind: "swimin", gain: 0.7, delay: 0))
         gaitTo(cx, cy, dash: !rm)
     }
     private func swimGreet() {

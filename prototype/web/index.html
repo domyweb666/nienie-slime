@@ -477,7 +477,7 @@ const SILL={on:false,g:null,air:false,c:0,cb:0,cj:0,ct:0,inBowl:false,want:false
 const CLING={on:false,side:'',t0:0,ax:null,ay:null,n0:0,n:0,acc:0,peelT:-9,popT:-9,said:false,p0:0};
 function clingWallD(side,x,y){const g=SILL.g;return side==='rjamb'?g.jr-x:side==='ljamb'?x-g.gx:y-g.gy}
 function clingP0(){return R*(mat.imp>=.5?Math.max(1,Math.min(1.5,1.25-.25*IMP.tr+.25*IMP.w)):1.2)}
-function clingStart(side){if(!(mat.cling>=.5))return;Object.assign(CLING,{on:true,side,t0:t,n0:0,n:0,acc:0,said:false});CLING.ax=new Float64Array(N).fill(NaN);CLING.ay=new Float64Array(N).fill(NaN);EYE.user=t+1.5}
+function clingStart(side){if(!(mat.cling>=.5))return;Object.assign(CLING,{on:true,side,t0:t,n0:0,n:0,acc:0,said:false});CLING.ax=new Float64Array(N).fill(NaN);CLING.ay=new Float64Array(N).fill(NaN);EYE.user=t+1.5;sfxPlay('fx.cling',.6)}
 function clingEnd(){CLING.on=false;CLING.n=0;if(CLING.ax){CLING.ax.fill(NaN);CLING.ay.fill(NaN)}}
 function clingFree(i){if(CLING.ax&&CLING.ax[i]===CLING.ax[i]){CLING.ax[i]=NaN;CLING.ay[i]=NaN;CLING.n--}}
 // 每小步：釘住的點留在牆上（放在所有碰撞之後，最後算）
@@ -494,7 +494,7 @@ function clingStep(dt){const S=SILL,g=S.g;if(!CLING.on||!g)return;if(CLING.t0>t)
   for(let i=0;i<N;i++)if(!GRAB[i]&&CLING.ax[i]!==CLING.ax[i]){PX[i]+=(Math.random()-.5)*R*.01;PY[i]+=(Math.random()-.5)*R*.01}   // 整團發抖
   CLING.acc+=dt;const step=.22/(1+1.5*(pull-p0)/R);   // 剛過門檻約 0.2 秒剝一顆，拉越遠越快
   while(CLING.acc>=step&&CLING.n>0){CLING.acc-=step;let far=-1,fd=-1;for(let i=0;i<N;i++){if(CLING.ax[i]!==CLING.ax[i])continue;const d=Math.hypot(X[i]-fx,Y[i]-fy);if(d>fd){fd=d;far=i}}if(far<0)break;clingFree(far)}
-  if(CLING.n<=Math.max(2,Math.ceil(CLING.n0*.25))){clingEnd();CLING.popT=t;sfxPlay('release',.9,.95);voice('poke',.8)}}   // 揣下來那一下：剩下的一起放掉
+  if(CLING.n<=Math.max(2,Math.ceil(CLING.n0*.25))){clingEnd();CLING.popT=t;sfxPlay('release',.6,.95);sfxPlay('fx.unstick',.9);voice('poke',.8)}}   // 揣下來那一下：剩下的一起放掉
 const SILLG=14;   // 重力：每秒每秒幾個半徑
 function sillGeo(){const s=Math.min(W/860,H/1130),U=s*860/393,off=H*.72-1177*s,ox=(W-992*s)/2,fl=off+1228*s,bw=205*U,bh=bw*298/420,by=fl-bh,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s;   // v2.31 碗回正中間（多米 11-07）：窗框下緣兩側只剩 53 點，所以牠不再自己爬窗框（envFrame 0）；v2.30 曾移到左邊
   return{s,U,off,ox,fl,bw,bh,bx:W/2,by,gx,gy,gw,gh,jr:gx+gw,bt:gy+gh,oy:gy+gh+22*U,rim:by+bh*.5,lip:by+bh*.568,back:by+bh*.05,cav:bw*.40,outer:bw*.5,bf:by+bh*.86,l:Math.max(0,ox+40*s)+4,r:Math.min(W,ox+950*s)-4,sl:ox+40*s,sr:ox+950*s}}   // bt 窗框下緣、jr 右窗框、oy 窗外台階、lip 碗前緣最低點（bowlFront 挖掉的橢圓下緣）、back 碗後緣、sl sr 窗台兩端
@@ -780,7 +780,7 @@ const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lof
 let sfxRubLevel=0;
 function sfxInit(){if(SFX)SFX.init()} // iOS 規定：要在第一次觸碰裡建立音訊
 function sfxPlay(kind,gain=1,rate=1){if(!SFX)return;if(kind==='press')SFX.press(gain);else if(kind==='release')SFX.release(gain);else if(kind==='pull')SFX.strand(gain);
-  else if(kind.startsWith('voice.'))SFX.voice(kind.slice(6),gain,rate);else if(kind.startsWith('knock.')&&SFX.knock)SFX.knock(kind.slice(6),gain,rate);else if(kind==='ding')sfxDing(gain)}   // v2.22：它的聲音；v2.31 沉澱清了的叮
+  else if(kind.startsWith('voice.'))SFX.voice(kind.slice(6),gain,rate);else if(kind.startsWith('knock.')&&SFX.knock)SFX.knock(kind.slice(6),gain,rate);else if(kind.startsWith('fx.')&&SFX.fx)SFX.fx(kind.slice(3),gain,rate);else if(kind==='ding')sfxDing(gain)}   // v2.22：它的聲音；v2.31 沉澱清了的叮
 function sfxRub(level){sfxRubLevel=level} // 真正的播放在每幀的 SFX.frame
 // v2.31 叮：沉澱清透那一刻。三個正弦（E6 為主）短起音、1.4 秒衰減，走音效的 master；全部靜音時不響
 function sfxDing(g){if(!SFX||!SFX.ctx||SFX.mode===2)return;const c=SFX.ctx,out=SFX.master||c.destination,t0=c.currentTime;for(const [f,v,d] of [[1318.5,1,1.4],[2637,.35,.9],[1975.5,.18,.6]]){const o=c.createOscillator(),ga=c.createGain();o.type='sine';o.frequency.value=f;ga.gain.setValueAtTime(0,t0);ga.gain.linearRampToValueAtTime(.16*g*v,t0+.008);ga.gain.exponentialRampToValueAtTime(.0005,t0+d);o.connect(ga);ga.connect(out);o.start(t0);o.stop(t0+d+.05)}}
@@ -1337,7 +1337,7 @@ function introStep(dt,h){const I=INTRO;I.pt+=dt;let y1=-1e9;for(const i of bnd)y
     if(I.pt>=.07){for(let i=0;i<N;i++)PY[i]=Y[i]+v0*h;I.ph='air';I.pt=0;I.tair=tair}}   // 起跳：給整團向上的速度（Verlet 的速度＝這一小步減上一小步）
   else if(I.ph==='air'){const q=Math.min(1,I.pt/I.tair);I.sq=-.07*Math.sin(Math.PI*q);
     if(I.n>1)I.u=Math.min(1,(I.k+q)/I.n);
-    if(I.pt>I.tair*.5&&y1>=I.floor-.5){I.ph='land';I.pt=0;I.sq=0;if(I.n>1)I.u=Math.min(1,(I.k+1)/I.n);sfxPlay('press',.15+.45*IV.s)}}
+    if(I.pt>I.tair*.5&&y1>=I.floor-.5){I.ph='land';I.pt=0;I.sq=0;if(I.n>1)I.u=Math.min(1,(I.k+1)/I.n);sfxPlay('fx.land',.25+.5*IV.s)}}
   else if(I.ph==='land'){if(I.pt>=(I.k+1>=I.n?.3:.08)){I.k++;I.pt=0;if(I.k>=I.n)endIntro();else I.ph='crouch'}}}
 // v2.18 心情的事件：放手時看這一抓是哪一種。拉扯（撐過 0.5 秒）→ 往拉的反方向逃；輕揉 1 秒以上而且舒服 → 開心（挺高、偽足搖、小跳）；
 // 很快的一下（0.25 秒內、沒拉開）→ 戳：縮一下，1 秒內第 3 下就往旁邊閃
@@ -1421,7 +1421,7 @@ function drCrash(p,base){if(!DRon()||!p.deco||drRecent(p.crashAt,4))return;p.cra
   let held=t>=lastTouch&&t-lastTouch<1;for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'||f.mode==='push')held=true;
   if(held){DR.hab[p.im]=n;DR.n.heldSkip=(DR.n.heldSkip||0)+1;if(amt>=.02){DR.wideT=t;EYE.pulse=t}return}   // 多米 11-16：這時候只睜大眼 0.8 秒（只改眼睛怎麼畫，身體、怕、心情、習慣都不動）   // 剛放手 1 秒內也不嚇：身體還在彈回來   // 被你抓著、摸著的時候不嚇：注意力在你手上。嚇到會發抖、縮、心情掉，都會改到被拉長的身體（selftest T54 抓到：拖到右下角撞掉罐子，面積從 0.8 掉到 0.46）
   if(amt<.02)return;DR.n.scare++;MOOD.scare=Math.min(1,MOOD.scare+amt);BMEM.ev.sc=Math.max(BMEM.ev.sc,MOOD.scare);
-  if(SLP.on){if(amt>=.08){DR.n.wake++;wake(true)}}else{FLN.at=t+.12;FLN.pre=LIFE.st==='rest'?'rest':'go';FLN.boost=1+amt;EYE.pulse=t+.12}
+  if(SLP.on){if(amt>=.08){DR.n.wake++;wake(true)}}else{if(amt>=.08)voice('startle',Math.min(.9,.4+amt));FLN.at=t+.12;FLN.pre=LIFE.st==='rest'?'rest':'go';FLN.boost=1+amt;EYE.pulse=t+.12}
   DR.lookT=t+1.6;DR.lx=p.x;DR.ly=Math.min(p.y,SILL.g.fl)}
 function drCandleX(){if(!DRon()||VIEW.bg!=='night')return null;let p=null;for(const q of PROPS)if(q.im==='d_candle')p=q;
   if(!p||p.gone||p.fade||t-p.upT<=3||Math.abs(p.x-p.hx)>R*.3)return null;const g=SILL.g;return Math.max(g.l+R*.9,Math.min(g.bx,p.hx+p.hw+R*.85))}
@@ -1554,7 +1554,10 @@ function goStart(dir){if(SILL.on){sillGo();return}const far=Math.random()<mat.da
 // 一縮一衝的常數：一下 P 秒（快跑 0.62），前 c 秒收縮（速度 50 毫秒追上峰值），之後放鬆滑停（tau 秒時間常數）；一下前進 sd；沿前進方向最多拉長 kA。
 // 減少動態：節奏慢一倍、一下走一半（速度 ×0.25）、拉長減半
 function gaitConst(G){const rm=REDUCED;if(G.climb)return{P:1.15*(rm?2:1),c:.32*(rm?2:1),tau:.36*(rm?2:1),sd:.34*R*(rm?.5:1),kA:.15*(rm?.5:1)};return{P:(G.dash?.62:1.1)*(rm?2:1),c:(G.dash?.15:.25)*(rm?2:1),tau:(G.dash?.24:.35)*(rm?2:1),sd:(G.dash?.8:.5)*R*(rm?.5:1)*(1+.3*exLevel())*(1+.2*BRM()),kA:(G.dash?.17:.12)*(rm?.5:1)}}
-function strokeStart(G,K){if(SILL.on){if(SILL.tanV)G.tx=HOMEX;else{G.ty=HOMEY;if(!SILL.route)G.tx=sillClampX(G.tx)}}const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
+// v2.50 場景聲：每一縮一衝響一下。爬窗框（climb、往上抬、在窗框上）是爬的聲音，走在布墊上是布的聲音，其他是在窗台上爬
+function gaitSfx(G){const S=SILL,g=S.g;if(G.climb||(S.on&&(S.tanV||S.plane==='frame'))){sfxPlay('fx.climb',.5);return}
+  if(S.on&&g&&mat.deco>=.5&&S.plane==='room'&&!S.inBowl&&Math.abs(globalC.xc-g.bx)<DECODEF.cloth.w*g.U*.5){sfxPlay('fx.cloth',.55);return}sfxPlay('fx.crawl',G.dash?.55:.4)}
+function strokeStart(G,K){gaitSfx(G);if(SILL.on){if(SILL.tanV)G.tx=HOMEX;else{G.ty=HOMEY;if(!SILL.route)G.tx=sillClampX(G.tx)}}const dx=G.tx-HOMEX,dy=G.ty-HOMEY,rem=Math.hypot(dx,dy);
   G.h=Math.atan2(dy,dx)+(Math.random()-.5)*.42;   // 每一下方向偏一點（±12 度），路線是彎的；速度跟方向在同一刻變
   const per=K.c/2+K.tau*(1-Math.exp(-(K.P-K.c)/K.tau));   // 這個速度剖面，每單位峰值速度走多遠
   if(rem<K.sd*1.4&&!SILL.lift){G.last=true;G.str=Math.max(.35,Math.min(1,rem/K.sd))}else G.str=1;   // 最後一下比較小
@@ -1764,10 +1767,11 @@ function sleepTry(){if(!IV3('sleep')||SLP.on)return false;
   if(t-Math.max(lastTouch,SLP.lastAny)<40||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03||SNW.loose.length)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
   SLP.on=true;LIFE.st='sleep';cutSniffs();return true}
 function wake(sharp,self){if(!SLP.on)return;SLP.on=false;SLP.wakeT=t;SLP.nearT=0;LIFE.st='rest';LIFE.until=t+1.5+Math.random();EYE.blinkT=t;
-  if(sharp){FLN.at=t+.05;FLN.pre='rest';FLN.boost=1.6;if(MDon())BRAIN.m-=.1}if(!self)SLP.askAt=t+(sharp?.45:.3)}
+  if(sharp){voice.last=-9;voice('startle',.8);FLN.at=t+.05;FLN.pre='rest';FLN.boost=1.6;if(MDon())BRAIN.m-=.1}if(!self)SLP.askAt=t+(sharp?.45:.3)}
 function sleepStep(dt){if(!IV3('sleep')&&SLP.on)wake(false);
   if(SLP.on)for(const f of fingers.values())if(t-f.hitT<.05){wake(true);break}   // 從外面推進來碰到它
   SLP.k+=((SLP.on?1:0)-SLP.k)*(1-Math.exp(-dt/(SLP.on?1.6:.25)));if(SLP.k<1e-3&&!SLP.on)SLP.k=0;
+  if(SLP.on&&SLP.k>.8){if(!(SLP.snoreAt>0))SLP.snoreAt=t+1+2*Math.random();else if(t>=SLP.snoreAt){SLP.snoreAt=t+4+3*Math.random();sfxPlay('fx.snore',.5)}}else SLP.snoreAt=0;   // v2.50 睡著的呼吸聲，4 到 7 秒一次
   if(SLP.askAt>0&&t>=SLP.askAt){SLP.askAt=-9;voice.last=-9;voice('ask',.6);EYE.user=t+1.2}}
 // C6：空白處點 2 到 8 下，每個間隔 0.12 到 1.2 秒；停下來（1.4 倍最長間隔、至少 0.8 秒）它看著你點的地方想 0.35 秒，再照同樣的次數和間隔一縮一縮回你（每下「噗」，iPhone 每下輕震）。
 // 你接著點一樣的節奏（15 秒內、次數一樣、每個間隔差兩成五內）：它回完之後開心（∩、搖偽足、「噗咿」、熟一點）
@@ -1791,7 +1795,7 @@ function echoStep(dt){if(!IV3('echo')){ECHO.st='idle';ECHO.taps.length=0;return}
       if(ECHO.same){ECHO.joyUntil=t+1.6;MOOD.wagT=t;voice.last=-9;voice('happy',.8);if(mat.imp>=.5)IMP.tr=Math.min(1,IMP.tr+.08*mat.trRate)}}}}
 // 開場游過來（多米 11-02）：從畫面右邊外面（減少動態：旁邊 1.6R）一縮一衝游到家，鏡頭不動；到了看著你、搖偽足、打招呼。換史萊姆時也這樣進場
 function swimIntro(side){const rm=REDUCED,dx=(rm?R*1.6:W/2+R*1.9)*side,dy=rm?0:-H*.06;moveHome(dx,dy,1/60);WANDER.vx=0;WANDER.vy=0;
-  SWIM.on=true;SWIM.t0=t;lastTouch=t-3;gaitTo(CX,CY,!rm)}
+  SWIM.on=true;SWIM.t0=t;lastTouch=t-3;gaitTo(CX,CY,!rm);sfxPlay('fx.swimin',.7)}
 function swimGreet(){if(!SWIM.on)return;if(t-SWIM.t0>9){SWIM.on=false;return}
   if(LIFE.st==='rest'){SWIM.on=false;EYE.user=t+2;MOOD.wagT=t+.1;voice.last=-9;voice('hello',.8);LIFE.until=t+2.5}}
 // 收集（多米 11-02：一開始全部都有）：四隻，各自的材質、顏色、外形種子、個性（休息長短、走多遠、聲音高低、眼睛大小、熟得快慢、戒得快慢、多常來找你）。
@@ -1846,7 +1850,7 @@ function pairStep(dt){PAIR.st=0;PAIR.stR=0;if(!(mat.pairMax>0)){PAIR.over=0;retu
     const raw=Math.hypot(b.x-a.x,b.y-a.y)/Lp;if(raw>wr){wr=raw;worst=[a,b]}}
   if(mat.tear>=.5&&worst&&wr>mat.tearK){PAIR.over+=dt;if(PAIR.over>=.12){PAIR.over=0;const c=globalC,da=Math.hypot(worst[0].x-c.xc,worst[0].y-c.yc),db=Math.hypot(worst[1].x-c.xc,worst[1].y-c.yc);tearFinger(da>=db?worst[0]:worst[1])}}else PAIR.over=0}
 // 撕開：照一般放手走（手感、印象、情緒都一樣），拉伸量算滿所以啵最大；這根手指不再抓，要抬起來再按
-function tearFinger(f){f.stretch=Math.max(f.stretch||0,2);releaseFinger(f,false);PAIR.tearT=t;sfxPlay('pull',1);sfxPlay('voice.tear',1,1)}   // v2.50 撕裂聲（AI 音效，manifest voice.tear；沒有檔案就安靜）
+function tearFinger(f){f.stretch=Math.max(f.stretch||0,2);releaseFinger(f,false);PAIR.tearT=t;sfxPlay('pull',1);sfxPlay('voice.tear',1,1);if(SFX&&SFX.fx)SFX.fx('drip',.6,1,.35)}   // v2.50 撕裂聲（AI 音效，manifest voice.tear；沒有檔案就安靜）
 // v2.38 家不准被拖出房間（多米 11-09：極限拉扯還是會壞）。拉力（slide）讓整隻跟著手指的真實位置走，沒有邊界：手指往窗台下面、窗框外面拉，
 // 家跟著跑出房間，手指的有效位置也從那裡量起，整隻被往牆角裡壓。量到往右下角拉：壓成 14 點高、寬 644 點（窗框外面）、面積剩 9%、內部翻 700 個三角形。
 // 家夾在「靜止形狀放進房間還塞得下」的範圍內（留 15% 給本來就有的壓扁），夾到的那一軸速度歸零，放手才不會甩出去
@@ -2041,7 +2045,7 @@ function update(dt){
     if(LV('lifeBreath')){   // v2.19 A6：每一下快慢不同（平滑亂數 ±15%）；喘（exert）快一倍、淺三成；每 30 到 90 秒一次大口呼吸（深 1.8 倍、慢 1.6 倍），吐完停 1 秒
       if(BRX.sighNext<0)BRX.sighNext=t+30+60*Math.random();
       const ex=BRX.exert,cyc=Math.floor(BR.phase);T*=(1+.15*vnoise(77,BR.phase*.9))*(1-.5*ex);BRX.ampX=1-.3*ex;
-      if(BRX.sighCyc<0&&t>BRX.sighNext&&ex<.2&&LIFE.st!=='go')BRX.sighCyc=cyc+1;
+      if(BRX.sighCyc<0&&t>BRX.sighNext&&ex<.2&&LIFE.st!=='go'){BRX.sighCyc=cyc+1;if(!SLP.on)sfxPlay('fx.sigh',.45)}
       if(cyc===BRX.sighCyc){T*=1.6;BRX.ampX*=1.8}else if(BRX.sighCyc>=0&&cyc>BRX.sighCyc){BRX.sighCyc=-1;BRX.pauseUntil=t+1;BRX.sighNext=t+30+60*Math.random()}}
     amp*=BRX.ampX;
     if(t>=BRX.pauseUntil)BR.phase+=(tl-BR.tlPrev)/T;BR.tlPrev=tl;BR.amp=amp;
@@ -2300,7 +2304,7 @@ function sillStep(dt){const S=SILL,g=S.g,gc=globalC,cx=gc.xc,cy=gc.yc;if(cx==nul
   {const k=1-Math.exp(-dt/.12);S.gvx+=(S.gtx-S.gvx)*k;S.gvy+=(S.gty-S.gvy)*k}   // 重力方向慢慢轉，轉角才不會一下甩出去
   const wasAir=S.air;S.air=(S.c===0||(S.hop&&S.hop.ph==='air'&&S.hop.t<.45))&&!S.grab&&!INTRO.on&&!S.lift&&!(S.hop&&S.hop.ph==='crouch');   // v2.31 起跳後 0.3 秒內碰到碗壁也算在空中：身體比碗口寬，起跳時側邊一直碰著，不算空中的話阻尼把跳吃掉（量過只跳 2 點高）
   if(S.air){S.fall=Math.max(S.fall,S.vy);for(let i=0;i<N;i++){const lim=R*30*dt/SUB,v=Y[i]-PY[i];if(v>lim)PY[i]=Y[i]-lim;else if(v<-lim)PY[i]=Y[i]+lim}}
-  if(wasAir&&!S.air&&!S.grab){if(S.fall>R*2.5)sfxPlay('press',Math.min(.9,.2+S.fall/(R*16)));if(S.hop&&S.hop.ph==='air')S.hop=null;S.want=false;S.fall=0;S.lastHome=Math.max(S.lastHome,t-8);if(!S.route){LIFE.st='rest';LIFE.until=t+1+Math.random();if(!S.surf)S.surf=S.plane==='frame'?'bar':S.plane==='out'?'ledge':S.inBowl?'bowl':'floor'}}
+  if(wasAir&&!S.air&&!S.grab){if(S.fall>R*2.5)sfxPlay('fx.land',Math.min(.9,.25+S.fall/(R*14)));if(S.hop&&S.hop.ph==='air')S.hop=null;S.want=false;S.fall=0;S.lastHome=Math.max(S.lastHome,t-8);if(!S.route){LIFE.st='rest';LIFE.until=t+1+Math.random();if(!S.surf)S.surf=S.plane==='frame'?'bar':S.plane==='out'?'ledge':S.inBowl?'bowl':'floor'}}
   // 被抓：路線取消，回到窗台層（舉起來，畫在最前面）
   if(S.grab&&!S.held){if(S.route)routeEnd(true);if(S.hop)S.hop=null;S.stickT=-1;S.surf=null;S.tanV=false;S.lift=false;S.gtx=0;S.gty=1;planeSet('room')}
   // 放手：碗正上方掉進碗；窗戶範圍內、身體不跟碗或擺飾重疊就落到窗框層；慢慢放在窗框旁邊會黏住；其他落在窗台
@@ -2356,7 +2360,7 @@ function propAt(x,y){for(let k=PROPS.length-1;k>=0;k--){const p=PROPS[k];if(!p.g
 function propHome(p){Object.assign(p,{x:p.hx,y:p.hy,a:0,vx:0,vy:0,va:0,gone:false,fell:false,tip:false,fade:1,alpha:0,skip:false,lastHit:t})}
 function propSlotFree(p){const S=SILL;if(p.deco||S.plane!=='room'||S.inBowl)return true;return !(S.x0<p.hx+p.r&&S.x1>p.hx-p.r&&S.y1>p.hy-p.r)}
 function propsMarkOverlap(){for(const p of PROPS){if(p.deco||p.gone){continue}let o=false;for(let i=0;i<N&&!o;i++)if(propIn(p,X[i],Y[i],0))o=true;p.skip=o}}   // 換回窗台層時已經疊著的擺飾先不撞，分開了才開始（不然一抓就把盆栽踢飛）
-function propKnock(p,g,far){if(t-p.knockT<.14)return;p.knockT=t;sfxPlay('knock.'+p.kind,Math.max(.05,Math.min(1,g)),far?.8:1);if(!far&&p.deco)drLook(p,.12,p.x,p.y)}
+function propKnock(p,g,far){if(t-p.knockT<.14)return;p.knockT=t;if(far){sfxPlay('fx.fallout',Math.max(.3,Math.min(1,g)));return}sfxPlay('knock.'+(p.im==='d_candle'?'candle':p.kind),Math.max(.05,Math.min(1,g)),1);if(!far&&p.deco)drLook(p,.12,p.x,p.y)}   // v2.50 掉到看不到的地方是遠遠一聲；蠟燭有自己的聲音
 function propRelease(f){const p=f.prop;if(!p)return;p.held=null;p.lastHit=t;p.fingT=t;if(t-f.tDown<.25&&Math.hypot(f.x-f.ax,f.y-f.ay)<R*.12){p.va+=(f.ax<p.x?1:-1)*(p.tap||3.2);propKnock(p,.22)}}
 // v2.44 掛著的兩件是擺錘：角度 a（畫布 rotate 的方向，正的是下端往左）、角速度 va。搖手機踢一下，手指抓著就跟手指，放手自己晃到停。風鈴被碰、晃過正中間夠快就叮一聲
 const HANG={bell:{w2:77,damp:.9,kick:1.9,tap:2.6,ring:true},teru:{w2:115,damp:1.4,kick:1.3,tap:3.2,ring:false}};
@@ -2422,7 +2426,7 @@ function propsStep(dt){const S=SILL,g=S.g,G0=R*SILLG,bwr=g.bx+g.bw*.48,bwy=g.by+
     p.tc=touch;if(p.deco&&!p.held&&touch>=2){const f=PROP_MU*G0*dt;p.vx=Math.abs(p.vx)<=f?0:p.vx-Math.sign(p.vx)*f}   // v2.45 平放著滑會被窗台磨停（原本只有落地那一下有摩擦，一推就滑出窗台）
     if(touch){p.vx*=.9985;p.va*=.994;if(!p.held&&touch>=2&&Math.abs(p.vx)+Math.abs(p.vy)<7&&Math.abs(p.va)<.22){p.vx=0;p.vy=0;p.va=0;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a));if(Math.abs(w)<.08)p.a-=w*.2}}   // 兩個點著地才算停；只差一點點就慢慢躺平，不留歪的
     if(p.deco&&Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)))>.6)p.upT=t;   // 蠟燭倒了火就熄，扶正 3 秒後再亮
-    if(p.deco&&!p.held){const w=Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)));if(w>.6&&!p.tip){p.tip=true;drCrash(p,.35)}else if(w<.3)p.tip=false}   // v2.46 倒下那一下（歪過 0.6 算倒，回到 0.3 以內才算站回來，在邊緣晃不會算兩次）
+    if(p.deco&&!p.held){const w=Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)));if(w>.6&&!p.tip){p.tip=true;drCrash(p,.35);sfxPlay('fx.topple',.7)}else if(w<.3)p.tip=false}   // v2.46 倒下那一下（歪過 0.6 算倒，回到 0.3 以內才算站回來，在邊緣晃不會算兩次）
     if(p.y>g.fl+R*.9&&!p.fell){p.fell=true;propKnock(p,.55,true);drCrash(p,.45)}   // 掉到窗台下面：看不到了，聽得到一聲
     if(p.y>g.fl+R*2.5||p.x>W+R*2||p.x<-R*2){if(p.deco&&!p.fell){propKnock(p,.45,true);drCrash(p,.45)}p.gone=true;p.upT=t+20;p.alpha=0;p.backAt=t+20;p.vx=0;p.vy=0;p.va=0;p.fade=0;p.held=null}}
   for(let i=0;i<PROPS.length;i++)for(let j=i+1;j<PROPS.length;j++){const A=PROPS[i],B=PROPS[j];if(!A.gone&&!B.gone&&A.alpha>.6&&B.alpha>.6){propPair(A,B);propPair(B,A)}}

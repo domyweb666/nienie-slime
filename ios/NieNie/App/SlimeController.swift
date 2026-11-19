@@ -154,6 +154,10 @@ final class SlimeController: ObservableObject {
             // v2.28 窗台: it landed after a fall or a hop (the web plays the press sound); a soft dull tap
             sound.press(intensity: gain * 0.6)
             haptics.transient(intensity: 0.15 + 0.3 * gain, sharpness: 0.2)
+        case .fx(let kind, let gain, let delay):
+            // v2.50 場景聲; landing keeps the soft dull tap it had as .land
+            sound.fx(kind, gain: gain, delay: delay)
+            if kind == "land" { haptics.transient(intensity: 0.15 + 0.3 * gain, sharpness: 0.2) }
         case .ding(let gain):
             // v2.31 搖晃沉澱: settled clear; a small bright tap with it
             sound.ding(gain: gain)

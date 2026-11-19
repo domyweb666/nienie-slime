@@ -73,9 +73,8 @@
   },
   "rub": {
     "loop": [
-      "rub-loop-01.wav",
-      "rub-loop-02.wav",
-      "rub-loop-03.wav"
+      "ai-rub-loop-01.wav",
+      "ai-rub-loop-02.wav"
     ]
   },
   "settle": {
@@ -105,10 +104,8 @@
       "ai-voice-poke-04.wav"
     ],
     "mmm": [
-      "voice-mmm-01.wav",
-      "voice-mmm-02.wav",
-      "voice-mmm-03.wav",
-      "voice-mmm-04.wav"
+      "ai-voice-mmm-01.wav",
+      "ai-voice-mmm-02.wav"
     ],
     "protest": [
       "ai-voice-protest-01.wav",
@@ -123,10 +120,9 @@
       "ai-voice-happy-04.wav"
     ],
     "ask": [
-      "voice-ask-01.wav",
-      "voice-ask-02.wav",
-      "voice-ask-03.wav",
-      "voice-ask-04.wav"
+      "ai-voice-ask-01.wav",
+      "ai-voice-ask-02.wav",
+      "ai-voice-ask-03.wav"
     ],
     "giggle": [
       "ai-voice-giggle-01.wav",
@@ -135,51 +131,119 @@
       "ai-voice-giggle-04.wav"
     ],
     "gulp": [
-      "voice-gulp-01.wav",
-      "voice-gulp-02.wav",
-      "voice-gulp-03.wav",
-      "voice-gulp-04.wav"
+      "ai-voice-gulp-01.wav",
+      "ai-voice-gulp-02.wav"
     ],
     "hello": [
-      "voice-hello-01.wav",
-      "voice-hello-02.wav",
-      "voice-hello-03.wav"
+      "ai-voice-hello-01.wav",
+      "ai-voice-hello-02.wav",
+      "ai-voice-hello-03.wav"
     ],
     "tear": [
       "ai-voice-tear-01.wav",
       "ai-voice-tear-02.wav"
+    ],
+    "startle": [
+      "ai-voice-startle-01.wav",
+      "ai-voice-startle-02.wav",
+      "ai-voice-startle-03.wav"
     ]
   },
   "prop": {
     "pot": [
-      "prop-pot-01.wav",
-      "prop-pot-02.wav",
-      "prop-pot-03.wav",
-      "prop-pot-04.wav"
+      "ai-prop-pot-01.wav",
+      "ai-prop-pot-02.wav"
     ],
     "dish": [
-      "prop-dish-01.wav",
-      "prop-dish-02.wav",
-      "prop-dish-03.wav",
-      "prop-dish-04.wav"
+      "ai-prop-dish-01.wav",
+      "ai-prop-dish-02.wav",
+      "ai-prop-dish-03.wav",
+      "ai-prop-dish-04.wav"
     ],
     "glass": [
-      "prop-glass-01.wav",
-      "prop-glass-02.wav",
-      "prop-glass-03.wav",
-      "prop-glass-04.wav"
+      "ai-prop-glass-01.wav",
+      "ai-prop-glass-02.wav",
+      "ai-prop-glass-03.wav",
+      "ai-prop-glass-04.wav"
     ],
     "book": [
-      "prop-book-01.wav",
-      "prop-book-02.wav",
-      "prop-book-03.wav",
-      "prop-book-04.wav"
+      "ai-prop-book-01.wav",
+      "ai-prop-book-02.wav",
+      "ai-prop-book-03.wav"
     ],
     "bell": [
-      "prop-bell-01.wav",
-      "prop-bell-02.wav",
-      "prop-bell-03.wav",
-      "prop-bell-04.wav"
+      "ai-prop-bell-01.wav",
+      "ai-prop-bell-02.wav"
+    ],
+    "candle": [
+      "ai-prop-candle-01.wav",
+      "ai-prop-candle-02.wav"
+    ]
+  },
+  "fx": {
+    "crawl": [
+      "ai-fx-crawl-01.wav",
+      "ai-fx-crawl-02.wav",
+      "ai-fx-crawl-03.wav",
+      "ai-fx-crawl-04.wav",
+      "ai-fx-crawl-05.wav",
+      "ai-fx-crawl-06.wav"
+    ],
+    "climb": [
+      "ai-fx-climb-01.wav",
+      "ai-fx-climb-02.wav",
+      "ai-fx-climb-03.wav",
+      "ai-fx-climb-04.wav",
+      "ai-fx-climb-05.wav",
+      "ai-fx-climb-06.wav"
+    ],
+    "land": [
+      "ai-fx-land-01.wav",
+      "ai-fx-land-02.wav",
+      "ai-fx-land-03.wav",
+      "ai-fx-land-04.wav"
+    ],
+    "swimin": [
+      "ai-fx-swimin-01.wav",
+      "ai-fx-swimin-02.wav"
+    ],
+    "cling": [
+      "ai-fx-cling-01.wav",
+      "ai-fx-cling-02.wav"
+    ],
+    "unstick": [
+      "ai-fx-unstick-01.wav",
+      "ai-fx-unstick-02.wav"
+    ],
+    "drip": [
+      "ai-fx-drip-01.wav",
+      "ai-fx-drip-02.wav",
+      "ai-fx-drip-03.wav",
+      "ai-fx-drip-04.wav"
+    ],
+    "snore": [
+      "ai-fx-snore-01.wav",
+      "ai-fx-snore-02.wav"
+    ],
+    "sigh": [
+      "ai-fx-sigh-01.wav",
+      "ai-fx-sigh-02.wav"
+    ],
+    "topple": [
+      "ai-fx-topple-01.wav",
+      "ai-fx-topple-02.wav"
+    ],
+    "fallout": [
+      "ai-fx-fallout-01.wav",
+      "ai-fx-fallout-02.wav"
+    ],
+    "cloth": [
+      "ai-fx-cloth-01.wav",
+      "ai-fx-cloth-02.wav",
+      "ai-fx-cloth-03.wav",
+      "ai-fx-cloth-04.wav",
+      "ai-fx-cloth-05.wav",
+      "ai-fx-cloth-06.wav"
     ]
   }
 }

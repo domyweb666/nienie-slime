@@ -215,6 +215,14 @@
   S.voice = function (kind, g, r) { one('voice.' + kind, { g: clamp(g, 0, 1), r: r || 1, lp: 4000 }); };
   // v2.30 擺飾碰到東西：kind pot 或 dish，g 力道；rate 小於 1 是掉到看不到的地方（遠一點、悶一點）
   S.knock = function (kind, g, rate) { const far = rate && rate < 1; one('prop.' + kind, { g: clamp(g, 0, 1) * (far ? 0.5 : 0.9), r: rnd(0.94, 1.06) * (far ? 0.9 : 1), lp: far ? 1200 : 5000 }); };
+  // v2.50 場景聲（AI 音效，manifest fx.<kind>）：走、爬窗框、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣、擺飾倒下、掉出窗外、走過布墊。
+  // 同一種 0.25 秒內只響一次；音高 ±4% 每次不同；沒有檔案就安靜（舊的 manifest 照樣能用）
+  S.fx = function (kind, g, r, delay) {
+    const c = S.ctx; if (!c) return;
+    const k = 'fx.' + kind, now = c.currentTime;
+    if (now - (S.last[k] || -9) < 0.25) return; S.last[k] = now;
+    one(k, { g: clamp(g, 0, 1), r: (r || 1) * rnd(0.96, 1.04), lp: 9000, delay: delay || 0 });
+  };
   S.drip = function (g) { one('settle.bubble', { g: clamp(g, 0, 1) * 0.6, r: rnd(0.8, 1.1), lp: 3000, deco: true }); };
   S.strand = function (gain) { const p = MAP.pull.strand(S.st); p.g = clamp(p.g * (0.6 + 0.8 * gain), 0, 1); p.deco = false; one('pull.strand', p); };
 

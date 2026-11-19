@@ -155,11 +155,13 @@ def level(y, target_rms_db):
 
 
 def ref_rms(manifest, kind, layer):
-    """同一層現有合成音的 RMS 中位數（有聲音的部分），當作 AI 版的目標音量。"""
+    """同一層現有合成音的 RMS 中位數（有聲音的部分），當作 AI 版的目標音量。
+    讀資料夾裡 <類>-<層>-NN.wav 的合成檔（manifest 換成 ai- 之後合成檔還留著），重跑也量得到。"""
     vals = []
-    for f in manifest.get(kind, {}).get(layer, []):
+    pre = '%s-%s-' % (kind, layer)
+    for f in sorted(os.listdir(WEB)):
         p = os.path.join(WEB, f)
-        if f.startswith('ai-') or not os.path.exists(p):
+        if not (f.startswith(pre) and f.endswith('.wav')):
             continue
         sr, y = wavfile.read(p)
         y = y.astype(np.float64) / 32768
@@ -227,10 +229,53 @@ def main():
     seg_layer('voice', 'protest', ['17', '18'], 4, 30, 0.12, 0.15, 1.1)
     seg_layer('voice', 'tear', ['07', '08'], 2, 35, 0.4, 0.3, 1.6)
 
+    # ---- 第二批（11-19，多米：碰到東西、爬窗台等等，全部接上）：19 到 66 ----
+    # 它的聲音：換掉合成的四種，加「嚇到」
+    seg_layer('voice', 'gulp', ['59', '60'], 4, 30, 0.12, 0.12, 1.0)
+    seg_layer('voice', 'hello', ['53', '54'], 4, 30, 0.15, 0.15, 1.2)
+    seg_layer('voice', 'ask', ['55', '56'], 4, 30, 0.15, 0.12, 1.0)
+    seg_layer('voice', 'mmm', ['57', '58'], 4, 30, 0.2, 0.3, 1.6)
+    seg_layer('voice', 'startle', ['51', '52'], 4, 30, 0.12, 0.1, 1.0)
+    # 揉的 loop：兩條
+    plan[('rub', 'loop')] = [make_loop(S[i][slice(*segments(S[i], 40, 0.5, 0.5, 9)[0])]) for i in ('63', '64')]
+    # 場景（fx.*）：走、爬、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣
+    onset_layer('fx', 'crawl', ['39', '40'], 6, 0.45, 6, 0.3, fout=0.12)
+    onset_layer('fx', 'climb', ['37', '38'], 6, 0.5, 6, 0.3, fout=0.12)
+    seg_layer('fx', 'land', ['41', '42'], 4, 30, 0.1, 0.08, 0.7)
+    seg_layer('fx', 'swimin', ['65', '66'], 2, 40, 0.5, 0.5, 2.6)
+    seg_layer('fx', 'cling', ['43', '44'], 2, 40, 0.4, 0.4, 1.6)
+    seg_layer('fx', 'unstick', ['45', '46'], 4, 30, 0.1, 0.08, 0.8)
+    onset_layer('fx', 'drip', ['47', '48'], 4, 0.35, 6, 0.3, fout=0.1)
+    seg_layer('fx', 'snore', ['49', '50'], 4, 35, 0.25, 0.4, 2.5)
+    seg_layer('fx', 'sigh', ['61', '62'], 2, 35, 0.4, 0.5, 2.6)
+    # 只有網頁版有的（iPhone 版還沒有擺飾的物理）：擺飾被碰、倒下、掉出窗外、走過布墊
+    seg_layer('prop', 'pot', ['19', '20'], 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('prop', 'dish', ['21', '22'], 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('prop', 'glass', ['23', '24'], 4, 30, 0.1, 0.05, 0.9)
+    seg_layer('prop', 'book', ['25', '26'], 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('prop', 'bell', ['27', '28'], 2, 40, 0.5, 0.3, 2.8)
+    seg_layer('prop', 'candle', ['29', '30'], 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('fx', 'topple', ['33', '34'], 2, 40, 0.5, 0.4, 2.6)
+    seg_layer('fx', 'fallout', ['35', '36'], 2, 40, 0.5, 0.3, 2.6)
+    onset_layer('fx', 'cloth', ['31', '32'], 6, 0.5, 5, 0.3, fout=0.15)
+    WEB_ONLY = {('prop', k) for k in ('pot', 'dish', 'glass', 'book', 'bell', 'candle')} | {('fx', k) for k in ('topple', 'fallout', 'cloth')}
+    # 新的層沒有合成音可以對照，音量用耳朵定的相對值（捏的聲音約 −27 dB，背景性的小聲一點）
+    FX_RMS = {'crawl': -36, 'climb': -34, 'land': -30, 'swimin': -34, 'cling': -32, 'unstick': -30, 'drip': -32,
+              'snore': -37, 'sigh': -32, 'topple': -30, 'fallout': -36, 'cloth': -37}
+
     # 音量：對齊同一層現有合成音；撕開沒有對照，用放手濕聲的音量再大 3 dB（最重的放手）
     files, layers = {}, {}
     for (kind, layer), outs in plan.items():
-        tgt = ref_rms(manifest, 'release', 'wet') + 3 if (kind, layer) == ('voice', 'tear') else ref_rms(manifest, kind, layer)
+        if kind == 'fx':
+            tgt = FX_RMS[layer]
+        elif (kind, layer) == ('voice', 'startle'):
+            tgt = ref_rms(manifest, 'voice', 'ask')
+        elif (kind, layer) == ('prop', 'candle'):
+            tgt = ref_rms(manifest, 'prop', 'glass')
+        elif (kind, layer) == ('voice', 'tear'):
+            tgt = ref_rms(manifest, 'release', 'wet') + 3
+        else:
+            tgt = ref_rms(manifest, kind, layer)
         names = []
         for k, y in enumerate(outs):
             name = 'ai-%s-%s-%02d.wav' % (kind, layer, k + 1)
@@ -239,17 +284,21 @@ def main():
         layers[(kind, layer)] = names
         print('  %-14s 目標 RMS %.1f dB' % (kind + '.' + layer, tgt))
 
-    # 網頁與 iOS 的 manifest 本來就不一樣（網頁有 prop、iOS 有 ding），各自讀自己的、只換上面那幾層
+    # 網頁與 iOS 的 manifest 本來就不一樣（網頁有 prop、iOS 有 ding），各自讀自己的、只換上面那幾層；
+    # WEB_ONLY 那幾層（擺飾）只寫網頁版
     for d in (WEB, IOS):
+        mine = {n for (k, l), ns in layers.items() if d == WEB or (k, l) not in WEB_ONLY for n in ns}
         for old in os.listdir(d):
-            if old.startswith('ai-') and old.endswith('.wav') and old not in files:
+            if old.startswith('ai-') and old.endswith('.wav') and old not in mine:
                 os.remove(os.path.join(d, old))
-        for name, y in files.items():
-            wavfile.write(os.path.join(d, name), SR, (np.clip(y, -1, 1) * 32767).astype(np.int16))
+        for name in mine:
+            wavfile.write(os.path.join(d, name), SR, (np.clip(files[name], -1, 1) * 32767).astype(np.int16))
         mp = os.path.join(d, 'manifest.json')
         with open(mp, encoding='utf-8') as f:
             m = json.load(f)
         for (kind, layer), names in layers.items():
+            if d == IOS and (kind, layer) in WEB_ONLY:
+                continue
             m.setdefault(kind, {})[layer] = names
         with open(mp, 'w', encoding='utf-8', newline='\n') as f:
             json.dump(m, f, ensure_ascii=False, indent=2)
