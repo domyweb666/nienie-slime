@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>合成音 vs AI 音效</title>
+<style>
+  :root{--bg:#faf7f2;--card:#fff;--ink:#2b2622;--mute:#8a8079;--line:#e8e1d8;--a:#c8643b;--b:#5b8c7a}
+  @media (prefers-color-scheme:dark){:root{--bg:#1d1a18;--card:#26221f;--ink:#efe9e2;--mute:#a39990;--line:#3a3430}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"PingFang TC","Noto Sans TC",sans-serif;padding:16px}
+  main{max-width:720px;margin:0 auto}
+  h1{font-size:20px;margin:4px 0 4px}
+  p.note{color:var(--mute);margin:0 0 16px;font-size:13px}
+  .row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .row h2{font-size:15px;margin:0 0 8px}
+  .row h2 small{color:var(--mute);font-weight:400;margin-left:6px}
+  .grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
+  .lab{width:52px;font-size:12px;color:var(--mute)}
+  button{border:0;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;color:#fff;cursor:pointer}
+  button.s{background:var(--b)} button.ai{background:var(--a)}
+  button.on{outline:3px solid var(--ink);outline-offset:1px}
+  .none{color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<h1>合成音 vs AI 音效</h1>
+<p class="note">綠色是現在 app 裡的合成音，橘色是 Higgsfield（Mirelo）生的。AI 版已經把峰值拉到跟合成音一樣（−12 dB），頭尾空白剪掉了。點一下播放，再點一下停止。建議用手機喇叭聽一次、耳機聽一次。</p>
+<div id="list"></div>
+</main>
+<script>
+const ROWS=[
+  ['被壓','慢慢壓進去的濕黏下沉',['press-wet-01','press-body-01'],['01-press-a','02-press-b']],
+  ['被拉','黏絲拉長的連續聲',['pull-loop-01','pull-loop-02'],['03-pull-a','04-pull-b']],
+  ['拉到斷絲','細絲一根根斷',['pull-strand-01','pull-strand-04'],['05-strand-a','06-strand-b']],
+  ['被撕開','新的，現在沒有對應的合成音',[],['07-tear-a','08-tear-b']],
+  ['放手','回彈、啵、小氣泡',['release-wet-01','settle-bubble-01'],['09-release-a','10-release-b']],
+  ['被戳','「噗」',['voice-poke-01','voice-poke-02'],['11-poke-a','12-poke-b']],
+  ['開心','「噗咿」',['voice-happy-01','voice-happy-02'],['13-happy-a','14-happy-b']],
+  ['被搔癢','咯咯笑',['voice-giggle-01','voice-giggle-02'],['15-giggle-a','16-giggle-b']],
+  ['不要啦','被扯時的「嗯嗯」',['voice-protest-01','voice-protest-02'],['17-protest-a','18-protest-b']],
+  ['第一次的樣本','你說 OK 的那段（4 秒擠壓）',[],['00-sample-squeeze']],
+];
+const list=document.getElementById('list');let cur=null,curBtn=null;
+function play(src,btn){
+  if(cur){cur.pause();cur.currentTime=0;curBtn&&curBtn.classList.remove('on');if(curBtn===btn){cur=null;curBtn=null;return}}
+  cur=new Audio(src);curBtn=btn;btn.classList.add('on');
+  cur.onended=()=>{btn.classList.remove('on');cur=null;curBtn=null};
+  cur.play().catch(()=>{btn.classList.remove('on')});
+}
+for(const [name,hint,syn,ai] of ROWS){
+  const r=document.createElement('section');r.className='row';
+  r.innerHTML=`<h2>${name}<small>${hint}</small></h2>`;
+  const g1=document.createElement('div');g1.className='grp';g1.innerHTML='<span class="lab">合成</span>';
+  if(!syn.length)g1.innerHTML+='<span class="none">沒有</span>';
+  syn.forEach((f,i)=>{const b=document.createElement('button');b.className='s';b.textContent=`合成 ${i+1}`;b.onclick=()=>play(f+'.wav',b);g1.appendChild(b)});
+  const g2=document.createElement('div');g2.className='grp';g2.innerHTML='<span class="lab">AI</span>';
+  ai.forEach((f,i)=>{const b=document.createElement('button');b.className='ai';b.textContent=`AI ${'AB'[i]||''}`.trim();b.onclick=()=>play('ai/'+f+'.mp3',b);g2.appendChild(b)});
+  r.append(g1,g2);list.appendChild(r);
+}
+</script>
+</body>
+</html>
