@@ -10,40 +10,40 @@
       "press-body-06.wav"
     ],
     "wet": [
-      "press-wet-01.wav",
-      "press-wet-02.wav",
-      "press-wet-03.wav",
-      "press-wet-04.wav",
-      "press-wet-05.wav",
-      "press-wet-06.wav"
+      "ai-press-wet-01.wav",
+      "ai-press-wet-02.wav",
+      "ai-press-wet-03.wav",
+      "ai-press-wet-04.wav",
+      "ai-press-wet-05.wav",
+      "ai-press-wet-06.wav"
     ],
     "air": [
-      "press-air-01.wav",
-      "press-air-02.wav",
-      "press-air-03.wav",
-      "press-air-04.wav",
-      "press-air-05.wav",
-      "press-air-06.wav"
+      "ai-press-air-01.wav",
+      "ai-press-air-02.wav",
+      "ai-press-air-03.wav",
+      "ai-press-air-04.wav",
+      "ai-press-air-05.wav",
+      "ai-press-air-06.wav"
     ]
   },
   "release": {
     "air": [
-      "release-air-01.wav",
-      "release-air-02.wav",
-      "release-air-03.wav",
-      "release-air-04.wav",
-      "release-air-05.wav",
-      "release-air-06.wav",
-      "release-air-07.wav",
-      "release-air-08.wav"
+      "ai-release-air-01.wav",
+      "ai-release-air-02.wav",
+      "ai-release-air-03.wav",
+      "ai-release-air-04.wav",
+      "ai-release-air-05.wav",
+      "ai-release-air-06.wav",
+      "ai-release-air-07.wav",
+      "ai-release-air-08.wav"
     ],
     "wet": [
-      "release-wet-01.wav",
-      "release-wet-02.wav",
-      "release-wet-03.wav",
-      "release-wet-04.wav",
-      "release-wet-05.wav",
-      "release-wet-06.wav"
+      "ai-release-wet-01.wav",
+      "ai-release-wet-02.wav",
+      "ai-release-wet-03.wav",
+      "ai-release-wet-04.wav",
+      "ai-release-wet-05.wav",
+      "ai-release-wet-06.wav"
     ],
     "body": [
       "release-body-01.wav",
@@ -55,20 +55,20 @@
   },
   "pull": {
     "loop": [
-      "pull-loop-01.wav",
-      "pull-loop-02.wav"
+      "ai-pull-loop-01.wav",
+      "ai-pull-loop-02.wav"
     ],
     "strand": [
-      "pull-strand-01.wav",
-      "pull-strand-02.wav",
-      "pull-strand-03.wav",
-      "pull-strand-04.wav",
-      "pull-strand-05.wav",
-      "pull-strand-06.wav",
-      "pull-strand-07.wav",
-      "pull-strand-08.wav",
-      "pull-strand-09.wav",
-      "pull-strand-10.wav"
+      "ai-pull-strand-01.wav",
+      "ai-pull-strand-02.wav",
+      "ai-pull-strand-03.wav",
+      "ai-pull-strand-04.wav",
+      "ai-pull-strand-05.wav",
+      "ai-pull-strand-06.wav",
+      "ai-pull-strand-07.wav",
+      "ai-pull-strand-08.wav",
+      "ai-pull-strand-09.wav",
+      "ai-pull-strand-10.wav"
     ]
   },
   "rub": {
@@ -80,16 +80,16 @@
   },
   "settle": {
     "bubble": [
-      "settle-bubble-01.wav",
-      "settle-bubble-02.wav",
-      "settle-bubble-03.wav",
-      "settle-bubble-04.wav",
-      "settle-bubble-05.wav",
-      "settle-bubble-06.wav",
-      "settle-bubble-07.wav",
-      "settle-bubble-08.wav",
-      "settle-bubble-09.wav",
-      "settle-bubble-10.wav"
+      "ai-settle-bubble-01.wav",
+      "ai-settle-bubble-02.wav",
+      "ai-settle-bubble-03.wav",
+      "ai-settle-bubble-04.wav",
+      "ai-settle-bubble-05.wav",
+      "ai-settle-bubble-06.wav",
+      "ai-settle-bubble-07.wav",
+      "ai-settle-bubble-08.wav",
+      "ai-settle-bubble-09.wav",
+      "ai-settle-bubble-10.wav"
     ],
     "hiss": [
       "settle-hiss-01.wav",
@@ -99,11 +99,10 @@
   },
   "voice": {
     "poke": [
-      "voice-poke-01.wav",
-      "voice-poke-02.wav",
-      "voice-poke-03.wav",
-      "voice-poke-04.wav",
-      "voice-poke-05.wav"
+      "ai-voice-poke-01.wav",
+      "ai-voice-poke-02.wav",
+      "ai-voice-poke-03.wav",
+      "ai-voice-poke-04.wav"
     ],
     "mmm": [
       "voice-mmm-01.wav",
@@ -112,16 +111,16 @@
       "voice-mmm-04.wav"
     ],
     "protest": [
-      "voice-protest-01.wav",
-      "voice-protest-02.wav",
-      "voice-protest-03.wav",
-      "voice-protest-04.wav"
+      "ai-voice-protest-01.wav",
+      "ai-voice-protest-02.wav",
+      "ai-voice-protest-03.wav",
+      "ai-voice-protest-04.wav"
     ],
     "happy": [
-      "voice-happy-01.wav",
-      "voice-happy-02.wav",
-      "voice-happy-03.wav",
-      "voice-happy-04.wav"
+      "ai-voice-happy-01.wav",
+      "ai-voice-happy-02.wav",
+      "ai-voice-happy-03.wav",
+      "ai-voice-happy-04.wav"
     ],
     "ask": [
       "voice-ask-01.wav",
@@ -130,10 +129,10 @@
       "voice-ask-04.wav"
     ],
     "giggle": [
-      "voice-giggle-01.wav",
-      "voice-giggle-02.wav",
-      "voice-giggle-03.wav",
-      "voice-giggle-04.wav"
+      "ai-voice-giggle-01.wav",
+      "ai-voice-giggle-02.wav",
+      "ai-voice-giggle-03.wav",
+      "ai-voice-giggle-04.wav"
     ],
     "gulp": [
       "voice-gulp-01.wav",
@@ -145,6 +144,10 @@
       "voice-hello-01.wav",
       "voice-hello-02.wav",
       "voice-hello-03.wav"
+    ],
+    "tear": [
+      "ai-voice-tear-01.wav",
+      "ai-voice-tear-02.wav"
     ]
   },
   "prop": {

@@ -21,6 +21,7 @@
   button.s{background:var(--b)} button.ai{background:var(--a)}
   button.on{outline:3px solid var(--ink);outline-offset:1px}
   .none{color:var(--mute);font-size:13px}
+  h3.sec{font-size:13px;color:var(--mute);margin:22px 4px 8px;font-weight:600;letter-spacing:.05em}
 </style>
 </head>
 <body>
@@ -31,6 +32,7 @@
 </main>
 <script>
 const ROWS=[
+  '捏它（已經換成 AI 版）',
   ['被壓','慢慢壓進去的濕黏下沉',['press-wet-01','press-body-01'],['01-press-a','02-press-b']],
   ['被拉','黏絲拉長的連續聲',['pull-loop-01','pull-loop-02'],['03-pull-a','04-pull-b']],
   ['拉到斷絲','細絲一根根斷',['pull-strand-01','pull-strand-04'],['05-strand-a','06-strand-b']],
@@ -41,6 +43,34 @@ const ROWS=[
   ['被搔癢','咯咯笑',['voice-giggle-01','voice-giggle-02'],['15-giggle-a','16-giggle-b']],
   ['不要啦','被扯時的「嗯嗯」',['voice-protest-01','voice-protest-02'],['17-protest-a','18-protest-b']],
   ['第一次的樣本','你說 OK 的那段（4 秒擠壓）',[],['00-sample-squeeze']],
+  '碰到東西',
+  ['碰到陶盆','',['prop-pot-01'],['19-pot-a','20-pot-b']],
+  ['碰到盤子','',['prop-dish-01'],['21-dish-a','22-dish-b']],
+  ['碰到玻璃罐','',['prop-glass-01'],['23-glass-a','24-glass-b']],
+  ['碰到書','',['prop-book-01'],['25-book-a','26-book-b']],
+  ['碰到風鈴','',['prop-bell-01'],['27-bell-a','28-bell-b']],
+  ['碰到蠟燭','新的',[],['29-candle-a','30-candle-b']],
+  ['滑過布墊','新的',[],['31-cloth-a','32-cloth-b']],
+  ['把東西推倒','新的（像貓推東西）',[],['33-topple-a','34-topple-b']],
+  ['東西掉到窗外','新的（遠遠的一聲）',[],['35-fallout-a','36-fallout-b']],
+  '在窗台上移動',
+  ['爬窗框','新的',[],['37-climb-a','38-climb-b']],
+  ['在窗台上爬','新的（一縮一衝）',[],['39-crawl-a','40-crawl-b']],
+  ['跳下來落地','現在用按的聲音代替',[],['41-land-a','42-land-b']],
+  ['從玻璃滑下來','新的',[],['43-glassslide-a','44-glassslide-b']],
+  ['從玻璃上拔開','新的（吸盤放開）',[],['45-unstick-a','46-unstick-b']],
+  ['游進場','新的（開場、換一隻）',[],['65-swimin-a','66-swimin-b']],
+  '黏液',
+  ['黏液滴下來','現在用小氣泡代替',['settle-bubble-01'],['47-drip-a','48-drip-b']],
+  ['吞黏液「咕嚕」','',['voice-gulp-01','voice-gulp-02'],['59-gulp-a','60-gulp-b']],
+  '它的聲音和狀態',
+  ['睡著的呼吸','新的',[],['49-snore-a','50-snore-b']],
+  ['被嚇到／嚇醒','現在用「嗯？」代替',[],['51-startle-a','52-startle-b']],
+  ['打招呼','',['voice-hello-01','voice-hello-02'],['53-hello-a','54-hello-b']],
+  ['討摸「嗯？」','',['voice-ask-01','voice-ask-02'],['55-ask-a','56-ask-b']],
+  ['被揉「嗯～」','',['voice-mmm-01','voice-mmm-02'],['57-mmm-a','58-mmm-b']],
+  ['嘆氣','新的（跑完、休息時）',[],['61-sigh-a','62-sigh-b']],
+  ['揉的連續聲','',['rub-loop-01','rub-loop-02'],['63-rub-a','64-rub-b']],
 ];
 const list=document.getElementById('list');let cur=null,curBtn=null;
 function play(src,btn){
@@ -49,7 +79,9 @@ function play(src,btn){
   cur.onended=()=>{btn.classList.remove('on');cur=null;curBtn=null};
   cur.play().catch(()=>{btn.classList.remove('on')});
 }
-for(const [name,hint,syn,ai] of ROWS){
+for(const row of ROWS){
+  if(typeof row==='string'){const h=document.createElement('h3');h.className='sec';h.textContent=row;list.appendChild(h);continue}
+  const [name,hint,syn,ai]=row;
   const r=document.createElement('section');r.className='row';
   r.innerHTML=`<h2>${name}<small>${hint}</small></h2>`;
   const g1=document.createElement('div');g1.className='grp';g1.innerHTML='<span class="lab">合成</span>';

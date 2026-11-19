@@ -4375,6 +4375,7 @@ final class SlimeRig {
         f.stretch = max(f.stretch, 2)
         release(id, quiet: false)
         onEvent?(.pull(gain: 1, rate: 1))
+        onEvent?(.voice(kind: "tear", gain: 1, rate: 1))   // v2.50 the rip (AI sample, manifest voice.tear; silent without the file)
     }
     /// v2.38 home may not be dragged out of the room. The pull (slide) has the whole body follow the finger's real position with no edge: pulled below
     /// the sill or past the frame, home went with it and the finger's effective position counted from there, pressing the body into the corner

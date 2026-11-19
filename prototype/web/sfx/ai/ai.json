@@ -112,5 +112,293 @@
   "rms_db": -25.5,
   "active_s": 3.0,
   "gain_db": -4.4
+ },
+ "19-pot-a": {
+  "peak_db": -20.5,
+  "rms_db": -42.1,
+  "active_s": 2.0,
+  "gain_db": 8.5
+ },
+ "20-pot-b": {
+  "peak_db": -16.3,
+  "rms_db": -34.4,
+  "active_s": 2.0,
+  "gain_db": 4.3
+ },
+ "21-dish-a": {
+  "peak_db": -15.7,
+  "rms_db": -35.3,
+  "active_s": 1.98,
+  "gain_db": 3.7
+ },
+ "22-dish-b": {
+  "peak_db": -35.0,
+  "rms_db": -61.4,
+  "active_s": 2.0,
+  "gain_db": 23.0
+ },
+ "23-glass-a": {
+  "peak_db": -34.3,
+  "rms_db": -62.8,
+  "active_s": 2.0,
+  "gain_db": 22.3
+ },
+ "24-glass-b": {
+  "peak_db": -9.9,
+  "rms_db": -38.0,
+  "active_s": 2.0,
+  "gain_db": -2.1
+ },
+ "25-book-a": {
+  "peak_db": -26.3,
+  "rms_db": -53.2,
+  "active_s": 2.0,
+  "gain_db": 14.3
+ },
+ "26-book-b": {
+  "peak_db": -26.0,
+  "rms_db": -49.8,
+  "active_s": 2.0,
+  "gain_db": 14.0
+ },
+ "27-bell-a": {
+  "peak_db": -0.3,
+  "rms_db": -13.1,
+  "active_s": 3.0,
+  "gain_db": -11.7
+ },
+ "28-bell-b": {
+  "peak_db": -1.2,
+  "rms_db": -20.8,
+  "active_s": 3.0,
+  "gain_db": -10.8
+ },
+ "29-candle-a": {
+  "peak_db": -19.6,
+  "rms_db": -40.8,
+  "active_s": 2.0,
+  "gain_db": 7.6
+ },
+ "30-candle-b": {
+  "peak_db": -4.3,
+  "rms_db": -26.3,
+  "active_s": 0.73,
+  "gain_db": -7.7
+ },
+ "31-cloth-a": {
+  "peak_db": -18.7,
+  "rms_db": -43.7,
+  "active_s": 3.0,
+  "gain_db": 6.7
+ },
+ "32-cloth-b": {
+  "peak_db": -6.7,
+  "rms_db": -41.0,
+  "active_s": 2.32,
+  "gain_db": -5.3
+ },
+ "33-topple-a": {
+  "peak_db": -0.7,
+  "rms_db": -27.6,
+  "active_s": 2.7,
+  "gain_db": -11.3
+ },
+ "34-topple-b": {
+  "peak_db": -14.7,
+  "rms_db": -46.7,
+  "active_s": 2.97,
+  "gain_db": 2.7
+ },
+ "35-fallout-a": {
+  "peak_db": -0.1,
+  "rms_db": -19.9,
+  "active_s": 3.0,
+  "gain_db": -11.9
+ },
+ "36-fallout-b": {
+  "peak_db": -7.9,
+  "rms_db": -30.2,
+  "active_s": 1.52,
+  "gain_db": -4.1
+ },
+ "37-climb-a": {
+  "peak_db": -20.3,
+  "rms_db": -45.6,
+  "active_s": 3.9,
+  "gain_db": 8.3
+ },
+ "38-climb-b": {
+  "peak_db": -19.2,
+  "rms_db": -41.1,
+  "active_s": 4.0,
+  "gain_db": 7.2
+ },
+ "39-crawl-a": {
+  "peak_db": -13.6,
+  "rms_db": -40.9,
+  "active_s": 4.0,
+  "gain_db": 1.6
+ },
+ "40-crawl-b": {
+  "peak_db": -12.6,
+  "rms_db": -48.8,
+  "active_s": 3.91,
+  "gain_db": 0.6
+ },
+ "41-land-a": {
+  "peak_db": -37.1,
+  "rms_db": -60.5,
+  "active_s": 2.0,
+  "gain_db": 25.1
+ },
+ "42-land-b": {
+  "peak_db": -18.2,
+  "rms_db": -47.1,
+  "active_s": 1.99,
+  "gain_db": 6.2
+ },
+ "43-glassslide-a": {
+  "peak_db": -22.4,
+  "rms_db": -49.7,
+  "active_s": 3.0,
+  "gain_db": 10.4
+ },
+ "44-glassslide-b": {
+  "peak_db": -29.8,
+  "rms_db": -58.3,
+  "active_s": 3.0,
+  "gain_db": 17.8
+ },
+ "45-unstick-a": {
+  "peak_db": -20.8,
+  "rms_db": -47.9,
+  "active_s": 2.0,
+  "gain_db": 8.8
+ },
+ "46-unstick-b": {
+  "peak_db": -23.3,
+  "rms_db": -50.4,
+  "active_s": 1.66,
+  "gain_db": 11.3
+ },
+ "47-drip-a": {
+  "peak_db": -0.0,
+  "rms_db": -26.6,
+  "active_s": 1.87,
+  "gain_db": -12.0
+ },
+ "48-drip-b": {
+  "peak_db": -20.1,
+  "rms_db": -36.1,
+  "active_s": 2.0,
+  "gain_db": 8.1
+ },
+ "49-snore-a": {
+  "peak_db": -2.8,
+  "rms_db": -38.8,
+  "active_s": 3.63,
+  "gain_db": -9.2
+ },
+ "50-snore-b": {
+  "peak_db": -23.8,
+  "rms_db": -52.1,
+  "active_s": 3.93,
+  "gain_db": 11.8
+ },
+ "51-startle-a": {
+  "peak_db": -7.6,
+  "rms_db": -40.9,
+  "active_s": 1.68,
+  "gain_db": -4.4
+ },
+ "52-startle-b": {
+  "peak_db": -1.1,
+  "rms_db": -19.5,
+  "active_s": 1.39,
+  "gain_db": -10.9
+ },
+ "53-hello-a": {
+  "peak_db": -23.0,
+  "rms_db": -54.0,
+  "active_s": 2.0,
+  "gain_db": 11.0
+ },
+ "54-hello-b": {
+  "peak_db": -7.1,
+  "rms_db": -33.7,
+  "active_s": 1.8,
+  "gain_db": -4.9
+ },
+ "55-ask-a": {
+  "peak_db": -5.4,
+  "rms_db": -24.5,
+  "active_s": 2.0,
+  "gain_db": -6.6
+ },
+ "56-ask-b": {
+  "peak_db": -11.1,
+  "rms_db": -36.0,
+  "active_s": 1.53,
+  "gain_db": -0.9
+ },
+ "57-mmm-a": {
+  "peak_db": -4.5,
+  "rms_db": -25.8,
+  "active_s": 3.0,
+  "gain_db": -7.5
+ },
+ "58-mmm-b": {
+  "peak_db": -21.5,
+  "rms_db": -55.2,
+  "active_s": 3.0,
+  "gain_db": 9.5
+ },
+ "59-gulp-a": {
+  "peak_db": -11.2,
+  "rms_db": -46.9,
+  "active_s": 1.99,
+  "gain_db": -0.8
+ },
+ "60-gulp-b": {
+  "peak_db": -9.0,
+  "rms_db": -43.0,
+  "active_s": 1.91,
+  "gain_db": -3.0
+ },
+ "61-sigh-a": {
+  "peak_db": -1.7,
+  "rms_db": -16.8,
+  "active_s": 3.0,
+  "gain_db": -10.3
+ },
+ "62-sigh-b": {
+  "peak_db": -7.2,
+  "rms_db": -39.0,
+  "active_s": 2.99,
+  "gain_db": -4.8
+ },
+ "63-rub-a": {
+  "peak_db": -21.8,
+  "rms_db": -57.1,
+  "active_s": 4.0,
+  "gain_db": 9.8
+ },
+ "64-rub-b": {
+  "peak_db": -19.5,
+  "rms_db": -43.7,
+  "active_s": 4.0,
+  "gain_db": 7.5
+ },
+ "65-swimin-a": {
+  "peak_db": -30.1,
+  "rms_db": -48.9,
+  "active_s": 3.0,
+  "gain_db": 18.1
+ },
+ "66-swimin-b": {
+  "peak_db": 0.0,
+  "rms_db": -20.8,
+  "active_s": 3.0,
+  "gain_db": -12.0
  }
 }

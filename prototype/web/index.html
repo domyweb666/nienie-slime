@@ -1846,7 +1846,7 @@ function pairStep(dt){PAIR.st=0;PAIR.stR=0;if(!(mat.pairMax>0)){PAIR.over=0;retu
     const raw=Math.hypot(b.x-a.x,b.y-a.y)/Lp;if(raw>wr){wr=raw;worst=[a,b]}}
   if(mat.tear>=.5&&worst&&wr>mat.tearK){PAIR.over+=dt;if(PAIR.over>=.12){PAIR.over=0;const c=globalC,da=Math.hypot(worst[0].x-c.xc,worst[0].y-c.yc),db=Math.hypot(worst[1].x-c.xc,worst[1].y-c.yc);tearFinger(da>=db?worst[0]:worst[1])}}else PAIR.over=0}
 // 撕開：照一般放手走（手感、印象、情緒都一樣），拉伸量算滿所以啵最大；這根手指不再抓，要抬起來再按
-function tearFinger(f){f.stretch=Math.max(f.stretch||0,2);releaseFinger(f,false);PAIR.tearT=t;sfxPlay('pull',1)}
+function tearFinger(f){f.stretch=Math.max(f.stretch||0,2);releaseFinger(f,false);PAIR.tearT=t;sfxPlay('pull',1);sfxPlay('voice.tear',1,1)}   // v2.50 撕裂聲（AI 音效，manifest voice.tear；沒有檔案就安靜）
 // v2.38 家不准被拖出房間（多米 11-09：極限拉扯還是會壞）。拉力（slide）讓整隻跟著手指的真實位置走，沒有邊界：手指往窗台下面、窗框外面拉，
 // 家跟著跑出房間，手指的有效位置也從那裡量起，整隻被往牆角裡壓。量到往右下角拉：壓成 14 點高、寬 644 點（窗框外面）、面積剩 9%、內部翻 700 個三角形。
 // 家夾在「靜止形狀放進房間還塞得下」的範圍內（留 15% 給本來就有的壓扁），夾到的那一軸速度歸零，放手才不會甩出去
