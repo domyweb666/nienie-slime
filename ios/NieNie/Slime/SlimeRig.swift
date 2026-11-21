@@ -37,7 +37,7 @@ final class SlimeRig {
         if m.limbs > 0 { m.noFlip = 0; m.gripUp = 0.2; m.homeCap = 0; m.fingerSolid = 0 }
         if m.scene >= 0.5 {   // v2.28 窗台: the room is fixed, so a very long pull would not fit; on the sill it does not lift itself by pulsing; a little more upright; no hop-in (it drops into the bowl)
             m.bodySize = 0.27; m.intro = 0; m.introSwim = 0; m.jellyLift = 0
-            m.maxPull = min(m.maxPull, 3.2); m.memMax = min(m.memMax, 2.6); m.upright = max(m.upright, 0.03)
+            m.maxPull = min(m.maxPull, m.strand >= 0.5 ? 2.4 : 3.2); m.memMax = min(m.memMax, 2.6); m.upright = max(m.upright, 0.03)
         }
         return m
     }
@@ -574,6 +574,7 @@ final class SlimeRig {
     private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
 
     final class Finger {
+        var tug: Bool? = nil      // v2.51: grabbed near the outline: it pulls a strand out, the body is not carried (nil = not judged yet)
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
         enum Mode { case grab, push, none, stroke }   // v2.26 F6 stroke: sliding over it, nothing pinned
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
@@ -635,7 +636,43 @@ final class SlimeRig {
         }
     }
 
+    /// v2.51 不規則外形 (web shape.js, same numbers and the same order of random draws): radius as a function of the angle, so the mesh builds as before.
+    private struct Lump {
+        var bumps: [(a: Double, k: Double, w: Double)] = []
+        var p1 = 0.0, p2 = 0.0, k = 1.0, scale = 1.0
+        func raw(_ a: Double) -> Double {
+            var v: Double = 0.10 * sin(a) + 0.06 * cos(2 * a) + 0.04 * sin(3 * a + p1) + 0.025 * sin(5 * a + p2)
+            for b in bumps {
+                var d = a - b.a
+                d = atan2(sin(d), cos(d))
+                v += b.k * exp(-pow(d / b.w, 2))
+            }
+            return 1 + k * v
+        }
+        func r(_ a: Double) -> Double { raw(a) * scale }
+    }
+    private var lumpShape: Lump?
+    private func makeLump(seed: Int, k: Double) -> Lump {
+        var g = LCG(seed: seed * 13 + 5)
+        let D = Double.pi / 180
+        let side: Double = g.next() < 0.5 ? -1 : 1
+        var s = Lump()
+        s.k = k
+        s.p1 = g.next() * 6.28; s.p2 = g.next() * 6.28
+        let a1 = (-90 + side * (25 + g.next() * 35)) * D, k1 = 0.20 + g.next() * 0.12, w1 = 0.42 + g.next() * 0.14   // the bump on top, leaning to one side
+        let a2 = (90 + side * (50 + g.next() * 30)) * D, k2 = 0.10 + g.next() * 0.08, w2 = 0.36 + g.next() * 0.12    // a smaller one low on the other side
+        let a3 = (-90 - side * (40 + g.next() * 70)) * D, k3 = -(0.05 + g.next() * 0.05), w3 = 0.30 + g.next() * 0.10   // a shallow dip high on the other side
+        s.bumps = [(a1, k1, w1), (a2, k2, w2), (a3, k3, w3)]
+        var sum = 0.0
+        let n = 360
+        for i in 0..<n { let q = s.raw(Double(i) / Double(n) * .pi * 2); sum += q * q }
+        s.scale = 0.98 / (sum / Double(n)).squareRoot()   // same area as the old blob
+        return s
+    }
+
     private func defineShape() {
+        goo.removeAll(); b2On = false; b2Held = false; b2ID = nil   // v2.51: a rebuilt body starts whole
+        lumpShape = Int(params.limbs.rounded()) <= 0 && params.lump > 0 ? makeLump(seed: Int(params.seed.rounded()), k: params.lump) : nil
         var r = LCG(seed: Int(params.seed.rounded()) * 7 + 3)
         ph = [r.next() * 6.28, r.next() * 6.28, r.next() * 6.28, (-72 + (r.next() - 0.5) * 30) * .pi / 180]
         // screen coords, y down: 90° is straight down. Most hang below or sideways.
@@ -662,6 +699,7 @@ final class SlimeRig {
     /// Blob radius in units of R, with the head bump on top.
     private func blobR(_ a: Double) -> Double {
         // no tentacles: one lump, no head bump, a little bigger to keep the tentacles' mass
+        if tent.isEmpty, let s = lumpShape { return s.r(a) }   // v2.51
         if tent.isEmpty { return 0.98 + 0.07 * sin(2 * a + ph[0]) + 0.05 * sin(3 * a + ph[1]) + 0.03 * sin(5 * a + ph[2]) }
         if tent.count > 5 { return 0.72 + 0.05 * sin(2 * a + ph[0]) + 0.03 * sin(3 * a + ph[1]) + 0.02 * sin(5 * a + ph[2]) }   // v2.27 ringed tentacles: no head bump
         var d = a - ph[3]
@@ -1411,6 +1449,11 @@ final class SlimeRig {
         if introOn { let mini = introMini; endIntro(); if !mini { return } }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab; during a happy hop it grabs as usual
         let (x, y) = toWorld(sx, sy)
         slpLastAny = t   // v2.23 B2: a tap anywhere counts as someone there
+        if allowed && b2On && !b2Held && b2Merge <= 0 && hypot(x - b2X, y - b2Y) < b2R * 1.5 && !insideBody(x, y) {   // v2.51: this touch picks up the small blob
+            b2Held = true; b2ID = id; b2TX = x; b2TY = y; b2SX = sx; b2SY = sy; b2SqV += 2; lastTouch = t
+            onEvent?(.press(gain: 0.3))
+            return
+        }
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
         var grab = allowed && (insideBody(x, y) || nearBody(x, y, R * 0.22))
         if sillOn, let g = sillG {   // v2.30: behind the bowl or outside, the bowl, the frame and the wall are in front of it; 走路: a tap on the gift stone asks instead of grabbing
@@ -1466,6 +1509,7 @@ final class SlimeRig {
     /// only on frames that received a fresh move event (Apple: predicted touches are temporary and must be
     /// replaced as real touches arrive). `distance` is the true travelled distance from coalesced touches.
     func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, predictedX: Double?, predictedY: Double?, distance: Double, radius: Double = 0) {
+        if b2On && b2Held && b2ID == id { b2TX += (x - b2SX) / camZ; b2TY += (y - b2SY) / camZ; b2SX = x; b2SY = y; return }   // v2.51: the touch holding the small blob
         guard let f = fingers[id] else { return }
         // in the world the finger only follows its real movement: screen travel ÷ the current zoom (v2.15). From v2.12 the screen point was
         // mapped back every frame, so as the view backed off a resting finger ran outward in the world, the shape stretched, the view
@@ -1485,6 +1529,7 @@ final class SlimeRig {
     }
 
     func touchEnded(_ id: ObjectIdentifier, time: TimeInterval) {
+        if b2Drop(id) { return }   // v2.51
         guard let f = fingers[id] else { return }
         // 候選 26 放手黏連: lifted slowly (under one radius per second) the grab holds on for `stick` seconds, the patch
         // staying at the fingertip; a flick lets go at once. A tiny tick marks the stick, the pop comes at the real release
@@ -1825,6 +1870,7 @@ final class SlimeRig {
 
     /// The system took the touch away (edge gesture, call, app switch): let go quietly, no pop.
     func touchCancelled(_ id: ObjectIdentifier) {
+        if b2Drop(id) { return }   // v2.51
         release(id, quiet: true)
     }
 
@@ -2036,6 +2082,7 @@ final class SlimeRig {
         pairStep(dt)   // v2.38 the limit between two fingers, and tearing
         for f in fingers.values { f.fx += (f.tgx - f.fx) * f.lagK; f.fy += (f.tgy - f.fy) * f.lagK }
         strokeStep(dt)   // v2.26 F6
+        gooStep(dt); b2Step(dt)   // v2.51 the strand, the small blob
         dragStep(dt)   // v2.20 D1: home follows `drag` of the fingers' travel; how far the body itself is pulled open (sb); C3 slipping free
 
         // press flat: as far as the finger went down (relative to the height when it began) the remembered shape squashes,
@@ -3321,8 +3368,13 @@ final class SlimeRig {
         }
         // let go right over the bowl: it wants in; anywhere else it lands on the sill (the frame and the walls come with the next batch)
         if sillHeld && !sillGrab && clingOn {   // v2.36: let go with suckers still on, it springs back onto the wall and keeps sticking
-            planeSet(.frame); surfSet(clingSide); sillInBowl = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1); clingSaid = false
+            planeSet(isEdge(clingSide) ? .room : .frame); surfSet(clingSide); sillInBowl = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1); clingSaid = false
             onEvent?(.press(gain: 0.25))
+        } else if sillHeld && !sillGrab && !sillInBowl, let sd = edgeSide(g, y1) {   // v2.51 黏在螢幕四周
+            surfSet(sd); sillWant = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1)
+            for i in 0..<N { PX[i] = X[i]; PY[i] = Y[i] }
+            onEvent?(.press(gain: 0.3))
+            clingStart(sd)
         } else if sillHeld && !sillGrab && !sillInBowl {
             sillWant = !noBowl && abs(sillRelX - g.bx) < g.cav * 0.9
             if !sillWant && params.cling >= 0.5 && gcx > g.gx && gcx < g.jr && y1 < g.bt - 1 {
@@ -3346,7 +3398,9 @@ final class SlimeRig {
         sillHeld = sillGrab
         if sillStickT > t { sillStickT = t }   // the clock went back
         if sillStickT >= 0 && params.life2 >= 0.5 && sillRoute == nil && fingers.isEmpty && t - sillStickT > (sillStickDur > 0 ? sillStickDur : 1.6) {
-            sillStickT = -1; clingEnd(); routeStart(rtFromWall() + rtBackIn())   // 8-15 s on the wall, then it climbs down and comes home
+            sillStickT = -1
+            if isEdge(sillSurf) { clingEnd(); sillTanV = false; sillSurf = nil; sillGTX = 0; sillGTY = 1 }   // v2.51: off a screen edge it just drops to the sill
+            else { clingEnd(); routeStart(rtFromWall() + rtBackIn()) }   // 8-15 s on the wall, then it climbs down and comes home
         }
         clingStep(dt)
         // home: not while grabbed; in the air it follows the body; on the ground y follows and, inside the bowl, x eases back to the middle
@@ -3451,7 +3505,35 @@ final class SlimeRig {
     private var sillStickT = -1.0, sillStickDur = 0.0
     private func clingWallD(_ side: String, _ x: Double, _ y: Double) -> Double {
         guard let g = sillG else { return 1e9 }
-        return side == "rjamb" ? g.jr - x : side == "ljamb" ? x - g.gx : y - g.gy
+        switch side {
+        case "rjamb": return g.jr - x
+        case "ljamb": return x - g.gx
+        case "rwall": return g.r - x     // v2.51 the screen's edges (the room's walls): left, right, top; below is the sill
+        case "lwall": return x - g.l
+        case "top": return y - 4
+        default: return y - g.gy
+        }
+    }
+    private func isEdge(_ s: String?) -> Bool { s == "rwall" || s == "lwall" || s == "top" }
+    private func clingPinAt(_ side: String, _ g: SillGeo, _ x: Double, _ y: Double) -> (x: Double, y: Double) {
+        switch side {
+        case "rjamb": return (g.jr, y)
+        case "ljamb": return (g.gx, y)
+        case "rwall": return (g.r, y)
+        case "lwall": return (g.l, y)
+        case "top": return (x, 4)
+        default: return (x, g.gy)
+        }
+    }
+    /// v2.51: set down slowly beside a screen edge, its bottom off the sill: which edge it sticks to
+    private func edgeSide(_ g: SillGeo, _ y1: Double) -> String? {
+        guard params.edgeCling >= 0.5, params.cling >= 0.5, sillPlane == .room, hypot(sillVX, sillVY) < R * 2.5, y1 < g.fl - R * 0.4, !ringCrossed() else { return nil }
+        var x0 = 1e9, x1 = -1e9, y0 = 1e9
+        for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]) }
+        if x1 > g.r - R * 0.3 { return "rwall" }
+        if x0 < g.l + R * 0.3 { return "lwall" }
+        if y0 < 4 + R * 0.3 { return "top" }
+        return nil
     }
     /// How far it must be pulled off before a sucker lets go: trusting 1 R, wary 1.5 R
     private func clingP0() -> Double { R * (params.imp >= 0.5 ? max(1, min(1.5, 1.25 - 0.25 * impTrust + 0.25 * impWary)) : 1.2) }
@@ -3485,8 +3567,8 @@ final class SlimeRig {
                     if clingN >= 16 { break }
                     if !clingAX[i].isNaN || GRAB[i] { continue }
                     if clingWallD(sd, X[i], Y[i]) < R * 0.08 {
-                        clingAX[i] = sd == "rjamb" ? g.jr : sd == "ljamb" ? g.gx : X[i]
-                        clingAY[i] = sd == "ceil" ? g.gy : Y[i]
+                        let pa = clingPinAt(sd, g, X[i], Y[i])
+                        clingAX[i] = pa.x; clingAY[i] = pa.y
                         clingN += 1; clingN0 = max(clingN0, clingN)
                     }
                 }
@@ -3563,6 +3645,9 @@ final class SlimeRig {
         case "rjamb": sillGTX = 0.6; sillGTY = 0; sillTanV = true
         case "ljamb": sillGTX = -0.6; sillGTY = 0; sillTanV = true
         case "ceil": sillGTX = 0; sillGTY = -0.6; sillTanV = false
+        case "rwall": sillGTX = 0.6; sillGTY = 0; sillTanV = true    // v2.51 screen edges
+        case "lwall": sillGTX = -0.6; sillGTY = 0; sillTanV = true
+        case "top": sillGTX = 0; sillGTY = -0.6; sillTanV = false
         default: sillGTX = 0; sillGTY = 1; sillTanV = false
         }
         if !clusters.isEmpty { homeX = clusters[gi].xc; homeY = clusters[gi].yc }
@@ -4318,7 +4403,10 @@ final class SlimeRig {
     private func dragTarget() -> (x: Double, y: Double, n: Int) {
         guard params.slide > 0 else { let a = dragAvg(), k = dragFollow(); return (a.x * k, a.y * k, a.n) }
         var sx = 0.0, sy = 0.0, n = 0
-        for f in fingers.values where f.mode == .grab { sx += f.x - f.ax; sy += f.y - f.ay; n += 1 }
+        for f in fingers.values where f.mode == .grab {   // v2.51 tug: a finger holding the edge does not carry the body, it pulls a strand out
+            if f.tug != true { sx += f.x - f.ax; sy += f.y - f.ay }
+            n += 1
+        }
         if n == 0 { return (0, 0, 0) }
         let dx = sx / Double(n), dy = sy / Double(n), dl = hypot(dx, dy)
         if dl < 1e-9 { return (0, 0, n) }
@@ -4380,6 +4468,177 @@ final class SlimeRig {
         } else { pairOver = 0 }
     }
     /// Tearing: an ordinary release (feel, trust, mood the same), the stretch counted full so the pop is the biggest; that finger holds nothing until lifted.
+    // MARK: - v2.51 黏條、分裂、黏合 (多米 11-22). Port of the web's strandStep / splitNow / b2Step / extraMask.
+    // The strand: the physical body stretches only to a stable length; the rest of the way to the finger is a chain of `gooN` nodes (the middle lags, so it
+    // bends when swung), drawn into the skin's mask. The mask is blurred and thresholded anyway, so the strand joins the body round. Half-width: 0.26R at the
+    // root, thinner in the middle with length but never under 0.12R (still above the threshold after the blur, it cannot vanish), 0.2R at the finger.
+    // The split: the finger farther than splitAt×R from the centre for 0.4 s, the middle pinches shut over 0.25 s; the body's end draws back, the finger's
+    // end becomes the small blob (a point, a radius, a squash). The merge: left alone `rejoin` seconds it crawls back; touching the body (or dropped on it)
+    // it is drawn in over 0.45 s. Both are in one mask, so a bridge forms between them by itself as they close.
+    private struct Goo {
+        var id: ObjectIdentifier
+        var free = false
+        var n: [(x: Double, y: Double)]
+        var k = 0.0, pinch = 0.0, over = 0.0, want = 0.0, L = 0.0
+        var ai = -1
+        var rx = 0.0, ry = 0.0, tx = 0.0, ty = 0.0
+    }
+    private var goo: [Goo] = []
+    private let gooN = 14
+    private var b2On = false, b2Held = false, b2Air = true
+    private var b2ID: ObjectIdentifier?
+    private var b2X = 0.0, b2Y = 0.0, b2VX = 0.0, b2VY = 0.0, b2R = 0.0, b2G = 1.0, b2Sq = 0.0, b2SqV = 0.0
+    private var b2TX = 0.0, b2TY = 0.0, b2SX = 0.0, b2SY = 0.0, b2Idle = 0.0, b2Merge = 0.0
+
+    private func gooW(_ q: Goo, _ u: Double) -> Double {
+        let wr: Double = R * 0.26, wm: Double = R * max(0.12, 0.26 / (1 + q.L / (R * 1.4))), wt: Double = R * 0.2
+        let a: Double = (1 - u) * (1 - u) * (1 - u), b: Double = u < 0.8 ? 0 : (u - 0.8) / 0.2
+        var w: Double = wm + (wr - wm) * a + (wt - wm) * b * b * (3 - 2 * b)
+        if q.pinch > 0 { let d = (u - 0.5) / 0.16; w *= 1 - q.pinch * exp(-d * d) }   // the waist
+        return w * q.k
+    }
+
+    private func gooStep(_ dt: Double) {
+        guard params.strand >= 0.5, !clusters.isEmpty else { goo.removeAll(); return }
+        let gc = clusters[gi]
+        for (id, f) in Array(fingers) where f.mode == .grab {
+            if f.tug == nil {   // held within tugEdge×R of the outline: a strand is pulled out; nearer the middle: picked up whole
+                var bd = 1e18
+                for i in bnd { let e = (X[i] - f.ax) * (X[i] - f.ax) + (Y[i] - f.ay) * (Y[i] - f.ay); if e < bd { bd = e } }
+                f.tug = bd.squareRoot() < R * params.tugEdge
+            }
+            let d: Double = hypot(f.x - f.fx, f.y - f.fy)
+            var qi = goo.firstIndex(where: { $0.id == id && !$0.free })
+            if qi == nil {
+                if d < R * 0.3 { continue }
+                goo.append(Goo(id: id, n: Array(repeating: (f.fx, f.fy), count: gooN)))
+                qi = goo.count - 1
+            }
+            guard let q = qi else { continue }
+            goo[q].rx = f.fx; goo[q].ry = f.fy; goo[q].tx = f.x; goo[q].ty = f.y; goo[q].want = d > R * 0.3 ? 1 : 0
+            var bd = 1e18
+            for i in bnd { let e = (X[i] - f.fx) * (X[i] - f.fx) + (Y[i] - f.fy) * (Y[i] - f.fy); if e < bd { bd = e; goo[q].ai = i } }   // let go, the root rides this boundary particle
+            // the split: the finger far enough from the centre, long enough
+            let far: Bool = hypot(f.x - gc.xc, f.y - gc.yc) > params.splitAt * R
+            if params.split >= 0.5 && !b2On && far && goo[q].k > 0.9 { goo[q].over += dt } else { goo[q].over = max(0, goo[q].over - dt * 2) }
+            goo[q].pinch = max(0, min(1, (goo[q].over - 0.4) / 0.25))
+            if goo[q].pinch >= 1 { splitNow(q, f) }
+        }
+        var j = goo.count - 1
+        while j >= 0 {
+            if !goo[j].free {
+                let held: Bool = fingers[goo[j].id].map { $0.mode == .grab } ?? false
+                if !held { goo[j].free = true; goo[j].pinch = 0 }
+            }
+            if goo[j].free {
+                let ai = goo[j].ai
+                if ai >= 0 && ai < N { goo[j].rx = X[ai]; goo[j].ry = Y[ai] }
+                let k = 1 - exp(-dt / 0.07)
+                goo[j].tx += (goo[j].rx - goo[j].tx) * k; goo[j].ty += (goo[j].ry - goo[j].ty) * k
+                goo[j].want = 1
+                if hypot(goo[j].tx - goo[j].rx, goo[j].ty - goo[j].ry) < R * 0.12 { goo.remove(at: j); j -= 1; continue }
+            }
+            goo[j].k += (goo[j].want - goo[j].k) * (1 - exp(-dt / 0.06))
+            let L: Double = hypot(goo[j].tx - goo[j].rx, goo[j].ty - goo[j].ry)
+            goo[j].L = L
+            for i in 0..<gooN {
+                let u = Double(i) / Double(gooN - 1), sg = sin(.pi * u)
+                let gx: Double = goo[j].rx + (goo[j].tx - goo[j].rx) * u
+                let gy: Double = goo[j].ry + (goo[j].ty - goo[j].ry) * u + (sillOn ? L * 0.05 * sg : 0)   // a little sag under gravity
+                let k: Double = i == 0 || i == gooN - 1 ? 1 : 1 - exp(-dt / (0.012 + 0.05 * sg))
+                goo[j].n[i].x += (gx - goo[j].n[i].x) * k; goo[j].n[i].y += (gy - goo[j].n[i].y) * k
+            }
+            j -= 1
+        }
+    }
+
+    private func splitNow(_ q: Int, _ f: Finger) {
+        let m = goo[q].n[gooN / 2]
+        b2On = true; b2X = f.x; b2Y = f.y; b2VX = 0; b2VY = 0; b2R = R * 0.46; b2G = 0.5; b2Sq = 0; b2SqV = 3
+        b2Held = true; b2ID = goo[q].id; b2TX = f.x; b2TY = f.y; b2SX = f.sx; b2SY = f.sy; b2Idle = t; b2Merge = 0; b2Air = true
+        goo[q].free = true; goo[q].pinch = 0; goo[q].over = 0; goo[q].tx = m.x; goo[q].ty = m.y
+        tearFinger(f)   // the finger lets go of the body (the rip and the drip); the touch now holds the small blob
+    }
+
+    /// The touch holding the small blob lifted (or was taken away).
+    private func b2Drop(_ id: ObjectIdentifier) -> Bool {
+        guard b2On, b2Held, b2ID == id else { return false }
+        b2Held = false; b2ID = nil; b2Idle = t
+        let sp = hypot(b2VX, b2VY), cap = R * 8
+        if sp > cap { b2VX *= cap / sp; b2VY *= cap / sp }
+        onEvent?(.release(gain: 0.4, rate: 1.1, special: false))
+        return true
+    }
+
+    private func b2Step(_ dt: Double) {
+        guard b2On, !clusters.isEmpty else { return }
+        let gc = clusters[gi]
+        b2G += (1 - b2G) * (1 - exp(-dt / 0.12))
+        if b2Merge > 0 {   // drawn into the body
+            b2Merge += dt / 0.45
+            let k = 1 - exp(-dt / 0.12)
+            b2X += (gc.xc - b2X) * k; b2Y += (gc.yc - b2Y) * k
+            if b2Merge >= 1.9 {
+                b2On = false
+                voiceLast = -9; voice("gulp", 0.6)
+                onEvent?(.press(gain: 0.3))
+                if sillOn && !introOn { introSq = 0.12 }   // the body bulges once
+                eyeUser = t + 1.2
+            }
+            return
+        }
+        if b2Held {
+            lastTouch = t; b2Idle = t
+            let k = 1 - exp(-dt / 0.04), ox = b2X, oy = b2Y
+            b2X += (b2TX - b2X) * k; b2Y += (b2TY - b2Y) * k
+            b2VX = (b2X - ox) / dt; b2VY = (b2Y - oy) / dt; b2Air = true
+        } else {
+            if !fingers.isEmpty { b2Idle = t }
+            let wl = worldWalls, rr = b2R * 0.85
+            let room: Bool = sillOn && sillG != nil
+            if room { b2VY += R * sillGrav * dt; b2VX *= exp(-dt / (b2Air ? 2 : 0.15)) } else { b2VX *= exp(-dt / 0.6); b2VY *= exp(-dt / 0.6) }
+            if t - b2Idle > params.rejoin {   // left alone: it crawls back in pulses
+                let dx: Double = gc.xc - b2X, dy: Double = room ? 0 : gc.yc - b2Y
+                let l: Double = max(1e-9, hypot(dx, dy)), ph: Double = sin((t - b2Idle) * 5), p: Double = max(0, ph)
+                b2VX = dx / l * R * 1.3 * p * p
+                if !room { b2VY = dy / l * R * 1.3 * p * p }
+                b2Sq += (0.1 * ph - b2Sq) * (1 - exp(-dt / 0.05))
+            }
+            b2X += b2VX * dt; b2Y += b2VY * dt
+            if wl.b.isFinite && b2Y > wl.b - rr {
+                if b2Air && b2VY > R * 2 { b2SqV += min(6, b2VY / R * 0.5); onEvent?(.fx(kind: "land", gain: min(0.6, 0.15 + b2VY / (R * 20)), delay: 0)) }
+                b2Y = wl.b - rr; b2VY = 0; b2Air = false
+            } else if room { b2Air = true }
+            if wl.l.isFinite && b2X < wl.l + rr { b2X = wl.l + rr; b2VX = abs(b2VX) * 0.3 }
+            if wl.r.isFinite && b2X > wl.r - rr { b2X = wl.r - rr; b2VX = -abs(b2VX) * 0.3 }
+            if wl.t.isFinite && b2Y < wl.t + rr { b2Y = wl.t + rr; b2VY = abs(b2VY) * 0.3 }
+            // touching the body: merge
+            var bd = 1e18
+            for i in bnd { let e = (X[i] - b2X) * (X[i] - b2X) + (Y[i] - b2Y) * (Y[i] - b2Y); if e < bd { bd = e } }
+            if insideBody(b2X, b2Y) || bd.squareRoot() < b2R * 0.75 { b2Merge = 0.001; onEvent?(.fx(kind: "cling", gain: 0.5, delay: 0)) }
+        }
+        b2SqV += (-b2Sq * 140 - b2SqV * 9) * dt; b2Sq += b2SqV * dt
+        b2Sq = max(-0.35, min(0.35, b2Sq))
+    }
+
+    /// What the skin draws besides the body, in world points: the strand as round-capped segments (full width), the small blob as an ellipse.
+    var gooView: (segs: [(x0: Double, y0: Double, x1: Double, y1: Double, w: Double)], blob: (x: Double, y: Double, rx: Double, ry: Double)?) {
+        var segs: [(x0: Double, y0: Double, x1: Double, y1: Double, w: Double)] = []
+        for q in goo where q.k >= 0.03 {
+            for i in 0..<(gooN - 1) {
+                let w: Double = gooW(q, Double(i) / Double(gooN - 1)) + gooW(q, Double(i + 1) / Double(gooN - 1))
+                if w < 0.5 { continue }
+                segs.append((q.n[i].x, q.n[i].y, q.n[i + 1].x, q.n[i + 1].y, w))
+            }
+        }
+        var blob: (x: Double, y: Double, rx: Double, ry: Double)? = nil
+        if b2On {
+            let sh: Double = b2Merge > 0 ? max(0, 1 - max(0, b2Merge - 0.9)) : 1, rad: Double = b2R * b2G * sh
+            if rad > 1 { blob = (b2X, b2Y + rad * b2Sq * 0.6, rad * (1 + b2Sq), rad * (1 - b2Sq)) }
+        }
+        return (segs, blob)
+    }
+
     private func tearFinger(_ f: Finger) {
         guard let id = fingers.first(where: { $0.value === f })?.key else { return }
         f.stretch = max(f.stretch, 2)

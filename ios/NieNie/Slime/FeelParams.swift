@@ -271,8 +271,18 @@ struct FeelParams: Equatable, Codable {
     var water: Double = 1             // 1: what is behind it shows through its body, bent; thin places almost colourless, the thick part takes its colour. 0 = the v2.48 skin
     var refr: Double = 0.3            // how far the background seen through it shifts (in radii); most at the edge
     var absorb: Double = 0.68         // 0 the whole of it like clear water; 1 a strong colour in the middle
-    var caustic: Double = 1           // sitting, a patch of gathered light under it and a faint ring of shade; 0 off
-    var bubbles: Double = 6           // small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
+    var caustic: Double = 0           // v2.51: 0 (the ring under it read as a base). sitting, a patch of gathered light under it and a faint ring of shade; 0 off
+    // v2.51 (多米 11-22). Web: the same keys in PRESETS
+    var shine: Double = 0             // 0: no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50
+    var opaque: Double = 0.9          // how much the thick part of the body hides what is behind it. 0 = v2.50 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
+    var lump: Double = 1              // irregular outline (web shape.js): heavy below, a bump leaning to one side on top, a smaller one low on the other side; 0 = the near-round blob of v2.50. Rebuilds the body
+    var strand: Double = 1            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
+    var tugEdge: Double = 0.42        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
+    var split: Double = 1             // the finger farther than splitAt×R from the body's centre for 0.4 s: the strand pinches and parts, the finger's end becomes a second small blob (no face). At most two. 0 off
+    var splitAt: Double = 3.4
+    var rejoin: Double = 6            // seconds left alone before the small blob crawls back and merges; dropped on the body it merges at once
+    var edgeCling: Double = 1         // set down slowly by the left, right or top edge of the screen it sticks there, the same suckers as on the window jambs; 0 = jambs only
+    var bubbles: Double = 0           // v2.51: 0 (多米: no drops inside). small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -654,6 +664,15 @@ struct TuneField: Identifiable {
         TuneField(key: \.refr, name: "水把後面的東西彎多少 v2.49", hint: "透過身體看到的背景偏移多少（×半徑），邊緣彎最多", range: 0...0.6, step: 0.02),
         TuneField(key: \.absorb, name: "厚的地方多有顏色 v2.49", hint: "0 整隻像清水；1 中間很濃", range: 0...1, step: 0.05),
         TuneField(key: \.caustic, name: "底下的聚光 v2.49", hint: "坐著時底下一塊聚起來的亮光和一圈淡影；0 關", range: 0...1.5, step: 0.1),
+        TuneField(key: \.shine, name: "身體上的亮點 v2.51", hint: "（多米 11-22：身體內不要有反光）0 沒有：主亮點、小亮點、左上白弧、柔光全關；1 回 v2.50", range: 0...1, step: 0.1),
+        TuneField(key: \.opaque, name: "身體多不透明 v2.51", hint: "（多米 11-22：下方有一條線或底座）厚的地方蓋掉多少後面的東西。0 回 v2.50：窗台邊和布墊透過身體看得到；0.9 只剩邊緣薄的地方透", range: 0...1, step: 0.05),
+        TuneField(key: \.lump, name: "不規則外形 v2.51", hint: "（多米 11-22：預設形狀要不規則）1：下盤重、上面一個歪向一邊的鼓包；0 回 v2.50 接近圓的團塊", range: 0...1, step: 0.1),
+        TuneField(key: \.strand, name: "黏條 v2.51", hint: "（多米 11-22：不能破皮；手指拉到哪就延長到哪）1：身體只拉到穩定的長度，再遠用一條黏條接到手指，不會斷；0 回 v2.50", range: 0...1, step: 1),
+        TuneField(key: \.tugEdge, name: "捏邊緣算拉、捏中間算拿 v2.51", hint: "手指按下的地方離外框這麼近（×半徑）以內，就只把那塊拉出去；更靠中間照舊整隻被拖著走。0 一律整隻拖走", range: 0...1, step: 0.02),
+        TuneField(key: \.split, name: "拉到極限分成兩團 v2.51", hint: "手指離身體中心超過「分裂距離」再撐 0.4 秒，黏條中間收腰、斷開，手指那頭變成小的一團；最多兩團。0 關", range: 0...1, step: 1),
+        TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "手指離身體中心多遠才算拉到極限", range: 2...8, step: 0.2),
+        TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
+        TuneField(key: \.edgeCling, name: "黏在螢幕四周 v2.51", hint: "（多米 11-22）1：慢慢放在螢幕左邊、右邊、上邊旁邊會黏住；0 只有窗框", range: 0...1, step: 1),
         TuneField(key: \.bubbles, name: "身體裡的氣泡幾顆 v2.49", hint: "黏在身體裡、跟著被擠開；0 沒有", range: 0...12, step: 1),
         TuneField(key: \.wet, name: "水潤 v2.47", hint: "1（多米 11-16：要很有水份的感覺）：更透、亮點更大更銳、多一顆小亮點、邊緣一圈反光；0 回 v2.46 的皮", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.skin, name: "皮", hint: "1 果凍 A 清透（多米 11-07 定）：看得到肚子裡的亮粉在沉；亮粉揚起來時往奶凍混。0 平塗（舊畫法，沒有 Metal 的手機也用這個）", range: 0...1, step: 1, section: "外形"),

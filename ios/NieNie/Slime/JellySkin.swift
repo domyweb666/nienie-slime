@@ -100,7 +100,8 @@ final class JellySkin {
 
     /// One frame. `path` is the body in screen points; `rpx` the body radius in points on screen; colours already tinted by mood and impression.
     /// v2.47 `round`: the outline is cut from the small blur instead of the mask (sharp corners round off, concave ones join); it scales that blur. 0 = the mask's own edge.
-    func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin, round: Double = 0, water: Double = 0, refr: Double = 0.3, absorb: Double = 0.68) {
+    func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin, round: Double = 0, water: Double = 0, refr: Double = 0.3, absorb: Double = 0.68,
+                shine: Double = 1, opaque: Double = 0, extra: [CGPath] = []) {   // v2.51: highlights × shine; the thick part hides the room; extra shapes (the strand, the small blob) join the mask
         guard let mask, let h1, let h2, let q1, let q2, let ctx = maskCtx, let data = ctx.data else { return }
         // 1 the mask
         ctx.setFillColor(gray: 0, alpha: 1)
@@ -108,6 +109,7 @@ final class JellySkin {
         ctx.setFillColor(gray: 1, alpha: 1)
         ctx.addPath(path)
         ctx.fillPath()
+        for e in extra { ctx.addPath(e); ctx.fillPath() }
         mask.replace(region: MTLRegionMake2D(0, 0, W, H), mipmapLevel: 0, withBytes: data, bytesPerRow: ctx.bytesPerRow)
         guard let cmd = queue.makeCommandBuffer(), let drawable = layer.nextDrawable() else { return }
         // 2 the blurs: small for the edge, large for the inner shading
@@ -144,10 +146,11 @@ final class JellySkin {
         u.append(mix(bc, white, skin.kEdge)); u.append(mix(bc, sc, skin.kCore)); u.append(mix(sc, lc, 0.35)); u.append(mix(bc, white, 0.3))
         u.append(SIMD4<Float>(skin.aEdge, skin.aCore, skin.amb, skin.dif))
         u.append(SIMD4<Float>(skin.glow, skin.line, skin.nk, skin.shin))
-        u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec, skin.sheen))
-        u.append(SIMD4<Float>(skin.arc, round > 0 ? 0.46 : 0, skin.wet, 0))
+        let sh = Float(max(0, min(1, shine)))
+        u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec * sh, skin.sheen * sh))
+        u.append(SIMD4<Float>(skin.arc * sh, round > 0 ? 0.46 : 0, skin.wet * sh, 0))
         let wv: Float = bg != nil ? Float(max(0, min(1, water))) * min(1, skin.wet) : 0   // v2.49: no baked room, no water skin
-        u.append(SIMD4<Float>(wv, Float(refr), Float(absorb), 0))
+        u.append(SIMD4<Float>(wv, Float(refr), Float(absorb), Float(max(0, min(1, opaque)))))
         let rp = MTLRenderPassDescriptor()
         rp.colorAttachments[0].texture = drawable.texture
         rp.colorAttachments[0].loadAction = .clear

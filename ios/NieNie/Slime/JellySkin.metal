@@ -38,7 +38,7 @@ struct LightU {
     float4 k1;           // glow, line, nk, shin
     float4 k2;           // s0, s1, spec, sheen
     float4 k3;           // arc, rnd (v2.47: threshold on the small blur for the outline, 0 = the mask), wet (v2.47)
-    float4 k4;           // v2.49: water (0 = the v2.48 skin), refr (how far the background bends, in radii), absorb (how much the thick part takes its colour)
+    float4 k4;           // v2.49: water (0 = the v2.48 skin), refr (how far the background bends, in radii), absorb (how much the thick part takes its colour); v2.51 w: opaque
 };
 
 static float H1(float2 uv, texture2d<float> B1, sampler sm, constant LightU& u) {
@@ -85,6 +85,7 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
         float3 bg = BG.sample(sm, v + ro).rgb;
         float3 T = mix(float3(1.0), u.cCore.rgb, clamp(thick * u.k4.z + 0.05, 0.0, 1.0));
         float3 w = bg * T + u.cGlow.rgb * smoothstep(0.15, 0.8, tr) * (0.2 + 0.8 * fres) * glow * 0.5;
+        w = mix(w, col, clamp(smoothstep(0.03, 0.35, thick) * u.k4.w, 0.0, 1.0));   // v2.51: the thick part hides what is behind it
         w *= 1.0 - 0.16 * smoothstep(0.2, 0.55, fres) * (1.0 - smoothstep(0.55, 0.9, fres));
         w = mix(w, float3(0.95, 0.98, 1.0), fres * 0.3);
         c = mix(c, float4(w, 1.0), water);

@@ -568,9 +568,22 @@ final class SlimeView: UIView {
             return JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(r * z * 1.2), d: Float(min(1, d.d)))
         }
         let hz = rig.haze
+        // v2.51: the strand and the small blob go into the same mask, so the skin lights them as one body
+        var extra: [CGPath] = []
+        let gv = rig.gooView
+        for s in gv.segs {
+            let a = rig.toScreen(s.x0, s.y0), b = rig.toScreen(s.x1, s.y1), ln = CGMutablePath()
+            ln.move(to: CGPoint(x: Double(a.x), y: Double(a.y))); ln.addLine(to: CGPoint(x: Double(b.x), y: Double(b.y)))
+            extra.append(ln.copy(strokingWithWidth: CGFloat(s.w * z), lineCap: .round, lineJoin: .round, miterLimit: 1))
+        }
+        if let b = gv.blob {
+            let c = rig.toScreen(b.x, b.y)
+            extra.append(CGPath(ellipseIn: CGRect(x: Double(c.x) - b.rx * z, y: Double(c.y) - b.ry * z, width: b.rx * 2 * z, height: b.ry * 2 * z), transform: nil))
+        }
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
                  skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: rig.params.wet >= 0.5), round: rig.params.round,
-                 water: rig.params.water, refr: rig.params.refr, absorb: rig.params.absorb)
+                 water: rig.params.water, refr: rig.params.refr, absorb: rig.params.absorb,
+                 shine: rig.params.shine, opaque: rig.params.opaque, extra: extra)
         drawWater(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
         if let e = rig.eyeView {
