@@ -30,6 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 WEB = os.path.join(ROOT, 'prototype', 'web', 'sfx')
 IOS = os.path.join(ROOT, 'ios', 'NieNie', 'Resources')
 SRC = os.path.join(os.path.dirname(ROOT), '素材', 'higgsfield', 'slime')
+EL_SRC = os.path.join(os.path.dirname(ROOT), '素材', 'elevenlabs', 'slime', '_opus')
 PEAK_CAP_DB = -8.0
 
 
@@ -178,6 +179,9 @@ def main():
     if '--src' in sys.argv:
         src = sys.argv[sys.argv.index('--src') + 1]
     S = {n.split('-', 1)[0]: load(os.path.join(src, n)) for n in sorted(os.listdir(src)) if n.endswith('.mp3')}
+    # 11-21 多米：ElevenLabs 版比較好。質感類改用 ElevenLabs（每種 4 個版本，鍵是 <種類>-N），「它的聲音」暫時還是 Higgsfield 那批
+    S.update({n[:-5]: load(os.path.join(EL_SRC, n)) for n in sorted(os.listdir(EL_SRC)) if n.endswith('.opus')})
+    E = lambda k: ['%s-%d' % (k, i) for i in range(1, 5)]
     with open(os.path.join(WEB, 'manifest.json'), encoding='utf-8') as f:
         manifest = json.load(f)
     # 同一層的參考音量先量（換掉之前）
@@ -208,26 +212,26 @@ def main():
         plan[(kind, layer)] = outs
 
     # 按：濕聲從三段按壓（含多米說 OK 的第一段），氣泡是同樣三段的高頻起音
-    onset_layer('press', 'wet', ['00', '01', '02'], 6, 0.35, 6, 0.2)
-    onset_layer('press', 'air', ['00', '02'], 6, 0.12, 8, 0.1, band=2000)
+    onset_layer('press', 'wet', E('press'), 8, 0.35, 6, 0.2)
+    onset_layer('press', 'air', E('press'), 6, 0.12, 8, 0.1, band=2000)
     # 放手：濕聲、啵、餘韻的小氣泡
-    onset_layer('release', 'wet', ['09', '10'], 6, 0.28, 6, 0.15)
-    onset_layer('release', 'air', ['09', '10'], 8, 0.12, 8, 0.1, band=2000)
-    onset_layer('settle', 'bubble', ['00', '09', '10'], 10, 0.1, 9, 0.08, band=2500)
+    onset_layer('release', 'wet', E('release'), 8, 0.28, 6, 0.15)
+    onset_layer('release', 'air', E('release'), 8, 0.12, 8, 0.1, band=2000)
+    onset_layer('settle', 'bubble', E('release') + E('press'), 10, 0.1, 9, 0.08, band=2500)
     # 拉：細絲一根根斷；拉絲 loop 兩條
-    onset_layer('pull', 'strand', ['05', '06'], 10, 0.1, 7, 0.06, fout=0.04)
+    onset_layer('pull', 'strand', E('strand'), 10, 0.1, 7, 0.06, fout=0.04)
     loops = []
-    for i in ('03', '04'):
+    for i in E('pull'):
         a, b = segments(S[i], 40, 0.5, 0.5, 9)[0]
         loops.append(make_loop(S[i][a:b]))
     plan[('pull', 'loop')] = loops
-    print('pull.loop      兩條，各 %s 秒' % '、'.join('%.2f' % (len(l) / SR) for l in loops))
+    print('pull.loop      %d 條，各 %s 秒' % (len(loops), '、'.join('%.2f' % (len(l) / SR) for l in loops)))
     # 它的聲音：一句一句切（中間空 0.12 秒以上算下一句）
     seg_layer('voice', 'poke', ['11', '12'], 4, 30, 0.08, 0.05, 0.45)
     seg_layer('voice', 'happy', ['13', '14'], 4, 30, 0.12, 0.15, 1.1)
     seg_layer('voice', 'giggle', ['15', '16'], 4, 30, 0.15, 0.2, 1.2)
     seg_layer('voice', 'protest', ['17', '18'], 4, 30, 0.12, 0.15, 1.1)
-    seg_layer('voice', 'tear', ['07', '08'], 2, 35, 0.4, 0.3, 1.6)
+    seg_layer('voice', 'tear', E('tear'), 4, 35, 0.4, 0.3, 1.6)
 
     # ---- 第二批（11-19，多米：碰到東西、爬窗台等等，全部接上）：19 到 66 ----
     # 它的聲音：換掉合成的四種，加「嚇到」
@@ -237,27 +241,27 @@ def main():
     seg_layer('voice', 'mmm', ['57', '58'], 4, 30, 0.2, 0.3, 1.6)
     seg_layer('voice', 'startle', ['51', '52'], 4, 30, 0.12, 0.1, 1.0)
     # 揉的 loop：兩條
-    plan[('rub', 'loop')] = [make_loop(S[i][slice(*segments(S[i], 40, 0.5, 0.5, 9)[0])]) for i in ('63', '64')]
+    plan[('rub', 'loop')] = [make_loop(S[i][slice(*segments(S[i], 40, 0.5, 0.5, 9)[0])]) for i in E('rub')]
     # 場景（fx.*）：走、爬、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣
-    onset_layer('fx', 'crawl', ['39', '40'], 6, 0.45, 6, 0.3, fout=0.12)
-    onset_layer('fx', 'climb', ['37', '38'], 6, 0.5, 6, 0.3, fout=0.12)
-    seg_layer('fx', 'land', ['41', '42'], 4, 30, 0.1, 0.08, 0.7)
-    seg_layer('fx', 'swimin', ['65', '66'], 2, 40, 0.5, 0.5, 2.6)
-    seg_layer('fx', 'cling', ['43', '44'], 2, 40, 0.4, 0.4, 1.6)
-    seg_layer('fx', 'unstick', ['45', '46'], 4, 30, 0.1, 0.08, 0.8)
-    onset_layer('fx', 'drip', ['47', '48'], 4, 0.35, 6, 0.3, fout=0.1)
+    onset_layer('fx', 'crawl', E('crawl'), 8, 0.45, 6, 0.3, fout=0.12)
+    onset_layer('fx', 'climb', E('climb'), 8, 0.5, 6, 0.3, fout=0.12)
+    seg_layer('fx', 'land', E('land'), 6, 30, 0.1, 0.08, 0.7)
+    seg_layer('fx', 'swimin', E('swimin'), 4, 40, 0.5, 0.5, 2.6)
+    seg_layer('fx', 'cling', E('glassslide'), 4, 40, 0.4, 0.4, 1.6)
+    seg_layer('fx', 'unstick', E('unstick'), 4, 30, 0.1, 0.08, 0.8)
+    onset_layer('fx', 'drip', E('drip'), 6, 0.35, 6, 0.3, fout=0.1)
     seg_layer('fx', 'snore', ['49', '50'], 4, 35, 0.25, 0.4, 2.5)
     seg_layer('fx', 'sigh', ['61', '62'], 2, 35, 0.4, 0.5, 2.6)
     # 只有網頁版有的（iPhone 版還沒有擺飾的物理）：擺飾被碰、倒下、掉出窗外、走過布墊
-    seg_layer('prop', 'pot', ['19', '20'], 4, 30, 0.1, 0.05, 0.8)
-    seg_layer('prop', 'dish', ['21', '22'], 4, 30, 0.1, 0.05, 0.8)
-    seg_layer('prop', 'glass', ['23', '24'], 4, 30, 0.1, 0.05, 0.9)
-    seg_layer('prop', 'book', ['25', '26'], 4, 30, 0.1, 0.05, 0.8)
-    seg_layer('prop', 'bell', ['27', '28'], 2, 40, 0.5, 0.3, 2.8)
-    seg_layer('prop', 'candle', ['29', '30'], 4, 30, 0.1, 0.05, 0.8)
-    seg_layer('fx', 'topple', ['33', '34'], 2, 40, 0.5, 0.4, 2.6)
-    seg_layer('fx', 'fallout', ['35', '36'], 2, 40, 0.5, 0.3, 2.6)
-    onset_layer('fx', 'cloth', ['31', '32'], 6, 0.5, 5, 0.3, fout=0.15)
+    seg_layer('prop', 'pot', E('pot'), 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('prop', 'dish', E('dish'), 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('prop', 'glass', E('glass'), 4, 30, 0.1, 0.05, 0.9)
+    seg_layer('prop', 'book', E('book'), 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('prop', 'bell', E('bell'), 4, 40, 0.5, 0.3, 2.8)
+    seg_layer('prop', 'candle', E('candle'), 4, 30, 0.1, 0.05, 0.8)
+    seg_layer('fx', 'topple', E('topple'), 4, 40, 0.5, 0.4, 2.6)
+    seg_layer('fx', 'fallout', E('fallout'), 4, 40, 0.5, 0.3, 2.6)
+    onset_layer('fx', 'cloth', E('cloth'), 8, 0.5, 5, 0.3, fout=0.15)
     WEB_ONLY = {('prop', k) for k in ('pot', 'dish', 'glass', 'book', 'bell', 'candle')} | {('fx', k) for k in ('topple', 'fallout', 'cloth')}
     # 新的層沒有合成音可以對照，音量用耳朵定的相對值（捏的聲音約 −27 dB，背景性的小聲一點）
     FX_RMS = {'crawl': -36, 'climb': -34, 'land': -30, 'swimin': -34, 'cling': -32, 'unstick': -30, 'drip': -32,

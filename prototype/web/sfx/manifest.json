@@ -15,7 +15,9 @@
       "ai-press-wet-03.wav",
       "ai-press-wet-04.wav",
       "ai-press-wet-05.wav",
-      "ai-press-wet-06.wav"
+      "ai-press-wet-06.wav",
+      "ai-press-wet-07.wav",
+      "ai-press-wet-08.wav"
     ],
     "air": [
       "ai-press-air-01.wav",
@@ -43,7 +45,9 @@
       "ai-release-wet-03.wav",
       "ai-release-wet-04.wav",
       "ai-release-wet-05.wav",
-      "ai-release-wet-06.wav"
+      "ai-release-wet-06.wav",
+      "ai-release-wet-07.wav",
+      "ai-release-wet-08.wav"
     ],
     "body": [
       "release-body-01.wav",
@@ -56,7 +60,9 @@
   "pull": {
     "loop": [
       "ai-pull-loop-01.wav",
-      "ai-pull-loop-02.wav"
+      "ai-pull-loop-02.wav",
+      "ai-pull-loop-03.wav",
+      "ai-pull-loop-04.wav"
     ],
     "strand": [
       "ai-pull-strand-01.wav",
@@ -74,7 +80,9 @@
   "rub": {
     "loop": [
       "ai-rub-loop-01.wav",
-      "ai-rub-loop-02.wav"
+      "ai-rub-loop-02.wav",
+      "ai-rub-loop-03.wav",
+      "ai-rub-loop-04.wav"
     ]
   },
   "settle": {
@@ -141,7 +149,9 @@
     ],
     "tear": [
       "ai-voice-tear-01.wav",
-      "ai-voice-tear-02.wav"
+      "ai-voice-tear-02.wav",
+      "ai-voice-tear-03.wav",
+      "ai-voice-tear-04.wav"
     ],
     "startle": [
       "ai-voice-startle-01.wav",
@@ -152,7 +162,9 @@
   "prop": {
     "pot": [
       "ai-prop-pot-01.wav",
-      "ai-prop-pot-02.wav"
+      "ai-prop-pot-02.wav",
+      "ai-prop-pot-03.wav",
+      "ai-prop-pot-04.wav"
     ],
     "dish": [
       "ai-prop-dish-01.wav",
@@ -169,15 +181,20 @@
     "book": [
       "ai-prop-book-01.wav",
       "ai-prop-book-02.wav",
-      "ai-prop-book-03.wav"
+      "ai-prop-book-03.wav",
+      "ai-prop-book-04.wav"
     ],
     "bell": [
       "ai-prop-bell-01.wav",
-      "ai-prop-bell-02.wav"
+      "ai-prop-bell-02.wav",
+      "ai-prop-bell-03.wav",
+      "ai-prop-bell-04.wav"
     ],
     "candle": [
       "ai-prop-candle-01.wav",
-      "ai-prop-candle-02.wav"
+      "ai-prop-candle-02.wav",
+      "ai-prop-candle-03.wav",
+      "ai-prop-candle-04.wav"
     ]
   },
   "fx": {
@@ -187,7 +204,9 @@
       "ai-fx-crawl-03.wav",
       "ai-fx-crawl-04.wav",
       "ai-fx-crawl-05.wav",
-      "ai-fx-crawl-06.wav"
+      "ai-fx-crawl-06.wav",
+      "ai-fx-crawl-07.wav",
+      "ai-fx-crawl-08.wav"
     ],
     "climb": [
       "ai-fx-climb-01.wav",
@@ -195,7 +214,9 @@
       "ai-fx-climb-03.wav",
       "ai-fx-climb-04.wav",
       "ai-fx-climb-05.wav",
-      "ai-fx-climb-06.wav"
+      "ai-fx-climb-06.wav",
+      "ai-fx-climb-07.wav",
+      "ai-fx-climb-08.wav"
     ],
     "land": [
       "ai-fx-land-01.wav",
@@ -205,21 +226,29 @@
     ],
     "swimin": [
       "ai-fx-swimin-01.wav",
-      "ai-fx-swimin-02.wav"
+      "ai-fx-swimin-02.wav",
+      "ai-fx-swimin-03.wav",
+      "ai-fx-swimin-04.wav"
     ],
     "cling": [
       "ai-fx-cling-01.wav",
-      "ai-fx-cling-02.wav"
+      "ai-fx-cling-02.wav",
+      "ai-fx-cling-03.wav",
+      "ai-fx-cling-04.wav"
     ],
     "unstick": [
       "ai-fx-unstick-01.wav",
-      "ai-fx-unstick-02.wav"
+      "ai-fx-unstick-02.wav",
+      "ai-fx-unstick-03.wav",
+      "ai-fx-unstick-04.wav"
     ],
     "drip": [
       "ai-fx-drip-01.wav",
       "ai-fx-drip-02.wav",
       "ai-fx-drip-03.wav",
-      "ai-fx-drip-04.wav"
+      "ai-fx-drip-04.wav",
+      "ai-fx-drip-05.wav",
+      "ai-fx-drip-06.wav"
     ],
     "snore": [
       "ai-fx-snore-01.wav",
@@ -231,11 +260,15 @@
     ],
     "topple": [
       "ai-fx-topple-01.wav",
-      "ai-fx-topple-02.wav"
+      "ai-fx-topple-02.wav",
+      "ai-fx-topple-03.wav",
+      "ai-fx-topple-04.wav"
     ],
     "fallout": [
       "ai-fx-fallout-01.wav",
-      "ai-fx-fallout-02.wav"
+      "ai-fx-fallout-02.wav",
+      "ai-fx-fallout-03.wav",
+      "ai-fx-fallout-04.wav"
     ],
     "cloth": [
       "ai-fx-cloth-01.wav",
@@ -243,7 +276,9 @@
       "ai-fx-cloth-03.wav",
       "ai-fx-cloth-04.wav",
       "ai-fx-cloth-05.wav",
-      "ai-fx-cloth-06.wav"
+      "ai-fx-cloth-06.wav",
+      "ai-fx-cloth-07.wav",
+      "ai-fx-cloth-08.wav"
     ]
   }
 }
