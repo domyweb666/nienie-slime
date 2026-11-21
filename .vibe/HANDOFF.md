@@ -1,7 +1,7 @@
-# Handoff: v2.52《虛擬手感》3-3 到 3-5 的交辦 A、B、C 三組（網頁做完、自測 3 次全過；手機版 CI 編過；還沒合併、還沒發 TestFlight）
+# Handoff: v2.52《虛擬手感》3-3 到 3-5 的交辦 A、B、C 三組（網頁做完、自測 3 次全過；手機版 CI 編過、**TestFlight build 141 已上傳**；還沒合併）
 
 > 產出時間：2026-11-22 清晨（第二十九會話，claude.ai 雲端環境，沒有 Mac）
-> 分支：`feel-3x-panel-v1`，從 `swiftui-port` 的 `fffd8c1`（v2.51，build 136）開出來。多米 05:43 說推：**分支已經推上 GitHub 當備份**（只有這個分支，沒開 PR、沒觸發 CI、沒動 main／swiftui-port）。多米 06:17 說開：**PR #1**（`feel-3x-panel-v1` → `swiftui-port`）已開，**CI 兩次都 BUILD SUCCEEDED**（`7ecbff5`、`8ffbbe7`；之後只動了 `.vibe/`）。合併、發 TestFlight 還是要多米開口。
+> 分支：`feel-3x-panel-v1`，從 `swiftui-port` 的 `fffd8c1`（v2.51，build 136）開出來。多米 05:43 說推：**分支已經推上 GitHub 當備份**（只有這個分支，沒開 PR、沒觸發 CI、沒動 main／swiftui-port）。多米 06:17 說開：**PR #1**（`feel-3x-panel-v1` → `swiftui-port`）已開，**CI 兩次都 BUILD SUCCEEDED**（`7ecbff5`、`8ffbbe7`；之後只動了 `.vibe/`）。多米 06:28 說發：在這個分支上跑了 workflow（run #141），**build 141 已上傳 TestFlight**（Upload succeeded，11-22 06:34）。合併還是要多米開口。
 > 交辦來源：Project「史萊姆按壓手感」裡的《捏捏-決定與交辦-3-1到3-5》。這次只做 A、B、C；D 到 J 多米說先記錄、何時做由他定。
 > 上一份（AI 音效）在 `.vibe/handoff/archive/2026-11-22-第二十八會話-AI音效.md`。
 
@@ -58,7 +58,7 @@
 ## ⏭️ 下一步（照順序）
 
 1. ~~重跑 `selftest.js` 到 3 次全過~~ 做完了。
-2. ~~開 PR、CI 編譯~~ 做完了（PR #1，編過）。接下來：（可選）照 `.vibe/limrun-v2.52-模擬器測試.md` 在 limrun 模擬器上跑 17 項；多米說「發」→ 在這個分支上手動跑 workflow 勾 testflight（步驟在 `ios/README.md`）；多米測過說可以 → 合併 PR。
+2. ~~開 PR、CI 編譯~~ 做完了（PR #1，編過）。接下來：（可選）照 `.vibe/limrun-v2.52-模擬器測試.md` 在 limrun 模擬器上跑 17 項；~~發 TestFlight~~ 做完了（build 141）。多米在真機上照下面第 4 點量，結果貼回來：壞掉的直接修；延遲數字決定地基要不要動；盲比選的那邊寫成新預設（兩邊一起改、跑自測、發新版）。多米測過說可以 → 合併 PR。
 3. ~~文件~~ 寫完了：`.uiux/04-手感/調整面板規格.md`、`調參紀錄.md`、`參數表-暫定.md` 的 v2.52 一節、`.vibe/CLAUDE-md-v2.52-草稿.md`（草稿，等多米點頭才改 CLAUDE.md）、`.vibe/標準清單.md` 的 v2.52 一節。
 4. 多米拿到 TestFlight 後：照交辦清單「三、多米要動手的事」第 2、4 項（量 A、B、第一下；盲比四組），再加兩件：量測組按「跑亂捏測試」把結果複製回來；C3 開與關各看一次「擺飾透過身體 x 毫秒」。
 5. D 到 J 組：等多米說。
