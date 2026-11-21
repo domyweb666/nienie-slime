@@ -18,7 +18,7 @@
   .grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
   .lab{width:52px;font-size:12px;color:var(--mute)}
   button{border:0;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;color:#fff;cursor:pointer}
-  button.s{background:var(--b)} button.ai{background:var(--a)} button.el{background:#5a6bb0}
+  button.s{background:var(--b)} button.ai{background:var(--a)} button.el{background:#5a6bb0} button.as{background:#8a5aa8}
   button.on{outline:3px solid var(--ink);outline-offset:1px}
   .none{color:var(--mute);font-size:13px}
   h3.sec{font-size:13px;color:var(--mute);margin:22px 4px 8px;font-weight:600;letter-spacing:.05em}
@@ -72,6 +72,7 @@ const ROWS=[
   ['嘆氣','新的（跑完、休息時）',[],['61-sigh-a','62-sigh-b']],
   ['揉的連續聲','',['rub-loop-01','rub-loop-02'],['63-rub-a','64-rub-b']],
 ];
+const ASMR={poke:'一顆濕濕的小啵',happy:'往上冒的小泡泡',giggle:'快速細碎的小擠壓',protest:'黏絲被拉緊的吱聲',startle:'急促的濕縮聲',hello:'兩聲輕輕的啵啵',ask:'慢慢鼓起再破的泡泡',mmm:'慢而深的揉捏聲',gulp:'濕潤的吸入聲',sigh:'空氣從黏液漏出',snore:'像呼吸的慢冒泡'};
 const list=document.getElementById('list');let cur=null,curBtn=null;
 function play(src,btn){
   if(cur){cur.pause();cur.currentTime=0;curBtn&&curBtn.classList.remove('on');if(curBtn===btn){cur=null;curBtn=null;return}}
@@ -94,7 +95,12 @@ for(const row of ROWS){
   const g3=document.createElement('div');g3.className='grp';g3.innerHTML='<span class="lab">11Labs</span>';
   if(key&&key!=='sample')for(let n=1;n<=4;n++){const b=document.createElement('button');b.className='el';b.textContent='E'+n;b.onclick=()=>play('el/'+key+'-'+n+'.mp3',b);g3.appendChild(b)}
   else g3.innerHTML+='<span class="none">沒有</span>';
-  r.append(g1,g2,g3);list.appendChild(r);
+  r.append(g1,g2,g3);
+  // 11-21 多米：不要人聲，全部 ASMR。它的 11 種反應改用黏液本身的聲音（ElevenLabs，檔名 el/as-<key>-N.mp3）
+  if(ASMR[key]){const g4=document.createElement('div');g4.className='grp';g4.innerHTML='<span class="lab">ASMR</span>';
+    for(let n=1;n<=4;n++){const b=document.createElement('button');b.className='as';b.textContent='A'+n;b.onclick=()=>play('el/as-'+key+'-'+n+'.mp3',b);g4.appendChild(b)}
+    const h=document.createElement('span');h.className='none';h.textContent=ASMR[key];g4.appendChild(h);r.appendChild(g4)}
+  list.appendChild(r);
 }
 </script>
 </body>
