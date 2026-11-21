@@ -109,11 +109,15 @@
       "ai-voice-poke-01.wav",
       "ai-voice-poke-02.wav",
       "ai-voice-poke-03.wav",
-      "ai-voice-poke-04.wav"
+      "ai-voice-poke-04.wav",
+      "ai-voice-poke-05.wav",
+      "ai-voice-poke-06.wav"
     ],
     "mmm": [
       "ai-voice-mmm-01.wav",
-      "ai-voice-mmm-02.wav"
+      "ai-voice-mmm-02.wav",
+      "ai-voice-mmm-03.wav",
+      "ai-voice-mmm-04.wav"
     ],
     "protest": [
       "ai-voice-protest-01.wav",
@@ -125,27 +129,37 @@
       "ai-voice-happy-01.wav",
       "ai-voice-happy-02.wav",
       "ai-voice-happy-03.wav",
-      "ai-voice-happy-04.wav"
+      "ai-voice-happy-04.wav",
+      "ai-voice-happy-05.wav",
+      "ai-voice-happy-06.wav"
     ],
     "ask": [
       "ai-voice-ask-01.wav",
       "ai-voice-ask-02.wav",
-      "ai-voice-ask-03.wav"
+      "ai-voice-ask-03.wav",
+      "ai-voice-ask-04.wav"
     ],
     "giggle": [
       "ai-voice-giggle-01.wav",
       "ai-voice-giggle-02.wav",
       "ai-voice-giggle-03.wav",
-      "ai-voice-giggle-04.wav"
+      "ai-voice-giggle-04.wav",
+      "ai-voice-giggle-05.wav",
+      "ai-voice-giggle-06.wav"
     ],
     "gulp": [
       "ai-voice-gulp-01.wav",
-      "ai-voice-gulp-02.wav"
+      "ai-voice-gulp-02.wav",
+      "ai-voice-gulp-03.wav",
+      "ai-voice-gulp-04.wav"
     ],
     "hello": [
       "ai-voice-hello-01.wav",
       "ai-voice-hello-02.wav",
-      "ai-voice-hello-03.wav"
+      "ai-voice-hello-03.wav",
+      "ai-voice-hello-04.wav",
+      "ai-voice-hello-05.wav",
+      "ai-voice-hello-06.wav"
     ],
     "tear": [
       "ai-voice-tear-01.wav",
@@ -156,7 +170,10 @@
     "startle": [
       "ai-voice-startle-01.wav",
       "ai-voice-startle-02.wav",
-      "ai-voice-startle-03.wav"
+      "ai-voice-startle-03.wav",
+      "ai-voice-startle-04.wav",
+      "ai-voice-startle-05.wav",
+      "ai-voice-startle-06.wav"
     ]
   },
   "ding": [
@@ -217,11 +234,15 @@
     ],
     "snore": [
       "ai-fx-snore-01.wav",
-      "ai-fx-snore-02.wav"
+      "ai-fx-snore-02.wav",
+      "ai-fx-snore-03.wav",
+      "ai-fx-snore-04.wav"
     ],
     "sigh": [
       "ai-fx-sigh-01.wav",
-      "ai-fx-sigh-02.wav"
+      "ai-fx-sigh-02.wav",
+      "ai-fx-sigh-03.wav",
+      "ai-fx-sigh-04.wav"
     ]
   }
 }

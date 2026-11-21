@@ -179,7 +179,7 @@ def main():
     if '--src' in sys.argv:
         src = sys.argv[sys.argv.index('--src') + 1]
     S = {n.split('-', 1)[0]: load(os.path.join(src, n)) for n in sorted(os.listdir(src)) if n.endswith('.mp3')}
-    # 11-21 多米：ElevenLabs 版比較好。質感類改用 ElevenLabs（每種 4 個版本，鍵是 <種類>-N），「它的聲音」暫時還是 Higgsfield 那批
+    # 11-21 多米：ElevenLabs 版比較好。質感類改用 ElevenLabs（每種 4 個版本，鍵是 <種類>-N），它的反應也改成純 ASMR（as-<種類>）
     S.update({n[:-5]: load(os.path.join(EL_SRC, n)) for n in sorted(os.listdir(EL_SRC)) if n.endswith('.opus')})
     E = lambda k: ['%s-%d' % (k, i) for i in range(1, 5)]
     with open(os.path.join(WEB, 'manifest.json'), encoding='utf-8') as f:
@@ -227,19 +227,20 @@ def main():
     plan[('pull', 'loop')] = loops
     print('pull.loop      %d 條，各 %s 秒' % (len(loops), '、'.join('%.2f' % (len(l) / SR) for l in loops)))
     # 它的聲音：一句一句切（中間空 0.12 秒以上算下一句）
-    seg_layer('voice', 'poke', ['11', '12'], 4, 30, 0.08, 0.05, 0.45)
-    seg_layer('voice', 'happy', ['13', '14'], 4, 30, 0.12, 0.15, 1.1)
-    seg_layer('voice', 'giggle', ['15', '16'], 4, 30, 0.15, 0.2, 1.2)
-    seg_layer('voice', 'protest', ['17', '18'], 4, 30, 0.12, 0.15, 1.1)
+    # 11-21 多米：不要人聲，全部 ASMR。它的反應改用純黏液聲（ElevenLabs as-<種類>，每種 4 個版本）
+    onset_layer('voice', 'poke', E('as-poke'), 6, 0.3, 6, 0.3, fout=0.1)
+    onset_layer('voice', 'happy', E('as-happy'), 6, 0.6, 6, 0.5, fout=0.15)
+    onset_layer('voice', 'giggle', E('as-giggle'), 6, 0.8, 5, 0.6, fout=0.2)
+    seg_layer('voice', 'protest', E('as-protest'), 4, 30, 0.12, 0.2, 1.1)
     seg_layer('voice', 'tear', E('tear'), 4, 35, 0.4, 0.3, 1.6)
 
     # ---- 第二批（11-19，多米：碰到東西、爬窗台等等，全部接上）：19 到 66 ----
     # 它的聲音：換掉合成的四種，加「嚇到」
-    seg_layer('voice', 'gulp', ['59', '60'], 4, 30, 0.12, 0.12, 1.0)
-    seg_layer('voice', 'hello', ['53', '54'], 4, 30, 0.15, 0.15, 1.2)
-    seg_layer('voice', 'ask', ['55', '56'], 4, 30, 0.15, 0.12, 1.0)
-    seg_layer('voice', 'mmm', ['57', '58'], 4, 30, 0.2, 0.3, 1.6)
-    seg_layer('voice', 'startle', ['51', '52'], 4, 30, 0.12, 0.1, 1.0)
+    seg_layer('voice', 'gulp', E('as-gulp'), 4, 30, 0.12, 0.15, 1.0)
+    onset_layer('voice', 'hello', E('as-hello'), 6, 0.7, 6, 0.6, fout=0.15)
+    seg_layer('voice', 'ask', E('as-ask'), 4, 30, 0.15, 0.3, 1.4)
+    seg_layer('voice', 'mmm', E('as-mmm'), 4, 30, 0.2, 0.4, 1.6)
+    onset_layer('voice', 'startle', E('as-startle'), 6, 0.4, 6, 0.4, fout=0.12)
     # 揉的 loop：兩條
     plan[('rub', 'loop')] = [make_loop(S[i][slice(*segments(S[i], 40, 0.5, 0.5, 9)[0])]) for i in E('rub')]
     # 場景（fx.*）：走、爬、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣
@@ -250,8 +251,8 @@ def main():
     seg_layer('fx', 'cling', E('glassslide'), 4, 40, 0.4, 0.4, 1.6)
     seg_layer('fx', 'unstick', E('unstick'), 4, 30, 0.1, 0.08, 0.8)
     onset_layer('fx', 'drip', E('drip'), 6, 0.35, 6, 0.3, fout=0.1)
-    seg_layer('fx', 'snore', ['49', '50'], 4, 35, 0.25, 0.4, 2.5)
-    seg_layer('fx', 'sigh', ['61', '62'], 2, 35, 0.4, 0.5, 2.6)
+    seg_layer('fx', 'snore', E('as-snore'), 4, 35, 0.25, 0.4, 2.5)
+    seg_layer('fx', 'sigh', E('as-sigh'), 4, 35, 0.4, 0.5, 2.6)
     # 只有網頁版有的（iPhone 版還沒有擺飾的物理）：擺飾被碰、倒下、掉出窗外、走過布墊
     seg_layer('prop', 'pot', E('pot'), 4, 30, 0.1, 0.05, 0.8)
     seg_layer('prop', 'dish', E('dish'), 4, 30, 0.1, 0.05, 0.8)
