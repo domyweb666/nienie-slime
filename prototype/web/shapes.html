@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>捏捏史萊姆｜外形候選</title>
+<style>
+  body{margin:0;padding:16px;background:#f3e9de;color:#2c3a2e;font:15px/1.6 system-ui,"Noto Sans TC",sans-serif}
+  h1{font-size:18px;margin:0 0 4px}
+  p{margin:0 0 14px;max-width:40em}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  a.card{display:block;background:#fff;border:1.5px solid #d9cbbb;border-radius:14px;padding:8px;text-align:center;text-decoration:none;color:inherit}
+  a.card:hover{border-color:#2c3a2e}
+  canvas{width:100%;height:auto;display:block}
+  b{font-size:14px}
+</style>
+</head>
+<body>
+<h1>外形候選（種子 1 到 12）</h1>
+<p>每一格是一個種子靜止時的輪廓，坐下來底部會被窗台壓平。點一格會用那個種子打開原型，可以直接捏。看中哪個跟我說號碼。</p>
+<div class="grid" id="g"></div>
+<script src="shape.js"></script>
+<script>
+const g=document.getElementById('g');
+for(let seed=1;seed<=12;seed++){
+  const a=document.createElement('a');a.className='card';a.href='index.html?seed='+seed;
+  const c=document.createElement('canvas');c.width=300;c.height=300;const x=c.getContext('2d'),s=SlimeShape.make(seed,1),R=100;
+  x.translate(150,150);x.beginPath();
+  for(let i=0;i<=360;i++){const t=i/360*Math.PI*2,r=s.r(t)*R;i?x.lineTo(Math.cos(t)*r,Math.sin(t)*r):x.moveTo(Math.cos(t)*r,Math.sin(t)*r)}
+  x.closePath();x.fillStyle='#d9c4f2';x.fill();x.lineWidth=3;x.strokeStyle='#b79ee0';x.stroke();
+  // 眼睛只是幫忙看方向，位置是示意
+  x.fillStyle='#2b2148';for(const dx of [-22,22]){x.beginPath();x.ellipse(dx,-4,6,8,0,0,Math.PI*2);x.fill()}
+  a.appendChild(c);const b=document.createElement('b');b.textContent='種子 '+seed;a.appendChild(b);g.appendChild(a);
+}
+</script>
+</body>
+</html>
