@@ -97,7 +97,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 
 <div class="view" id="view">
   <div class="vrow" style="display:none"><b>搖</b><span class="seg" data-k="shk"><button data-v="settle">沉澱</button><button data-v="eat">散出來吃回來</button></span></div>
-  <div class="vrow"><b>聲音</b><span class="seg" data-k="amb"><button data-v="rain">雨</button><button data-v="fire">柴火</button><button data-v="lofi">lofi</button></span></div>
+  <div class="vrow"><b>聲音</b><span class="seg" data-k="amb"><button data-v="rain">雨</button><button data-v="fire">柴火</button><button data-v="noise">白噪音</button><button data-v="lofi">lofi</button></span></div>
   <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-toggle">收起</button></div>
 </div>
 
@@ -775,7 +775,7 @@ function buildClusters(){
 }
 
 /* ---------- 聲音：分層音效（sfx/engine.js，v2 2026-11-01），物理參數決定每層多大聲、多高、多亮；沒有檔案就安靜 ---------- */
-function VIEW0AMB(){try{const v=JSON.parse(localStorage.getItem('nienie.view')||'{}');return ['rain','fire','lofi'].includes(v.amb)?v.amb:'rain'}catch(_){return 'rain'}}   // v2.40：SFX 比 VIEW 早建立，先從存的設定讀
+function VIEW0AMB(){try{const v=JSON.parse(localStorage.getItem('nienie.view')||'{}');return ['rain','fire','noise','lofi'].includes(v.amb)?v.amb:'rain'}catch(_){return 'rain'}}   // v2.40：SFX 比 VIEW 早建立，先從存的設定讀
 const SFX=window.SlimeSfx||null;if(SFX){SFX.load('sfx/');SFX.bgmUrl='sfx/bgm-lofi-loop.m4a';SFX.amb=VIEW0AMB()}   // v2.21：sfx/ 是 ASMR 版（v3），舊的 v2 在 sfx/v2/（試聽頁對照）
 let sfxRubLevel=0;
 function sfxInit(){if(SFX)SFX.init()} // iOS 規定：要在第一次觸碰裡建立音訊
@@ -2581,7 +2581,8 @@ function shkMotionInit(){if(SNW.motion||typeof DeviceMotionEvent==='undefined')r
 
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
-const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle',amb:'rain'};   // v2.40 amb：環境音 rain／fire／lofi（多米 11-09：背景改成真實環境聲）
+const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle',amb:'rain'};   // v2.40 amb：環境音 rain／fire／noise／lofi（多米 11-09：背景改成真實環境聲；11-22 加 noise 粉紅噪音）
+VIEW.amb=VIEW0AMB();   // 11-22：重新整理後按鈕要亮在存的那個（原本聲音是對的，按鈕卻回到「雨」）
 try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;if(o.shk==='eat'||o.shk==='settle')VIEW.shk=o.shk;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
 function viewOver(){const o={shakeMode:VIEW.shk==='eat'?1:0};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});return o}
 const JSKINS={

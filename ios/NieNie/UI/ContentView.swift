@@ -122,6 +122,7 @@ struct ContentView: View {
                 Picker("背景聲音", selection: $controller.ambience) {
                     Text("雨").tag("rain")
                     Text("柴火").tag("fire")
+                    Text("白噪音").tag("noise")
                     Text("lofi").tag("lofi")
                 }
             }

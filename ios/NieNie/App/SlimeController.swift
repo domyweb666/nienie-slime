@@ -17,7 +17,7 @@ final class SlimeController: ObservableObject {
     @Published private(set) var params: [SlimeMaterial: FeelParams]
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2; syncAudio() } }
-    /// v2.40 環境音: "rain", "fire" or "lofi", kept in UserDefaults (long press the speaker button to choose)
+    /// v2.40 環境音: "rain", "fire", "noise" (pink noise, 11-22) or "lofi", kept in UserDefaults (long press the speaker button to choose)
     @Published var ambience = UserDefaults.standard.string(forKey: "nienie.amb") ?? "rain" {
         didSet { UserDefaults.standard.set(ambience, forKey: "nienie.amb"); sound.setAmbience(ambience) }
     }

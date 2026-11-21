@@ -144,6 +144,14 @@
     ],
     "settle": 484338
    }
+  },
+  "noise": {
+   "bed": "amb-noise-pink-bed.m4a",
+   "loopFrames": 5292000,
+   "events": {},
+   "src": {
+    "bed": "design_noise.py pink"
+   }
   }
  }
 }

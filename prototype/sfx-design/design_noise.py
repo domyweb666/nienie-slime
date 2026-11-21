@@ -10,9 +10,11 @@
 
 輸出格式跟 make_ambience.py 的 bed 一樣（120 秒一輪、頭尾各墊 1 秒、−26 dB RMS），選定後可以直接接進 amb.json。
 用法：python design_noise.py            → 試聽檔寫到 prototype/sfx-design/preview/noise-<顏色>.m4a
-      python design_noise.py --web [--ios] → 寫 amb-noise-<顏色>-bed.m4a 到 prototype/web/sfx/（與 ios/NieNie/Resources/）
+      python design_noise.py --web [--ios] [--pick 顏色] → 只寫選定的顏色（預設 pink，多米 11-22 選的）：
+          amb-noise-<顏色>-bed.m4a 到 prototype/web/sfx/（與 ios/NieNie/Resources/），並在 amb.json 加上 noise 場景
 每次結果都一樣（固定亂數種子）。
 """
+import json
 import os
 import subprocess
 import sys
@@ -86,11 +88,27 @@ def write_m4a(path, x, kbps=160):
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', w, '-c:a', 'aac', '-b:a', f'{kbps}k', path], check=True)
 
 
+def add_scene(d, bed, loop_frames, color):
+    """把 noise 場景寫進 amb.json（只有底，沒有零星事件）。其他場景原樣留著。"""
+    p = os.path.join(d, 'amb.json')
+    with open(p, encoding='utf-8') as f:
+        meta = json.load(f)
+    meta['scenes']['noise'] = {'bed': bed, 'loopFrames': loop_frames, 'events': {}, 'src': {'bed': 'design_noise.py ' + color}}
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=1)
+
+
 def main():
     web = '--web' in sys.argv
     outs = ([WEB] + ([IOS] if '--ios' in sys.argv else [])) if web else [PREVIEW]
+    # --web 只寫選定的那個顏色（多米 11-22 選粉紅），並把它接成 amb.json 的 noise 場景；--pick 換顏色
+    pick = sys.argv[sys.argv.index('--pick') + 1] if '--pick' in sys.argv else 'pink'
+    if pick not in COLORS:
+        sys.exit('--pick 只能是 ' + '、'.join(COLORS))
     for k, color in enumerate(COLORS):
-        x = make(color, 20261119 + k)
+        if web and color != pick:
+            continue
+        x = make(color, 20261119 + k)   # 種子跟顏色的順序綁在一起，進 app 的跟試聽檔是同一段
         p = int(PAD * SR)
         padded = np.concatenate([x[-p:], x, x[:p]])
         # 接縫檢查：尾巴最後一個樣本到開頭第一個樣本的跳動，跟一般相鄰樣本的跳動比
@@ -103,6 +121,8 @@ def main():
         for d in outs:
             name = ('amb-noise-%s-bed.m4a' % color) if web else ('noise-%s.m4a' % color)
             write_m4a(os.path.join(d, name), padded if web else x)
+            if web:
+                add_scene(d, name, len(x), color)
     print('寫到', '、'.join(outs))
 
 

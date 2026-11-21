@@ -12,7 +12,7 @@ protocol SlimeSoundSource: AnyObject {
     var rubMax: Double { get set }       // loudest the rub loop gets (the rub level passed to frame is already scaled by it)
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
     var music: Double { get set }        // v2.21 background volume (lofi; v2.40 rain and fire too), 0 = off
-    /// v2.40 環境音: "rain", "fire" or "lofi" (web `SFX.setAmb`).
+    /// v2.40 環境音: "rain", "fire", "noise" or "lofi" (web `SFX.setAmb`). Scenes come from `amb.json`; "noise" is a bed with no events.
     func setAmbience(_ name: String)
     /// Finger landed. `intensity` 0...1 (the controller folds in contact size).
     func press(intensity: Double)

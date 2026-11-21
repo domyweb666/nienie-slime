@@ -292,8 +292,15 @@ def main():
                 write_wav(p, y[1], mono=True)
             else:
                 write_wav(p, y)
-        with open(os.path.join(d, 'amb.json'), 'w', encoding='utf-8') as f:
-            json.dump(meta, f, ensure_ascii=False, indent=1)
+        # 這支只做雨和柴火；amb.json 裡別支腳本加的場景（design_noise.py 的 noise）原樣留著
+        out = dict(meta, scenes=dict(meta['scenes']))
+        jp = os.path.join(d, 'amb.json')
+        if os.path.exists(jp):
+            with open(jp, encoding='utf-8') as f:
+                for k, v in json.load(f).get('scenes', {}).items():
+                    out['scenes'].setdefault(k, v)
+        with open(jp, 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False, indent=1)
     tot = sum(os.path.getsize(os.path.join(WEB, n)) for n in files)
     print('寫了 %d 個檔（%.1f MB）到 %s' % (len(files) + 1, tot / 1e6, '、'.join(outs)))
 

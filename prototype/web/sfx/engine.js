@@ -54,7 +54,7 @@
     pullV: null, rubV: null,
     // v2.21 背景音樂（多米 build 77：背景要放 lofi）：mode 0 音樂和音效、1 只有捏的聲音、2 全部靜音。bgmUrl 由呼叫端給（沒給就沒有音樂）
     mode: 0, bgmUrl: null, bgmVol: 0.25, bgmDuck: 0.6, bgmG: null, bgmSrc: null, bgmT: -1,
-    // v2.40 環境音（多米 11-09：背景音改成真實環境聲，下雨、木材燃燒）：amb 'rain'／'fire'／'lofi'。雨和柴火是「底＋零星事件」，
+    // v2.40 環境音（多米 11-09：背景音改成真實環境聲，下雨、木材燃燒）：amb 'rain'／'fire'／'noise'／'lofi'（noise 是 11-22 加的粉紅噪音，只有底、沒有事件）。雨和柴火是「底＋零星事件」，
     // 底是兩分鐘無縫循環，事件照 amb.json 的頻率隨機冒出來（大小、左右、音高每次不同），聽不出循環。lofi 照舊
     // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
     amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
