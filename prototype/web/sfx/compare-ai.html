@@ -18,7 +18,7 @@
   .grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
   .lab{width:52px;font-size:12px;color:var(--mute)}
   button{border:0;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;color:#fff;cursor:pointer}
-  button.s{background:var(--b)} button.ai{background:var(--a)}
+  button.s{background:var(--b)} button.ai{background:var(--a)} button.el{background:#5a6bb0}
   button.on{outline:3px solid var(--ink);outline-offset:1px}
   .none{color:var(--mute);font-size:13px}
   h3.sec{font-size:13px;color:var(--mute);margin:22px 4px 8px;font-weight:600;letter-spacing:.05em}
@@ -27,7 +27,7 @@
 <body>
 <main>
 <h1>合成音 vs AI 音效</h1>
-<p class="note">綠色是現在 app 裡的合成音，橘色是 Higgsfield（Mirelo）生的。AI 版已經把峰值拉到跟合成音一樣（−12 dB），頭尾空白剪掉了。點一下播放，再點一下停止。建議用手機喇叭聽一次、耳機聽一次。</p>
+<p class="note">綠色是原本的合成音，橘色是 Higgsfield（Mirelo）生的、現在 app 裡用的版本，藍色是 ElevenLabs 用同一句描述生的 4 個版本。AI 的兩組都已經把峰值拉到跟合成音一樣（−12 dB），頭尾空白剪掉了。點一下播放，再點一下停止。建議用手機喇叭聽一次、耳機聽一次。</p>
 <div id="list"></div>
 </main>
 <script>
@@ -89,7 +89,12 @@ for(const row of ROWS){
   syn.forEach((f,i)=>{const b=document.createElement('button');b.className='s';b.textContent=`合成 ${i+1}`;b.onclick=()=>play(f+'.wav',b);g1.appendChild(b)});
   const g2=document.createElement('div');g2.className='grp';g2.innerHTML='<span class="lab">AI</span>';
   ai.forEach((f,i)=>{const b=document.createElement('button');b.className='ai';b.textContent=`AI ${'AB'[i]||''}`.trim();b.onclick=()=>play('ai/'+f+'.mp3',b);g2.appendChild(b)});
-  r.append(g1,g2);list.appendChild(r);
+  // 11-21：ElevenLabs（Sound Effects v3）同一句描述各生 4 個版本，檔名 el/<key>-N.mp3，key 從 AI 檔名中間那段取
+  const key=(ai[0]||'').split('-').slice(1,-1).join('-');
+  const g3=document.createElement('div');g3.className='grp';g3.innerHTML='<span class="lab">11Labs</span>';
+  if(key&&key!=='sample')for(let n=1;n<=4;n++){const b=document.createElement('button');b.className='el';b.textContent='E'+n;b.onclick=()=>play('el/'+key+'-'+n+'.mp3',b);g3.appendChild(b)}
+  else g3.innerHTML+='<span class="none">沒有</span>';
+  r.append(g1,g2,g3);list.appendChild(r);
 }
 </script>
 </body>

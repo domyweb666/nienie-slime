@@ -41,10 +41,13 @@ def main():
     src = SRC
     if '--src' in sys.argv:
         src = sys.argv[sys.argv.index('--src') + 1]
-    os.makedirs(OUT, exist_ok=True)
+    out = OUT
+    if '--out' in sys.argv:   # 11-21：ElevenLabs 那批寫到 sfx/el/（--src 素材/elevenlabs/slime/_opus --out ../web/sfx/el）
+        out = os.path.abspath(sys.argv[sys.argv.index('--out') + 1])
+    os.makedirs(out, exist_ok=True)
     info = {}
     for name in sorted(os.listdir(src)):
-        if not name.endswith('.mp3'):
+        if not name.endswith(('.mp3', '.opus')):
             continue
         x = load(os.path.join(src, name))
         pk = np.max(np.abs(x))
@@ -64,14 +67,14 @@ def main():
             w = os.path.join(td, 'a.wav')
             wavfile.write(w, SR, (np.clip(y, -1, 1) * 32767).astype(np.int16))
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', w, '-c:a', 'libmp3lame', '-b:a', '128k',
-                            os.path.join(OUT, stem + '.mp3')], check=True)
+                            os.path.join(out, stem + '.mp3')], check=True)
         info[stem] = {'peak_db': round(float(db(pk)), 1), 'rms_db': round(float(db(np.sqrt(np.mean(x ** 2)))), 1),
                       'active_s': round((b - a) / SR, 2), 'gain_db': round(float(gain), 1)}
         print('%-20s 原峰值 %6.1f dB、RMS %6.1f dB、有聲音 %.2f 秒、放大 %+5.1f dB' % (
             stem, info[stem]['peak_db'], info[stem]['rms_db'], info[stem]['active_s'], gain))
-    with open(os.path.join(OUT, 'ai.json'), 'w', encoding='utf-8') as f:
+    with open(os.path.join(out, 'ai.json'), 'w', encoding='utf-8') as f:
         json.dump(info, f, ensure_ascii=False, indent=1)
-    print('寫到', OUT)
+    print('寫到', out)
 
 
 if __name__ == '__main__':
