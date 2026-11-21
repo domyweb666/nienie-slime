@@ -1,69 +1,67 @@
-# Handoff: 音效全面換成 ElevenLabs 的 AI 音效，反應聲改成純黏液 ASMR，沒有人聲；白噪音做了試聽還沒選
+# Handoff: v2.52《虛擬手感》3-3 到 3-5 的交辦 A、B、C 三組（網頁做完測過，手機版寫完還沒編譯）
 
-> 產出時間：2026-11-22（第二十七、二十八會話，11-19 到 11-21）
-> 上一份（種子 1009、build 131 等回報）在 `.vibe/handoff/archive/2026-11-16-第二十六會話-種子1009.md`，那裡的待辦大多還開著，見下面「上一份留下的」。
+> 產出時間：2026-11-22 清晨（第二十九會話，claude.ai 雲端環境，沒有 Mac）
+> 分支：`feel-3x-panel-v1`，從 `swiftui-port` 的 `fffd8c1`（v2.51，build 136）開出來。**只 commit、沒推。多米說推才推。**
+> 交辦來源：Project「史萊姆按壓手感」裡的《捏捏-決定與交辦-3-1到3-5》。這次只做 A、B、C；D 到 J 多米說先記錄、何時做由他定。
+> 上一份（AI 音效）在 `.vibe/handoff/archive/2026-11-22-第二十八會話-AI音效.md`。
 
 ## ✅ 這次完成了什麼
 
-- 寫了白噪音合成 `prototype/sfx-design/design_noise.py`：白、粉紅、棕三種，120 秒，頭尾接得起來，試聽檔在 `prototype/sfx-design/preview/noise-*.m4a`（這個資料夾不進 git）。
-- 在 Higgsfield（Mirelo）生了 67 段音效，接進 app 之後發了 build 133（11-19，有 TestFlight）。**build 133 裡的是 Higgsfield 版，現在本機已經全部換掉了。**
-- 場景音效接線（v2.50，網頁和 Swift 都改）：走路一縮一衝響爬行聲、爬窗框、落地、游進場、黏到窗框、拔開、撕開（加撕裂聲和 0.35 秒後一滴）、睡著每 4 到 7 秒一次、嘆氣、被碰醒和擺飾倒下時嚇一跳。只有網頁版有的：擺飾被碰（含蠟燭）、推倒、掉出窗外、走過布墊（iPhone 版還沒有擺飾的物理）。
-- 在 ElevenLabs（Sound Effects v3）用同樣 33 句描述各生 4 個版本，多米聽完說 ElevenLabs 比較好，質感類全部改用 ElevenLabs（commit `7b29cd2`）。
-- 多米說不要人聲、全部 ASMR：11 種反應（被戳、開心、被搔癢、不要啦、嚇到、打招呼、討摸、被揉、吞黏液、嘆氣、睡覺）用純黏液聲重生，每種 4 個版本，已經換進 app（commit `3fdfb63`）。
-- 比較頁 `prototype/web/sfx/compare-ai.html`：合成、Higgsfield、ElevenLabs、ASMR 四組並排，音量對齊。
-- selftest 在 v4.1（場景接線）之後跑過一輪，全過。之後只換音檔，沒再跑。
-- 網頁版實測：39 層、208 段都載入，場景聲在對的時機響。
+**網頁（`prototype/web/`，做完、測過）**
 
-## 🚧 還沒做完 / 待決定
+- A1 窗台不再把拉伸上限蓋成 3.2、記形 2.6。黏條開著（v2.51 預設）身體拉到 `strandAt`，再遠是黏條；黏條關掉，身體照材料自己的 7／5。`sillCap` 3.2 可以回到 v2.50 對照。`mat` 本身不再被改寫。
+- A2 `effPull()`、`effMem()`、`effNote()`：隱藏面板和調節台的滑桿旁邊寫「實際是 X（原因）」。
+- A3 `stick`（黏手）放進調節台「更多」，預設照舊 0。
+- A4 `flow`（流）：放著不碰，記住的形狀沿重力往下塌，塌到原本高度的 65% 為止；手指一碰就停。預設 0。
+- A5 `GRD`：每個保險（拉到上限、壓到下限、防翻面、手指讓）作用的格數比例；`PHYS`：物理單獨的每格毫秒。`fuzz.js` 兩個都報。
+- B 調節台 v1 在新檔 `desk.js`：7 條主旋鈕＋「更多」、黏條開關、3 格存檔（換的時候不彈）、盲比（自動記一行）、預設版本＋指紋（預設改了會問「用新預設／留著我的」）、匯出貼回原樣重現、量測（灰盒、純圓、圖層、讀數）。舊的 v2.39 調節台拿掉，舊存檔會搬成存檔 1、2。
+- C1 `thin`（快到拉伸上限時圓角變小）、C2 `wbreath`（折射跟著呼吸）都是開關、預設關；C4 九個圖層各一個開關。C3 網頁本來就看得到，不用改。
+- 版本字樣改成 v2.52。
 
-- **本機 commit 沒推**：`5fce44a` 到 `3fdfb63`（ElevenLabs 質感、ASMR 反應）都只在本機。多米 11-22 說「先不要」推。iPhone 版還沒編譯過這幾筆，下一個 build 會是 134。
-- **白噪音沒選顏色**：建議粉紅。選了之後要把它加成第四個環境音：`make_ambience.py` 或 `design_noise.py --web --ios` 產 bed，`amb.json` 加場景，網頁 `index.html` 的 `VIEW0AMB` 清單和聲音按鈕列、Swift `SlimeController.ambience` 與 `SlimeAudio` 的選單一起改。
-- **舊的合成音檔還在 iOS Resources**：manifest 已經不用（`press-*.wav`、`voice-*.wav` 等），但還打包進 app，AI 音檔另外約 14 MB。多米確認新聲音 OK 後再清，**只清 `ios/NieNie/Resources/`**；`prototype/web/sfx/` 的合成檔不能刪，`make_ai_sfx.py` 量目標音量要讀它們。
-- **專案 `CLAUDE.md` 的「聲音」段落沒補 v4**（AI 音效、ElevenLabs、ASMR、場景接線）。全域規則：改之前先把現況給多米看。
-- **商用授權**：Higgsfield 和 ElevenLabs 的條款都沒查原文，記在 `.uiux/04-手感/素材授權紀錄.md`，上架前要對。
-- 真機還沒聽過 ElevenLabs 版和 ASMR 版。手機喇叭會不會太刺、太小聲，要多米捏過才知道；要調就改 `make_ai_sfx.py` 的 `FX_RMS` 或各層參數重跑。
-- 上一份留下的：build 131（水）、破圖（種子 1009）都還等多米回報。
+**手機（`ios/`，寫完；能在 Linux 上驗的都驗了）**
 
-## 📌 關鍵決策（這次定下來的，下次別再爭論）
+- `SlimeRig.swift`、`FeelParams.swift`：跟網頁同一套（`effective()`、`flowStep`、保險計數、`greyBox()`、可指定種子的亂數）。
+- `SlimeFuzz.swift`（新）：亂捏測試搬到手機，在自己的一份物理上跑，不碰畫面上那隻、不讀寫使用者存的東西。
+- `UI/FeelDeskModel.swift`（新）：旋鈕、存檔、匯出匯入、盲比、生效值說明。同一個狀態匯出的字跟網頁一字不差（對過）。
+- `SlimeController.swift`、`FeelDesk.swift`、`TunePanel.swift`、`ContentView.swift`：調節台 v1、量測組（灰盒、純圓、延遲測試、圖層、亂捏測試、讀數）、隱藏面板的「實際是 X」、B7 上架版本不顯示「調」按鈕（TestFlight 和開發版照舊；隱藏面板裡多一個「手感調節台」入口）。
+- `SlimeView.swift`、`JellySkin.swift`、`SlimeCanvas.swift`：灰盒、純圓、物理毫秒、平塗皮也畫黏條、C1、C2、C3（會動的擺飾畫進透過身體看到的背景，`decoThru` 預設開）、C4。
 
-- 聲音一律用 ElevenLabs，不要人聲。它的反應用黏液本身的聲音表達（啵、泡泡、擠壓、吱聲），不用小生物叫聲。
-- 白噪音用程式合成，不用 AI 生（Higgsfield 生的不對）。
-- `design_sfx.py` 重跑會把 manifest 改回全合成，**重跑之後一定要再跑 `make_ai_sfx.py`**。
-- 網頁和 iOS 的 manifest 本來就不一樣（網頁有 `prop`，iOS 有 `ding`），`make_ai_sfx.py` 兩邊各讀各的、只換 AI 那幾層；擺飾類（`prop.*`、`fx.topple`、`fx.fallout`、`fx.cloth`）只寫網頁。
-- 黏液掉落功能 11-07 就拿掉了，`fx.drip` 接在撕開之後。
-- 多米開口才推、才發 TestFlight（這次 build 133 是他說的；11-22 他說先不要推）。
-- 多米 11-16 說先不要整份重跑測試：一輪就好，改動小只跑相關項目，回報講清楚跑了什麼。
+## 🔍 驗到哪裡
 
-## 📂 下個會話最重要的檔案
+| 東西 | 怎麼驗的 | 結果 |
+|---|---|---|
+| 網頁物理改動沒有動到原本行為 | 亂捏 30 組，改前改後逐組比 | 29 組一模一樣，另一組（1000）改之前自己兩次就不一樣 |
+| 網頁整套自測 `selftest.js` | 無頭 Chrome 跑一次（15 分鐘） | 64 項過 63；沒過的是新加的 T63 裡「按住時流不作用」，查出是測試自己前後兩段起點不一樣（跟流無關，流那一步按住時 0 次呼叫），已改成先空跑一次。**改完還沒重跑，repo 規定要跑 3 次** |
+| 調節台 | 無頭情境測試（存檔、盲比、匯出匯入、舊存檔搬家、預設提示） | 過。之後又改了四個小地方（見下面），沒重跑 |
+| Swift 物理、亂捏、調節台模型 | Linux 上 Swift 6.2 編譯、執行 | 過；保險比例跟網頁差不多（上限 31～33%、下限 48～54%、防翻面 62～66%、手指讓 23%） |
+| Swift 控制器、三個 SwiftUI 畫面 | 自己寫替身模組做型別檢查（先拿 v2.51 原檔驗過替身沒問題） | 0 個錯 |
+| `JellySkin.swift` | 同上，替身 Metal | 0 個錯 |
+| `SlimeView.swift`、`SlimeCanvas.swift` | 只做語法檢查 | 過；**型別沒驗，第一次 CI 可能有編譯錯** |
+| 真機上的任何東西 | 沒有 | 手感、畫面、Metal、觸覺都要等 TestFlight |
 
-- `prototype/sfx-design/make_ai_sfx.py` ← 所有 AI 音效怎麼切、哪層用哪批、音量
-- `prototype/sfx-design/prep_ai_compare.py`、`prototype/web/sfx/compare-ai.html` ← 比較頁
-- `prototype/sfx-design/design_noise.py` ← 白噪音
-- `prototype/sfx-design/el_recv.py` ← 從 ElevenLabs 存音檔的接收器
-- `prototype/web/sfx/engine.js`（`S.fx`）、`prototype/web/index.html`（搜尋 `v2.50`、`gaitSfx`）
-- `ios/NieNie/Slime/SlimeRig.swift`（搜尋 `v2.50`）、`ios/NieNie/Feedback/SlimeAudio.swift`（`fx`）、`ios/NieNie/App/SlimeController.swift`（`.fx`）
-- 原始素材：`E:\捏捏史萊姆\素材\elevenlabs\slime\_opus\`（`<種類>-N.opus`、`as-<種類>-N.opus`），`E:\捏捏史萊姆\素材\higgsfield\slime\`（已不使用）
-- `.uiux/04-手感/素材授權紀錄.md`
+## ⚠️ 我替多米做的決定（已寫進 `.vibe/代決清單.md`）
 
-## ⏭️ 下一步從哪繼續
+1. **`strandAt` 預設 2.4 → 1.6**（A1 以外唯一動的預設值）。v2.51 捏邊緣往外拉 2.5R 會把身體折起來：按住時翻面 5 個、放手瞬間 26 個、外框折到 135～145 度；拉到畫面頂是 40～85 個、177 度。16 種拉法裡 2.4 有 7 種折超過 120 度，1.6 是 0 種。亂捏 30 組：翻面的格 11.0% → 7.9%，按住不動的跳動 2.45 → 0.61 點。調回 2.4 就是 v2.51。
+2. A1 跟 v2.51 的黏條撞在一起：預設維持黏條開（身體 1.6R＋黏條），黏條關掉才是 A1 說的「身體自己拉到 7」。**要哪個當預設等多米在手機上比過再定。**
+3. 流塌到原本高度的 65% 就停（塌到 30% 會變成 5R 寬的薄餅、記住的形狀歪掉）。
+4. 手機版 `feelStartFrom`、`feelDefaults` 還是會彈一下（交辦只點名 `feelGo`）；網頁一直都不彈。
 
-1. 讀這份。
-2. 問多米三件事，照他的答案做：
-   - 要不要推上去發 build 134？要的話：`git push origin swiftui-port`，再 `gh workflow run ios.yml --ref swiftui-port -f testflight=true`（push 自己觸發的編譯會被這個取消，正常）。
-   - 白噪音選哪個顏色？選了就照「待決定」那條接進 app。
-   - `CLAUDE.md` 的聲音段落要不要補？先把現況給他看。
-3. 他捏過 build 134 回報哪個聲音不好：先在比較頁找那一種，要重生就照下面的流程。
+## 🐛 查到、沒修的
 
-## 🔁 重生音效的流程（試過很多條路，這條才穩）
+- v2.51 推上去時沒跑自測：舊 63 項有 11 項不過（pressReal、pullForce、v227、v225、v224、sill、knot、walk、extreme、deco、pullCalm），原因是 v2.51 的五個新開關改了舊測試量的行為。這次在 `selftest.js` 把舊項目釘在五個開關關掉、`sillCap` 3.2。
+- 芋圓的外形（種子 4）加上不規則外框，放著不碰時底部有一個三角形會翻（810 格裡 161 格），防翻面在四成的格出手；`lump 0` 或種子 7 是 0。試過把外框凹口磨平，沒用，已拿掉。
+- 自測的 `fresh()` 清不乾淨「上一段有沒有碰過牠」，連著兩段會差 0.01R 左右；亂捏第一組（1000）不穩也是同一類。
 
-1. **生成**：內建瀏覽器開 `https://elevenlabs.io/app/sound-effects`（多米已登入）。時長滑桿點一下之後用方向鍵，一格 0.1 秒；設定會記住。每生一次給 4 個版本，3 秒約 40 點、4 秒約 52 點。
-2. **存檔**：內建瀏覽器的下載不會存到電腦，改用 Chrome（多米已登入、已允許多檔下載和區域網路存取）。先在背景跑 `python prototype/sfx-design/el_recv.py <輸出資料夾>`，Chrome 開 `.../history?q=沒有結果的字`，頁面裡掛 `URL.createObjectURL` 攔 `audio/*` 的 blob，再把搜尋框改成那句描述裡獨有的幾個字，等 4 個 blob 出現，`fetch('http://127.0.0.1:8799/save?name=<種類>-N.opus',{method:'POST',body:blob})`。**每一種要重新載入頁面一次**，不然已經載過的音檔不會再建立 blob。
-3. **進 app**：`make_ai_sfx.py` 改來源，跑完再跑 `prep_ai_compare.py --src <資料夾> --out ../web/sfx/el` 更新比較頁。
+## ⏭️ 下一步（照順序）
 
-## 🗑️ 這次會話的雜訊（下次別重新討論）
+1. 重跑 `selftest.js` 到 3 次全過（`/home/claude/work/run_web.py <webdir> selftest`；雲端環境重開就沒有這個工具，瀏覽器 console 貼上執行也行）。
+2. 多米說推 → 推分支、開 PR 到 `swiftui-port`（PR 動到 `ios/**` 會觸發 CI 編譯）→ 修編譯錯 → 多米手動跑 workflow 發 TestFlight。
+3. 文件還沒寫：`.uiux/04-手感/調整面板規格.md`、`調參紀錄.md`、`參數表-暫定.md` 加新參數（flow、strandAt、sillCap、thin、wbreath、decoThru）、`CLAUDE-md-v2.52-草稿.md`。`.vibe/標準清單.md` 已加 v2.52 一節。
+4. 多米拿到 TestFlight 後：照交辦清單「三、多米要動手的事」第 2、4 項（量 A、B、第一下；盲比四組），再加兩件：量測組按「跑亂捏測試」把結果複製回來；C3 開與關各看一次「擺飾透過身體 x 毫秒」。
+5. D 到 J 組：等多米說。
 
-- 內建瀏覽器存不了下載檔，iframe、彈出視窗、直接連本機都被擋，別再試。
-- Chrome 用點擊下載會漏（分頁在背景時選單打不開、連點太快），別再用這招。
-- `swimIntro(side)` 一定要給方向（1 是從右邊），不給整隻變 NaN。這是測試時誤用，不是 bug。
-- 預覽埠 8791 被多米另一個專案「人蔘修煉」佔著，所以 `.claude/launch.json` 加了 `web-proto-8793`。
-- Higgsfield 的 Mirelo 目錄寫「只給遊戲流程用」，實際生得出來，但已經不用了。
+## 🧰 這次用的做法（下一個 Agent 用得到）
+
+- 沒有 Mac 也能驗 Swift：物理三個檔只用 Foundation，Linux 的 Swift 工具鏈編得過、跑得動；UI 層用假的 SwiftUI／UIKit／Metal 模組做型別檢查，先拿上一版原檔確認替身夠真，再檢查新檔。
+- 動預設值之前先量：`strandAt` 是先在 v2.51 原檔上重現折疊，再掃 1.2 到 2.4 六個值才選的。
+- 試過放棄的：`lumpEase`（磨平外框凹口）對種子 4 的翻面沒幫助。
