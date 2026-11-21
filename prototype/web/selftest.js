@@ -1,5 +1,7 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.52（11-22）：加 T63；舊項目釘住 v2.51 關掉、窗台拉伸上限回 3.2（見下面 PRE47 那段的說明）。
+
    用法：瀏覽器開 index.html，視窗固定 393×852（各項門檻是在這個尺寸定的；375×812 時 T42 亂捏觸手的黏土放手動能量到 38.8、門檻 12，會不過，2026-11-14），DevTools console 把這整個檔案貼上執行；
    或用 Claude 的 javascript_tool 直接跑。結果印在 console 並回傳，最後一欄 PASS 全 true 才算過。
    每次改演算法都跑（CLAUDE.md 硬規則）。
@@ -47,7 +49,10 @@
   // v2.47（多米 11-16 手機錄影）：舊項目量的是 v2.46 的手感，一律用舊數字：拉開了就不攤、拉得遠不衝過頭、記形抹圓都關，黏土的軟硬、慢一拍、按下去沉多久用調節台之前的值。
   // 換掉 PRESETS 本身，後面的 P1、P27、PSAVE、P27R 都從這裡來；PRE47 是真正的預設值，T61 用，跑完還給 PRESETS
   // v2.48：每一小塊的上下限、手指讓、被扯不發抖不扒，舊項目一律關（量的是原本的行為），只在 T62 開
-  const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
+  // v2.51（不規則外形、黏條、捏邊緣算拉、分裂、黏螢幕四周）推上去時沒跑過這份測試；11-22 補跑，63 項有 11 項不過（pressReal、pullForce、v227、v225、v224、sill、knot、walk、extreme、deco、pullCalm）。
+  //   照 v2.47、v2.48 的做法：舊項目一律關掉這五樣（量的是原本的行為），關掉之後剩 pullCalm（T61）不過，T61 的 SP 也一起關。v2.51 自己的行為還沒有專門的項目，只有 T63 g 量了捏邊緣往外拉
+  // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
+  const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
   // reset 也要停掉遊走：setup() 把家放回中間，但上一輪留下的遊走還在走，家會繼續往遊走目標移，60 步內身體就飄開（量過飄 58 點，
@@ -1523,7 +1528,7 @@
   // 同樣的拉法把三個修正關掉（pressPull、dragCalm、memSmooth 0）當對照，跳動至少是開著的 3 倍（量到 0.84 到 2.64 對 0.05 到 0.16）；
   // 放手 2 秒後面積回 1±0.08、沒有 NaN、外框不交叉；連拉六次（照錄影的玩法）放手後記住的形狀沒有翻面
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
-    const SP = { ...PRE47.clay, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };   // v2.48 的上下限關著：這一項量的是 v2.47 那三個修正
+    const SP = { ...PRE47.clay, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };   // v2.48 的上下限關著：這一項量的是 v2.47 那三個修正；v2.51 的五樣也關著（11-22）
     const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
     const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
     const ext = (dx, dy) => { let b = -1, bv = -1e9; for (const i of bnd) { const v = (X[i] - globalC.xc) * dx + (Y[i] - globalC.yc) * dy; if (v > bv) { bv = v; b = i; } } return b; };
@@ -1564,6 +1569,66 @@
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
     res.PASS.limits = r.downOn.mean < 3 && r.downOn.inv <= 8 && r.downOff.mean > r.downOn.mean * 3 && r.downOn.nan === 0
       && r.upOn.strain <= 3.6 && r.upOff.strain > 5 && r.upOn.exStrain <= 3 && r.upOff.exStrain > 4 && r.upOn.qStrain <= 2.6 && r.upOn.qFlips === 0 && r.upOn.nan === 0 && r.upOn.qH >= 2.3;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+
+  // T63 v2.52（多米 11-22，《虛擬手感》3-3 到 3-5 的交辦 A、B、C 組）。用真正的預設值（PRE47）在窗台上跑：
+  //   a 生效值（A1、A2）：黏條開著身體只拉到 strandAt（1.6），黏條關掉照材料自己的 7、記形 5，sillCap 3.2 回 v2.50；mat 本身沒被改、滑桿旁邊有字
+  //   b 黏條關著從頭頂往上拉到畫面頂（A1 要守住的）：放手 2 秒後沒有 NaN、外框不交叉、記住的形狀沒有翻面、面積回 1±0.08；按住時翻面不超過 5 個；身體不比 3.2R 的對照短
+  //   c 流（A4）：flow 0 放 10 秒記住的形狀不變；flow 0.2 放 10 秒，高度剩六成到七成五、寬度多兩成五以上、面積不漂、沒有翻面、外框不交叉；手指按著的 3 秒裡流不作用（跟按下那一刻把 flow 關掉的那次一樣）
+  //   d 保險計數與物理毫秒（A5）：拉一段放手後有格數、四個比例都在 0 到 100
+  //   e 灰盒（B6）：打開後牠自己的動作關掉、擺飾收起來、材料旋鈕不動，關掉原樣還回來；灰盒下拉一段沒有 NaN
+  //   f 調節台（B 組，desk.js 有載入才測）：換存檔位那一格身體一點都沒動（不彈）；匯出再匯入一字不差。跑完把使用者存的東西原樣還回去
+  //   g 捏邊緣往外拉（strandAt 2.4 → 1.6）：兩個外形種子、從頭頂的邊往上拉 2.5R、按住 0.75 秒、放手，外框最尖不超過 110 度、翻面不超過 3 個；
+  //     對照 strandAt 2.4（v2.51）至少有一個種子折超過 120 度（量到 135 到 174 度、翻面 5 到 65 個）
+  { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
+    const SP = { ...PRE47.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, brain: 0, envRoam: 0 };
+    const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(63); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 63 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const areaNow = () => { let a = 0; const n = bnd.length; for (let k = 0; k < n; k++) { const i = bnd[k], j = bnd[(k + 1) % n]; a += X[i] * Y[j] - X[j] * Y[i]; } return Math.abs(a) / 2; };
+    const nanN = () => { let n = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) n++; return n; };
+    const inv = () => { let n = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if (.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < -.02 * TRA[k / 3]) n++; } return n; };
+    const sharp = () => { const n = bnd.length; let m = 0; for (let i = 0; i < n; i++) { const a = bnd[(i + n - 1) % n], b = bnd[i], c = bnd[(i + 1) % n], ux = X[b] - X[a], uy = Y[b] - Y[a], vx = X[c] - X[b], vy = Y[c] - Y[b], an = Math.abs(Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)) * 57.3; if (an > m) m = an; } return Math.round(m); };
+    const qBox = () => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (let i = 0; i < N; i++) { x0 = Math.min(x0, QX[i]); x1 = Math.max(x1, QX[i]); y0 = Math.min(y0, QY[i]); y1 = Math.max(y1, QY[i]); } return [+((x1 - x0) / R).toFixed(3), +((y1 - y0) / R).toFixed(3)]; };
+    const qArea = () => { let a = 0, b = 0; const n = bnd.length; for (let k = 0; k < n; k++) { const i = bnd[k], j = bnd[(k + 1) % n]; a += QX[i] * QY[j] - QX[j] * QY[i]; b += Q0X[i] * Q0Y[j] - Q0X[j] * Q0Y[i]; } return +(a / b).toFixed(3); };
+    const rest = n => { for (let k = 0; k < n; k++) { LIFE.st = 'rest'; LIFE.until = t + 99; WANDER.moving = false; steps(1); } };
+    // a
+    fresh({}); r.a = { on: [effPull(), effMem(), mat.maxPull, mat.memMax], note: !!effNote('maxPull') }; mat.strand = 0; r.a.off = [effPull(), effMem(), effNote('maxPull')]; mat.sillCap = 3.2; r.a.cap = [effPull(), effMem()];
+    // b
+    const pullUp = over => { fresh({ strand: 0, split: 0, ...over }); const A0 = areaNow(), c = globalC, [sx, sy] = scr(c.xc, c.yc - R * .6), ey = 30; ev('pointerdown', 1, sx, sy); steps(4); for (let s = 1; s <= 40; s++) { ev('pointermove', 1, sx, sy + (ey - sy) * s / 40); steps(1); } let iv = 0; for (let k = 0; k < 60; k++) { steps(1); iv = Math.max(iv, flipCount(X, Y)); }
+      let top = 1e9, bot = -1e9; for (const i of bnd) { top = Math.min(top, Y[i]); bot = Math.max(bot, Y[i]); } const heldR = +((bot - top) / R).toFixed(2); ev('pointerup', 1, sx, ey); steps(120);
+      return { pullR: +((sy - ey) / R).toFixed(2), heldR, invHeld: iv, nan: nanN(), selfX: ringCrossed() ? 1 : 0, qFlips: flipCount(QX, QY), area: +(areaNow() / A0).toFixed(3), eff: effPull() }; };
+    r.b = { a1: pullUp({}), cap: pullUp({ sillCap: 3.2 }) };
+    // c
+    const idle = (over, n) => { fresh(over); const b0 = qBox(); rest(n); return { b0, b1: qBox(), qArea: qArea(), qFlips: flipCount(QX, QY), selfX: ringCrossed() ? 1 : 0 }; };
+    const held = cut => { fresh({ flow: .2 }); rest(60); const c = globalC, [sx, sy] = scr(c.xc, c.yc); ev('pointerdown', 1, sx, sy); if (cut) mat.flow = 0; steps(180); const b = qBox(); ev('pointerup', 1, sx, sy); return b; };
+    r.c = { f0: idle({ flow: 0 }, 600), f2: idle({ flow: .2 }, 600) };
+    // 先空跑一次再量：fresh 清不乾淨「上一段有沒有碰過牠」（上一段是放著不碰的，下一段按下去的反應差 0.01R 左右；跟流無關，流那一步在按住時一次都沒被呼叫）。
+    // 兩次要比的都接在「剛按過一次」後面，才是同一個起點（11-22 整套跑第一次時這一項就是差在這裡：1.328 對 1.319）
+    held(false); r.c.heldOn = held(false); r.c.heldCut = held(true);
+    // d
+    fresh({}); GRD.reset(); { const c = globalC, [sx, sy] = scr(c.xc, c.yc - R * .5); ev('pointerdown', 1, sx, sy); for (let s = 1; s <= 30; s++) { ev('pointermove', 1, sx + R * 2 * s / 30, sy + R * 1.5 * s / 30); steps(1); } steps(30); ev('pointerup', 1, sx + R * 2, sy + R * 1.5); steps(60); } r.d = { ...GRD.pct(), phys: typeof PHYS.ms === 'number' };
+    // e
+    fresh({}); { const before = { life2: mat.life2, alpha: mat.alpha, deco: mat.deco }, snd0 = SND; labGrey(true); const g = { life2: mat.life2, alpha: mat.alpha, deco: mat.deco }; const c = globalC, [sx, sy] = scr(c.xc, c.yc - R * .5); ev('pointerdown', 1, sx, sy); for (let s = 1; s <= 30; s++) { ev('pointermove', 1, sx + R * 1.5 * s / 30, sy); steps(1); } ev('pointerup', 1, sx + R * 1.5, sy); steps(60); const nan = nanN(); labGrey(false); r.e = { before, g, nan, back: { life2: mat.life2, alpha: mat.alpha, deco: mat.deco }, snd: SND === snd0 }; }
+    // f
+    if (typeof deskSnap === 'function') { let keep = null; try { keep = localStorage.getItem('nienie.feel'); } catch (_) {} const S0 = DESK.slots.slice(), L0 = DESK.log.slice(), B0 = DESK.base0; fresh({}); DESK.base0 = deskSnap(); DESK.slots = [deskSnap(), null, null]; mat.alpha = .3; DESK.slots[1] = deskSnap();
+      const x0 = Float64Array.from(X), p0 = Float64Array.from(PX); deskApply(DESK.slots[0]); let mv = 0; for (let i = 0; i < N; i++) mv = Math.max(mv, Math.abs(X[i] - x0[i]), Math.abs(PX[i] - p0[i]));
+      const t1 = deskText(); mat.alpha = .5; DESK.slots = [null, null, null]; deskImport(t1); r.f = { moved: mv, same: t1 === deskText(), alpha: mat.alpha }; DESK.slots = S0; DESK.log = L0; DESK.base0 = B0; try { if (keep === null) localStorage.removeItem('nienie.feel'); else localStorage.setItem('nienie.feel', keep); } catch (_) {} }
+    else r.f = { skipped: true, moved: 0, same: true };
+    // g
+    const tug = (sd, at) => { fresh({ seed: sd, strandAt: at }); const c = globalC; let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] < Y[bi]) bi = i; const [sx, sy] = scr(X[bi], Y[bi] + R * .15), ey = Math.max(30, sy - R * 2.5); ev('pointerdown', 1, sx, sy); steps(4); let iv = 0, sh = 0; const see = () => { iv = Math.max(iv, inv()); sh = Math.max(sh, sharp()); };
+      for (let s = 1; s <= 40; s++) { ev('pointermove', 1, sx, sy + (ey - sy) * s / 40); steps(1); see(); } for (let k = 0; k < 45; k++) { steps(1); see(); } const f = fingers.get(1), tg = !!(f && f.tug); ev('pointerup', 1, sx, ey); for (let k = 0; k < 90; k++) { steps(1); see(); } return { inv: iv, sharp: sh, tug: tg }; };
+    r.g = { s4: tug(4, 1.6), s7: tug(7, 1.6), s4old: tug(4, 2.4), s7old: tug(7, 2.4) };
+    res.T63_v252 = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    const okPct = v => v >= 0 && v <= 100;
+    res.PASS.v252 = r.a.on[0] === 1.6 && r.a.on[2] === 7 && r.a.on[3] === 5 && r.a.note && r.a.off[0] === 7 && r.a.off[1] === 5 && r.a.off[2] === null && r.a.cap[0] === 3.2 && r.a.cap[1] === 2.6
+      && r.b.a1.eff === 7 && r.b.a1.nan === 0 && r.b.a1.selfX === 0 && r.b.a1.qFlips === 0 && Math.abs(r.b.a1.area - 1) < .08 && r.b.a1.invHeld <= 5 && r.b.a1.heldR >= r.b.cap.heldR
+      && Math.abs(r.c.f0.b1[1] - r.c.f0.b0[1]) < .01 && r.c.f2.b1[1] < r.c.f0.b1[1] * .75 && r.c.f2.b1[1] > r.c.f0.b1[1] * .6 && r.c.f2.b1[0] > r.c.f0.b1[0] * 1.25 && Math.abs(r.c.f2.qArea - 1) < .02 && r.c.f2.qFlips === 0 && r.c.f2.selfX === 0
+      && Math.abs(r.c.heldOn[0] - r.c.heldCut[0]) < .005 && Math.abs(r.c.heldOn[1] - r.c.heldCut[1]) < .005
+      && r.d.frames >= 100 && okPct(r.d.hi) && okPct(r.d.lo) && okPct(r.d.flip) && okPct(r.d.give) && r.d.phys
+      && r.e.g.life2 === 0 && r.e.g.deco === 0 && r.e.g.alpha === r.e.before.alpha && r.e.back.life2 === r.e.before.life2 && r.e.back.deco === r.e.before.deco && r.e.nan === 0 && r.e.snd
+      && r.f.moved === 0 && r.f.same
+      && r.g.s4.sharp <= 110 && r.g.s7.sharp <= 110 && r.g.s4.inv <= 3 && r.g.s7.inv <= 3 && Math.max(r.g.s4old.sharp, r.g.s7old.sharp) > 120;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
