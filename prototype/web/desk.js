@@ -38,7 +38,7 @@ function deskStamp(){let s='';for(const m of ['clay','mochi','jelly'])for(const 
   let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return ('00000000'+h.toString(16)).slice(-8).slice(0,6)}
 function deskPick(){const o={};for(const k of DKEYS)o[k]=+dfmt(mat[k]);return o}
 function deskSnap(){return {base:curMat,pv:FEELVER,ps:deskStamp(),k:deskPick()}}
-function deskSave(){try{localStorage.setItem('nienie.feel',JSON.stringify({v:2,pv:DESK.pv,ps:DESK.ps,base:curMat,k:deskPick(),s:DESK.slots,log:DESK.log.slice(-30)}))}catch(_){}}
+function deskSave(){try{localStorage.setItem('nienie.feel',JSON.stringify({v:2,pv:DESK.pv,ps:DESK.ps,base:curMat,k:deskPick(),s:DESK.slots,log:DESK.log.slice(-60)}))}catch(_){}}
 // 套一份存檔：先換到它的材料，再蓋上 13 個數字。不彈、不出聲、不動牠（3-4：換的時候加的任何動作都會蓋在要比的東西上）
 function deskApply(sn){if(!sn||!sn.k)return;if(sn.base&&sn.base!==curMat&&PRESETS[sn.base])setMat(sn.base);
   for(const k of DKEYS)if(typeof sn.k[k]==='number'&&isFinite(sn.k[k]))mat[k]=sn.k[k];deskSync();deskSave()}
@@ -59,7 +59,7 @@ function deskText(){deskLive={base:curMat,k:deskPick()};const [a,b]=deskLine(des
   DESK.slots.forEach((s,i)=>{if(!s)return;const d=[];for(const k of DKEYS)if(dfmt(s.k[k])!==dfmt(PRESETS[s.base][k]))d.push(DNAME[k]+' '+dfmt(s.k[k]));
     t+='\n存檔 '+(i+1)+'（'+MATN[s.base]+'，預設 '+(s.pv||'?')+'）：'+(d.length?'跟'+MATN[s.base]+'預設不同的：'+d.join('、'):'跟預設一樣')});
   const ch=deskChanged();t+='\n這次動過：'+(ch.length?ch.join('、'):'沒有');
-  for(const l of DESK.log.slice(-5))t+='\n'+l;
+  for(const l of DESK.log.slice(-60))t+='\n'+l;   // 盲比紀錄全部帶上（最多留 60 行）：多米一組比十次，只帶最近 5 行會漏
   deskLive=null;return t+'\n#nienie-feel '+deskJSON()}
 function deskImport(txt){const m=/#nienie-feel\s+(\{.*\})\s*$/m.exec(txt||'');if(!m)return '找不到 #nienie-feel 那一行。要貼的是「複製數值給 Agent」複製出來的整段字。';
   let o;try{o=JSON.parse(m[1])}catch(_){return '那一行讀不出來，可能被截斷了。'}

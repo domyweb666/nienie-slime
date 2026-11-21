@@ -174,7 +174,7 @@ enum FeelExport {
             t += "\n存檔 \(i + 1)（\(m.name)，預設 \((s.pv ?? "").isEmpty ? "?" : (s.pv ?? "?"))）：" + (diff.isEmpty ? "跟預設一樣" : "跟\(m.name)預設不同的：" + diff.joined(separator: "、"))
         }
         t += "\n這次動過：" + (changed.isEmpty ? "沒有" : changed.joined(separator: "、"))
-        for l in log.suffix(5) { t += "\n" + l }
+        for l in log.suffix(60) { t += "\n" + l }   // every blind comparison kept (60 at most): ten rounds a pair would not fit in the last five
         for l in extra { t += "\n" + l }
         return t + "\n#nienie-feel " + json(current: current, slots: slots)
     }

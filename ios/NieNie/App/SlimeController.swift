@@ -409,7 +409,7 @@ final class SlimeController: ObservableObject {
     private static let feelKey = "nienie.feel"
     /// Three saved feels (多米 11-22 決定 10)
     @Published private(set) var feelSlots: [FeelSnap?] = [nil, nil, nil]
-    /// The blind comparisons, one line each, newest last; 30 are kept, the last 5 go out with the copied text
+    /// The blind comparisons, one line each, newest last; 60 are kept and all of them go out with the copied text
     @Published private(set) var feelLog: [String] = []
     /// Not nil when the numbers on the desk were tuned on other defaults than this build's: the desk asks 用新預設／留著我的 (B4)
     @Published private(set) var feelStale: String?
@@ -423,7 +423,7 @@ final class SlimeController: ObservableObject {
     private func feelPick() -> FeelSnap { FeelSnap.pick(current, base: material.rawValue) }
 
     private func feelSave() {
-        let s = FeelDeskStore(pv: feelPv, ps: feelPs, base: material.rawValue, k: feelPick().k, s: feelSlots, log: Array(feelLog.suffix(30)))
+        let s = FeelDeskStore(pv: feelPv, ps: feelPs, base: material.rawValue, k: feelPick().k, s: feelSlots, log: Array(feelLog.suffix(60)))
         if let d = try? JSONEncoder().encode(s) { UserDefaults.standard.set(d, forKey: Self.feelKey) }
     }
 
@@ -524,7 +524,7 @@ final class SlimeController: ObservableObject {
         feelBlind = nil
         guard let sa = feelSlots[b.pair.0], let sb = feelSlots[b.pair.1] else { feelApply(b.keep); return }
         feelLog.append(b.line(choice: choice, a: sa, b: sb, question: feelQuestion, now: ProcessInfo.processInfo.systemUptime))
-        if feelLog.count > 30 { feelLog.removeFirst(feelLog.count - 30) }
+        if feelLog.count > 60 { feelLog.removeFirst(feelLog.count - 60) }
         if let c = choice, c == 0 || c == 1, let s = feelSlots[b.map[c]] { feelApply(s) } else { feelApply(b.keep) }
         feelNote = b.reveal(choice: choice)
     }
