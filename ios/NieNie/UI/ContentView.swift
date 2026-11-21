@@ -12,6 +12,19 @@ extension Font {
     }
 }
 
+/// v2.52 B7 (多米 11-22 交辦: 上架版本拿掉「調」按鈕，隱藏面板照舊). The 調 button is for 多米's own tuning: there in a development build and on TestFlight,
+/// gone in the App Store's build. The hidden panel (long-press the title) stays in every build and can open the desk from there.
+enum AppChannel {
+    static let showsFeelButton: Bool = {
+        #if DEBUG
+        return true
+        #else
+        // a TestFlight install carries a receipt named sandboxReceipt; the App Store's is named receipt
+        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }()
+}
+
 /// Chunky cartoon chip: white fill, thick ink outline.
 struct ChipStyle: ButtonStyle {
     var circle = false
@@ -67,7 +80,9 @@ struct ContentView: View {
                     .allowsHitTesting(false)
                 Spacer(minLength: 0)
                 if showTune {
-                    TunePanel(isPresented: $showTune)
+                    TunePanel(isPresented: $showTune, openFeel: {
+                        withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showTune = false; showFeel = true }
+                    })
                         .padding(.bottom, 12)
                         .transition(.opacity)
                 }
@@ -177,7 +192,8 @@ struct ContentView: View {
 
             Spacer(minLength: 0)
 
-            // v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方)
+            // v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方); v2.52 B7: not in the App Store's build
+            if AppChannel.showsFeelButton {
             Button {
                 withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showFeel.toggle(); if showFeel { showTune = false } }
             } label: {
@@ -186,6 +202,7 @@ struct ContentView: View {
             }
             .buttonStyle(ChipStyle(circle: true))
             .accessibilityLabel(showFeel ? "收起手感調節台" : "打開手感調節台")
+            }
         }
     }
 

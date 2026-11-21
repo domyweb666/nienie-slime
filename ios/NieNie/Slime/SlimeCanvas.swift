@@ -17,6 +17,7 @@ struct SlimeCanvas: UIViewRepresentable {
         view.onFrame = { [weak controller] dt in controller?.frame(dt: dt) }
         view.onStats = { [weak controller] s in controller?.report(s) }
         view.latencyTest = controller.latencyTest
+        view.labGrey = controller.labGrey; view.labCircle = controller.labCircle; view.labLayersOff = controller.labLayersOff
         context.coordinator.slime = controller.slime
         return view
     }
@@ -29,5 +30,9 @@ struct SlimeCanvas: UIViewRepresentable {
         if view.latencyTest != controller.latencyTest {
             view.latencyTest = controller.latencyTest
         }
+        // v2.52 量測: the grey box, the bare circle and the layer switches (each setter does its own work only on a change)
+        if view.labGrey != controller.labGrey { view.labGrey = controller.labGrey }
+        if view.labCircle != controller.labCircle { view.labCircle = controller.labCircle }
+        if view.labLayersOff != controller.labLayersOff { view.labLayersOff = controller.labLayersOff }
     }
 }

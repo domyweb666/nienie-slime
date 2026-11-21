@@ -283,6 +283,16 @@ struct FeelParams: Equatable, Codable {
     var rejoin: Double = 6            // seconds left alone before the small blob crawls back and merges; dropped on the body it merges at once
     var edgeCling: Double = 1         // set down slowly by the left, right or top edge of the screen it sticks there, the same suckers as on the window jambs; 0 = jambs only
     var bubbles: Double = 0           // v2.51: 0 (多米: no drops inside). small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
+    // v2.52 (多米 11-22, 《虛擬手感》3-3 到 3-5 的決定；交辦 A、C 組). Web: the same keys in PRESETS
+    var flow: Double = 0              // A4 流: left alone on the sill, the remembered shape slumps under gravity and spreads sideways, this share of its height a second (0.05 ≈ half in 14 s); a finger stops it at once. 0 = off (v2.51). Per material once 多米 has filmed his reference
+    var strandAt: Double = 1.6        // A1: with the strand on, how far the body itself stretches on the sill (radii); the rest of the way is the strand. No effect with the strand off.
+                                      // v2.51 had 2.4 written in. Held by the edge (tugEdge: the body does not come along) the small grabbed patch had to stretch 2.4R by itself:
+                                      // the outline folded to 135-178°, dozens of triangles turned over while held and on release, and the fuzz test's jump-while-held went
+                                      // from 0.61 pt (v2.48) to 2.45. At 1.6 it is 0.61 again and the strand still reaches the finger (numbers in .vibe/代決清單.md)
+    var sillCap: Double = 0           // A1 control: 0 = the sill does not cap the stretch (clay pulls to its own 7 and remembers 5); 3.2 = v2.50 (stretch at most 3.2R, memory 2.6R). Only with the strand off
+    var thin: Double = 0              // C1 細絲: 1 = from 60% of the effective stretch limit the outline's rounding shrinks, down to 30% at the limit, so a thinning strand of body shows; 0 = v2.51 (fixed rounding)
+    var wbreath: Double = 0           // C2 水的呼吸: 1 = what is seen through the body bends ±12% with its breath (still, the refraction was static: glass, not water); 0 = v2.51
+    var decoThru: Double = 1          // C3: 1 = the wind bell, the teru bozu and what it brought back from walks show through the body too (the baked background gets them every frame); 0 = v2.49 (fixed background only), to measure the cost
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -488,6 +498,17 @@ extension FeelParams {
         inertiaHz = 0; dragSpring = 0; hapStatic = 1; hapSharpStretch = 0; popCount = 1; popDecay = 0.5; popSharp = 0.45
         tickSpacing = 0; tickMin = 0.1; tickMax = 0.3; tickSharp = 0.4; pressGrain = 0; purrRoll = 0
     }
+    /// v2.52 灰盒 (《虛擬手感》3-2): the physics alone. Nothing it does by itself (breath, pods, walking, reactions, the impression, sleep),
+    /// no dents, no decoration, the camera fixed, the sill's props put away; the sill and the walls stay (context is part of the feel).
+    /// Laid over the numbers the physics uses while the measuring switch is on, and gone again when it is off. None of the material
+    /// knobs (軟、黏滯、留形、彈、韌…) is in this set, so what is tuned in the grey box is the real material. Web: LAB.GREY.
+    mutating func greyBox() {
+        life = 0; life2 = 0; emo = 0; flee = 0; purr = 0; imp = 0; e1 = 0; e2 = 0; e3 = 0; e4 = 0; eyes = 0; sleep = 0; echo = 0
+        pods = 0; jelly = 0; wriggle = 0; drift = 0; wander = 0; excite = 0; envRoam = 0
+        dent = 0; dentTrail = 0; moodColor = 0; specks = 0; caustic = 0; bubbles = 0; shine = 0; glit = 0; shake = 0
+        camFollow = 0; deco = 0; props = 0; intro = 0; introSwim = 0
+        skin = 0   // the flat skin, which the view paints one grey
+    }
     mutating func off24() {
         off25()
         bodySize = 0.22; followZone = 0.8; flinchAmp = 0.05; camFill = 0.7; camPad = 0.35; camGrip = 0; pressLocal = 0; leanMove = 0; leanAmp = 0.16; nuzAmp = 0.05
@@ -673,6 +694,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "手指離身體中心多遠才算拉到極限", range: 2...8, step: 0.2),
         TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
         TuneField(key: \.edgeCling, name: "黏在螢幕四周 v2.51", hint: "（多米 11-22）1：慢慢放在螢幕左邊、右邊、上邊旁邊會黏住；0 只有窗框", range: 0...1, step: 1),
+        TuneField(key: \.flow, name: "流：放著會慢慢往下塌 v2.52", hint: "（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影", range: 0...0.5, step: 0.01),
+        TuneField(key: \.strandAt, name: "黏條開著時身體拉到多長 v2.52", hint: "黏條開著，窗台上身體本身最多拉到幾個半徑，再遠的部分是黏條。1.6（v2.52）：v2.51 的 2.4 捏著邊緣往外拉時，那一塊被拉到外框折起來（16 種拉法裡 7 種折超過 120 度；1.6 是 0 種）。2.4 回 v2.51。黏條關掉時這條不作用，身體照「拉伸上限」拉（黏土 7）", range: 1...8, step: 0.1),
+        TuneField(key: \.sillCap, name: "窗台上的拉伸上限（對照）v2.52", hint: "0：窗台不蓋掉拉伸上限（多米 11-22：黏土在窗台上也拉到 7）；3.2 回 v2.50（窗台上最多 3.2R、記形最多 2.6R）。只在黏條關著時作用，黏條開著看上面那條", range: 0...8, step: 0.1),
+        TuneField(key: \.thin, name: "細絲：快到上限時圓角變小 v2.52", hint: "（多米 11-22：中間做法）1：拉到拉伸上限的六成起，外框的圓角慢慢變小，到上限時剩三成，拉細的那條看得到；0 關（v2.51，圓角固定）", range: 0...1, step: 1),
+        TuneField(key: \.wbreath, name: "水的呼吸 v2.52", hint: "1：牠靜止時，透過身體看到的背景跟著呼吸輕輕變（彎的量 ±12%）；0 關（v2.51，靜止時折射是靜的）", range: 0...1, step: 1),
+        TuneField(key: \.decoThru, name: "會動的擺飾透過身體看得到 v2.52", hint: "（多米 11-22：做）1：風鈴、晴天娃娃、走路帶回來的東西隔著身體也看得到；0 只有固定的背景（v2.49 的做法，用來量成本：開和關各看一次「算」的毫秒）", range: 0...1, step: 1),
         TuneField(key: \.bubbles, name: "身體裡的氣泡幾顆 v2.49", hint: "黏在身體裡、跟著被擠開；0 沒有", range: 0...12, step: 1),
         TuneField(key: \.wet, name: "水潤 v2.47", hint: "1（多米 11-16：要很有水份的感覺）：更透、亮點更大更銳、多一顆小亮點、邊緣一圈反光；0 回 v2.46 的皮", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.skin, name: "皮", hint: "1 果凍 A 清透（多米 11-07 定）：看得到肚子裡的亮粉在沉；亮粉揚起來時往奶凍混。0 平塗（舊畫法，沒有 Metal 的手機也用這個）", range: 0...1, step: 1, section: "外形"),

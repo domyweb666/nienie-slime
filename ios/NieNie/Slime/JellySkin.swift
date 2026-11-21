@@ -33,6 +33,10 @@ final class JellySkin {
     private var mask: MTLTexture?, h1: MTLTexture?, h2: MTLTexture?, q1: MTLTexture?, q2: MTLTexture?
     private var maskCtx: CGContext?
     private var bg: MTLTexture?, bgKey = ""   // v2.49: the room behind it (sky, wall, props), baked once a scene, for the water skin to bend
+    /// v2.52 C3: something that moves behind the body, in view points; `x`, `y` is where its anchor (the middle of its width, `anchorY` down its height) sits, turned by `angle` about it
+    struct Sprite { var image: CGImage; var x, y, w, h, anchorY, angle, alpha: Double }
+    private var bgBase: CGContext?, bgLive: CGContext?   // the baked room kept as it was; and a copy the moving things are drawn into
+    private var liveRect = CGRect.null                   // the part of the texture that differs from the baked room right now
     private var W = 0, H = 0
 
     init?() {
@@ -65,7 +69,7 @@ final class JellySkin {
         layer.drawableSize = CGSize(width: CGFloat(width) * scale, height: CGFloat(height) * scale)
         if width == W && height == H { return }
         W = width; H = height
-        bg = nil; bgKey = ""
+        bg = nil; bgKey = ""; bgBase = nil; bgLive = nil; liveRect = .null
         func tex(_ w: Int, _ h: Int, _ f: MTLPixelFormat, render: Bool) -> MTLTexture? {
             let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: f, width: max(2, w), height: max(2, h), mipmapped: false)
             d.usage = render ? [.renderTarget, .shaderRead] : [.shaderRead]
@@ -85,6 +89,7 @@ final class JellySkin {
         guard W > 0, H > 0 else { return }
         if key == bgKey { return }
         bgKey = key
+        bgBase = nil; liveRect = .null
         guard !images.isEmpty else { bg = nil; return }
         let info = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: W * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info), let data = ctx.data else { bg = nil; return }
@@ -96,12 +101,63 @@ final class JellySkin {
         guard let tx = device.makeTexture(descriptor: d) else { bg = nil; return }
         tx.replace(region: MTLRegionMake2D(0, 0, W, H), mipmapLevel: 0, withBytes: data, bytesPerRow: ctx.bytesPerRow)
         bg = tx
+        bgBase = ctx
+    }
+
+    /// v2.52 C3 (多米 11-22 決定 8): the things that move behind the body (the wind bell, the teru teru bozu, what it brought back from its walks) are drawn
+    /// into the room the water skin bends, each frame, in the part around the body only. Before, the body bent a room without them, so behind it they vanished.
+    /// `rect` is that part in view points. An empty list, or nothing near the body, puts the baked room back (once) and then costs nothing.
+    /// - Returns: whether anything was drawn this frame
+    @discardableResult
+    func setDynamic(_ sprites: [Sprite], around rect: CGRect) -> Bool {
+        guard let bg, let base = bgBase, let src = base.data else { return false }
+        let full = CGRect(x: 0, y: 0, width: W, height: H)
+        var want = CGRect.null
+        var near: [Sprite] = []
+        if !sprites.isEmpty && !rect.isNull {
+            let r = rect.integral.intersection(full)
+            if !r.isNull && r.width >= 1 && r.height >= 1 {
+                for s in sprites where s.alpha > 0.01 {
+                    let reach = hypot(s.w, s.h)   // turned any way about its anchor, it stays inside this
+                    if CGRect(x: s.x - reach, y: s.y - reach, width: reach * 2, height: reach * 2).intersects(r) { near.append(s) }
+                }
+                if !near.isEmpty { want = r }
+            }
+        }
+        if want.isNull && liveRect.isNull { return false }   // nothing to draw, nothing to put back
+        let area = want.union(liveRect).integral.intersection(full)   // where the body is now, and where it was (that part goes back to the baked room)
+        guard !area.isNull, area.width >= 1, area.height >= 1 else { liveRect = .null; return false }
+        if bgLive == nil {
+            let info = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+            bgLive = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: base.bytesPerRow, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info)
+            bgLive?.translateBy(x: 0, y: CGFloat(H)); bgLive?.scaleBy(x: 1, y: -1)   // view coordinates: row 0 at the top
+        }
+        guard let live = bgLive, let dst = live.data, live.bytesPerRow == base.bytesPerRow else { return false }
+        let x0 = Int(area.minX), y0 = Int(area.minY), w = Int(area.width), h = Int(area.height), bpr = base.bytesPerRow
+        guard x0 >= 0, y0 >= 0, w > 0, h > 0, x0 + w <= W, y0 + h <= H else { return false }
+        for y in y0..<(y0 + h) { memcpy(dst + y * bpr + x0 * 4, src + y * bpr + x0 * 4, w * 4) }   // the baked room under them
+        if !near.isEmpty {
+            live.saveGState()
+            live.clip(to: area)
+            for s in near {
+                live.saveGState()
+                live.translateBy(x: s.x, y: s.y); live.rotate(by: s.angle); live.scaleBy(x: 1, y: -1)   // the picture upright in a context whose y runs down
+                live.setAlpha(s.alpha)
+                live.draw(s.image, in: CGRect(x: -s.w / 2, y: -(1 - s.anchorY) * s.h, width: s.w, height: s.h))
+                live.restoreGState()
+            }
+            live.restoreGState()
+        }
+        bg.replace(region: MTLRegionMake2D(x0, y0, w, h), mipmapLevel: 0, withBytes: dst + y0 * bpr + x0 * 4, bytesPerRow: bpr)
+        liveRect = want
+        return !near.isEmpty
     }
 
     /// One frame. `path` is the body in screen points; `rpx` the body radius in points on screen; colours already tinted by mood and impression.
     /// v2.47 `round`: the outline is cut from the small blur instead of the mask (sharp corners round off, concave ones join); it scales that blur. 0 = the mask's own edge.
     func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin, round: Double = 0, water: Double = 0, refr: Double = 0.3, absorb: Double = 0.68,
-                shine: Double = 1, opaque: Double = 0, extra: [CGPath] = []) {   // v2.51: highlights × shine; the thick part hides the room; extra shapes (the strand, the small blob) join the mask
+                shine: Double = 1, opaque: Double = 0, extra: [CGPath] = [],   // v2.51: highlights × shine; the thick part hides the room; extra shapes (the strand, the small blob) join the mask
+                hiOff: Bool = false, rimOff: Bool = false) {                    // v2.52 C4: the highlights, or the second highlight and the rim of light, left out (to read each layer's cost)
         guard let mask, let h1, let h2, let q1, let q2, let ctx = maskCtx, let data = ctx.data else { return }
         // 1 the mask
         ctx.setFillColor(gray: 0, alpha: 1)
@@ -146,9 +202,9 @@ final class JellySkin {
         u.append(mix(bc, white, skin.kEdge)); u.append(mix(bc, sc, skin.kCore)); u.append(mix(sc, lc, 0.35)); u.append(mix(bc, white, 0.3))
         u.append(SIMD4<Float>(skin.aEdge, skin.aCore, skin.amb, skin.dif))
         u.append(SIMD4<Float>(skin.glow, skin.line, skin.nk, skin.shin))
-        let sh = Float(max(0, min(1, shine)))
-        u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec * sh, skin.sheen * sh))
-        u.append(SIMD4<Float>(skin.arc * sh, round > 0 ? 0.46 : 0, skin.wet * sh, 0))
+        let sh = Float(max(0, min(1, shine))), hi: Float = hiOff ? 0 : sh
+        u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec * hi, skin.sheen * hi))
+        u.append(SIMD4<Float>(skin.arc * hi, round > 0 ? 0.46 : 0, rimOff ? 0 : skin.wet * sh, 0))
         let wv: Float = bg != nil ? Float(max(0, min(1, water))) * min(1, skin.wet) : 0   // v2.49: no baked room, no water skin
         u.append(SIMD4<Float>(wv, Float(refr), Float(absorb), Float(max(0, min(1, opaque)))))
         let rp = MTLRenderPassDescriptor()

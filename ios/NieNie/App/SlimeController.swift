@@ -16,7 +16,7 @@ final class SlimeController: ObservableObject {
     private var impressions: [SlimeKind: (trust: Double, wary: Double)] = [:]   // each slime's impression, this run only
     @Published private(set) var params: [SlimeMaterial: FeelParams]
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
-    @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2; syncAudio() } }
+    @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2 || labGrey; syncAudio() } }
     /// v2.40 環境音: "rain", "fire", "noise" (pink noise, 11-22) or "lofi", kept in UserDefaults (long press the speaker button to choose)
     @Published var ambience = UserDefaults.standard.string(forKey: "nienie.amb") ?? "rain" {
         didSet { UserDefaults.standard.set(ambience, forKey: "nienie.amb"); sound.setAmbience(ambience) }
@@ -62,7 +62,7 @@ final class SlimeController: ObservableObject {
             if let tr = savedTrust[saved] { rig.setImpression(trust: tr, wary: 0) }
         }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
-        feelLoad()   // v2.39 手感調節台: last time's numbers
+        feelLoad()   // 手感調節台: last time's numbers (v2.39; v2.52 the desk's v1 store)
         syncAudio()
         sound.setAmbience(ambience)   // v2.40 環境音, once at launch
         rig.walkOpen()   // 走路: the second open leaves the gift stone
@@ -252,8 +252,8 @@ final class SlimeController: ObservableObject {
     /// One line for the panel: real Hz, worst frame, dropped frames, main-thread work, finger contact radius, audio buffer;
     /// then the shake sensor: on or off, the strongest shake in the last 2 s against the threshold (both m/s²).
     var hudText: String {
-        String(format: "%.0f Hz｜最長幀 %.1f ms｜掉 %ld｜算 %.2f ms｜指 %.0f pt｜音訊緩衝 %.1f ms",
-               stats.hz, stats.maxFrameMs, stats.dropped, stats.workMs, stats.touchRadius, audioBufferMs)
+        String(format: "%.0f Hz｜最長幀 %.1f ms｜掉 %ld｜算 %.2f ms｜物理 %.2f ms｜指 %.0f pt｜音訊緩衝 %.1f ms",
+               stats.hz, stats.maxFrameMs, stats.dropped, stats.workMs, stats.physMs, stats.touchRadius, audioBufferMs)
         + "｜晃動感測 " + (motion.isDeviceMotionActive ? "開" : "關")
         + String(format: " %.1f／門檻 %.1f", shakePeak, current.shakeG)
     }
@@ -261,7 +261,9 @@ final class SlimeController: ObservableObject {
     // MARK: - Parameter plumbing
 
     private func pushParams() {
-        rig.params = current
+        var p = current
+        if labGrey { p.greyBox() }   // v2.52 灰盒 (3-2): only the physics is left; the sliders keep their own numbers
+        rig.params = p
         syncAudio()
         haptics.setAudioThroughHaptics(current.popViaHaptics >= 0.5, url: sound.releaseSampleURL)
     }
@@ -272,7 +274,7 @@ final class SlimeController: ObservableObject {
         sound.pullMax = current.sndPullMax
         sound.rubMax = current.rubMax
         sound.settleAmt = current.sndSettle
-        sound.music = soundMode == 0 ? current.volMusic : 0
+        sound.music = soundMode == 0 && !labGrey ? current.volMusic : 0
     }
 
     /// Press loudness from how the finger landed and how big its contact patch is (UITouch.majorRadius):
@@ -401,51 +403,53 @@ final class SlimeController: ObservableObject {
         rig.bump(1)
     }
 
-    // MARK: - v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方，我自己調試看怎樣手感最好)
+    // MARK: - v2.52 手感調節台 v1 (多米 11-22 交辦 B 組; 《虛擬手感》3-4 第十一節的規格)
+    // What a saved feel is, the copied text and the blind comparison's rules are in UI/FeelDeskModel.swift (the same as the web's desk.js).
 
-    /// One saved feel: the material it started from and the nine knobs. Same shape as the web's localStorage "nienie.feel".
-    struct FeelSnap: Codable, Equatable {
-        var base: String
-        var v: [String: Double]
-    }
-    private struct FeelStore: Codable {
-        var base: String
-        var v: [String: Double]
-        var A: FeelSnap?
-        var B: FeelSnap?
-    }
     private static let feelKey = "nienie.feel"
-    @Published private(set) var feelA: FeelSnap?
-    @Published private(set) var feelB: FeelSnap?
+    /// Three saved feels (多米 11-22 決定 10)
+    @Published private(set) var feelSlots: [FeelSnap?] = [nil, nil, nil]
+    /// The blind comparisons, one line each, newest last; 30 are kept, the last 5 go out with the copied text
+    @Published private(set) var feelLog: [String] = []
+    /// Not nil when the numbers on the desk were tuned on other defaults than this build's: the desk asks 用新預設／留著我的 (B4)
+    @Published private(set) var feelStale: String?
+    /// A blind comparison in progress (B3)
+    @Published private(set) var feelBlind: FeelBlind?
+    @Published var feelQuestion = ""
+    @Published var feelNote = "一次只動一條，用那一條底下寫的手勢捏幾下。兩組要比，存成兩格再按盲比。"
+    private var feelPv = FeelKnob.version, feelPs = FeelKnob.stamp   // the defaults the numbers on the desk were tuned on
+    private var feelBase0: FeelSnap?   // the desk as the app opened (or the material was last chosen): 「這次動過」 counts from here
 
-    private func feelPick() -> FeelSnap {
-        let p = current
-        var v: [String: Double] = [:]
-        for k in FeelKnob.all { v[k.id] = p[keyPath: k.key] }
-        return FeelSnap(base: material.rawValue, v: v)
-    }
+    private func feelPick() -> FeelSnap { FeelSnap.pick(current, base: material.rawValue) }
 
     private func feelSave() {
-        let s = FeelStore(base: material.rawValue, v: feelPick().v, A: feelA, B: feelB)
+        let s = FeelDeskStore(pv: feelPv, ps: feelPs, base: material.rawValue, k: feelPick().k, s: feelSlots, log: Array(feelLog.suffix(30)))
         if let d = try? JSONEncoder().encode(s) { UserDefaults.standard.set(d, forKey: Self.feelKey) }
     }
 
-    /// Lay a saved feel over the material's numbers: switch to its material first, then the nine knobs.
+    /// Lay a saved feel over the material's numbers: its material first, then the 13 numbers. Nothing else happens: no bump, no sound
+    /// (3-4: any movement added at the switch lies on top of what is being compared).
     private func feelApply(_ s: FeelSnap) {
         if let m = SlimeMaterial(rawValue: s.base), m != material { material = m }
         var p = current
-        for k in FeelKnob.all { if let x = s.v[k.id], x.isFinite { p[keyPath: k.key] = min(k.range.upperBound, max(k.range.lowerBound, x)) } }
+        s.apply(to: &p)
         params[material] = p
         pushParams()
         activeSlot = nil
+        feelSave()
     }
 
-    /// At launch: the numbers 多米 left on the desk last time come back (called from init).
+    /// At launch: the numbers 多米 left on the desk last time come back (called from init). The v2.39 to v2.51 desk's A and B become slots 1 and 2.
     func feelLoad() {
-        guard let d = UserDefaults.standard.data(forKey: Self.feelKey),
-              let s = try? JSONDecoder().decode(FeelStore.self, from: d) else { return }
-        feelA = s.A; feelB = s.B
-        feelApply(FeelSnap(base: s.base, v: s.v))
+        defer { feelBase0 = feelPick() }
+        guard let d = UserDefaults.standard.data(forKey: Self.feelKey), let r = FeelDeskStore.decode(d) else { return }
+        feelSlots = (0..<3).map { $0 < r.store.s.count ? r.store.s[$0]?.filled() : nil }
+        feelLog = r.store.log
+        if r.store.ps != FeelKnob.stamp {   // tuned on other defaults: keep that on record until 多米 answers, however many launches that takes
+            feelStale = r.old ? "v2.39 到 v2.51 的調節台" : (r.store.pv.isEmpty ? "舊版" : r.store.pv)
+            feelPv = r.store.pv; feelPs = r.store.ps
+        }
+        if let cur = FeelSnap(base: r.store.base, pv: nil, ps: nil, k: r.store.k).filled() { feelApply(cur) }
     }
 
     func feelBinding(_ k: FeelKnob) -> Binding<Double> {
@@ -462,50 +466,238 @@ final class SlimeController: ObservableObject {
         )
     }
 
-    /// 從哪個材質開始: that material's own numbers.
+    /// 韌的另一半 (v2.51 黏條): on, the body itself stops at a stable length and the rest is a strand; off, the body pulls as far as 韌 says (交辦 A1).
+    var feelStrand: Bool { current.strand >= 0.5 }
+    func feelToggleStrand() {
+        var p = current
+        p.strand = p.strand >= 0.5 ? 0 : 1
+        params[material] = p
+        pushParams()
+        activeSlot = nil
+        feelSave()
+    }
+
+    /// 從哪個材質開始: that material's own numbers (this build's defaults, so the question about older defaults is answered too).
     func feelStartFrom(_ m: SlimeMaterial) {
         material = m
         params[m] = m.defaults
         pushParams()
         activeSlot = nil
         rig.bump(1)
+        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        feelBase0 = feelPick()
         feelSave()
+        feelNote = "換成\(m.name)的預設值。"
     }
 
-    func feelStore(_ slot: String) {
-        if slot == "A" { feelA = feelPick() } else { feelB = feelPick() }
+    func feelStore(_ i: Int) {
+        guard feelSlots.indices.contains(i) else { return }
+        feelSlots[i] = feelPick()
         feelSave()
+        feelNote = "現在的手感存成 \(i + 1)。"
     }
 
-    func feelGo(_ slot: String) {
-        guard let s = slot == "A" ? feelA : feelB else { return }
+    /// v2.52 B2: no bump any more. The bump moved the body at the very moment the two feels were to be compared.
+    func feelGo(_ i: Int) {
+        guard feelSlots.indices.contains(i), let s = feelSlots[i] else { return }
         feelApply(s)
-        rig.bump(1)
-        feelSave()
+        feelNote = "換到 \(i + 1)（\(material.name)起點）。馬上捏，幾秒內再換另一個。"
     }
 
-    /// 回到預設: this slime's own material at its default numbers, A and B cleared.
+    // B3 盲比
+    func feelBlindStart(_ a: Int, _ b: Int) {
+        guard feelBlind == nil, feelSlots.indices.contains(a), feelSlots.indices.contains(b), feelSlots[a] != nil, feelSlots[b] != nil else { return }
+        let blind = FeelBlind(a, b, keep: feelPick(), now: ProcessInfo.processInfo.systemUptime)
+        feelBlind = blind
+        if let s = feelSlots[blind.slot] { feelApply(s) }
+        feelNote = "盲比開始。先摸的是 \(blind.first + 1) 號。用同一個手勢各捏幾下，幾秒內換過去再捏；選完才會告訴你哪個是哪個。"
+    }
+    func feelBlindShow(_ n: Int) {
+        guard var b = feelBlind, b.current != n, n == 0 || n == 1 else { return }
+        b.show(n)
+        feelBlind = b
+        if let s = feelSlots[b.slot] { feelApply(s) }
+    }
+    /// - Parameter choice: 0 or 1 for 1 號 or 2 號, nil for 分不出來
+    func feelBlindEnd(choice: Int?) {
+        guard let b = feelBlind else { return }
+        feelBlind = nil
+        guard let sa = feelSlots[b.pair.0], let sb = feelSlots[b.pair.1] else { feelApply(b.keep); return }
+        feelLog.append(b.line(choice: choice, a: sa, b: sb, question: feelQuestion, now: ProcessInfo.processInfo.systemUptime))
+        if feelLog.count > 30 { feelLog.removeFirst(feelLog.count - 30) }
+        if let c = choice, c == 0 || c == 1, let s = feelSlots[b.map[c]] { feelApply(s) } else { feelApply(b.keep) }
+        feelNote = b.reveal(choice: choice)
+    }
+    func feelBlindCancel() {
+        guard let b = feelBlind else { return }
+        feelBlind = nil
+        feelApply(b.keep)
+        feelNote = "盲比取消，回到剛剛的數字。這次不記。"
+    }
+
+    // B4 預設改版
+    func feelUseNewDefaults() {
+        params[material] = material.defaults
+        pushParams()
+        activeSlot = nil
+        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        feelBase0 = feelPick()
+        feelSave()
+        feelNote = "換成新預設（\(material.name)）。存檔那幾格還留著，是舊預設上調的。"
+    }
+    func feelKeepMine() {
+        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        feelSave()
+        feelNote = "留著你的數字。之後按「回到預設」可以看新預設。"
+    }
+
+    /// 回到預設: this slime's own material at its default numbers, the three slots cleared. The blind comparisons' lines stay.
     func feelDefaults() {
+        feelBlind = nil
         material = slime.material
         for m in SlimeMaterial.allCases { params[m] = m.defaults }
-        feelA = nil; feelB = nil
-        UserDefaults.standard.removeObject(forKey: Self.feelKey)
+        feelSlots = [nil, nil, nil]
+        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
         pushParams()
         activeSlot = nil
         rig.bump(1)
+        feelBase0 = feelPick()
+        feelSave()
+        feelNote = "回到預設（\(material.name)），三格存檔也清掉了。盲比紀錄留著。"
     }
 
-    /// Same text as the web's 複製數值給 Agent.
-    var feelText: String {
-        func line(_ s: FeelSnap) -> String {
-            let m = SlimeMaterial(rawValue: s.base)?.name ?? s.base
-            let parts = FeelKnob.all.map { k in "\(k.name) \(FeelKnob.fmt(s.v[k.id] ?? 0))（\(k.id)）" }
-            return "\(m)起點：" + parts.joined(separator: "、")
+    /// 這次動過: the knobs that differ from what was on the desk when the app opened, "名字 a→b"
+    var feelChanged: [String] {
+        guard let b = feelBase0 else { return [] }
+        let now = feelPick()
+        var o: [String] = []
+        if b.base != now.base { o.append("材料 \(FeelKnob.materialName(b.base))→\(FeelKnob.materialName(now.base))") }
+        for id in FeelKnob.keys where FeelKnob.fmt(b.k[id] ?? 0) != FeelKnob.fmt(now.k[id] ?? 0) {
+            o.append("\(FeelKnob.name(id)) \(FeelKnob.fmt(b.k[id] ?? 0))→\(FeelKnob.fmt(now.k[id] ?? 0))")
         }
-        var t = "手感調節台 v2.39（手機）\n現在 " + line(feelPick())
-        if let a = feelA { t += "\nA " + line(a) }
-        if let b = feelB { t += "\nB " + line(b) }
+        return o
+    }
+
+    /// v2.52 A2: what the sliders say against what the physics really uses (a scene or a mode can override a slider)
+    var feelEffective: FeelEffective { FeelEffective(current, grey: labGrey) }
+
+    /// "iPhone15,2": the hardware's own name (no public call gives the name on the box)
+    private static let machine: String = {
+        var info = utsname()
+        uname(&info)
+        return withUnsafePointer(to: &info.machine) { $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) } }
+    }()
+
+    /// B5: the first line of the copied text: build, defaults, model, refresh rate, low power
+    private var feelHeader: String {
+        let info = Bundle.main.infoDictionary
+        let build = (info?["CFBundleVersion"] as? String) ?? "?", ver = (info?["CFBundleShortVersionString"] as? String) ?? "?"
+        return "捏捏手感 v2｜build \(build)（\(ver)）｜預設 \(FeelKnob.version)·\(FeelKnob.stamp)｜\(Self.machine)｜螢幕 \(UIScreen.main.maximumFramesPerSecond) Hz、現在 \(Int(stats.hz.rounded())) Hz｜低電量 \(ProcessInfo.processInfo.isLowPowerModeEnabled ? "開" : "關")"
+    }
+
+    /// 複製數值給 Agent. Pasted back with 貼上匯入 (here or on the web), the same numbers and slots come up again.
+    var feelText: String {
+        let eff = feelEffective
+        var extra: [String] = []
+        if labGrey || labCircle || !labLayersOff.isEmpty {
+            let off = Self.labLayers.filter { labLayersOff.contains($0.id) }.map { $0.name }
+            extra.append("量測：灰盒 \(labGrey ? "開" : "關")、純圓 \(labCircle ? "開" : "關")" + (off.isEmpty ? "" : "、關掉的圖層：" + off.joined(separator: "、")))
+        }
+        extra.append("讀數：" + labText.replacingOccurrences(of: "\n", with: "｜"))
+        if let f = fuzzSummary { extra.append(f.text) }
+        return FeelExport.text(header: feelHeader, slimeName: slime.name, current: feelPick(),
+                               effectivePull: eff.used.maxPull != eff.set.maxPull ? eff.used.maxPull : nil,
+                               slots: feelSlots, changed: feelChanged, log: feelLog, extra: extra)
+    }
+
+    /// 貼上匯入
+    @discardableResult
+    func feelImport(_ text: String) -> Bool {
+        guard feelBlind == nil else { return false }
+        guard let r = FeelExport.parse(text) else {
+            feelNote = "剪貼簿裡找不到 #nienie-feel 那一行。先拷貝「複製數值給 Agent」複製出來的整段字，再按一次「貼上匯入」。"
+            return false
+        }
+        feelSlots = r.slots
+        feelApply(r.current)
+        feelNote = !r.ps.isEmpty && r.ps != FeelKnob.stamp
+            ? "匯入了。注意：這段字是在預設 \(r.pv.isEmpty ? "?" : r.pv) 上調的，現在的預設是 \(FeelKnob.version)。"
+            : "匯入了，數字跟那段字一樣。"
+        return true
+    }
+
+    // MARK: - v2.52 量測 (交辦 B6、A5、C4; 《虛擬手感》3-2 灰盒與純圓, 3-3 亂捏測試, 3-5 一層一層量). Never saved: off again at the next launch.
+
+    /// 灰盒: only the physics. One flat grey, no eyes, no life of its own, no sound, no haptics, no decorations; the wall, the sill and the bowl stay.
+    /// The sliders keep their numbers (the grey box lies over them while it is on).
+    @Published var labGrey = false {
+        didSet {
+            guard labGrey != oldValue else { return }
+            sound.muted = soundMode == 2 || labGrey
+            haptics.enabled = !labGrey
+            if labGrey { sound.stopAll(); haptics.stopContinuous() }
+            pushParams()
+        }
+    }
+    /// 純圓: a 2 cm disc whose centre is the finger, nothing handed to the body: the system's own lag (跟手基準的 C)
+    @Published var labCircle = false
+    /// 圖層 (C4): the skin's layers switched off one at a time, to read each one's cost off the frame readout
+    @Published private(set) var labLayersOff: Set<String> = []
+    static let labLayers: [(id: String, name: String)] = [
+        ("round", "輪廓圓角"), ("shade", "明暗"), ("hi", "高光"), ("wet", "第二高光與邊光"), ("refr", "折射"),
+        ("caustic", "聚光"), ("bubbles", "氣泡"), ("dent", "凹痕"), ("mood", "心情色"),
+    ]
+    func labToggleLayer(_ id: String) {
+        if labLayersOff.contains(id) { labLayersOff.remove(id) } else { labLayersOff.insert(id) }
+    }
+    /// A layer whose own number is 0 is not drawn anyway; its switch is greyed out
+    func labLayerDead(_ id: String) -> Bool {
+        let p = current
+        switch id {
+        case "round": return !(p.round > 0)
+        case "hi": return !(p.shine > 0)
+        case "wet": return !(p.shine > 0 && p.wet >= 0.5)
+        case "refr": return !(p.water > 0)
+        case "caustic": return !(p.caustic > 0)
+        case "bubbles": return !(p.bubbles > 0)
+        case "dent": return !(p.dent >= 0.5)
+        case "mood": return !(p.moodColor > 0)
+        default: return false
+        }
+    }
+    func labResetReadouts() { rig.guardReset() }
+
+    /// The 量測 readout (B6): refresh rate, longest frame, the physics alone, how often each guard acted (since 讀數歸零)
+    var labText: String {
+        let g = rig.guardStats
+        func f(_ v: Double, _ d: Int = 1) -> String { String(format: "%.\(d)f", v) }
+        var t = "\(f(stats.hz, 0)) Hz｜最長一格 \(f(stats.maxFrameMs)) 毫秒｜掉 \(stats.dropped) 格｜整格 \(f(stats.workMs, 2)) 毫秒｜物理 \(f(stats.physMs, 2)) 毫秒（一秒內最長 \(f(stats.physMaxMs))）"
+        if current.decoThru >= 0.5 { t += "｜擺飾透過身體 \(f(stats.decoMs, 2)) 毫秒" }
+        t += "\n保險作用的格：拉到上限 \(f(g.pct(g.hi)))%、壓到下限 \(f(g.pct(g.lo)))%、防翻面 \(f(g.pct(g.flip)))%、手指讓 \(f(g.pct(g.give)))%｜手指最多讓 \(f(g.giveMax, 2)) 個半徑、往外拉時 \(f(g.givePull, 2))｜\(g.frames) 格"
         return t
+    }
+
+    /// 亂捏測試 on the phone (A5): 30 fixed seeds on a rig of its own, off the main thread, with the numbers on the desk. About a minute; the slime on screen can be squeezed meanwhile.
+    @Published private(set) var fuzzRunning = false
+    @Published private(set) var fuzzText = ""
+    private(set) var fuzzSummary: SlimeFuzz.Summary?
+    func fuzzRun() {
+        guard !fuzzRunning, rig.W > 0, rig.H > 0 else { return }
+        fuzzRunning = true
+        fuzzText = "亂捏測試：0／30 組……大約一分鐘，可以繼續捏"
+        let p = current, w = rig.W, h = rig.H
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let r = SlimeFuzz.run(seeds: Array(1000...1029), params: p, width: w, height: h) { done, total in
+                DispatchQueue.main.async { [weak self] in self?.fuzzText = "亂捏測試：\(done)／\(total) 組……" }
+                return self != nil
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.fuzzRunning = false
+                self.fuzzSummary = r.summary
+                self.fuzzText = r.summary.text
+            }
+        }
     }
 
     // MARK: - Blind-test slots

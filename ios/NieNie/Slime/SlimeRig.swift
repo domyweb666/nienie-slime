@@ -32,15 +32,43 @@ final class SlimeRig {
     var params: FeelParams
     /// The params as the physics uses them. v2.29: the anti-knot guards are not applied to fixed tentacles (limbs > 0, the 8-legged control):
     /// those have their own rungs and slip, and 多米 11-06 no longer wants the legs.
-    private var effParams: FeelParams {
-        var m = params
+    private var effParams: FeelParams { Self.effective(params) }
+    /// v2.52 A2: the same numbers for the panels, so a slider can say「實際是 X」beside a value a scene or a mode has overridden
+    /// (3-3: what the panel shows, the default and what the physics uses must be one number, or the difference is written out).
+    var effectiveParams: FeelParams { effParams }
+    static func effective(_ p: FeelParams) -> FeelParams {
+        var m = p
         if m.limbs > 0 { m.noFlip = 0; m.gripUp = 0.2; m.homeCap = 0; m.fingerSolid = 0 }
-        if m.scene >= 0.5 {   // v2.28 窗台: the room is fixed, so a very long pull would not fit; on the sill it does not lift itself by pulsing; a little more upright; no hop-in (it drops into the bowl)
+        if m.scene >= 0.5 {   // v2.28 窗台: on the sill it does not lift itself by pulsing; a little more upright; no hop-in (it drops into the bowl)
             m.bodySize = 0.27; m.intro = 0; m.introSwim = 0; m.jellyLift = 0
-            m.maxPull = min(m.maxPull, m.strand >= 0.5 ? 2.4 : 3.2); m.memMax = min(m.memMax, 2.6); m.upright = max(m.upright, 0.03)
+            // v2.52 A1 (多米 11-22 決定 3: 拿掉窗台對拉伸的覆寫). The sill used to cap every stretch at 3.2R and the memory at 2.6R, so clay's own
+            // 7 and 5 were never used there and the panel showed a number the hand never felt. What is left is v2.51's strand: while it is on the
+            // body itself stretches only to strandAt (the rest of the way is the strand; 多米 11-22: 不能破皮). With the strand off the
+            // material's own numbers hold. sillCap > 0 is the control for v2.50 (the old cap), kept for blind tests and the selftest's old items.
+            if m.strand >= 0.5 { m.maxPull = min(m.maxPull, m.strandAt); m.memMax = min(m.memMax, m.strandAt + 0.2) }
+            else if m.sillCap > 0 { m.maxPull = min(m.maxPull, m.sillCap); m.memMax = min(m.memMax, 2.6) }
+            m.upright = max(m.upright, 0.03)
         }
         return m
     }
+    /// v2.52 A5: every random draw of the rig comes from here. Unseeded it is the system's generator, as before; the fuzz test seeds it
+    /// (`seedRandom`), so the same seed gives the same run on every build (3-3 第 8 欄: 固定種子的亂捏，每一版跑同一套).
+    struct RigRandom: RandomNumberGenerator {
+        var seeded = false
+        var state: UInt64 = 0
+        mutating func next() -> UInt64 {
+            guard seeded else { var g = SystemRandomNumberGenerator(); return g.next() }
+            state &+= 0x9E37_79B9_7F4A_7C15   // SplitMix64
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            return z ^ (z >> 31)
+        }
+    }
+    private var rng = RigRandom()
+    func seedRandom(_ seed: UInt64?) { if let s = seed { rng = RigRandom(seeded: true, state: s) } else { rng = RigRandom() } }
+    /// v2.52 A5: no reads or writes of what the user has stored (the fuzz test runs on a rig of its own, like the web's WALK.noSave)
+    var labNoSave = false
     /// Reduce Motion: idle motion and twitches halved. Feedback stays on.
     var reduceMotion = false
     var onEvent: ((SlimeEvent) -> Void)?
@@ -360,7 +388,7 @@ final class SlimeRig {
             if taps.count >= 3 {
                 var ux = clusters[gi].xc - f.ax, uy = clusters[gi].yc - f.ay
                 let ul = hypot(ux, uy)
-                if ul < R * 0.1 { let a = Double.random(in: 0..<(2 * .pi)); ux = cos(a); uy = sin(a) } else { ux /= ul; uy /= ul }
+                if ul < R * 0.1 { let a = Double.random(in: 0..<(2 * .pi), using: &rng); ux = cos(a); uy = sin(a) } else { ux /= ul; uy /= ul }
                 flee(ux, uy, W * 0.28 * params.flee); taps = []; moodC = max(-1, moodC - 0.3); moodA = 1
             }
             return
@@ -425,10 +453,10 @@ final class SlimeRig {
             wanderVX = (nx - homeX) / dt; wanderVY = (ny - homeY) / dt; homeX = nx; homeY = ny
             if lv(params.lifeGait) { strK = 1 + 0.15 * pow(1 - p, 2) * (reduceMotion ? 0.5 : 1); strH = atan2(escDY - escSY, escDX - escSX) }   // v2.19: stretched along the dash
             if p >= 1 {
-                escOn = false; cowerUntil = t + 1.2 + Double.random(in: 0..<0.8); wanderNext = max(wanderNext, t + 2 + Double.random(in: 0..<1.5))
+                escOn = false; cowerUntil = t + 1.2 + Double.random(in: 0..<0.8, using: &rng); wanderNext = max(wanderNext, t + 2 + Double.random(in: 0..<1.5, using: &rng))
                 if params.life2 >= 0.5 {   // v2.19 A6: out of breath after running away
                     if lv(params.lifeBreath) { exert = max(exert, 0.8) }
-                    lifeSt = .rest; lifeUntil = cowerUntil + 1 + Double.random(in: 0..<1)
+                    lifeSt = .rest; lifeUntil = cowerUntil + 1 + Double.random(in: 0..<1, using: &rng)
                 }
             }
         }
@@ -1001,6 +1029,7 @@ final class SlimeRig {
             let tg: Double = d > r * hi ? r * hi : (d < r * lo ? r * lo : 0)
             if tg == 0 || d < 1e-9 { continue }
             any = true
+            if live { if d < tg { grdLo = true } else { grdHi = true } }   // v2.52 A5
             var pi = false, pj = false
             if pins {
                 pi = !clingAX[i].isNaN; pj = !clingAX[j].isNaN
@@ -1472,7 +1501,7 @@ final class SlimeRig {
         // v2.19: caught, the sniffing pseudopods draw in and it stops walking; A5 the dent still shows at once (below) and 0.1...0.25 s
         // later it flinches by itself; A7 a touch on empty space within 3R makes it turn and sniff that way 0.3 s later
         // v2.20 C5: wary, it flinches sooner
-        if grab && lv(params.lifeFlinch) && !(flAt > t) { flAt = t + (0.1 + Double.random(in: 0..<0.15)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt }
+        if grab && lv(params.lifeFlinch) && !(flAt > t) { flAt = t + (0.1 + Double.random(in: 0..<0.15, using: &rng)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt }
         if grab && params.life2 >= 0.5 { cutSniffs(); gaitOn = false; gaitK = 1; wanderMoving = false; lifeSt = .rest; lifeUntil = -1; askOn = false }
         let lure = !grab && allowed && (iv2(params.impC1) || iv2(params.impC2))   // v2.20: a finger on empty space goes to C1, C2 (lureStep), not just one sniff
         if !grab && allowed && !lure && lv(params.lifeAttend) {
@@ -1768,7 +1797,7 @@ final class SlimeRig {
                 if f.tickNext <= 0 { f.tickNext = mat.tickSpacing; f.tickAt = f.travel }
                 if f.travel - f.tickAt >= f.tickNext && f.speedC > R * 0.1 && t - tickLastT >= 1 / max(1, mat.tickRate) {
                     f.tickAt = f.travel
-                    f.tickNext = mat.tickSpacing * (0.7 + 0.6 * Double.random(in: 0..<1))
+                    f.tickNext = mat.tickSpacing * (0.7 + 0.6 * Double.random(in: 0..<1, using: &rng))
                     tickLastT = t
                     onEvent?(.tick(gain: 0.7 * min(1, f.speedC / (R * 3))))
                 }
@@ -1855,11 +1884,11 @@ final class SlimeRig {
             releaseCount += 1
             if params.specialEvery > 0 {
                 let every = Int(params.specialEvery.rounded())
-                if nextSpecial == 0 { nextSpecial = max(1, every + Int.random(in: -2...2)) }
+                if nextSpecial == 0 { nextSpecial = max(1, every + Int.random(in: -2...2, using: &rng)) }
                 if releaseCount >= nextSpecial {
                     special = true
                     specialUntil = t + 0.35
-                    nextSpecial = max(releaseCount + 1, releaseCount + every + Int.random(in: -2...2))
+                    nextSpecial = max(releaseCount + 1, releaseCount + every + Int.random(in: -2...2, using: &rng))
                     s = min(1, s * 1.3)
                 }
             }
@@ -1887,7 +1916,7 @@ final class SlimeRig {
     func bump(_ amount: Double = 1) {
         guard N > 0 else { return }
         let amp = R * 0.0025 * amount * (reduceMotion ? 0.5 : 1)
-        let a = Double.random(in: 0..<(2 * .pi)), ix = cos(a) * amp, iy = sin(a) * amp
+        let a = Double.random(in: 0..<(2 * .pi), using: &rng), ix = cos(a) * amp, iy = sin(a) * amp
         for i in 0..<N where !GRAB[i] { PX[i] -= ix; PY[i] -= iy }
     }
 
@@ -1915,6 +1944,7 @@ final class SlimeRig {
 
     func update(_ dt: Double) {
         guard N > 0 else { return }
+        guardFold()   // v2.52 A5
         t += dt
         if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens || params.scene != builtScene {
             setup(width: W, height: H)
@@ -2060,7 +2090,7 @@ final class SlimeRig {
                     if f.tickNext <= 0 { f.tickNext = mat.tickSpacing * tense; f.tickAt = f.travel }
                     if f.travel - f.tickAt >= f.tickNext && f.speedC > R * 0.1 && t - tickLastT >= 1 / max(1, mat.tickRate) {
                         f.tickAt = f.travel   // what was travelled while capped is forgiven: no burst afterwards
-                        f.tickNext = mat.tickSpacing * tense * (0.7 + 0.6 * Double.random(in: 0..<1))
+                        f.tickNext = mat.tickSpacing * tense * (0.7 + 0.6 * Double.random(in: 0..<1, using: &rng))
                         tickLastT = t
                         onEvent?(.tick(gain: min(1, max(f.speedC / (R * 3), 0.5 * pullK))))
                     }
@@ -2182,12 +2212,12 @@ final class SlimeRig {
             if lv(mat.lifeBreath) {
                 // v2.19 A6: each breath a little different (smooth noise ±15%); panting (exert) twice as fast and 30% shallower; a sigh
                 // every 30...90 s (1.8× deeper, 1.6× slower), then a 1 s pause before the next
-                if sighNext < 0 { sighNext = t + 30 + Double.random(in: 0..<60) }
+                if sighNext < 0 { sighNext = t + 30 + Double.random(in: 0..<60, using: &rng) }
                 let ex = exert, cyc = Int(floor(brPhase))
                 T *= (1 + 0.15 * Self.vnoise(77, brPhase * 0.9)) * (1 - 0.5 * ex); brAmpX = 1 - 0.3 * ex
                 if sighCyc < 0 && t > sighNext && ex < 0.2 && lifeSt != .go { sighCyc = cyc + 1; if !slpOn { onEvent?(.fx(kind: "sigh", gain: 0.45, delay: 0)) } }
                 if cyc == sighCyc { T *= 1.6; brAmpX *= 1.8 }
-                else if sighCyc >= 0 && cyc > sighCyc { sighCyc = -1; pauseUntil = t + 1; sighNext = t + 30 + Double.random(in: 0..<60) }
+                else if sighCyc >= 0 && cyc > sighCyc { sighCyc = -1; pauseUntil = t + 1; sighNext = t + 30 + Double.random(in: 0..<60, using: &rng) }
             }
             amp *= brAmpX
             if t >= pauseUntil { brPhase += (tl - brPrev) / T }
@@ -2223,12 +2253,12 @@ final class SlimeRig {
             if mat.pods > 0 && !lv(mat.lifeRest) && pods.count < Int(mat.pods.rounded()) && podClock >= podNext {   // v2.19 A2: no random pods, pseudopods only sniff
                 var a = 0.0
                 for _ in 0..<10 {
-                    a = Double.random(in: 0..<(2 * .pi))
+                    a = Double.random(in: 0..<(2 * .pi), using: &rng)
                     if pods.allSatisfy({ abs(atan2(sin(a - $0.a), cos(a - $0.a))) > 1.1 }) { break }
                 }
-                pods.append(Pod(a: a, L: mat.podLen * (0.7 + 0.5 * Double.random(in: 0..<1)), sig: 0.22 + 0.1 * Double.random(in: 0..<1),
-                                bend: (Double.random(in: 0..<1) - 0.5) * 0.8, D: 4 + 4 * Double.random(in: 0..<1)))
-                podNext = podClock + 0.8 + 2.2 * Double.random(in: 0..<1)
+                pods.append(Pod(a: a, L: mat.podLen * (0.7 + 0.5 * Double.random(in: 0..<1, using: &rng)), sig: 0.22 + 0.1 * Double.random(in: 0..<1, using: &rng),
+                                bend: (Double.random(in: 0..<1, using: &rng) - 0.5) * 0.8, D: 4 + 4 * Double.random(in: 0..<1, using: &rng)))
+                podNext = podClock + 0.8 + 2.2 * Double.random(in: 0..<1, using: &rng)
             }
             func ease(_ x: Double) -> Double { x * x * (3 - 2 * x) }
             let cw = t < cowerUntil ? 1 : max(0, 1 - (t - cowerUntil) / 0.6)   // v2.18 curled up: pods drawn in
@@ -2321,15 +2351,15 @@ final class SlimeRig {
                 if mat.camFollow >= 0.5 {
                     // v2.17: walk out from where it is; with the `dash` chance far and fast (2.5×: the camera lags, it leaves the screen
                     // a bit). Over three view widths from the start it heads back
-                    let far = Double.random(in: 0..<1) < mat.dash
-                    let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.2 + 0.3 * Double.random(in: 0..<1))   // v2.18: walks further (多米: it always sits in the middle)
-                    var a = Double.random(in: 0..<(2 * .pi))
-                    if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5) }
+                    let far = Double.random(in: 0..<1, using: &rng) < mat.dash
+                    let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1, using: &rng) : 0.2 + 0.3 * Double.random(in: 0..<1, using: &rng))   // v2.18: walks further (多米: it always sits in the middle)
+                    var a = Double.random(in: 0..<(2 * .pi), using: &rng)
+                    if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5, using: &rng) }
                     wanderX = homeX + cos(a) * dist; wanderY = homeY + sin(a) * dist * 0.8
                     if far { sp = 2.5 }
                 } else {
-                    wanderX = cx + (Double.random(in: 0..<1) - 0.5) * W * 0.36
-                    wanderY = cy + (Double.random(in: 0..<1) - 0.5) * H * 0.16
+                    wanderX = cx + (Double.random(in: 0..<1, using: &rng) - 0.5) * W * 0.36
+                    wanderY = cy + (Double.random(in: 0..<1, using: &rng) - 0.5) * H * 0.16
                 }
                 wanderT = max(0.5, hypot(wanderX - homeX, wanderY - homeY) / (mat.wander * sp * R * (reduceMotion ? 0.5 : 1)))
                 wanderP = 0
@@ -2343,12 +2373,12 @@ final class SlimeRig {
                 homeX = nx; homeY = ny
                 if p >= 1 {
                     wanderMoving = false
-                    wanderNext = t + (mat.camFollow >= 0.5 ? 0.8 + Double.random(in: 0..<2.2) : 1.5 + Double.random(in: 0..<5))   // v2.18: shorter rests
+                    wanderNext = t + (mat.camFollow >= 0.5 ? 0.8 + Double.random(in: 0..<2.2, using: &rng) : 1.5 + Double.random(in: 0..<5, using: &rng))   // v2.18: shorter rests
                 }
             }
         } else if !fingers.isEmpty {
             wanderMoving = false
-            wanderNext = t + 2 + Double.random(in: 0..<3)
+            wanderNext = t + 2 + Double.random(in: 0..<3, using: &rng)
         }
 
         if mat.morph >= 0.5 { morphCoef(tl * mat.idlePace) }   // idlePace (多米 2026-11-01: the wriggle was too fast)
@@ -2695,9 +2725,10 @@ final class SlimeRig {
             for _ in 0..<rounds {
                 let a: Bool = strainStep(&X, &Y, mat.capLo, mat.stretchCap, true, mat)
                 let b: Bool = mat.noFlip > 0 ? meshGuard(&X, &Y, mat.noFlip, GRAB, mat) : false
+                if b { grdFlip = true }   // v2.52 A5
                 if !a && !b { break }
             }
-        } else if mat.noFlip > 0 { meshGuard(&X, &Y, mat.noFlip, GRAB) }   // v2.29 防打結: before the walls, so the collisions have the last word and it does not sink into the floor
+        } else if mat.noFlip > 0 { if meshGuard(&X, &Y, mat.noFlip, GRAB) { grdFlip = true } }   // v2.29 防打結: before the walls, so the collisions have the last word and it does not sink into the floor
         // 4 home (float), bounds
         let hx = homeX + tugX + dragOX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY + tugY + dragOY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
@@ -2746,6 +2777,7 @@ final class SlimeRig {
                 for m in f.mem { sx += SLX[m.i] * m.w; sy += SLY[m.i] * m.w; sw += m.w }
                 if sw > 0 {
                     let gx: Double = sx / sw * mat.capSlip, gy: Double = sy / sw * mat.capSlip
+                    if abs(sx) + abs(sy) > sw * 0.02 { grdGive = true }   // v2.52 A5
                     f.slx += gx; f.sly += gy
                     let l: Double = hypot(f.slx, f.sly), top: Double = R * 2
                     if l > top { f.slx *= top / l; f.sly *= top / l }
@@ -2852,6 +2884,35 @@ final class SlimeRig {
                     X[g.b] -= ux * delta * wg / sw; Y[g.b] -= uy * delta * wg / sw
                 }
             }
+        }
+    }
+
+    // MARK: - v2.52 A4 流 (多米 11-22 決定 5: 放著會慢慢往下塌). Port of the web's flowFree / flowStep.
+    // A real slime rolled into a ball and left on the table flows flat by itself (2-5); the model had 留形 and 回原形 but nothing that slumps.
+    // With no finger on it and resting on the sill, the remembered shape is pressed down along gravity and spread sideways. `flow` is the share
+    // of its height lost a second (0.05 ≈ half in 14 s); recover pulls it back at the same time, the two balance at recover ÷ (recover + flow)
+    // of the height. It never slumps below 65% of the original height (that floor is a guard, not material: at 65% it is about 1.5 times as
+    // wide, 3.2R, about all a 393 pt screen holds; with the floor at 30% the edge limits pushed the remembered shape askew within 30 s). Done in rest space: the world's
+    // "down" (0, 1) is (sn, cs) there. The area is brought back by the end of plasticity, the edge lengths are held by memCap.
+    private var flowFree: Bool {
+        sillOn && sillPlane == .room && sillC > 0 && !sillGrab && !sillAir && sillHop == nil && sillRoute == nil && sillStickT < 0
+            && !escOn && !clingOn && !gaitOn && fingers.isEmpty
+    }
+    private func flowStep(_ dt: Double, _ flow: Double) {
+        guard N > 0, !clusters.isEmpty else { return }
+        let g = clusters[gi], dx: Double = g.sn, dy: Double = g.cs
+        var a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9, q0 = 1e9, q1 = -1e9
+        for i in 0..<N {
+            let a: Double = QX[i] * dx + QY[i] * dy, b: Double = QX[i] * dy - QY[i] * dx
+            if a < a0 { a0 = a }; if a > a1 { a1 = a }; if b < b0 { b0 = b }; if b > b1 { b1 = b }
+            if Q0Y[i] < q0 { q0 = Q0Y[i] }; if Q0Y[i] > q1 { q1 = Q0Y[i] }
+        }
+        guard a1 - a0 > (q1 - q0) * 0.65 else { return }
+        let k: Double = min(0.2, flow * dt), bm: Double = (b0 + b1) / 2
+        for i in 0..<N {
+            let a: Double = QX[i] * dx + QY[i] * dy, b: Double = QX[i] * dy - QY[i] * dx
+            let a2: Double = a1 - (a1 - a) * (1 - k), b2: Double = bm + (b - bm) * (1 + k)
+            QX[i] = a2 * dx + b2 * dy; QY[i] = a2 * dy - b2 * dx
         }
     }
 
@@ -2968,6 +3029,7 @@ final class SlimeRig {
             if kr > 0 {
                 for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
             }
+            if mat.flow > 0 && flowFree { flowStep(dt, mat.flow) }   // v2.52 A4 流
         }
         // tentacles barely remember: tips always spring back to their length and thickness (the body is the clay).
         // tentMem 1 (clay, 多米 2026-11-01: a pinched foot snapped straight back) turns this off; they relax at `recover`.
@@ -3359,7 +3421,7 @@ final class SlimeRig {
             if sillFall > R * 2.5 { onEvent?(.fx(kind: "land", gain: min(0.9, 0.25 + sillFall / (R * 14)), delay: 0)) }
             if hopAir { sillHop = nil }
             sillWant = false; sillFall = 0; sillLastHome = max(sillLastHome, t - 8)
-            if sillRoute == nil { lifeSt = .rest; lifeUntil = t + 1 + Double.random(in: 0..<1); if sillSurf == nil { sillSurf = sillPlane == .frame ? "bar" : (sillPlane == .out ? "ledge" : (sillInBowl ? "bowl" : "floor")) } }
+            if sillRoute == nil { lifeSt = .rest; lifeUntil = t + 1 + Double.random(in: 0..<1, using: &rng); if sillSurf == nil { sillSurf = sillPlane == .frame ? "bar" : (sillPlane == .out ? "ledge" : (sillInBowl ? "bowl" : "floor")) } }
         }
         if sillGrab && !sillHeld {   // picked up: whatever it was doing stops
             if sillRoute != nil { routeEnd(abort: true) }
@@ -3368,10 +3430,10 @@ final class SlimeRig {
         }
         // let go right over the bowl: it wants in; anywhere else it lands on the sill (the frame and the walls come with the next batch)
         if sillHeld && !sillGrab && clingOn {   // v2.36: let go with suckers still on, it springs back onto the wall and keeps sticking
-            planeSet(isEdge(clingSide) ? .room : .frame); surfSet(clingSide); sillInBowl = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1); clingSaid = false
+            planeSet(isEdge(clingSide) ? .room : .frame); surfSet(clingSide); sillInBowl = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1, using: &rng); clingSaid = false
             onEvent?(.press(gain: 0.25))
         } else if sillHeld && !sillGrab && !sillInBowl, let sd = edgeSide(g, y1) {   // v2.51 黏在螢幕四周
-            surfSet(sd); sillWant = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1)
+            surfSet(sd); sillWant = false; sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1, using: &rng)
             for i in 0..<N { PX[i] = X[i]; PY[i] = Y[i] }
             onEvent?(.press(gain: 0.3))
             clingStart(sd)
@@ -3388,7 +3450,7 @@ final class SlimeRig {
                 let messy: Bool = effParams.clingTidy >= 0.5 && (y0 < g.gy - R * 0.8 || x0 < g.gx - R * 0.8 || x1 > g.jr + R * 0.8 || ringCrossed())
                 let sd: String? = !inFront && !messy && sp < R * 2.5 && y1 < g.bt - R * 0.4 ? (x1 > g.jr - R * 0.3 ? "rjamb" : x0 < g.gx + R * 0.3 ? "ljamb" : y0 < g.gy + R * 0.3 ? "ceil" : nil) : nil
                 if let sd {   // v2.36: only sticking takes it onto the frame (it does not climb the frame by itself)
-                    planeSet(.frame); surfSet(sd); sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1)
+                    planeSet(.frame); surfSet(sd); sillStickT = t; sillStickDur = 8 + 7 * Double.random(in: 0..<1, using: &rng)
                     for i in 0..<N { PX[i] = X[i]; PY[i] = Y[i] }
                     onEvent?(.press(gain: 0.3))
                     clingStart(sd)
@@ -3457,9 +3519,9 @@ final class SlimeRig {
 
     /// It decides to go somewhere (goStart on the sill): mostly it stays; from the bowl it sometimes climbs out; on the sill it mostly goes back in, else walks a little.
     private func sillGo() {
-        lifeSt = .rest; lifeUntil = t + 2 + 2 * Double.random(in: 0..<1)
+        lifeSt = .rest; lifeUntil = t + 2 + 2 * Double.random(in: 0..<1, using: &rng)
         guard sillG != nil, !clusters.isEmpty, sillRoute == nil, sillHop == nil, !sillAir, params.envRoam > 0, snwK <= 0.3, sillStickT < 0, !clingOn else { return }   // v2.31: while the glitter settles it stays in
-        let cx0 = clusters[gi].xc, r = Double.random(in: 0..<1) / max(0.01, params.envRoam)
+        let cx0 = clusters[gi].xc, r = Double.random(in: 0..<1, using: &rng) / max(0.01, params.envRoam)
         if sillInBowl { if r < 0.16 { routeStart(rtOutFront(nil)) }; return }
         if sillPlane == .frame { routeStart(rtFromWall() + rtBackIn()); return }   // v2.31: it does not climb the frame by itself, it comes back in
         if sillPlane == .out { routeStart(rtComeBack()); return }
@@ -3475,12 +3537,12 @@ final class SlimeRig {
         guard let g = sillG else { return nil }
         let lo = g.l + R * 0.9, hi = g.r - R * 0.9
         if hi - lo < R * 0.3 { return nil }
-        return lo + (hi - lo) * Double.random(in: 0..<1)
+        return lo + (hi - lo) * Double.random(in: 0..<1, using: &rng)
     }
     /// Out of the bowl over its front edge: a pseudopod reaches up, the body lifts above the edge, it is in front of the bowl now, flows down onto the sill.
     private func rtOutFront(_ x: Double?) -> [RouteStep] {
         guard let g = sillG else { return [] }
-        let a = -.pi / 2 + (Double.random(in: 0..<1) < 0.5 ? -0.3 : 0.3)
+        let a = -.pi / 2 + (Double.random(in: 0..<1, using: &rng) < 0.5 ? -0.3 : 0.3)
         var steps: [RouteStep] = [.sniff(a: a, L: 0.5, T: 0.7), .move(y: g.lip - 6), .plane(.room, inBowl: false), .move(y: g.fl - 2), .surf("floor")]
         if let x { steps.append(.walk(surf: "floor", to: x)) }
         return steps
@@ -3588,7 +3650,7 @@ final class SlimeRig {
         eyeSqU = max(eyeSqU, t + 0.3)
         if !clingSaid { clingSaid = true; voice("protest") }
         for i in 0..<min(N, clingAX.count) where !GRAB[i] && clingAX[i].isNaN {   // the whole thing trembles
-            PX[i] += Double.random(in: -0.5..<0.5) * R * 0.01; PY[i] += Double.random(in: -0.5..<0.5) * R * 0.01
+            PX[i] += Double.random(in: -0.5..<0.5, using: &rng) * R * 0.01; PY[i] += Double.random(in: -0.5..<0.5, using: &rng) * R * 0.01
         }
         clingAcc += dt
         let step = 0.22 / (1 + 1.5 * (pull - p0) / R)   // just past the threshold a sucker every 0.2 s, faster the further you pull
@@ -3771,7 +3833,7 @@ final class SlimeRig {
         let g0 = R * sillGrav, hs = 1.0 / 240
         var y1 = -1e9
         for i in bnd { y1 = max(y1, Y[i]) }
-        var hh = R * (0.55 + 0.25 * Double.random(in: 0..<1))
+        var hh = R * (0.55 + 0.25 * Double.random(in: 0..<1, using: &rng))
         if q.toBowl { hh = max(y1 - g.rim, 0) + R * (sillInBowl ? 0.9 : 0.45) }
         else if sillInBowl { hh = max(hh, y1 - g.rim + R * 0.85) }   // v2.31: inside the bowl it jumps higher, the rim eats part of it
         let vy = sqrt(2 * g0 * hh), land = q.toBowl ? g.rim : g.fl
@@ -3841,14 +3903,14 @@ final class SlimeRig {
     private func shkStir(_ a: Double) {
         guard params.shake >= 0.5, a > 0, !snwGlit.isEmpty else { return }
         if snwCloud < 0.15 && a >= 0.1 {
-            let r = Double.random(in: 0..<1)
+            let r = Double.random(in: 0..<1, using: &rng)
             snwShape = r < 0.09 ? "heart" : (r < 0.21 ? "star" : "mound")
             shkTargets(snwShape)
         }
         let pr = min(1, a * 1.6)
-        for k in snwGlit.indices where Double.random(in: 0..<1) < pr {
-            snwGlit[k].h = max(snwGlit[k].h, 0.5 + 0.5 * Double.random(in: 0..<1))
-            let rr = sqrt(Double.random(in: 0..<1)) * 0.8, th = Double.random(in: 0..<6.283)
+        for k in snwGlit.indices where Double.random(in: 0..<1, using: &rng) < pr {
+            snwGlit[k].h = max(snwGlit[k].h, 0.5 + 0.5 * Double.random(in: 0..<1, using: &rng))
+            let rr = sqrt(Double.random(in: 0..<1, using: &rng)) * 0.8, th = Double.random(in: 0..<6.283, using: &rng)
             snwGlit[k].sx = cos(th) * rr; snwGlit[k].sy = sin(th) * rr
         }
         snwCleared = false
@@ -3870,7 +3932,7 @@ final class SlimeRig {
             let k = min(2, params.shakeKick)
             var ux = dx, uy = dy
             let l = hypot(ux, uy)
-            if l < 1e-3 { ux = Double.random(in: 0..<1) < 0.5 ? -1 : 1; uy = -0.6 } else { ux /= l; uy /= l }
+            if l < 1e-3 { ux = Double.random(in: 0..<1, using: &rng) < 0.5 ? -1 : 1; uy = -0.6 } else { ux /= l; uy /= l }
             snwKick = (vx: max(-1, min(1, ux)) * R * 2.6 * k, vy: max(-1, min(0.2, uy)) * R * 0.7 * k, until: t + 0.15)
         }
     }
@@ -3968,11 +4030,13 @@ final class SlimeRig {
     private func walkLoadOnce() {
         guard !walkLoaded else { return }
         walkLoaded = true
+        guard !labNoSave else { return }
         guard let d = UserDefaults.standard.data(forKey: "nienie.walk"), let o = try? JSONDecoder().decode(WalkSave.self, from: d) else { return }
         walkItems = o.items.filter { walkKinds.contains($0.k) }
         walkBank = o.bank; walkDay = o.day; walkDayN = o.dayN; walkOpens = o.opens; walkPerm = o.perm
     }
     private func walkSave() {
+        guard !labNoSave else { return }
         let o = WalkSave(items: walkItems, bank: walkBank, day: walkDay, dayN: walkDayN, opens: walkOpens, perm: walkPerm)
         if let d = try? JSONEncoder().encode(o) { UserDefaults.standard.set(d, forKey: "nienie.walk") }
     }
@@ -4042,7 +4106,7 @@ final class SlimeRig {
         cx += dx; homeX = tx; homeY += dy; clusters[gi].xc += dx; clusters[gi].yc += dy; sillPX = 0; sillPY = 0   // the centroid moves too: the route looks at it on its first step
         sillInBowl = false; sillWant = false; sillAir = false; sillC = 1; sillLift = false; sillTanV = false
         sillGTX = 0; sillGTY = 1; sillGVX = 0; sillGVY = 1; sillSurf = rm ? "bar" : "ledge"
-        walkStuck = WalkStuck(k: walkKinds.randomElement() ?? "stone", big: big, i: walkPick(), a: Double.random(in: -0.4..<0.4), idle: 0)
+        walkStuck = WalkStuck(k: walkKinds.randomElement(using: &rng) ?? "stone", big: big, i: walkPick(), a: Double.random(in: -0.4..<0.4, using: &rng), idle: 0)
         if rm { sillPlane = .frame; sillZoom = 1; sillZTG = 1; lifeSt = .rest; lifeUntil = t + 3 }
         else { sillPlane = .out; sillZoom = 0.8; sillZTG = 0.8; sillZPX = W / 2; sillZPY = g.oy; sillOutT = t; routeStart(rtComeBack() + rtBackIn() + [.walkHops]) }
     }
@@ -4060,8 +4124,8 @@ final class SlimeRig {
         let i = q.i < N ? q.i : 0, x0 = X[i], y0 = Y[i], sx = walkSlotX(sl), ty = walkY(q.big), G = R * sillGrav * 0.6
         let h = max(R * 0.35, y0 - ty + R * 0.35), vy = -sqrt(2 * G * h)
         let T = (-vy + sqrt(max(0, vy * vy + 2 * G * (ty - y0)))) / G
-        let va = (Double.random(in: 0..<1) < 0.5 ? -1.0 : 1.0) * (3 + 3 * Double.random(in: 0..<1))
-        walkFall.append(WalkFall(k: q.k, big: q.big, s: sl, x: x0, y: y0, vx: (sx - x0) / max(0.05, T), vy: vy, a: q.a, va: va, ty: ty, G: G, b: 0, na: Double.random(in: -0.25..<0.25)))
+        let va = (Double.random(in: 0..<1, using: &rng) < 0.5 ? -1.0 : 1.0) * (3 + 3 * Double.random(in: 0..<1, using: &rng))
+        walkFall.append(WalkFall(k: q.k, big: q.big, s: sl, x: x0, y: y0, vx: (sx - x0) / max(0.05, T), vy: vy, a: q.a, va: va, ty: ty, G: G, b: 0, na: Double.random(in: -0.25..<0.25, using: &rng)))
         onEvent?(.land(gain: 0.22))
     }
     private func walkLand(_ f: WalkFall) { walkItems.append(WalkItem(k: f.k, big: f.big, s: f.s, a: f.na, gift: false)); walkSave() }
@@ -4166,34 +4230,34 @@ final class SlimeRig {
     private func startSniff(_ a: Double, _ len: Double, _ T1: Double, _ T2: Double, _ T3: Double) -> Sniff {
         cutSniffs()
         sniffSeq += 1
-        let s = Sniff(a: a, L: len, t0: t, T1: T1, T2: T2, T3: T3, ph: Double.random(in: 0..<6.283), id: sniffSeq)
+        let s = Sniff(a: a, L: len, t0: t, T1: T1, T2: T2, T3: T3, ph: Double.random(in: 0..<6.283, using: &rng), id: sniffSeq)
         sniffs.append(s)
         return s
     }
     /// Rest length: mostly 3...5 s, now and then a long stare; comfortable longer, tense shorter (lifeRest off: v2.18's 0.8...3 s).
     private func restDur() -> Double {
-        if !lv(params.lifeRest) { return 0.8 + Double.random(in: 0..<2.2) }
-        var d = 2.5 + Double.random(in: 0..<3.5)
-        if Double.random(in: 0..<1) < 0.2 { d += 5 + Double.random(in: 0..<6) }
+        if !lv(params.lifeRest) { return 0.8 + Double.random(in: 0..<2.2, using: &rng) }
+        var d = 2.5 + Double.random(in: 0..<3.5, using: &rng)
+        if Double.random(in: 0..<1, using: &rng) < 0.2 { d += 5 + Double.random(in: 0..<6, using: &rng) }
         return d * params.restMul * (1 - 0.5 * exLevel()) * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare)) * (iv2(params.impC5) ? 1 - 0.4 * impWary : 1)   // v2.20 C5: wary rests less
     }
     private func pickDir() -> Double {
-        if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6) }   // too far out: sniff back
+        if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6, using: &rng) }   // too far out: sniff back
         if iv2(params.impC5) && impHas {   // v2.20: trusting sniffs toward where you last touched it (and mostly goes), wary the other way
-            let dx = impLX - homeX, dy = impLY - homeY, d = hypot(dx, dy), ta = atan2(dy, dx), r = Double.random(in: 0..<1)
-            if d > R * 1.5 && r < 0.6 * impTrust { return ta + Double.random(in: -0.3..<0.3) }
-            if d < R * 3 && r < 0.6 * impWary { return ta + .pi + Double.random(in: -0.4..<0.4) }
+            let dx = impLX - homeX, dy = impLY - homeY, d = hypot(dx, dy), ta = atan2(dy, dx), r = Double.random(in: 0..<1, using: &rng)
+            if d > R * 1.5 && r < 0.6 * impTrust { return ta + Double.random(in: -0.3..<0.3, using: &rng) }
+            if d < R * 3 && r < 0.6 * impWary { return ta + .pi + Double.random(in: -0.4..<0.4, using: &rng) }
         }
-        return Double.random(in: 0..<(2 * .pi))
+        return Double.random(in: 0..<(2 * .pi), using: &rng)
     }
     /// Set off toward `dir` (the way it just sniffed) or, with none, anywhere (up and down at 0.8); far and fast with the `dash` chance.
     private func goStart(_ dir: Double?) {
         if sillOn { sillGo(); return }   // v2.30 窗台: it picks from what it can do there (mostly it stays)
-        let far = Double.random(in: 0..<1) < params.dash
-        let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1) : 0.2 + 0.3 * Double.random(in: 0..<1))
-        var a = dir ?? Double.random(in: 0..<(2 * .pi))
+        let far = Double.random(in: 0..<1, using: &rng) < params.dash
+        let dist = W * (far ? 0.5 + 0.4 * Double.random(in: 0..<1, using: &rng) : 0.2 + 0.3 * Double.random(in: 0..<1, using: &rng))
+        var a = dir ?? Double.random(in: 0..<(2 * .pi), using: &rng)
         let ys = dir == nil ? 0.8 : 1.0
-        if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5) }
+        if hypot(homeX - cx, homeY - cy) > W * 3 { a = atan2(cy - homeY, cx - homeX) + Double.random(in: -0.5..<0.5, using: &rng) }
         lifeSt = .go; wanderSX = homeX; wanderSY = homeY; wanderX = homeX + cos(a) * dist; wanderY = homeY + sin(a) * dist * ys; wanderMoving = true
         if lv(params.lifeGait) {
             gaitOn = true; gaitTX = wanderX; gaitTY = wanderY; gaitDash = far; gaitClimb = false; gaitPh = -1; gaitPrep = 0; gaitV = 0
@@ -4220,7 +4284,7 @@ final class SlimeRig {
         gaitSfx()
         if sillOn { if sillTanV { gaitTX = homeX } else { gaitTY = homeY; if sillRoute == nil { gaitTX = sillClampX(gaitTX) } } }   // v2.28 窗台: along the sill; v2.30 or straight up and down while it lifts itself
         let dx = gaitTX - homeX, dy = gaitTY - homeY, rem = hypot(dx, dy)
-        gaitH = atan2(dy, dx) + Double.random(in: -0.21..<0.21)   // each stroke veers a little (±12°): a curved path, speed and heading change together
+        gaitH = atan2(dy, dx) + Double.random(in: -0.21..<0.21, using: &rng)   // each stroke veers a little (±12°): a curved path, speed and heading change together
         let per = K.c / 2 + K.tau * (1 - exp(-(K.P - K.c) / K.tau))   // how far this speed profile goes per unit of peak speed
         if rem < K.sd * 1.4 && !sillLift { gaitLast = true; gaitStr = max(0.35, min(1, rem / K.sd)) } else { gaitStr = 1 }   // the last stroke is smaller (lifting itself the target is far away on purpose)
         gaitVP = gaitStr * K.sd / per
@@ -4272,7 +4336,7 @@ final class SlimeRig {
         if lv(params.lifeAttend) && !escOn && !introOn && !clusters.isEmpty && hypot(f.fx - clusters[gi].xc, f.fy - clusters[gi].yc) > R * 0.4 {
             attOn = true; attAt = t + 0.5; attX = f.fx; attY = f.fy
         }
-        lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<2)
+        lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<2, using: &rng)
     }
     private func lifeStep(_ dt: Double, _ idle: Double, _ engaged: Bool) {
         swimGreet()   // v2.23: swum home, say hello
@@ -4307,15 +4371,15 @@ final class SlimeRig {
             attOn = false
             if !engaged && !escOn && !introOn && lv(params.lifeAttend) && !clusters.isEmpty {
                 let dx = attX - clusters[gi].xc, dy = attY - clusters[gi].yc, d = hypot(dx, dy), ang = atan2(dy, dx)
-                startSniff(ang, max(0.3, min(params.podLen * 1.1, d / R - 0.6)), 0.5, 0.7 + Double.random(in: 0..<0.4), 0.6)
+                startSniff(ang, max(0.3, min(params.podLen * 1.1, d / R - 0.6)), 0.5, 0.7 + Double.random(in: 0..<0.4, using: &rng), 0.6)
                 gaitOn = false; wanderMoving = false
-                lifeSt = .look; lifeLooks = 0; lifeNoGo = true; lastDir = ang; lifeUntil = t + 1.8 + Double.random(in: 0..<0.4)
+                lifeSt = .look; lifeLooks = 0; lifeNoGo = true; lastDir = ang; lifeUntil = t + 1.8 + Double.random(in: 0..<0.4, using: &rng)
             }
         }
         // A1 deciding: rest → look (85%) or go; look sniffs once or twice → 65% go the last way sniffed, else rest; arrive → bump → rest
         let restOn = lv(params.lifeRest), canGo = params.wander > 0
         let free = idle > 0.5 && !introOn && !escOn && t > cowerUntil && !engaged
-        if lifeUntil < 0 { lifeUntil = t + (restOn ? 1.5 + Double.random(in: 0..<1) : 0.8 + Double.random(in: 0..<1)) }
+        if lifeUntil < 0 { lifeUntil = t + (restOn ? 1.5 + Double.random(in: 0..<1, using: &rng) : 0.8 + Double.random(in: 0..<1, using: &rng)) }
         if engaged || escOn || introOn {
             if gaitOn || lifeSt == .go { gaitOn = false; wanderMoving = false; lifeSt = .rest; lifeUntil = -1 }
             return
@@ -4340,16 +4404,16 @@ final class SlimeRig {
         }
         if !lured && !e4 {
             if lifeSt == .rest && t >= lifeUntil {
-                if restOn && (Double.random(in: 0..<1) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1) < 0.45 + 0.35 * exLevel() ? 2 : 1; lifeNoGo = false; lifeUntil = t }
+                if restOn && (Double.random(in: 0..<1, using: &rng) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1, using: &rng) < 0.45 + 0.35 * exLevel() ? 2 : 1; lifeNoGo = false; lifeUntil = t }
                 else if canGo { goStart(nil) } else { lifeUntil = t + restDur() }
             }
             if lifeSt == .look && t >= lifeUntil {
                 if lifeLooks > 0 {
                     lifeLooks -= 1
-                    let a = pickDir(), s = startSniff(a, params.podLen * (0.75 + 0.35 * Double.random(in: 0..<1)), 1.2, 0.5 + Double.random(in: 0..<1), 0.8)
-                    lastDir = a; lifeUntil = t + s.T1 + s.T2 + s.T3 + 0.3 + Double.random(in: 0..<0.5)
-                } else if !lifeNoGo && canGo && Double.random(in: 0..<1) < 0.65 {
-                    goStart(lastDir + Double.random(in: -0.175..<0.175))
+                    let a = pickDir(), s = startSniff(a, params.podLen * (0.75 + 0.35 * Double.random(in: 0..<1, using: &rng)), 1.2, 0.5 + Double.random(in: 0..<1, using: &rng), 0.8)
+                    lastDir = a; lifeUntil = t + s.T1 + s.T2 + s.T3 + 0.3 + Double.random(in: 0..<0.5, using: &rng)
+                } else if !lifeNoGo && canGo && Double.random(in: 0..<1, using: &rng) < 0.65 {
+                    goStart(lastDir + Double.random(in: -0.175..<0.175, using: &rng))
                 } else {
                     lifeSt = .rest; lifeUntil = t + restDur()
                 }
@@ -4858,7 +4922,7 @@ final class SlimeRig {
     private func voice(_ kind: String, _ g: Double = 0.8) {
         guard iv3(params.e1), t - voiceLast >= 0.3 else { return }
         voiceLast = t
-        onEvent?(.voice(kind: kind, gain: g, rate: (1 + 0.1 * impTrust - 0.08 * impWary) * Double.random(in: 0.96..<1.04) * params.voicePitch))
+        onEvent?(.voice(kind: kind, gain: g, rate: (1 + 0.1 * impTrust - 0.08 * impWary) * Double.random(in: 0.96..<1.04, using: &rng) * params.voicePitch))
     }
     private func firstGrab() -> Finger? { fingers.values.first { $0.mode == .grab } }
     /// E1: pulled until it wants to flee → "mm-mm"; purring → "mmm~" (once a grab each).
@@ -4883,7 +4947,7 @@ final class SlimeRig {
         let sp = hypot(g.vxS, g.vyS) / R, dx = g.fx - clusters[gi].xc, dy = g.fy - clusters[gi].yc, l = max(1e-6, hypot(dx, dy))
         if !g.pushed2 && t - g.tDown > 0.35 && sp < 0.5 && g.stretch < 0.3 && impWary < 0.4 {
             g.pushed2 = true
-            if Double.random(in: 0..<1) < 0.3 { leanT = t; leanA = atan2(dy, dx); leanS = 1; onEvent?(.nudge) }
+            if Double.random(in: 0..<1, using: &rng) < 0.3 { leanT = t; leanA = atan2(dy, dx); leanS = 1; onEvent?(.nudge) }
         }
         // tickling: the finger at 1.5R/s or more turning back by more than 120°, tickRev times within a second
         // v2.24 tickSeg: a leg longer than this is rubbing, not tickling (the travel between turns: the speed is smoothed, the turn is seen late and two points would measure short)
@@ -4934,7 +4998,7 @@ final class SlimeRig {
     private func e4Step(_ dt: Double) -> Bool {
         guard iv3(params.e4), !clusters.isEmpty else { e4On = false; return false }
         if !e4On {
-            if e4Wait < 0 { e4Wait = (10 + Double.random(in: 0..<10)) * params.e4Mul }
+            if e4Wait < 0 { e4Wait = (10 + Double.random(in: 0..<10, using: &rng)) * params.e4Mul }
             guard impTrust > 0.5, Double(e4Count) < 3 + (2 * exLevel()).rounded(), t - lastTouch > e4Wait, t - e4LastT > 40, fingers.isEmpty, lifeSt == .rest else { return false }
             let q = toWorld(W / 2, viewV.y + H * 0.12), dx = q.x - clusters[gi].xc, dy = q.y - clusters[gi].yc, d = hypot(dx, dy)
             e4On = true; e4Wave = false; e4T0 = t
@@ -4992,9 +5056,9 @@ final class SlimeRig {
         else if let s = sniffs.last, !(s.cut > 0) { o = (cos(s.a), sin(s.a)) }
         if o == nil {
             if t >= eyeSacT {
-                eyeSacT = t + 1.2 + Double.random(in: 0..<2.8)
-                if Double.random(in: 0..<1) < 0.45 + 0.15 * exLevel() { eyeSX = 0; eyeSY = 0 }
-                else { let a = Double.random(in: 0..<(2 * .pi)), k = (0.5 + Double.random(in: 0..<0.5)) * (params.gazeAmp > 0.1 ? 0.5 : 1); eyeSX = cos(a) * k; eyeSY = sin(a) * k * 0.7 }   // v2.24: idle glances do not grow with gazeAmp
+                eyeSacT = t + 1.2 + Double.random(in: 0..<2.8, using: &rng)
+                if Double.random(in: 0..<1, using: &rng) < 0.45 + 0.15 * exLevel() { eyeSX = 0; eyeSY = 0 }
+                else { let a = Double.random(in: 0..<(2 * .pi), using: &rng), k = (0.5 + Double.random(in: 0..<0.5, using: &rng)) * (params.gazeAmp > 0.1 ? 0.5 : 1); eyeSX = cos(a) * k; eyeSY = sin(a) * k * 0.7 }   // v2.24: idle glances do not grow with gazeAmp
             }
             o = (eyeSX, eyeSY)
         }
@@ -5032,7 +5096,7 @@ final class SlimeRig {
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
         if impWary > 0.5 || moodScare > 0.3 || t - slpWakeT < 0.8 { wide = 1.18 }
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
-        if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4)) * (1 - 0.3 * exLevel())) }
+        if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
         eyeBlink = u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1)))
         let k = 1 - exp(-dt / 0.05)
@@ -5129,7 +5193,7 @@ final class SlimeRig {
     /// Awake again: sharp (touched) it flinches 1.6× and opens wide; gently (a finger beside it) it just opens; then "mm?".
     private func wake(_ sharp: Bool) {
         guard slpOn else { return }
-        slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1); eyeBlinkT = t
+        slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1, using: &rng); eyeBlinkT = t
         if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
         slpAskAt = t + (sharp ? 0.45 : 0.3)
     }
@@ -5140,8 +5204,8 @@ final class SlimeRig {
         if slpK < 1e-3 && !slpOn { slpK = 0 }
         // v2.50 sleeping breaths, one every 4 to 7 s
         if slpOn && slpK > 0.8 {
-            if slpSnoreAt <= 0 { slpSnoreAt = t + 1 + Double.random(in: 0..<2) }
-            else if t >= slpSnoreAt { slpSnoreAt = t + 4 + Double.random(in: 0..<3); onEvent?(.fx(kind: "snore", gain: 0.5, delay: 0)) }
+            if slpSnoreAt <= 0 { slpSnoreAt = t + 1 + Double.random(in: 0..<2, using: &rng) }
+            else if t >= slpSnoreAt { slpSnoreAt = t + 4 + Double.random(in: 0..<3, using: &rng); onEvent?(.fx(kind: "snore", gain: 0.5, delay: 0)) }
         } else { slpSnoreAt = 0 }
         if slpAskAt > 0 && t >= slpAskAt { slpAskAt = -9; voiceLast = -9; voice("ask", 0.6); eyeUser = t + 1.2 }
     }
@@ -5183,7 +5247,7 @@ final class SlimeRig {
         } else if echoSt == 2 {
             while echoI < echoBeats.count && t >= echoT0 + echoBeats[echoI] { echoBeat(echoI); echoI += 1 }
             if echoI >= echoBeats.count && t > echoT0 + (echoBeats.last ?? 0) + 0.4 {
-                echoSt = 0; eyeUser = t + 1.5; lifeSt = .rest; lifeUntil = t + 2 + Double.random(in: 0..<1)
+                echoSt = 0; eyeUser = t + 1.5; lifeSt = .rest; lifeUntil = t + 2 + Double.random(in: 0..<1, using: &rng)
                 if echoSame {
                     echoJoyUntil = t + 1.6; wagT = t; voiceLast = -9; voice("happy")
                     if params.imp >= 0.5 { impTrust = min(1, impTrust + 0.08 * params.trRate) }
@@ -5208,15 +5272,129 @@ final class SlimeRig {
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
     private func twitch(_ L: Double) {
         if t < nextTwitch { return }
-        nextTwitch = t + 2.2 + Double.random(in: 0..<4.5)
+        nextTwitch = t + 2.2 + Double.random(in: 0..<4.5, using: &rng)
         if L < 0.5 || params.life <= 0 || lv(params.lifeRest) { return }   // v2.19 A1: no causeless twitches
         let amp = R * 0.0012 * params.life * (reduceMotion ? 0.5 : 1)   // per-substep displacement = velocity
-        let whole = Double.random(in: 0..<1) < 0.25
-        let c = whole ? clusters[gi] : clusters[Int.random(in: 0..<max(1, clusters.count - 1))]
-        let a = Double.random(in: 0..<(2 * .pi)), s = whole ? 0.6 : 1.0
+        let whole = Double.random(in: 0..<1, using: &rng) < 0.25
+        let c = whole ? clusters[gi] : clusters[Int.random(in: 0..<max(1, clusters.count - 1), using: &rng)]
+        let a = Double.random(in: 0..<(2 * .pi), using: &rng), s = whole ? 0.6 : 1.0
         let ix = cos(a) * amp * s, iy = sin(a) * amp * s
         for i in c.idx where !GRAB[i] { PX[i] -= ix; PY[i] -= iy }
     }
+
+    // MARK: - v2.52 A5 保險計數與量測讀數 (《虛擬手感》3-3 第 8、9 欄). Web: GRD, and what fuzz.js measures.
+
+    /// How often each guard acted, in display frames. While a guard acts the body is not moving by its material numbers, so it is counted.
+    /// hi: a bit of the mesh at its upper stretch limit; lo: at its lower one (squeezed; often on while it sits on the sill or is pressed into
+    /// itself); flip: the no-flip guard; give: the finger gave way. giveMax: the farthest the finger's effective position has given (radii);
+    /// givePull: how far it gave while pulling outward (the rule is 0: it may give only pushing into the body or into a wall, 3-3 鏈五).
+    struct GuardStats: Equatable {
+        var frames = 0, hi = 0, lo = 0, flip = 0, give = 0
+        var giveMax = 0.0, givePull = 0.0
+        func pct(_ n: Int) -> Double { frames > 0 ? (1000.0 * Double(n) / Double(frames)).rounded() / 10 : 0 }
+    }
+    private(set) var guardStats = GuardStats()
+    private var grdHi = false, grdLo = false, grdFlip = false, grdGive = false
+    func guardReset() { guardStats = GuardStats(); grdHi = false; grdLo = false; grdFlip = false; grdGive = false }
+    /// At the start of each update: last frame's flags go into the counts.
+    private func guardFold() {
+        guardStats.frames += 1
+        if grdHi { guardStats.hi += 1 }
+        if grdLo { guardStats.lo += 1 }
+        if grdFlip { guardStats.flip += 1 }
+        if grdGive { guardStats.give += 1 }
+        grdHi = false; grdLo = false; grdFlip = false; grdGive = false
+        guard !clusters.isEmpty else { return }
+        let c = clusters[gi]
+        for f in fingers.values where f.mode == .grab && (f.slx != 0 || f.sly != 0) {
+            let l: Double = hypot(f.slx, f.sly) / R
+            if l > guardStats.giveMax { guardStats.giveMax = l }
+            let ox: Double = f.x - c.xc, oy: Double = f.y - c.yc, ol: Double = hypot(ox, oy)
+            if ol > R * 1.2 && hypot(f.x - f.ax, f.y - f.ay) > R * 0.5 && (f.x - f.ax) * ox + (f.y - f.ay) * oy > 0 {
+                let back: Double = -(f.slx * ox + f.sly * oy) / ol / R
+                if back > guardStats.givePull { guardStats.givePull = back }
+            }
+        }
+    }
+
+    /// What the fuzz test reads each frame (the same measures as the web's fuzz.js).
+    struct LabShape {
+        var flips = 0          // triangles really turned over: area below −2% of rest (pressed flat on the sill, area 0, does not count)
+        var memFlips = 0       // the same in the remembered shape
+        var strain = 0.0       // the longest mesh edge, times its rest length
+        var memStrain = 0.0
+        var nan = 0
+    }
+    func labShape() -> LabShape {
+        var o = LabShape()
+        var k = 0, q = 0
+        while k + 2 < TRI.count, q < TRA.count {
+            let a = TRI[k], b = TRI[k + 1], c = TRI[k + 2], lim: Double = -0.02 * TRA[q]
+            if 0.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < lim { o.flips += 1 }
+            if 0.5 * ((QX[b] - QX[a]) * (QY[c] - QY[a]) - (QY[b] - QY[a]) * (QX[c] - QX[a])) < lim { o.memFlips += 1 }
+            k += 3; q += 1
+        }
+        var e = 0, j = 0
+        while e + 1 < EDG.count, j < EDL.count {
+            let a = EDG[e], b = EDG[e + 1], r: Double = EDL[j]
+            let l: Double = hypot(X[a] - X[b], Y[a] - Y[b]) / r, lq: Double = hypot(QX[a] - QX[b], QY[a] - QY[b]) / r
+            if l > o.strain { o.strain = l }
+            if lq > o.memStrain { o.memStrain = lq }
+            e += 2; j += 1
+        }
+        for i in 0..<N where !X[i].isFinite || !Y[i].isFinite { o.nan += 1 }
+        return o
+    }
+    /// Where the turned-over triangles are, from the body's centre in radii (x right, y down), with each one's rest area as a share of the
+    /// mean triangle: tells a thin sliver in the rest mesh from a real fold.
+    func labFlipSites() -> [(x: Double, y: Double, rest: Double)] {
+        guard !clusters.isEmpty, !TRA.isEmpty else { return [] }
+        let c = clusters[gi], mean: Double = TRA.reduce(0, +) / Double(TRA.count)
+        var out: [(x: Double, y: Double, rest: Double)] = []
+        var k = 0, q = 0
+        while k + 2 < TRI.count, q < TRA.count {
+            let a = TRI[k], b = TRI[k + 1], d = TRI[k + 2]
+            if 0.5 * ((X[b] - X[a]) * (Y[d] - Y[a]) - (Y[b] - Y[a]) * (X[d] - X[a])) < -0.02 * TRA[q] {
+                out.append(((X[a] + X[b] + X[d]) / 3 - c.xc, (Y[a] + Y[b] + Y[d]) / 3 - c.yc, TRA[q] / mean))
+            }
+            k += 3; q += 1
+        }
+        return out.map { ($0.x / R, $0.y / R, $0.rest) }
+    }
+    /// The outline's sharpest corner in degrees (180 is a fold) and how many corners are past 75°.
+    func labSharp() -> (max: Double, spikes: Int) {
+        let n = bnd.count
+        guard n >= 3 else { return (0, 0) }
+        var m = 0.0, cnt = 0
+        for i in 0..<n {
+            let a = bnd[(i + n - 1) % n], b = bnd[i], c = bnd[(i + 1) % n]
+            let ux: Double = X[b] - X[a], uy: Double = Y[b] - Y[a], vx: Double = X[c] - X[b], vy: Double = Y[c] - Y[b]
+            let an: Double = abs(atan2(ux * vy - uy * vx, ux * vx + uy * vy)) * 180 / .pi
+            if an > m { m = an }
+            if an > 75 { cnt += 1 }
+        }
+        return (m, cnt)
+    }
+    /// Does the outline cross itself anywhere (web selfX > 0).
+    func labCrossed() -> Bool { ringCrossed() }
+    /// The particles' positions (a copy), the body's centre and radius: the fuzz test takes its jitter and picks its grab points from these.
+    func labParticles() -> (x: [Double], y: [Double]) { (X, Y) }
+    var labCentre: (x: Double, y: Double) { clusters.isEmpty ? (cx, cy) : (clusters[gi].xc, clusters[gi].yc) }
+    var labRadius: Double { R }
+
+    // MARK: - v2.52 C1 細絲、C2 水的呼吸: what the skin needs to know
+
+    /// 0...1: how near the most-stretched grabbing finger is to the effective stretch limit, 0 up to 60% of it and 1 at the limit.
+    /// With `thin` on the skin's rounding shrinks by it (多米 11-22 決定 6: the rounding hid a thinning strand of body). Web: jelRound().
+    var thinLevel: Double {
+        guard params.thin >= 0.5 else { return 0 }
+        let lim: Double = max(0.01, effParams.maxPull)
+        var s = 0.0
+        for f in fingers.values where f.mode == .grab { s = max(s, f.stretch / lim) }
+        return s > 0.6 ? min(1, (s - 0.6) / 0.4) : 0
+    }
+    /// −1...1 with its breath; the skin bends what is seen through it by this (C2, `wbreath`). Web: jelBreath().
+    var breathWave: Double { sin(2 * .pi * brPhase) }
 
     // MARK: - Readouts for sound and haptics
 

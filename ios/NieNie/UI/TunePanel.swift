@@ -6,14 +6,20 @@ import SwiftUI
 struct TunePanel: View {
     @EnvironmentObject var controller: SlimeController
     @Binding var isPresented: Bool
+    /// v2.52 B7: the App Store's build has no 調 button; the desk opens from here
+    var openFeel: () -> Void = {}
     @State private var copied = false
 
     var body: some View {
+        let eff = controller.feelEffective   // v2.52 A2: what the physics really uses, next to a slider something overrides
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("調整面板").font(.rounded(17, .heavy))
                 Text("\(controller.slime.name)・\(controller.material.name)").font(.rounded(13)).foregroundStyle(Palette.inkSoft)
                 Spacer()
+                Button("手感調節台") { openFeel() }
+                    .font(.rounded(13))
+                    .foregroundStyle(Palette.inkSoft)
                 Button("收起") { isPresented = false }
                     .font(.rounded(13))
                     .foregroundStyle(Palette.inkSoft)
@@ -23,7 +29,7 @@ struct TunePanel: View {
             Text(controller.hudText)
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(Palette.inkSoft)
-                .lineLimit(2)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
 
             // blind test: save the current numbers as 1 or 2, then switch by number only
@@ -107,6 +113,9 @@ struct TunePanel: View {
                                 Slider(value: value, in: f.range, step: f.step)
                                     .tint(Palette.ink)
                                     .accessibilityLabel(f.name)
+                                if let note = eff.note(f.key) {
+                                    Text(note).font(.rounded(11.5, .heavy)).foregroundStyle(Color(red: 0.70, green: 0.33, blue: 0.08))
+                                }
                             }
                         }
                     }

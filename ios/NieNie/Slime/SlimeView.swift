@@ -15,6 +15,9 @@ final class SlimeView: UIView {
         var maxFrameMs = 0.0    // longest frame in the last second
         var dropped = 0         // frames longer than 1.5× the display's frame interval, last second
         var workMs = 0.0        // physics + sound/haptics + drawing on the main thread, average, last second
+        var physMs = 0.0        // v2.52 A5: the physics alone (rig.update), average, last second
+        var physMaxMs = 0.0     // ...and its longest frame
+        var decoMs = 0.0        // v2.52 C3: drawing the moving things into the room behind the body, average, last second
         var touchRadius = 0.0   // UITouch.majorRadius of the finger down, points
     }
     var onStats: ((FrameStats) -> Void)?
@@ -23,7 +26,22 @@ final class SlimeView: UIView {
     var latencyTest = false
     private let flashLayer = CALayer()
     private var flashFrames = 0
-    private var frameLog: [(time: CFTimeInterval, dt: Double, work: Double, dropped: Bool)] = []
+    private var frameLog: [(time: CFTimeInterval, dt: Double, work: Double, phys: Double, deco: Double, dropped: Bool)] = []
+    // v2.52 量測 (《虛擬手感》3-2 灰盒與純圓, 3-5 C4): set from the feel desk's 量測 group, never saved
+    /// 灰盒: one flat grey, no eyes, no shadow, the things from its walks put away. The rig's numbers are grey-boxed by the controller (FeelParams.greyBox).
+    var labGrey = false { didSet { if labGrey != oldValue { applyColors() } } }
+    /// 純圓: a 2 cm disc whose centre is the finger, nothing handed to the body. Dragged along a ruler it shows the system's own lag (跟手基準的 C).
+    var labCircle = false { didSet { if !labCircle { circleLayer.isHidden = true } } }
+    /// 圖層: the skin's layers switched off one at a time, to read each one's cost off the frame readout
+    var labLayersOff: Set<String> = [] { didSet { tintKey = .min } }
+    private let circleLayer = CAShapeLayer()
+    private let gooFlatLayer = CAShapeLayer()   // the strand and the small blob for the flat skin (the jelly skin takes them into its mask)
+    private var thinK = 0.0                     // C1 細絲: the rounding's shrink, eased
+    private var frameDt = 1.0 / 60              // this frame's length, for that easing
+    private var bellImage: CGImage?, teruImage: CGImage?   // C3: the two hanging things, to draw into what is seen through the body
+    private var backSprites: [SlimeRig.WalkSprite] = []    // ...and what it brought back, as placed this frame
+    private var decoCost = 0.0                             // seconds spent this frame drawing them into the room behind the body
+    private static let greyColors = SlimeColors(base: UIColor(hex: 0x8D949B), shade: UIColor(hex: 0x8D949B), line: UIColor(hex: 0x8D949B), light: UIColor(hex: 0x8D949B), eye: UIColor(hex: 0x8D949B))
     private var lastStatsTime: CFTimeInterval = 0
 
     private var link: CADisplayLink?
@@ -95,6 +113,8 @@ final class SlimeView: UIView {
         shadowLayer.fillColor = UIColor(red: 60 / 255, green: 90 / 255, blue: 40 / 255, alpha: 0.18).cgColor
         layer.addSublayer(shadowLayer)
         layer.addSublayer(shadeLayer)
+        gooFlatLayer.isHidden = true
+        layer.addSublayer(gooFlatLayer)
         litGroup.mask = litMask
         layer.addSublayer(litGroup)
         litGroup.addSublayer(baseLayer)
@@ -143,6 +163,10 @@ final class SlimeView: UIView {
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
         layer.addSublayer(flashLayer)
+        circleLayer.fillColor = UIColor(red: 20 / 255, green: 24 / 255, blue: 28 / 255, alpha: 0.85).cgColor
+        circleLayer.path = CGPath(ellipseIn: CGRect(x: -62, y: -62, width: 124, height: 124), transform: nil)   // 2 cm across at 163 points an inch
+        circleLayer.zPosition = 5; circleLayer.isHidden = true
+        layer.addSublayer(circleLayer)
         applyColors()
 
         isAccessibilityElement = true
@@ -172,6 +196,8 @@ final class SlimeView: UIView {
         } else {
             CATransaction.setDisableActions(true)
         }
+        let colors = labGrey ? Self.greyColors : self.colors   // v2.52 灰盒
+        gooFlatLayer.fillColor = colors.shade.cgColor
         shadeLayer.fillColor = colors.shade.cgColor
         baseLayer.fillColor = colors.base.cgColor
         dentShadeLayer.fillColor = colors.shade.cgColor
@@ -195,6 +221,7 @@ final class SlimeView: UIView {
 
     /// v2.22 E3: trusting leans warm, wary leans pale, inside the same two flat colours (the style stays).
     private func tinted(_ c: UIColor, _ tr: Double, _ w: Double, shade: Bool = false) -> UIColor {
+        if labLayersOff.contains("mood") { return c }   // v2.52 C4
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         c.getRed(&r, green: &g, blue: &b, alpha: &a)
         var rr = min(255, Double(r) * 255 + 22 * tr), gg = min(255, Double(g) * 255 + 4 * tr), bb = max(0, Double(b) * 255 - 18 * tr)
@@ -260,6 +287,17 @@ final class SlimeView: UIView {
         p.y > safeAreaInsets.top + edgeBand && p.y < bounds.height - safeAreaInsets.bottom - edgeBand
     }
 
+    /// v2.52 純圓: the disc goes to the newest sample at once, in the touch handler itself (no physics, no smoothing, no prediction)
+    private func circleFollow(_ touches: Set<UITouch>, with event: UIEvent?, down: Bool) {
+        guard let t = touches.first else { return }
+        let p = (event?.coalescedTouches(for: t)?.last ?? t).location(in: self)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        circleLayer.position = p
+        circleLayer.isHidden = !down
+        CATransaction.commit()
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         touchesDown += touches.count
         setFrameRate(120)
@@ -271,6 +309,7 @@ final class SlimeView: UIView {
             flashFrames = 0
             CATransaction.commit()
         }
+        if labCircle { circleFollow(touches, with: event, down: true); return }
         for t in touches {
             let p = t.location(in: self)
             rig.touchBegan(ObjectIdentifier(t), x: Double(p.x), y: Double(p.y), time: t.timestamp,
@@ -279,6 +318,7 @@ final class SlimeView: UIView {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if labCircle { circleFollow(touches, with: event, down: true); return }
         for t in touches {
             // coalesced samples: true travelled distance at the digitizer rate
             let samples = event?.coalescedTouches(for: t) ?? [t]
@@ -302,6 +342,7 @@ final class SlimeView: UIView {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if labCircle { circleFollow(touches, with: event, down: false) }
         for t in touches { rig.touchEnded(ObjectIdentifier(t), time: t.timestamp) }
         touchesDown = max(0, touchesDown - touches.count)
         lastTouchEnd = CACurrentMediaTime()
@@ -309,6 +350,7 @@ final class SlimeView: UIView {
 
     /// The system took the touch (edge gesture, call, app switch): let go without the release pop.
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if labCircle { circleFollow(touches, with: event, down: false) }
         for t in touches { rig.touchCancelled(ObjectIdentifier(t)) }
         touchesDown = max(0, touchesDown - touches.count)
         lastTouchEnd = CACurrentMediaTime()
@@ -344,13 +386,15 @@ final class SlimeView: UIView {
                 flashFrames += 1
             }
         }
+        frameDt = dt
         let t0 = CACurrentMediaTime()
         rig.update(dt)
+        let phys = CACurrentMediaTime() - t0
         onFrame?(dt)
         redraw()
         let work = CACurrentMediaTime() - t0
         // frame readout over a one-second window
-        frameLog.append((time: now, dt: dt, work: work, dropped: dt > nominal * 1.5))
+        frameLog.append((time: now, dt: dt, work: work, phys: phys, deco: decoCost, dropped: dt > nominal * 1.5))
         while let first = frameLog.first, now - first.time > 1 { frameLog.removeFirst() }
         if now - lastStatsTime > 0.5, let onStats, let first = frameLog.first {
             lastStatsTime = now
@@ -359,6 +403,9 @@ final class SlimeView: UIView {
             s.maxFrameMs = (frameLog.map { $0.dt }.max() ?? 0) * 1000
             s.dropped = frameLog.filter { $0.dropped }.count
             s.workMs = frameLog.map { $0.work }.reduce(0, +) / Double(frameLog.count) * 1000
+            s.physMs = frameLog.map { $0.phys }.reduce(0, +) / Double(frameLog.count) * 1000
+            s.physMaxMs = (frameLog.map { $0.phys }.max() ?? 0) * 1000
+            s.decoMs = frameLog.map { $0.deco }.reduce(0, +) / Double(frameLog.count) * 1000
             s.touchRadius = rig.maxTouchRadius
             onStats(s)
         }
@@ -473,6 +520,7 @@ final class SlimeView: UIView {
             jelly?.setBackground(key: key, images: [imgs.sky.cgImage, imgs.wall.cgImage, imgs.props.cgImage].compactMap { $0 })   // v2.49: the room behind it, for the water skin to bend
             bowlFrontLayer.contents = imgs.bowlFront.cgImage
             bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
+            bellImage = imgs.bell?.cgImage; teruImage = imgs.teru?.cgImage
             for (l, im, x, w0) in [(bellLayer, imgs.bell, g.jr - 46 * g.U, 50.0), (teruLayer, imgs.teru, g.gx + 46 * g.U, 54.0)] {
                 l.contents = im?.cgImage
                 guard let im else { continue }
@@ -498,8 +546,10 @@ final class SlimeView: UIView {
         bellLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.decoSwing(0.22)))
         teruLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.decoSwing(0.06)))
         let night = kind == 2
-        place(rig.walkBackSprites, in: &itemLayers, group: itemsGroup, world: false, night: night)
+        backSprites = rig.walkBackSprites
+        place(backSprites, in: &itemLayers, group: itemsGroup, world: false, night: night)
         place(rig.walkWorldSprites, in: &stuckLayers, group: stuckGroup, world: true, night: night)
+        if labGrey { itemsGroup.isHidden = true; stuckGroup.isHidden = true }   // v2.52 灰盒: only the room stays
     }
     private func place(_ sprites: [SlimeRig.WalkSprite], in pool: inout [CALayer], group: CALayer, world: Bool, night: Bool) {
         while pool.count < sprites.count && pool.count < 16 {
@@ -524,7 +574,7 @@ final class SlimeView: UIView {
     /// v2.49 看得出是水: the bubbles inside it and the gathered light under it (web: drawBubbles, drawCaustic). Core Animation layers, no implicit animation (the caller's transaction turns it off).
     private func drawWater(body: CGPath, z: Double) {
         let p = rig.params, on = p.water > 0 && p.wet >= 0.5
-        let bubs = on ? rig.bubbleView : []
+        let bubs = on && !labLayersOff.contains("bubbles") ? rig.bubbleView : []
         if bubs.isEmpty { bubbleRing.isHidden = true; bubbleDot.isHidden = true } else {
             let ring = CGMutablePath(), dot = CGMutablePath()
             var lw = 0.6
@@ -539,7 +589,7 @@ final class SlimeView: UIView {
             bubbleRing.isHidden = false; bubbleDot.isHidden = false
         }
         let box = body.boundingBoxOfPath
-        if on && p.caustic > 0 && rig.restsOnSill && !box.isNull && box.width > 1 {
+        if on && p.caustic > 0 && !labLayersOff.contains("caustic") && rig.restsOnSill && !box.isNull && box.width > 1 {
             let w = Double(box.width) * 0.5, cx = Double(box.midX), by = Double(box.maxY), R = rig.R * z, k = Float(min(1.5, p.caustic))
             causticShade.bounds = CGRect(x: 0, y: 0, width: w * 2.1, height: R * 0.17); causticShade.position = CGPoint(x: cx, y: by - R * 0.015); causticShade.opacity = min(1, k)
             causticLight.bounds = CGRect(x: 0, y: 0, width: w * 1.24, height: R * 0.10); causticLight.position = CGPoint(x: cx + w * 0.22, y: by - R * 0.01); causticLight.opacity = min(1, k)
@@ -549,25 +599,10 @@ final class SlimeView: UIView {
     /// v2.28 果凍皮: the Metal skin instead of the flat fill, outline, highlight, dents and trail (those stay for the flat control); the blush under the eyes.
     private func drawJelly(body: CGPath, z: Double) {
         let on = jellyOn
+        decoCost = 0
         shadeLayer.isHidden = on; baseLayer.isHidden = on; highlightLayer.isHidden = on; outlineLayer.isHidden = on
         dentShadeLayer.isHidden = on || dentShadeLayer.isHidden; dentLitLayer.isHidden = on || dentLitLayer.isHidden
         if on { for l in dentLayers { l.isHidden = true }; for l in trailLayers { l.isHidden = true } }
-        guard on, let j = jelly else {
-            jelly?.layer.isHidden = true
-            for l in blushLayers { l.isHidden = true }
-            for l in [bubbleRing, bubbleDot, causticShade, causticLight] as [CALayer] { l.isHidden = true }
-            return
-        }
-        j.layer.isHidden = false
-        let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
-        let R = rig.R * z
-        let dents = rig.dents.compactMap { d -> JellySkin.Dent? in
-            let r = rig.R * rig.params.dentSize * d.d
-            guard r >= 0.5 else { return nil }
-            let p = rig.toScreen(d.x, d.y)
-            return JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(r * z * 1.2), d: Float(min(1, d.d)))
-        }
-        let hz = rig.haze
         // v2.51: the strand and the small blob go into the same mask, so the skin lights them as one body
         var extra: [CGPath] = []
         let gv = rig.gooView
@@ -580,10 +615,60 @@ final class SlimeView: UIView {
             let c = rig.toScreen(b.x, b.y)
             extra.append(CGPath(ellipseIn: CGRect(x: Double(c.x) - b.rx * z, y: Double(c.y) - b.ry * z, width: b.rx * 2 * z, height: b.ry * 2 * z), transform: nil))
         }
+        // v2.52: the flat skin (phones without Metal, and the grey box) draws them too, in the shade colour; before, a strand there could not be seen
+        if on || extra.isEmpty { gooFlatLayer.isHidden = true } else {
+            let all = CGMutablePath()
+            for e in extra { all.addPath(e) }
+            gooFlatLayer.path = all; gooFlatLayer.isHidden = false
+        }
+        guard on, let j = jelly else {
+            jelly?.layer.isHidden = true
+            for l in blushLayers { l.isHidden = true }
+            for l in [bubbleRing, bubbleDot, causticShade, causticLight] as [CALayer] { l.isHidden = true }
+            return
+        }
+        j.layer.isHidden = false
+        let off = labLayersOff, moodOff = off.contains("mood")
+        let tr = rig.showsImpression && !moodOff ? rig.impShownTrust : 0, w = rig.showsImpression && !moodOff ? rig.impShownWary : 0
+        let R = rig.R * z
+        let dents = off.contains("dent") ? [] : rig.dents.compactMap { d -> JellySkin.Dent? in
+            let r = rig.R * rig.params.dentSize * d.d
+            guard r >= 0.5 else { return nil }
+            let p = rig.toScreen(d.x, d.y)
+            return JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(r * z * 1.2), d: Float(min(1, d.d)))
+        }
+        let hz = rig.haze
+        let p = rig.params
+        // C1 細絲 (多米 11-22 決定 6): the rounding hides a strand of body thinner than about 0.1R; with `thin` on it shrinks as the pull nears its limit
+        thinK += (rig.thinLevel - thinK) * (1 - pow(0.8, frameDt * 60))   // the web eases by a fifth each 60 Hz frame
+        let round: Double = off.contains("round") ? 0 : p.round * (1 - 0.7 * thinK)
+        // C2 水的呼吸 (決定 7): still, the refraction was static (glass, not water; Kawabe 2015); with `wbreath` on it follows its breath, ±12% (half with Reduce Motion)
+        let refr: Double = p.refr * (p.wbreath >= 0.5 ? 1 + (rig.reduceMotion ? 0.06 : 0.12) * rig.breathWave : 1)
+        var skin = JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: p.wet >= 0.5)
+        if off.contains("shade") { skin.amb = 1; skin.dif = 0 }
+        // C3 (決定 8): what moves behind it shows through it too
+        let t0 = CACurrentMediaTime()
+        if p.decoThru >= 0.5 && p.water > 0 && !off.contains("refr") && rig.sillPlane == .room && !labGrey {
+            var sprites: [JellySkin.Sprite] = []
+            if let im = bellImage, !bellLayer.isHidden {
+                sprites.append(JellySkin.Sprite(image: im, x: Double(bellLayer.position.x), y: Double(bellLayer.position.y), w: Double(bellLayer.bounds.width), h: Double(bellLayer.bounds.height), anchorY: 0, angle: rig.decoSwing(0.22), alpha: 1))
+            }
+            if let im = teruImage, !teruLayer.isHidden {
+                sprites.append(JellySkin.Sprite(image: im, x: Double(teruLayer.position.x), y: Double(teruLayer.position.y), w: Double(teruLayer.bounds.width), h: Double(teruLayer.bounds.height), anchorY: 0, angle: rig.decoSwing(0.06), alpha: 1))
+            }
+            let night = rig.sceneKind == 2
+            for sp in backSprites {
+                guard let im = SceneArt.sprite(sp.kind, night: night).cgImage else { continue }
+                let sz: Double = (sp.big ? 30 : 22) * 1.05
+                sprites.append(JellySkin.Sprite(image: im, x: sp.x, y: sp.y, w: sz, h: sz, anchorY: 0.5, angle: sp.a, alpha: sp.alpha))
+            }
+            j.setDynamic(sprites, around: body.boundingBoxOfPath.insetBy(dx: -R * 0.7, dy: -R * 0.7))
+        } else { j.setDynamic([], around: .null) }
+        decoCost = CACurrentMediaTime() - t0
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
-                 skin: JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: rig.params.wet >= 0.5), round: rig.params.round,
-                 water: rig.params.water, refr: rig.params.refr, absorb: rig.params.absorb,
-                 shine: rig.params.shine, opaque: rig.params.opaque, extra: extra)
+                 skin: skin, round: round,
+                 water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
+                 shine: p.shine, opaque: p.opaque, extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"))
         drawWater(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
         if let e = rig.eyeView {
@@ -699,7 +784,7 @@ final class SlimeView: UIView {
 
         // floating: a soft shadow under the lowest point, fainter the higher it hangs. v2.19 A8: none (it floats and walks every way;
         // a shadow said up was flying one moment and the floor moved along the next)
-        let noShadow = rig.params.life2 >= 0.5 && rig.params.shadow < 0.5
+        let noShadow = (rig.params.life2 >= 0.5 && rig.params.shadow < 0.5) || labGrey   // v2.52 灰盒: no shadow
         shadowLayer.isHidden = noShadow
         if !noShadow {
             let sw = (maxX - minX) * 0.5
@@ -821,7 +906,7 @@ final class SlimeView: UIView {
         let tkImp: Int = rig.showsImpression ? q40(rig.impShownTrust) * 100 + q40(rig.impShownWary) : -1
         let tkMood: Int = moodOn ? (q40(rig.mcC) + q40(rig.mcS) * 41 + q40(rig.mcW) * 1681 + q40(rig.mcZ) * 68921 + 1) * 10000 : 0
         let tk: Int = tkImp + tkMood
-        if tk != tintKey {
+        if tk != tintKey && !labGrey {
             tintKey = tk
             let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
             let sh = tinted(colors.shade, tr, w, shade: true).cgColor, ba = tinted(colors.base, tr, w).cgColor
