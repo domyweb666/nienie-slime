@@ -1676,7 +1676,7 @@
     res.PASS.homeFloor = r.on.every(o => o.low <= 3 && o.xs === 0 && o.nan === 0) && r.off.some(o => o.low >= 20); }
   // T67 v2.56 補點後站穩（remeshCalm，11-23）。v2.55 之後拉長按住，補點那一刻換了一批點，之後十來幀身體各處來回彈（拉 3R 按住，補點後 12 幀每幀跳 8 到 10 點）。
   // 用真正的預設值、T66 的拉法往上拉 2.5R、3R、3.5R 按住 3 秒，量 T61 的跳動（扣掉整團平移後每顆粒子一幀的速度變化，補點那一幀粒子換了不算）：
-  // 開著每個距離平均不超過 3.5、三個加起來不到 remeshCalm 0 的 0.85 倍；放手 2 秒後身體長度不比關掉短一成以上（站穩不能吃掉拉長）、沒有 NaN、外框不交叉
+  // 開著每個距離平均不超過 5（v2.55 量過到 11；同一個距離跑跑之間 1.9 到 4.4，雜訊大）、三個加起來不到 remeshCalm 0 的 0.85 倍；放手 2 秒後身體長度不比關掉短一成以上（站穩不能吃掉拉長）、沒有 NaN、外框不交叉
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
     const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };
     const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
@@ -1694,7 +1694,7 @@
     res.T67_remeshCalm = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
     const sum = a => a.reduce((s, o) => s + o.mean, 0);
-    res.PASS.remeshCalm = r.on.every((o, k) => o.mean <= 3.5 && o.nan === 0 && o.selfX === 0 && o.rel >= .9 * r.off[k].rel) && sum(r.on) < .85 * sum(r.off) && r.on.some(o => o.remesh > 0);
+    res.PASS.remeshCalm = r.on.every((o, k) => o.mean <= 5 && o.nan === 0 && o.selfX === 0 && o.rel >= .9 * r.off[k].rel) && sum(r.on) < .85 * sum(r.off) && r.on.some(o => o.remesh > 0);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
