@@ -287,6 +287,8 @@ struct FeelParams: Equatable, Codable {
     var pullCreep: Double = 15        // pulled outward (0.6R on, fully at 1.8R) the remembered shape follows this fast instead of creep
     var pullNearR: Double = 10        // and is measured in the whole body's frame this far around the finger (×R) instead of nearR
     var homeFloor: Double = 1         // v2.55 (11-23): held on the sill, the home spring may not pull the body into the floor (home lowest where the bottom just touches the surface). Pulled up 2.5 to 3.5R and held, the remembered shape grew long while home stayed at the short body's centre, so the spring pushed the lower half into the sill: flattened to a line, a hundred flipped triangles. 0 = v2.54b
+    var remeshCalm: Double = 0.25     // v2.56 (11-23): for this long after a re-sample, each 1/60 s the body keeps remeshCalmK of its velocity relative to the whole (the new mesh settles instead of bouncing; held at 3R the 12 frames after a re-sample jerked 8 to 10). 0 = v2.55
+    var remeshCalmK: Double = 0.2     // how much of that relative velocity is kept per 1/60 s while settling; 1 = no effect
     var remesh: Double = 1            // v2.54 拉長時自動補點: re-sample the body from the remembered shape when it is pulled long (see SlimeRig.remesh); 0 = only widen the limits
     var remeshHi: Double = 2.6        // an outline edge of the remembered shape longer than this many point spacings
     var remeshStr: Double = 2.8       // or an edge inside past this × its rest length
@@ -715,6 +717,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.homeFloor, name: "抓著時家不壓進窗台 v2.55", hint: "（11-23：抓頭頂往上拉 2.5 到 3.5R 按住一秒多，身體下半被壓進窗台、扁成一條、翻面上百個）1：抓著時家最低只到身體底部剛好碰到地面；0 回 v2.54b", range: 0...1, step: 0.05),
         TuneField(key: \.pullNearR, name: "無限拉：拉長時記形範圍", hint: "往外拉長時整條都用整身座標記形（×半徑）", range: 0.5...12, step: 0.1),
         TuneField(key: \.growK, name: "無限拉：上限放寬多快", hint: "被抓的那塊跟不上手指時，每條邊的上限每秒放寬幾倍（e 的幾次方）", range: 0.2...6, step: 0.1),
+        TuneField(key: \.remeshCalm, name: "補點後站穩幾秒 v2.56", hint: "（11-23）補點之後新的網格要重新站穩，這段時間每一幀把身體各處相對整團的速度留兩成，彈不起來、慢慢落定。量過拉 2.5 到 4.5R 按住：每幀跳動平均 3 到 9.5 → 1.8 到 2.7。0 回 v2.55", range: 0...1, step: 0.05),
+        TuneField(key: \.remeshCalmK, name: "站穩時速度留幾成 v2.56", hint: "每 1/60 秒身體各處相對整團的速度留多少；1 等於不作用", range: 0...1, step: 0.05),
         TuneField(key: \.remesh, name: "拉長時自動補點 v2.54", hint: "（多米 11-22）記住的形狀外框點距超過 2.6 個點距、或身體裡有邊拉到原形 2.8 倍，就照現在的形狀重新撒點（點距不變，最多原本 3 倍）；退回去點太密時再撒一次變少。0：只放寬上限不補點", range: 0...1, step: 1),
         TuneField(key: \.rateK, name: "快扯變硬、慢拉變軟 v2.54", hint: "（多米 11-22）手指每秒移動不到 rateLo 個半徑最軟（硬度少三成五×這個值），超過 rateHi 最硬（硬度多兩倍×這個值、記形少九成五×這個值）：猛扯拉不太長、會彈回去，慢拉一路變長。0 關掉", range: 0...1, step: 0.05),
         TuneField(key: \.rateLo, name: "快扯變硬：多慢算慢拉（半徑／秒）", hint: "一般慢慢拉大約每秒 3 到 6 個半徑；量過設 1 的話一般的拉也會變硬、跟不上手", range: 0.2...10, step: 0.1),

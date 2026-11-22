@@ -88,7 +88,7 @@ final class SlimeRig {
     /// v2.54 補點: what the remembered shape returns to. The same as Q0 until the body is re-sampled; then Q0 becomes the remembered
     /// shape of that moment (mesh, clusters and rest lengths are measured from it) and H0, carried over by interpolation, is the original lump.
     private var H0X: [Double] = [], H0Y: [Double] = []
-    private var remN = 0, remN0 = 0, remLast = -9.0, remChk = 0.0
+    private var remN = 0, remN0 = 0, remLast = -9.0, remChk = 0.0, remCalm = -9.0
     private(set) var remeshCount = 0, remeshMs = 0.0
     // v2.25 F4: QD is the reference shape with inertia (the body chases QD, QD chases Q on a spring); QV its velocity; QW how much a drag's acceleration pushes each particle
     private var QDX: [Double] = [], QDY: [Double] = [], QVX: [Double] = [], QVY: [Double] = [], QW: [Double] = []
@@ -883,7 +883,7 @@ final class SlimeRig {
             QX[i] = Q0X[i]; QY[i] = Q0Y[i]
             X[i] = cx + Q0X[i]; Y[i] = cy + Q0Y[i]; PX[i] = X[i]; PY[i] = Y[i]
         }
-        H0X = Q0X; H0Y = Q0Y; remN = 0; remN0 = N; remLast = -9   // v2.54 補點
+        H0X = Q0X; H0Y = Q0Y; remN = 0; remN0 = N; remLast = -9; remCalm = -9   // v2.54 補點
         for k in tent.indices {   // v2.27 tentSlip, tentBump, tentRest
             tent[k].all = (0..<N).filter { TID[$0] == k }
             tent[k].root = tent[k].all.filter { TUB[$0] < 0.08 }
@@ -1171,8 +1171,26 @@ final class SlimeRig {
         if shrink && !grow && fingers.values.contains(where: { $0.mode != .none }) { return }
         guard !ringCrossedQ(), !ringCrossed(), flipCount(X, Y) == 0 else { return }
         let t0 = Date()
-        if remesh() { remN += 1; remeshCount += 1 }
+        if remesh() { remN += 1; remeshCount += 1; remCalm = t + max(0, mat.remeshCalm) }
         remLast = t; remeshMs = Date().timeIntervalSince(t0) * 1000
+    }
+
+    /// v2.56 補點後站穩 (web `remeshCalmStep`). A re-sample swaps in a new set of particles and rebuilds the mesh and the clusters; the new mesh's
+    /// balance is a little off the old one's, and for a dozen frames the body bounced (held at 3R: 8 to 10 points a frame for 12 frames, 1-something
+    /// otherwise). Measured on the web: points kept and only rebuilt 2; rest shape swapped to the remembered one 2.5 to 5.7; new points 8. So it is the
+    /// new set finding its balance, not one wrong constraint. For remeshCalm s after a re-sample, each particle keeps remeshCalmK (per 1/60 s) of its
+    /// velocity relative to the whole; the whole body's movement is untouched.
+    private func remeshCalmStep(_ dt: Double) {
+        let kk = effParams.remeshCalmK
+        guard t < remCalm, kk < 1, N > 0 else { return }
+        let k = pow(max(0, kk), dt * 60)
+        var mx = 0.0, my = 0.0
+        for i in 0..<N { mx += X[i] - PX[i]; my += Y[i] - PY[i] }
+        mx /= Double(N); my /= Double(N)
+        for i in 0..<N {
+            let vx = X[i] - PX[i] - mx, vy = Y[i] - PY[i] - my
+            PX[i] = X[i] - mx - vx * k; PY[i] = Y[i] - my - vy * k
+        }
     }
 
     private func ringCrossedQ() -> Bool {
@@ -2733,6 +2751,7 @@ final class SlimeRig {
         }
         lastSdt = sdt
         if sillOn { sillStepPre() }   // v2.28 窗台
+        remeshCalmStep(dt)   // v2.56 補點後站穩
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         rateStep(dt)   // v2.54 快扯變硬
         capGrowStep(dt)   // v2.54 無限拉

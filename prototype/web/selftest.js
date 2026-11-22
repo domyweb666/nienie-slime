@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.56（11-23）：加 T67（補點後站穩）；T65、T66 照慣例把它關掉。
    v2.52（11-22）：加 T63；舊項目釘住 v2.51 關掉、窗台拉伸上限回 3.2（見下面 PRE47 那段的說明）。
 
    用法：瀏覽器開 index.html，視窗固定 393×852（各項門檻是在這個尺寸定的；375×812 時 T42 亂捏觸手的黏土放手動能量到 38.8、門檻 12，會不過，2026-11-14），DevTools console 把這整個檔案貼上執行；
@@ -1636,7 +1637,7 @@
   // T65 v2.54 無限拉（多米 11-22：拉五公分只長三公分）。v2.54b 補點、快扯變硬開著之後，拉著時細長三角形翻一點的最多 44 個（畫面看不出、記形不擋），門檻從 10 放到 60。v2.54 的預設：往上拉 4R、斜拉 5.5R，被抓的那塊跟手指差不到 0.5R、身體拉到 5R 以上、
   // 拉著時沒有翻面和交叉、放手 2 秒還留 3.5R 以上；同一套關掉無限拉（v2.53）身體只到 3.3R 以下（對照，證明量得到差別）。另外看黏窗框關掉：放在右窗框旁不黏
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
-    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, life2: 0 };
+    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, life2: 0, remeshCalm: 0 };   // v2.56 補點後站穩關著（在 T67）
     const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(65); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 65 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(120); log.splice(0); };
     const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
     const wld = (sx, sy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(sx - q.left - v.x) / CAM.z + CAM.x, (sy - q.top - v.y) / CAM.z + CAM.y]; };
@@ -1661,7 +1662,7 @@
   // 記形把身體記長了，家還停在原本矮矮那一團的中心，回家彈簧把長身體往下拉進窗台，一秒多後下半扁成一條，底部（離窗台 0.5R 內）翻面 24 到 97 個。
   // 開著：每個距離底部翻面不超過 3 個、拉著時外框不交叉、放手後沒有 NaN；同一套 homeFloor 0 當對照，至少一個距離底部翻面 20 個以上（證明量得到）
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
-    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };
+    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, remeshCalm: 0 };   // v2.56 補點後站穩關著（在 T67）
     const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
     const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
     const inv = fl => { let n = 0, lo = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if (.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < -.02 * TRA[k / 3]) { n++; if (fl - (Y[a] + Y[b] + Y[c]) / 3 < R * .5) lo++; } } return [n, lo]; };
@@ -1672,7 +1673,28 @@
     r.on = [2.5, 3, 3.5].map(d => hold({}, d)); r.off = [2.5, 3, 3.5].map(d => hold({ homeFloor: 0 }, d));
     res.T66_homeFloor = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
-    res.PASS.homeFloor = r.on.every(o => o.low <= 3 && o.xs === 0 && o.nan === 0) && r.off.some(o => o.low >= 20);
+    res.PASS.homeFloor = r.on.every(o => o.low <= 3 && o.xs === 0 && o.nan === 0) && r.off.some(o => o.low >= 20); }
+  // T67 v2.56 補點後站穩（remeshCalm，11-23）。v2.55 之後拉長按住，補點那一刻換了一批點，之後十來幀身體各處來回彈（拉 3R 按住，補點後 12 幀每幀跳 8 到 10 點）。
+  // 用真正的預設值、T66 的拉法往上拉 2.5R、3R、3.5R 按住 3 秒，量 T61 的跳動（扣掉整團平移後每顆粒子一幀的速度變化，補點那一幀粒子換了不算）：
+  // 開著每個距離平均不超過 3.5、三個加起來不到 remeshCalm 0 的 0.85 倍；放手 2 秒後身體長度不比關掉短一成以上（站穩不能吃掉拉長）、沒有 NaN、外框不交叉
+  { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
+    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };
+    const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const tall = () => { let a = 1e9, b = -1e9; for (const i of bnd) { a = Math.min(a, Y[i]); b = Math.max(b, Y[i]); } return (b - a) / R; };
+    const hold = (over, dist) => { fresh(over); let b = -1, bv = 1e9; for (const i of bnd) if (Y[i] < bv) { bv = Y[i]; b = i; } const [sx, sy] = scr(X[b], Y[b] + R * .25), ex = sx + R * .3 * dist * CAM.z, ey = sy - R * dist * CAM.z;
+      ev('pointerdown', 1, sx, sy); steps(6); for (let s = 1; s <= 24; s++) { ev('pointermove', 1, sx + (ex - sx) * s / 24, sy + (ey - sy) * s / 24); steps(1); }
+      let vx = null, vy = null; const prime = () => { vx = new Float64Array(N); vy = new Float64Array(N); let mx = 0, my = 0; for (let i = 0; i < N; i++) { vx[i] = X[i] - PX[i]; vy[i] = Y[i] - PY[i]; mx += vx[i]; my += vy[i]; } mx /= N; my /= N; for (let i = 0; i < N; i++) { vx[i] -= mx; vy[i] -= my; } };
+      prime(); let js = 0, nj = 0, rm = 0;
+      for (let k = 0; k < 180; k++) { const n0 = N, x0 = Float64Array.from(X), y0 = Float64Array.from(Y); steps(1); if (N !== n0) { rm++; prime(); continue; }
+        let ax = 0, ay = 0; for (let i = 0; i < N; i++) { ax += X[i] - x0[i]; ay += Y[i] - y0[i]; } ax /= N; ay /= N; let j = 0; for (let i = 0; i < N; i++) { const nx = X[i] - x0[i] - ax, ny = Y[i] - y0[i] - ay, d = Math.hypot(nx - vx[i], ny - vy[i]); if (d > j) j = d; vx[i] = nx; vy[i] = ny; } js += j; nj++; }
+      const held = tall(); ev('pointerup', 1, ex, ey); steps(120); let nan = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) nan++;
+      return { mean: +(js / Math.max(1, nj)).toFixed(2), remesh: rm, held: +held.toFixed(2), rel: +tall().toFixed(2), selfX: selfX(), nan }; };
+    r.on = [2.5, 3, 3.5].map(d => hold({}, d)); r.off = [2.5, 3, 3.5].map(d => hold({ remeshCalm: 0 }, d));
+    res.T67_remeshCalm = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
+    const sum = a => a.reduce((s, o) => s + o.mean, 0);
+    res.PASS.remeshCalm = r.on.every((o, k) => o.mean <= 3.5 && o.nan === 0 && o.selfX === 0 && o.rel >= .9 * r.off[k].rel) && sum(r.on) < .85 * sum(r.off) && r.on.some(o => o.remesh > 0);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
