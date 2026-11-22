@@ -15,6 +15,10 @@ final class SlimeController: ObservableObject {
     @Published private(set) var slime: SlimeKind = .honey
     private var impressions: [SlimeKind: (trust: Double, wary: Double)] = [:]   // each slime's impression, this run only
     @Published private(set) var params: [SlimeMaterial: FeelParams]
+    /// v2.57 (多米 11-23: the six new slimes on the phone, both looks, a switch to compare): the panel's two chips, kept in UserDefaults.
+    /// showAll: all ten in the bottom row (一隻為主 off for every material); oldLook6: the six in the v2.51 look (opaque, no highlights)
+    @Published var showAll = UserDefaults.standard.bool(forKey: "nienie.showAll") { didSet { UserDefaults.standard.set(showAll, forKey: "nienie.showAll"); pushParams() } }
+    @Published var oldLook6 = UserDefaults.standard.bool(forKey: "nienie.look6") { didSet { UserDefaults.standard.set(oldLook6, forKey: "nienie.look6"); pushParams() } }
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2 || labGrey; syncAudio() } }
     /// v2.40 環境音: "rain", "fire", "noise" (pink noise, 11-22) or "lofi", kept in UserDefaults (long press the speaker button to choose)
@@ -47,11 +51,14 @@ final class SlimeController: ObservableObject {
         for m in SlimeMaterial.allCases { p[m] = m.defaults }
         params = p
         // v2.33 一隻為主: always 芋圓 while 一隻為主 is on (the default); off, the slime chosen last time
-        let saved = SlimeMaterial.clay.defaults.one >= 0.5 ? SlimeKind.taro : (SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey)
+        let saved = SlimeMaterial.clay.defaults.one >= 0.5 && !UserDefaults.standard.bool(forKey: "nienie.showAll") ? SlimeKind.taro : (SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey)   // v2.57: 十隻都顯示 on, the last one chosen
         slime = saved; material = saved.material
         var start = saved.material.defaults
         saved.apply(&start)
+        if UserDefaults.standard.bool(forKey: "nienie.showAll") { start.one = 0 }
+        if UserDefaults.standard.bool(forKey: "nienie.look6") { start.look6 = 1 }
         rig = SlimeRig(params: start)
+        rig.fx = saved.fx   // v2.57 its signature
         rig.reduceMotion = reduceMotion
         rig.onEvent = { [weak self] e in self?.handle(e) }
         rig.onGiftTap = { [weak self] in self?.walkAsk = true }
@@ -110,6 +117,8 @@ final class SlimeController: ObservableObject {
     var current: FeelParams {
         var p = params[material] ?? material.defaults
         slime.apply(&p)
+        if showAll { p.one = 0 }   // v2.57
+        p.look6 = oldLook6 ? 1 : 0
         return p
     }
 
@@ -354,6 +363,7 @@ final class SlimeController: ObservableObject {
         guard k != slime else { return }
         impressions[slime] = (rig.impTrust, rig.impWary)
         slime = k; material = k.material
+        rig.fx = k.fx   // v2.57 the new six's signatures
         UserDefaults.standard.set(k.rawValue, forKey: "slime")
         pushParams()
         activeSlot = nil

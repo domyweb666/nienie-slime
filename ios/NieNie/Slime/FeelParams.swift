@@ -248,6 +248,9 @@ struct FeelParams: Equatable, Codable {
     var introSwim: Double = 1         // the cold start (and a slime switch): it swims in from off the right edge, looks at you, waves, says hello. 0: the v2.17 hops
     // v2.23 personality (set by the chosen slime, see SlimeKind): rest length, voice pitch, eye size, how fast trust and wariness grow, how soon it visits
     var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
+    // v2.57 (the six new slimes, web v2.52): seconds alone before it falls asleep (湯圓 25), how fast wariness fades (× 260 s; 布丁 0.12, scared easily but forgets fast)
+    var sleepAfter: Double = 40, wFade: Double = 1
+    var look6: Double = 0             // v2.57 (多米 11-23: make both looks, a switch in the app): 1 gives the six new slimes the v2.51 look they were designed in (body 0.9 opaque, no highlights); 0 they look like the others (glossy and clear, v2.53b). Set from the panel's chip, for every material
     // v2.47 (多米 11-16, phone video of build 127: pulled about, some places turn sharp; pulled too long it twitches; take the powder out; it should look full of water)
     var pressPull: Double = 1         // 1: the press spread fades once the finger has pulled away from where it landed (0.15R to 0.6R). Measured: pulled 3R and held still, the patch under the finger was still spread 0.3R (the grab radius), tearing it: 18 flipped triangles, the guard pushing 5 pt back every frame. 0 = v2.46
     var dragCalm: Double = 1          // 1: the spring the whole body follows the finger on is damped more from 1R of travel, no overshoot from 3R (pulled 3.5R it ran 60 pt past and came back, jumping for a second with the hand still). 0 = v2.46
@@ -321,6 +324,16 @@ struct FeelParams: Equatable, Codable {
     var volMusic: Double = 0.25       // v2.21 background lofi volume (the speaker button's first state); ducks to 0.6 while held
     var sndSettle: Double = 1         // after-release tail: bubbles after a pull, a small hiss after a long press; 0 = off
     var sndPressSize: Double = 0.5    // how much contact size (majorRadius) changes the press sound; 0 = off
+}
+
+/// v2.57 a new slime's signature (web `fx`): purple where it is rubbed (蝶豆), fog when shaken (汽水), a sesame core (湯圓), a caramel cap (布丁), pearls (珍奶). RGB 0...255.
+struct SlimeFx {
+    var purple: (Double, Double, Double)? = nil
+    var fog: (Double, Double, Double)? = nil
+    var core: (Double, Double, Double)? = nil
+    var cap: (Double, Double, Double)? = nil
+    var pearls = 0
+    var isEmpty: Bool { purple == nil && fog == nil && core == nil && cap == nil && pearls == 0 }
 }
 
 struct SlimeColors {
@@ -419,10 +432,34 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
 /// prototype's SLIMES. Each keeps its own impression for this run; the chosen one is remembered across launches.
 enum SlimeKind: String, CaseIterable, Identifiable {
     case honey, mint, taro, peach
+    // v2.57 the six new ones (多米 11-22, web v2.52 overnight; ids as on the web). Always after the first four, which keep their places
+    case xiancao, tangyuan, diedou, qishui, buding, zhennai
     var id: String { rawValue }
-    var name: String { ["蜜蜜", "薄荷", "芋圓", "桃桃"][index] }
-    var desc: String { ["黏土，慢吞吞，最愛睡", "果凍，好動，愛到處跑", "黏土，怕生，熟了很黏人", "黏土，愛撒嬌，常來找你"][index] }
-    var material: SlimeMaterial { [.clay, .jelly, .clay, .clay][index] }   // v2.33: 芋圓 mochi → clay (clay is the reference feel; her material is still undecided, 麻糬 stays in the panel)
+    var name: String { ["蜜蜜", "薄荷", "芋圓", "桃桃", "仙草", "湯圓", "蝶豆", "汽水", "布丁", "珍奶"][index] }
+    var desc: String { ["黏土，慢吞吞，最愛睡", "果凍，好動，愛到處跑", "黏土，怕生，熟了很黏人", "黏土，愛撒嬌，常來找你",
+                        "果凍偏硬，酷，慢熟", "麻糬，愛睡，肚子裡有芝麻餡", "果凍，怕生，揉過的地方會變紫", "最軟，停不下來，搖了會變霧", "最 Q，膽小，頭上有焦糖", "黏土，貪吃，肚子裡有珍珠"][index] }
+    var material: SlimeMaterial { [.clay, .jelly, .clay, .clay, .jelly, .mochi, .jelly, .jelly, .jelly, .clay][index] }
+    /// v2.57 one of the six new ones (the panel's 新六隻外觀 switch only touches these)
+    var isNew: Bool { index >= 4 }
+    /// v2.57 each new one's signature, drawn on the body (web `fx`, `drawFx`)
+    var fx: SlimeFx {
+        switch self {
+        case .tangyuan: return SlimeFx(core: (58, 52, 54))
+        case .diedou: return SlimeFx(purple: (186, 104, 236))
+        case .qishui: return SlimeFx(fog: (240, 248, 252))
+        case .buding: return SlimeFx(cap: (168, 90, 30))
+        case .zhennai: return SlimeFx(pearls: 5)
+        default: return SlimeFx()
+        }
+    }
+    /// v2.57 its own jelly skin numbers on top of the default skin (web `sk`): 仙草's edge does not go white
+    var skin: (kEdge: Double?, kCore: Double?, glow: Double?)? {
+        switch self {
+        case .xiancao: return (0.16, 0.5, 0.5)
+        case .zhennai: return (0.3, nil, nil)
+        default: return nil
+        }
+    }   // v2.33: 芋圓 mochi → clay (clay is the reference feel; her material is still undecided, 麻糬 stays in the panel)
     private var index: Int { Self.allCases.firstIndex(of: self) ?? 0 }
     var colors: SlimeColors {
         switch self {
@@ -430,6 +467,12 @@ enum SlimeKind: String, CaseIterable, Identifiable {
         case .mint: return SlimeColors(base: UIColor(hex: 0x9BEBD0), shade: UIColor(hex: 0x5CCBA8), line: UIColor(hex: 0x1F6B55), light: UIColor(hex: 0xECFFF8), eye: UIColor(hex: 0x173F33))
         case .taro: return SlimeColors(base: UIColor(hex: 0xD2C2FF), shade: UIColor(hex: 0xA691EC), line: UIColor(hex: 0x4F3A8C), light: UIColor(hex: 0xF6F1FF), eye: UIColor(hex: 0x2E2350))
         case .peach: return SlimeColors(base: UIColor(hex: 0xFFC2CF), shade: UIColor(hex: 0xF28FA6), line: UIColor(hex: 0x8C3349), light: UIColor(hex: 0xFFF0F3), eye: UIColor(hex: 0x4A1C28))
+        case .xiancao: return SlimeColors(base: UIColor(hex: 0x4A3A32), shade: UIColor(hex: 0x2A201C), line: UIColor(hex: 0x120D0B), light: UIColor(hex: 0xF6EBD8), eye: UIColor(hex: 0xF6EBD8))
+        case .tangyuan: return SlimeColors(base: UIColor(hex: 0xFBF8F4), shade: UIColor(hex: 0xDDD4CA), line: UIColor(hex: 0x7A6F68), light: UIColor(hex: 0xFFFFFF), eye: UIColor(hex: 0x2A2422))
+        case .diedou: return SlimeColors(base: UIColor(hex: 0xA9BEFA), shade: UIColor(hex: 0x6C8EF0), line: UIColor(hex: 0x2A3C8F), light: UIColor(hex: 0xF2F6FF), eye: UIColor(hex: 0x1A2456))
+        case .qishui: return SlimeColors(base: UIColor(hex: 0xBFE9F8), shade: UIColor(hex: 0x7FCDEB), line: UIColor(hex: 0x1F6F99), light: UIColor(hex: 0xFFFFFF), eye: UIColor(hex: 0x123E57))
+        case .buding: return SlimeColors(base: UIColor(hex: 0xFFEFB0), shade: UIColor(hex: 0xF2CC5E), line: UIColor(hex: 0x7A4A14), light: UIColor(hex: 0xFFFBE6), eye: UIColor(hex: 0x4A2E12))
+        case .zhennai: return SlimeColors(base: UIColor(hex: 0xF3DCC0), shade: UIColor(hex: 0xD9B48A), line: UIColor(hex: 0x7A5230), light: UIColor(hex: 0xFFF6E8), eye: UIColor(hex: 0x3A2412))
         }
     }
     /// Shape seed and personality on top of the material's numbers.
@@ -439,6 +482,13 @@ enum SlimeKind: String, CaseIterable, Identifiable {
         case .mint: p.seed = 12; p.restMul = 0.6; p.voicePitch = 1.12; p.dash = 0.45; p.eyeSize = 0.95; p.trRate = 1; p.wRate = 0.8; p.e4Mul = 1
         case .taro: p.seed = 4; p.restMul = 1; p.voicePitch = 0.94; p.dash = 0.2; p.eyeSize = 0.88; p.trRate = 0.7; p.wRate = 1.6; p.e4Mul = 0.7
         case .peach: p.seed = 19; p.restMul = 0.9; p.voicePitch = 1.18; p.dash = 0.25; p.eyeSize = 1.1; p.trRate = 1.6; p.wRate = 0.8; p.e4Mul = 0.6
+        // v2.57 the six (web SLIMES `p`): the feel numbers are guesses from the design sheets, nobody has squeezed them yet
+        case .xiancao: p.seed = 9; p.alpha = 0.42; p.damp = 0.975; p.inertiaZ = 0.24; p.restMul = 1.2; p.voicePitch = 0.86; p.dash = 0.15; p.eyeSize = 0.8; p.trRate = 0.5; p.wRate = 1; p.e4Mul = 1.6
+        case .tangyuan: p.seed = 5; p.recover = 0.12; p.restMul = 1.35; p.voicePitch = 0.9; p.dash = 0.12; p.eyeSize = 1.15; p.trRate = 1.3; p.wRate = 0.6; p.e4Mul = 1; p.sleepAfter = 25
+        case .diedou: p.seed = 2; p.restMul = 1; p.voicePitch = 1.05; p.dash = 0.25; p.eyeSize = 0.9; p.trRate = 0.5; p.wRate = 1.8; p.e4Mul = 0.5
+        case .qishui: p.seed = 11; p.alpha = 0.22; p.damp = 0.988; p.inertiaHz = 2.4; p.inertiaZ = 0.12; p.shake = 1; p.glit = 0; p.settleT = 14; p.restMul = 0.5; p.voicePitch = 1.22; p.dash = 0.55; p.eyeSize = 1; p.trRate = 1.2; p.wRate = 0.8; p.e4Mul = 0.7   // no "water" material: a softened jelly; the shake clouds it but draws no glitter (多米 11-22: no bubbles, only the fog)
+        case .buding: p.seed = 8; p.damp = 0.992; p.inertiaHz = 3.6; p.inertiaZ = 0.09; p.restMul = 0.9; p.voicePitch = 1.15; p.dash = 0.2; p.eyeSize = 1.1; p.trRate = 1; p.wRate = 1.4; p.e4Mul = 0.9; p.wFade = 0.12
+        case .zhennai: p.seed = 6; p.restMul = 0.85; p.voicePitch = 0.96; p.dash = 0.3; p.eyeSize = 1; p.trRate = 1.1; p.wRate = 0.9; p.e4Mul = 0.8
         }
     }
 }

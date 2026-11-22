@@ -44,6 +44,13 @@ struct TunePanel: View {
                     .foregroundStyle(Palette.inkSoft)
             }
 
+            // v2.57 (多米 11-23): all ten in the bottom row, and the new six's two looks to compare on the phone
+            HStack(spacing: 6) {
+                chip("十隻都顯示", on: controller.showAll) { controller.showAll.toggle() }
+                chip(controller.oldLook6 ? "新六隻：不透明（v2.51）" : "新六隻：亮面透明", on: controller.oldLook6) { controller.oldLook6.toggle() }
+                Spacer(minLength: 0)
+            }
+
             // v2.23: the material moved here from the bottom bar (the same slime on another material, for blind tests)
             HStack(spacing: 6) {
                 ForEach(SlimeMaterial.allCases) { m in

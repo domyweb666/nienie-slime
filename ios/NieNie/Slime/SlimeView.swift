@@ -5,6 +5,7 @@ import UIKit
 final class SlimeView: UIView {
     let rig: SlimeRig
     var colors: SlimeColors { didSet { applyColors(animated: !rig.reduceMotion) } }
+    var kind: SlimeKind = .honey { didSet { tintKey = .min } }   // v2.57: its signature (purple, fog), its own skin, the new six's look switch
     /// Fires once per frame, after the rig stepped, so sound/haptics read the same state as the picture.
     var onFrame: ((_ dt: Double) -> Void)?
     var usePredictedTouches = true
@@ -64,6 +65,10 @@ final class SlimeView: UIView {
     // v2.28 果凍皮: the body as a lit jelly on Metal, under litGroup (the glitter and the eyes stay Core Animation); the blush with it
     private let jelly = JellySkin()
     private let blushLayers = [CAGradientLayer(), CAGradientLayer()]
+    // v2.57 新六隻的招牌 (web drawFx): on the jelly skin, under the blush and the eyes, clipped to the body by litGroup
+    private let fxGroup = CALayer()
+    private let fxStainLayers = (0..<6).map { _ in CAGradientLayer() }, fxCoreLayers = (0..<22).map { _ in CAGradientLayer() }
+    private let fxPearlLayer = CAShapeLayer(), fxPearlLitLayer = CAShapeLayer(), fxCapGrad = CAGradientLayer(), fxCapMask = CAShapeLayer()
     private let bubbleRing = CAShapeLayer(), bubbleDot = CAShapeLayer(), causticShade = CAGradientLayer(), causticLight = CAGradientLayer()   // v2.49 water: bubbles inside it, gathered light under it
     private let glitLayers = [CAShapeLayer(), CAShapeLayer(), CAShapeLayer(), CAShapeLayer()]
     private let glitColors: [UIColor] = [UIColor(red: 1, green: 224 / 255, blue: 138 / 255, alpha: 1), .white, UIColor(red: 1, green: 195 / 255, blue: 214 / 255, alpha: 1), UIColor(red: 190 / 255, green: 240 / 255, blue: 230 / 255, alpha: 1)]
@@ -143,6 +148,11 @@ final class SlimeView: UIView {
         bubbleRing.fillColor = UIColor(white: 1, alpha: 0.10).cgColor; bubbleRing.strokeColor = UIColor(white: 1, alpha: 0.62).cgColor
         bubbleDot.fillColor = UIColor(white: 1, alpha: 0.9).cgColor; bubbleDot.strokeColor = nil
         for l in [bubbleRing, bubbleDot] { l.zPosition = -0.4; l.isHidden = true; layer.addSublayer(l) }
+        litGroup.addSublayer(fxGroup); fxGroup.isHidden = true   // v2.57, under the blush
+        for l in fxStainLayers + fxCoreLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; fxGroup.addSublayer(l) }
+        fxCapGrad.mask = fxCapMask; fxCapGrad.startPoint = CGPoint(x: 0.5, y: 0); fxCapGrad.endPoint = CGPoint(x: 0.5, y: 1); fxCapGrad.isHidden = true; fxGroup.addSublayer(fxCapGrad)
+        fxPearlLayer.fillColor = UIColor(red: 43 / 255, green: 27 / 255, blue: 20 / 255, alpha: 0.92).cgColor; fxPearlLitLayer.fillColor = UIColor(red: 98 / 255, green: 64 / 255, blue: 46 / 255, alpha: 0.5).cgColor   // no white glint (多米 11-22): a lighter brown makes it round
+        fxGroup.addSublayer(fxPearlLayer); fxGroup.addSublayer(fxPearlLitLayer)
         for l in blushLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; litGroup.addSublayer(l) }
         litGroup.addSublayer(fogLayer)
         for (k, l) in glitLayers.enumerated() { l.fillColor = glitColors[k].cgColor; litGroup.addSublayer(l) }
@@ -225,15 +235,26 @@ final class SlimeView: UIView {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         c.getRed(&r, green: &g, blue: &b, alpha: &a)
         var rr = min(255, Double(r) * 255 + 22 * tr), gg = min(255, Double(g) * 255 + 4 * tr), bb = max(0, Double(b) * 255 - 18 * tr)
+        let fx = kind.fx
+        if let pp = fx.purple {   // v2.57 蝶豆: trusting leans purple, not warm
+            let k = 0.62 * tr, q: Double = shade ? 0.8 : 1
+            rr = Double(r) * 255; gg = Double(g) * 255; bb = Double(b) * 255
+            rr += (pp.0 * q - rr) * k; gg += (pp.1 * q - gg) * k; bb += (pp.2 * q - bb) * k
+        }
         rr += (255 - rr) * 0.22 * w; gg += (255 - gg) * 0.22 * w; bb += (255 - bb) * 0.22 * w
         // v2.27 mood colour: towards the mood's colour, by the same share for every slime
         let mC: Double = rig.mcC, mS: Double = rig.mcS, mW: Double = rig.mcW, mZ: Double = rig.mcZ, sum: Double = mC + mS + mW + mZ, A: Double = rig.params.moodColor
         if A > 0 && sum > 0.002 {
             let k: Double = A * sum / max(1, sum), sh: Double = shade ? 0.82 : 1
-            let mr: Double = (mC * 255 + mS * 240 + mW * 141 + mZ * 108) / sum * sh
-            let mg: Double = (mC * 154 + mS * 68 + mW * 166 + mZ * 120) / sum * sh
-            let mb: Double = (mC * 139 + mS * 79 + mW * 217 + mZ * 184) / sum * sh
+            let cc: (Double, Double, Double) = fx.purple ?? (255, 154, 139)   // v2.57 蝶豆: happy is purple too
+            let mr: Double = (mC * cc.0 + mS * 240 + mW * 141 + mZ * 108) / sum * sh
+            let mg: Double = (mC * cc.1 + mS * 68 + mW * 166 + mZ * 120) / sum * sh
+            let mb: Double = (mC * cc.2 + mS * 79 + mW * 217 + mZ * 184) / sum * sh
             rr += (mr - rr) * k; gg += (mg - gg) * k; bb += (mb - bb) * k
+        }
+        if let fg = fx.fog, rig.fogCloud > 0.001 {   // v2.57 汽水: shaken, the whole body leans misty white by the haze, clearing as it settles
+            let k = min(1, rig.fogCloud) * 0.88, q: Double = shade ? 0.9 : 1
+            rr += (fg.0 * q - rr) * k; gg += (fg.1 * q - gg) * k; bb += (fg.2 * q - bb) * k
         }
         return UIColor(red: CGFloat(rr / 255), green: CGFloat(gg / 255), blue: CGFloat(bb / 255), alpha: a)
     }
@@ -623,6 +644,7 @@ final class SlimeView: UIView {
         }
         guard on, let j = jelly else {
             jelly?.layer.isHidden = true
+            fxGroup.isHidden = true
             for l in blushLayers { l.isHidden = true }
             for l in [bubbleRing, bubbleDot, causticShade, causticLight] as [CALayer] { l.isHidden = true }
             return
@@ -645,6 +667,12 @@ final class SlimeView: UIView {
         // C2 水的呼吸 (決定 7): still, the refraction was static (glass, not water; Kawabe 2015); with `wbreath` on it follows its breath, ±12% (half with Reduce Motion)
         let refr: Double = p.refr * (p.wbreath >= 0.5 ? 1 + (rig.reduceMotion ? 0.06 : 0.12) * rig.breathWave : 1)
         var skin = JellySkin.skin(cloud: hz.cloud, glow: hz.glow, wet: p.wet >= 0.5)
+        if let o = kind.skin {   // v2.57 its own skin numbers (仙草's edge does not go white)
+            if let v = o.kEdge { skin.kEdge = Float(v) }
+            if let v = o.kCore { skin.kCore = Float(v) }
+            if let v = o.glow { skin.glow = Float(v) }
+        }
+        let old6 = kind.isNew && p.look6 >= 0.5   // v2.57 新六隻外觀 1: the v2.51 look they were designed in
         if off.contains("shade") { skin.amb = 1; skin.dif = 0 }
         // C3 (決定 8): what moves behind it shows through it too
         let t0 = CACurrentMediaTime()
@@ -668,8 +696,9 @@ final class SlimeView: UIView {
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
                  skin: skin, round: round,
                  water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
-                 shine: p.shine, opaque: p.opaque, extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"))
+                 shine: old6 ? 0 : p.shine, opaque: old6 ? 0.9 : p.opaque, extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"))
         drawWater(body: body, z: z)
+        drawFx(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
         if let e = rig.eyeView {
             let S = e.size * z, l = rig.toScreen(e.lx, e.ly), r = rig.toScreen(e.rx, e.ry), a = atan2(r.y - l.y, r.x - l.x)
@@ -682,6 +711,50 @@ final class SlimeView: UIView {
                 bl.colors = [pink0, pink1, pink2]; bl.locations = [0, 0.55, 1]
             }
         } else { for l in blushLayers { l.isHidden = true } }
+    }
+
+    /// v2.57 新六隻的招牌 (web drawFx): 蝶豆's purple spots, 湯圓's sesame core, 珍奶's pearls, 布丁's caramel cap. The same soft spots as the blush.
+    private func drawFx(body: CGPath, z: Double) {
+        guard let v = rig.fxView, !labLayersOff.contains("fx") else { fxGroup.isHidden = true; return }
+        fxGroup.isHidden = false
+        let Rz = rig.R * z, fx = kind.fx
+        func soft(_ l: CAGradientLayer, _ x: Double, _ y: Double, _ r: Double, _ c: (Double, Double, Double), _ a: Double) {
+            l.isHidden = false
+            l.bounds = CGRect(x: 0, y: 0, width: 2 * r, height: 2 * r)
+            l.position = CGPoint(x: x, y: y)
+            func col(_ al: Double) -> CGColor { UIColor(red: CGFloat(c.0 / 255), green: CGFloat(c.1 / 255), blue: CGFloat(c.2 / 255), alpha: CGFloat(al)).cgColor }
+            l.colors = [col(a), col(a * 0.5), col(0)]; l.locations = [0, 0.55, 1]
+        }
+        for (k, l) in fxStainLayers.enumerated() {
+            if let pp = fx.purple, k < v.stains.count { let s = v.stains[k], p = rig.toScreen(s.x, s.y); soft(l, p.x, p.y, s.r * z, pp, 0.78 * s.k) } else { l.isHidden = true }
+        }
+        for (k, l) in fxCoreLayers.enumerated() {
+            if let c = fx.core, k < v.core.count { let p = rig.toScreen(v.core[k].x, v.core[k].y); soft(l, p.x, p.y, Rz * 0.34, c, 0.1) } else { l.isHidden = true }
+        }
+        if v.pearls.isEmpty { fxPearlLayer.path = nil; fxPearlLitLayer.path = nil } else {
+            let dark = CGMutablePath(), lit = CGMutablePath(), rr = Rz * 0.1
+            for q in v.pearls {
+                let p = rig.toScreen(q.x, q.y)
+                dark.addEllipse(in: CGRect(x: p.x - rr, y: p.y - rr, width: 2 * rr, height: 2 * rr))
+                let lx = p.x - rr * 0.22, ly = p.y - rr * 0.22, lr = rr * 0.52
+                lit.addEllipse(in: CGRect(x: lx - lr, y: ly - lr, width: 2 * lr, height: 2 * lr))
+            }
+            fxPearlLayer.path = dark; fxPearlLitLayer.path = lit
+        }
+        if let c = fx.cap {   // always on whichever side is up: measured down from the outline's top, however the body has turned; the lower edge drips in a few arcs
+            let bb = body.boundingBoxOfPath, x0 = Double(bb.minX), x1 = Double(bb.maxX), y0 = Double(bb.minY), hh = Double(bb.height), cxm = (x0 + x1) / 2, fl = v.capFlow
+            let base = y0 + hh * (0.25 + 0.04 * fl), amp = Rz * (0.045 + 0.05 * fl)
+            func yb(_ x: Double) -> Double { let u = (x - cxm) / max(1, Rz); return base + amp * (0.62 * sin(u * 5.3 + 1.2) + 0.38 * sin(u * 9.4 + 0.5) + 0.5) }
+            let fr = CGRect(x: x0 - 4, y: y0 - 4, width: x1 - x0 + 8, height: max(1, base + amp * 1.5 - (y0 - 4)))
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: 0, y: 0)); path.addLine(to: CGPoint(x: fr.width, y: 0))
+            var x = x1 + 4
+            while x >= x0 - 4 { path.addLine(to: CGPoint(x: x - Double(fr.minX), y: yb(x) - Double(fr.minY))); x -= 3 }
+            path.closeSubpath()
+            fxCapGrad.isHidden = false; fxCapGrad.frame = fr; fxCapMask.frame = CGRect(origin: .zero, size: fr.size); fxCapMask.path = path
+            fxCapGrad.colors = [UIColor(red: CGFloat(min(255, c.0 + 22) / 255), green: CGFloat(min(255, c.1 + 18) / 255), blue: CGFloat(min(255, c.2 + 10) / 255), alpha: 0.93).cgColor,
+                                UIColor(red: CGFloat(c.0 / 255), green: CGFloat(c.1 / 255), blue: CGFloat(c.2 / 255), alpha: 0.93).cgColor]
+        } else { fxCapGrad.isHidden = true }
     }
 
     /// v2.31 搖晃沉澱: the haze (thickest low in the middle), the glitter, the glow at the clear moment; all clipped to the body by litGroup
@@ -905,7 +978,7 @@ final class SlimeView: UIView {
         func q40(_ v: Double) -> Int { Int((v * 40).rounded()) }
         let tkImp: Int = rig.showsImpression ? q40(rig.impShownTrust) * 100 + q40(rig.impShownWary) : -1
         let tkMood: Int = moodOn ? (q40(rig.mcC) + q40(rig.mcS) * 41 + q40(rig.mcW) * 1681 + q40(rig.mcZ) * 68921 + 1) * 10000 : 0
-        let tk: Int = tkImp + tkMood
+        let tk: Int = tkImp + tkMood + (kind.fx.fog != nil ? q40(rig.fogCloud) * 1_000_000_000_000 : 0)   // v2.57 汽水's fog
         if tk != tintKey && !labGrey {
             tintKey = tk
             let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0

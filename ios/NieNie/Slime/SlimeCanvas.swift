@@ -13,6 +13,7 @@ struct SlimeCanvas: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SlimeView {
         let view = SlimeView(rig: controller.rig, colors: controller.slime.colors)
+        view.kind = controller.slime   // v2.57
         let controller = self.controller
         view.onFrame = { [weak controller] dt in controller?.frame(dt: dt) }
         view.onStats = { [weak controller] s in controller?.report(s) }
@@ -26,6 +27,7 @@ struct SlimeCanvas: UIViewRepresentable {
         if context.coordinator.slime != controller.slime {
             context.coordinator.slime = controller.slime
             view.colors = controller.slime.colors
+            view.kind = controller.slime
         }
         if view.latencyTest != controller.latencyTest {
             view.latencyTest = controller.latencyTest

@@ -89,6 +89,12 @@ final class SlimeRig {
     /// shape of that moment (mesh, clusters and rest lengths are measured from it) and H0, carried over by interpolation, is the original lump.
     private var H0X: [Double] = [], H0Y: [Double] = []
     private var remN = 0, remN0 = 0, remLast = -9.0, remChk = 0.0, remCalm = -9.0
+    // v2.57 the six new slimes' signatures (web fxStep, drawFx): set by the controller with the chosen slime
+    var fx = SlimeFx() { didSet { fxReset() } }
+    private var fxStains: [(i: Int, k: Double, r: Double, hot: Bool)] = []   // 蝶豆: rubbed spots turning purple (particle, how purple, how wide ×R, rubbed this frame)
+    private var fxCoreN = 0, fxCore: [Int] = []                               // 湯圓: the sesame core hangs on these inner particles
+    private var fxPearlN = 0, fxPearls: [(i: Int, x: Double, y: Double)] = [], fxPearlSink = 0.0   // 珍奶: each pearl trails one inner particle; sink after a shake
+    private(set) var fxCapFlow = 0.0                                          // 布丁: 0...1, the caramel runs down while it is held
     private(set) var remeshCount = 0, remeshMs = 0.0
     // v2.25 F4: QD is the reference shape with inertia (the body chases QD, QD chases Q on a spring); QV its velocity; QW how much a drag's acceleration pushes each particle
     private var QDX: [Double] = [], QDY: [Double] = [], QVX: [Double] = [], QVY: [Double] = [], QW: [Double] = []
@@ -2752,6 +2758,7 @@ final class SlimeRig {
         lastSdt = sdt
         if sillOn { sillStepPre() }   // v2.28 窗台
         remeshCalmStep(dt)   // v2.56 補點後站穩
+        fxStep(dt)   // v2.57 新六隻的招牌
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         rateStep(dt)   // v2.54 快扯變硬
         capGrowStep(dt)   // v2.54 無限拉
@@ -4273,6 +4280,7 @@ final class SlimeRig {
     /// One shake of the phone; dx, dy is the screen direction the contents are flung relative to the phone.
     func shake(dx: Double, dy: Double) {
         decoKick = t; decoDir = dx < 0 ? -1 : 1   // v2.37 the wind bell
+        if fx.pearls > 0 { fxPearlSink = 1 }   // v2.57 珍奶: the pearls sink to the bottom
         guard params.shake >= 0.5 else { return }
         let n = max(1, params.shakeN)
         snwLast = t
@@ -5168,7 +5176,7 @@ final class SlimeRig {
             let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate
             impTrust += (0.04 + 0.04 * purr) * dt * e3m; impWary -= 0.05 * dt * e3m
         }
-        impWary *= exp(-dt / 260)
+        impWary *= exp(-dt / (260 * (params.wFade > 0 ? params.wFade : 1)))   // v2.57 wFade: 布丁 is scared easily and forgets fast
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
         let ks = 1 - exp(-dt / 1)
         impShownTrust += (impTrust - impShownTrust) * ks; impShownWary += (impWary - impShownWary) * ks
@@ -5539,7 +5547,7 @@ final class SlimeRig {
     /// B2: untouched 40 s (a tap on empty space counts) while resting, it falls asleep: eyes close, it melts a little, breathes slow and deep.
     private func sleepTry() -> Bool {
         guard iv3(params.sleep), !slpOn else { return false }
-        guard t - max(lastTouch, slpLastAny) >= 40, lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn, snwCloud <= 0.03 else { return false }   // v2.31: not while the glitter settles, it has to open its eyes at the clear moment
+        guard t - max(lastTouch, slpLastAny) >= (params.sleepAfter > 0 ? params.sleepAfter : 40), lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn, snwCloud <= 0.03 else { return false }   // v2.31: not while the glitter settles, it has to open its eyes at the clear moment
         slpOn = true; lifeSt = .sleep; cutSniffs()
         return true
     }
@@ -5796,4 +5804,84 @@ final class SlimeRig {
 
     /// v2.19 A4: how long the grabbing finger has been held still (s); past 0.8 s each breath comes through as one soft tap.
     var heldStill: Double { fingers.values.filter { $0.mode == .grab }.map(\.stillT).max() ?? 0 }
+}
+
+// MARK: - v2.57 新六隻的招牌 (web fxStep, fxInner, drawFx; 多米 11-22). Drawn on top of the jelly skin by the view; nothing here changes the physics.
+extension SlimeRig {
+    struct FxView {
+        var stains: [(x: Double, y: Double, r: Double, k: Double)]   // world points, r already × R
+        var core: [(x: Double, y: Double)]
+        var pearls: [(x: Double, y: Double)]
+        var capFlow: Double
+    }
+    /// How clouded a shaken slime is, for 汽水's fog (the glitter's haze is 0 while no glitter is drawn)
+    var fogCloud: Double { params.shake >= 0.5 ? snwCloud : 0 }
+
+    func fxReset() { fxStains = []; fxCoreN = 0; fxCore = []; fxCapFlow = 0; fxPearlN = 0; fxPearls = []; fxPearlSink = 0 }
+
+    /// Inner body particles within rad·R of (0, cy·R) in the rest shape, evenly picked, at most `max` (by index, no random draws)
+    private func fxInner(_ cyK: Double, _ rad: Double, _ maxN: Int) -> [Int] {
+        var cand: [Int] = []
+        for i in 0..<N where BIDX[i] < 0 && TID[i] < 0 && hypot(Q0X[i], Q0Y[i] - R * cyK) < R * rad { cand.append(i) }
+        let st = max(1, Int((Double(cand.count) / Double(maxN)).rounded(.up)))
+        return stride(from: 0, to: cand.count, by: st).map { cand[$0] }
+    }
+
+    func fxStep(_ dt: Double) {
+        guard N > 0, !fx.isEmpty else { if !fxStains.isEmpty { fxStains = [] }; return }
+        if fx.pearls > 0 {
+            if fxPearlN != N {   // lower half of the belly, one high one low (by index they bunched beside the eyes like more eyes; in an arc like a mouth)
+                fxPearlN = N; var used = Set<Int>(); fxPearls = []
+                let n = fx.pearls
+                for k in 0..<n {
+                    let u: Double = n > 1 ? Double(k) / Double(n - 1) - 0.5 : 0, tx = u * R * 0.95, ty = R * (k % 2 == 1 ? 0.58 : 0.38 + 0.04 * Double(k % 3))
+                    var bi = -1, bd = 1e9
+                    for i in 0..<N where BIDX[i] < 0 && TID[i] < 0 && !used.contains(i) { let d = hypot(Q0X[i] - tx, Q0Y[i] - ty); if d < bd { bd = d; bi = i } }
+                    if bi >= 0 { used.insert(bi); fxPearls.append((i: bi, x: X[bi], y: Y[bi])) }
+                }
+            }
+            fxPearlSink *= exp(-dt / 5)
+            var by = -1e9, cxs = 0.0
+            for i in bnd { by = max(by, Y[i]); cxs += X[i] }
+            cxs /= Double(max(1, bnd.count))
+            let q = 1 - exp(-dt / 0.14), s = min(1, fxPearlSink * 1.6), n = fxPearls.count
+            for k in fxPearls.indices {   // sunk: in a row just above the lowest point; 5 s back to their places; too far (a scene change, swimming in) jumps there
+                let p = fxPearls[k]
+                guard p.i < N else { continue }
+                let tx = X[p.i] + (cxs + (Double(k) - Double(n - 1) / 2) * R * 0.24 - X[p.i]) * s * 0.8, ty = Y[p.i] + (by - R * 0.2 - Y[p.i]) * s
+                if hypot(tx - p.x, ty - p.y) > R * 2 { fxPearls[k].x = tx; fxPearls[k].y = ty } else { fxPearls[k].x += (tx - p.x) * q; fxPearls[k].y += (ty - p.y) * q }
+            }
+        }
+        if fx.cap != nil {   // held: runs down in 0.9 s; let go: back in a little over 3 s
+            let g: Double = fingers.values.contains(where: { $0.mode == .grab }) ? 1 : 0
+            fxCapFlow += (g - fxCapFlow) * (1 - exp(-dt / (g > 0 ? 0.9 : 3.2)))
+        }
+        if fx.purple != nil {   // rubbed: purple in a second; let go: down to a third in 7 s, spreading to 0.8R
+            for k in fxStains.indices { fxStains[k].hot = false }
+            for g in fingers.values where g.mode == .grab {
+                var bi = -1, bd = 1e9
+                for i in 0..<N { let d = hypot(X[i] - g.x, Y[i] - g.y); if d < bd { bd = d; bi = i } }
+                if bi < 0 || bd > R * 0.5 { continue }
+                var si = -1
+                for (k, o) in fxStains.enumerated() where o.i < N { if hypot(X[o.i] - X[bi], Y[o.i] - Y[bi]) < R * 0.3 { si = k; break } }
+                if si < 0 { fxStains.append((i: bi, k: 0, r: 0.28, hot: true)); if fxStains.count > 6 { fxStains.removeFirst() }; si = fxStains.count - 1 }
+                fxStains[si].hot = true; fxStains[si].k = min(1, fxStains[si].k + dt * 1.1)
+            }
+            for k in fxStains.indices.reversed() {
+                fxStains[k].r += (0.8 - fxStains[k].r) * (1 - exp(-dt / 5))
+                if !fxStains[k].hot { fxStains[k].k *= exp(-dt / 7) }
+                if fxStains[k].k < 0.01 || fxStains[k].i >= N { fxStains.remove(at: k) }
+            }
+        } else if !fxStains.isEmpty { fxStains = [] }
+    }
+
+    /// What the view draws for the chosen slime's signature; nil when it has none
+    var fxView: FxView? {
+        guard N > 0, !fx.isEmpty else { return nil }
+        if fx.core != nil && fxCoreN != N { fxCoreN = N; fxCore = fxInner(0.4, 0.44, 22) }   // twenty-odd faint ones make an even lump; fewer, stronger ones looked like dirt
+        return FxView(stains: fx.purple == nil ? [] : fxStains.filter { $0.i < N }.map { (x: X[$0.i], y: Y[$0.i], r: R * $0.r, k: $0.k) },
+                      core: fx.core == nil ? [] : fxCore.filter { $0 < N }.map { (x: X[$0], y: Y[$0]) },
+                      pearls: fxPearls.map { (x: $0.x, y: $0.y) },
+                      capFlow: fxCapFlow)
+    }
 }

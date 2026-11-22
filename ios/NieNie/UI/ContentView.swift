@@ -151,7 +151,7 @@ struct ContentView: View {
             // v2.23 收集 (多米 11-02: all of them there from the start): four slimes; the material moved to the panel
             // v2.33 一隻為主: hidden while the panel's 一隻為主 is 1
             if controller.current.one < 0.5 {
-            HStack(spacing: 2) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(76), spacing: 2), count: 3), spacing: 2) {   // v2.57 ten do not fit in a row: three to a row, like the web
                 ForEach(SlimeKind.allCases) { k in
                     let on = controller.slime == k
                     Button {
@@ -175,7 +175,7 @@ struct ContentView: View {
                 }
             }
             .padding(3)
-            .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
+            .background(RoundedRectangle(cornerRadius: 22).fill(Palette.chip).overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("選史萊姆")
             }
