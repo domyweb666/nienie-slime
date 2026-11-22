@@ -286,6 +286,7 @@ struct FeelParams: Equatable, Codable {
     var growMax: Double = 12          // the most the edge limits widen
     var pullCreep: Double = 15        // pulled outward (0.6R on, fully at 1.8R) the remembered shape follows this fast instead of creep
     var pullNearR: Double = 10        // and is measured in the whole body's frame this far around the finger (×R) instead of nearR
+    var homeFloor: Double = 1         // v2.55 (11-23): held on the sill, the home spring may not pull the body into the floor (home lowest where the bottom just touches the surface). Pulled up 2.5 to 3.5R and held, the remembered shape grew long while home stayed at the short body's centre, so the spring pushed the lower half into the sill: flattened to a line, a hundred flipped triangles. 0 = v2.54b
     var remesh: Double = 1            // v2.54 拉長時自動補點: re-sample the body from the remembered shape when it is pulled long (see SlimeRig.remesh); 0 = only widen the limits
     var remeshHi: Double = 2.6        // an outline edge of the remembered shape longer than this many point spacings
     var remeshStr: Double = 2.8       // or an edge inside past this × its rest length
@@ -711,6 +712,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
         TuneField(key: \.endless, name: "無限拉 v2.54", hint: "（多米 11-22：拉五公分只長三公分，要能無限擴張、跟手）1：手指不讓、拉伸上限不作用，邊拉滿了上限自己放寬，整條一起變長；0 回 v2.53", range: 0...1, step: 1),
         TuneField(key: \.pullCreep, name: "無限拉：拉長時定型速度", hint: "往外拉開 0.6R 起慢慢換成這個速度（1.8R 全換）：記形追得上手指，放手才不會縮回一截。揉、刷、兩指擠照舊用「定型速度」", range: 0...60, step: 1),
+        TuneField(key: \.homeFloor, name: "抓著時家不壓進窗台 v2.55", hint: "（11-23：抓頭頂往上拉 2.5 到 3.5R 按住一秒多，身體下半被壓進窗台、扁成一條、翻面上百個）1：抓著時家最低只到身體底部剛好碰到地面；0 回 v2.54b", range: 0...1, step: 0.05),
         TuneField(key: \.pullNearR, name: "無限拉：拉長時記形範圍", hint: "往外拉長時整條都用整身座標記形（×半徑）", range: 0.5...12, step: 0.1),
         TuneField(key: \.growK, name: "無限拉：上限放寬多快", hint: "被抓的那塊跟不上手指時，每條邊的上限每秒放寬幾倍（e 的幾次方）", range: 0.2...6, step: 0.1),
         TuneField(key: \.remesh, name: "拉長時自動補點 v2.54", hint: "（多米 11-22）記住的形狀外框點距超過 2.6 個點距、或身體裡有邊拉到原形 2.8 倍，就照現在的形狀重新撒點（點距不變，最多原本 3 倍）；退回去點太密時再撒一次變少。0：只放寬上限不補點", range: 0...1, step: 1),

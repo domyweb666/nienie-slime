@@ -1617,7 +1617,8 @@
       const t1 = deskText(); mat.alpha = .5; DESK.slots = [null, null, null]; deskImport(t1); r.f = { moved: mv, same: t1 === deskText(), alpha: mat.alpha }; DESK.slots = S0; DESK.log = L0; DESK.base0 = B0; try { if (keep === null) localStorage.removeItem('nienie.feel'); else localStorage.setItem('nienie.feel', keep); } catch (_) {} }
     else r.f = { skipped: true, moved: 0, same: true };
     // g
-    const tug = (sd, at) => { fresh({ seed: sd, strandAt: at, strand: 1, tugEdge: .42 }); const c = globalC; let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] < Y[bi]) bi = i; const [sx, sy] = scr(X[bi], Y[bi] + R * .15), ey = Math.max(30, sy - R * 2.5); ev('pointerdown', 1, sx, sy); steps(4); let iv = 0, sh = 0; const see = () => { iv = Math.max(iv, inv()); sh = Math.max(sh, sharp()); };
+    const tug = (sd, at) => { fresh({ seed: sd, strandAt: at, strand: 1, tugEdge: .42, homeFloor: 0 });   // v2.55：量的是 strandAt 2.4 會折、1.6 不折，homeFloor 也會讓 2.4 少折一些（82 對 120 以上），對照組要關掉
+      const c = globalC; let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] < Y[bi]) bi = i; const [sx, sy] = scr(X[bi], Y[bi] + R * .15), ey = Math.max(30, sy - R * 2.5); ev('pointerdown', 1, sx, sy); steps(4); let iv = 0, sh = 0; const see = () => { iv = Math.max(iv, inv()); sh = Math.max(sh, sharp()); };
       for (let s = 1; s <= 40; s++) { ev('pointermove', 1, sx, sy + (ey - sy) * s / 40); steps(1); see(); } for (let k = 0; k < 45; k++) { steps(1); see(); } const f = fingers.get(1), tg = !!(f && f.tug); ev('pointerup', 1, sx, ey); for (let k = 0; k < 90; k++) { steps(1); see(); } return { inv: iv, sharp: sh, tug: tg }; };
     r.g = { s4: tug(4, 1.6), s7: tug(7, 1.6), s4old: tug(4, 2.4), s7old: tug(7, 2.4) };
     res.T63_v252 = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
@@ -1655,6 +1656,23 @@
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
     res.PASS.endless = r.up.gap < .5 && r.up.held >= 5 && r.up.flips <= 60 && r.up.xs === 0 && r.up.after >= 3.5 && r.diag.held >= 5 && r.diag.xs === 0 && r.diag.after >= 3.5 && r.up.endX === 0 && r.diag.endX === 0
       && r.upOld.held < 3.6 && !(r.jamb.cling && /jamb|ceil/.test(r.jamb.side));
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T66 v2.55 抓著時家不壓進窗台（homeFloor，11-23）。v2.54 黏土拖動門檻 4、無限拉之後，抓頭頂往內 0.25R 往上拉 2.5R、3R、3.5R 按住 3 秒：
+  // 記形把身體記長了，家還停在原本矮矮那一團的中心，回家彈簧把長身體往下拉進窗台，一秒多後下半扁成一條，底部（離窗台 0.5R 內）翻面 24 到 97 個。
+  // 開著：每個距離底部翻面不超過 3 個、拉著時外框不交叉、放手後沒有 NaN；同一套 homeFloor 0 當對照，至少一個距離底部翻面 20 個以上（證明量得到）
+  { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
+    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };
+    const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const inv = fl => { let n = 0, lo = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if (.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < -.02 * TRA[k / 3]) { n++; if (fl - (Y[a] + Y[b] + Y[c]) / 3 < R * .5) lo++; } } return [n, lo]; };
+    const hold = (over, dist) => { fresh(over); const fl = SILL.g.fl; let b = -1, bv = 1e9; for (const i of bnd) if (Y[i] < bv) { bv = Y[i]; b = i; } const [sx, sy] = scr(X[b], Y[b] + R * .25), ex = sx + R * .3 * dist * CAM.z, ey = sy - R * dist * CAM.z;
+      ev('pointerdown', 1, sx, sy); steps(6); for (let s = 1; s <= 24; s++) { ev('pointermove', 1, sx + (ex - sx) * s / 24, sy + (ey - sy) * s / 24); steps(1); }
+      let all = 0, low = 0, xs = 0; for (let k = 0; k < 180; k++) { steps(1); const [n, lo] = inv(fl); all = Math.max(all, n); low = Math.max(low, lo); if (k % 15 === 0 && selfX() > 0) xs++; }
+      ev('pointerup', 1, ex, ey); steps(90); let nan = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) nan++; return { all, low, xs, nan }; };
+    r.on = [2.5, 3, 3.5].map(d => hold({}, d)); r.off = [2.5, 3, 3.5].map(d => hold({ homeFloor: 0 }, d));
+    res.T66_homeFloor = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
+    res.PASS.homeFloor = r.on.every(o => o.low <= 3 && o.xs === 0 && o.nan === 0) && r.off.some(o => o.low >= 20);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();

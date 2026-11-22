@@ -3054,7 +3054,16 @@ final class SlimeRig {
         let hx = homeX + tugX + dragOX + Lamp * mat.life * R * 0.035 * sin(tl * 2 * .pi / 7.3)
         let hy = homeY + tugY + dragOY - brLift + (mat.jelly >= 0.5 ? 0 : Lamp * mat.life * R * 0.05 * sin(tl * 2 * .pi / 4.7))   // jellyfish: up and down only with the pulse
         // 候選 21: idle home spring homeK (0.003 drifts back in about half a second with no overshoot); grabbed stays 0.02 × anchor
-        let hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
+        var hyF = flatOn ? flatFloor - flatQB : hy   // pressing flat: home is where the bottom sits on the table
+        // v2.55 homeFloor: held on the sill, the home spring may not pull the body into the surface (home lowest where the bottom just touches it). Same as the web's.
+        if mat.homeFloor > 0 && sillOn && sillGrab && !clingOn && !sillTanV && !flatOn, let g = sillG,
+           fingers.values.allSatisfy({ $0.mode != .grab || $0.fy < gcy }) {   // only while every holding finger is above the centre (pulling up): one pulling down would have the spring yank the body up
+            let fy: Double = sillPlane == .frame ? g.bt : sillPlane == .out ? g.oy : sillInBowl ? g.bf : g.fl
+            var yb = -Double.infinity
+            for i in bnd where Y[i] > yb { yb = Y[i] }
+            let lo = gcy + (fy - yb)
+            if hyF > lo { hyF += (lo - hyF) * min(1, mat.homeFloor) }
+        }
         let kh: Double = sillOn ? 0.006 * (grabbing ? mat.anchor : 1) : (grabbing ? 0.02 * mat.anchor : mat.homeK), dx0 = hx - gcx, dy0 = hyF - gcy   // v2.28 窗台: a weak home only
         let hxOn = !(sillOn && (sillAir || (sillTanV && !sillLift && !sillGrab))), hyOn = !introOn && !(sillOn && !sillGrab && !sillTanV)   // v2.28 窗台: in the air nothing pulls it home; on the sill up and down is gravity's unless grabbed; v2.30 walking vertically the other way round
         let soft = sillOn && mat.softWall >= 0.5
