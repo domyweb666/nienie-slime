@@ -286,6 +286,15 @@ struct FeelParams: Equatable, Codable {
     var growMax: Double = 12          // the most the edge limits widen
     var pullCreep: Double = 15        // pulled outward (0.6R on, fully at 1.8R) the remembered shape follows this fast instead of creep
     var pullNearR: Double = 10        // and is measured in the whole body's frame this far around the finger (×R) instead of nearR
+    var remesh: Double = 1            // v2.54 拉長時自動補點: re-sample the body from the remembered shape when it is pulled long (see SlimeRig.remesh); 0 = only widen the limits
+    var remeshHi: Double = 2.6        // an outline edge of the remembered shape longer than this many point spacings
+    var remeshStr: Double = 2.8       // or an edge inside past this × its rest length
+    var remeshLo: Double = 0.55       // going back: an outline edge shorter than this many spacings (and more points than at build time)
+    var remeshMaxN: Double = 3        // at most this × the build-time point count
+    var rateK: Double = 0.8           // v2.54 快扯變硬、慢拉變軟: how much the finger's speed changes the stiffness while held (0 = off)
+    var rateLo: Double = 4            // radii a second, at or below: softest
+    var rateHi: Double = 14            // radii a second, at or above: stiffest
+    var hapPull: Double = 0.55        // v2.54 震動跟著拉力走: continuous rumble at full tension (0 = off)
     var frameCling: Double = 0        // v2.54 (多米 11-22: only the phone's four edges, no more window ledge): 1 = v2.53, set down by the window jambs or under the top bar it sticks to the frame
     var edgeCling: Double = 1         // set down slowly by the left, right or top edge of the screen it sticks there, the same suckers as on the window jambs; 0 = jambs only
     var bubbles: Double = 0           // v2.51: 0 (多米: no drops inside). small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
@@ -704,6 +713,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.pullCreep, name: "無限拉：拉長時定型速度", hint: "往外拉開 0.6R 起慢慢換成這個速度（1.8R 全換）：記形追得上手指，放手才不會縮回一截。揉、刷、兩指擠照舊用「定型速度」", range: 0...60, step: 1),
         TuneField(key: \.pullNearR, name: "無限拉：拉長時記形範圍", hint: "往外拉長時整條都用整身座標記形（×半徑）", range: 0.5...12, step: 0.1),
         TuneField(key: \.growK, name: "無限拉：上限放寬多快", hint: "被抓的那塊跟不上手指時，每條邊的上限每秒放寬幾倍（e 的幾次方）", range: 0.2...6, step: 0.1),
+        TuneField(key: \.remesh, name: "拉長時自動補點 v2.54", hint: "（多米 11-22）記住的形狀外框點距超過 2.6 個點距、或身體裡有邊拉到原形 2.8 倍，就照現在的形狀重新撒點（點距不變，最多原本 3 倍）；退回去點太密時再撒一次變少。0：只放寬上限不補點", range: 0...1, step: 1),
+        TuneField(key: \.rateK, name: "快扯變硬、慢拉變軟 v2.54", hint: "（多米 11-22）手指每秒移動不到 rateLo 個半徑最軟（硬度少三成五×這個值），超過 rateHi 最硬（硬度多兩倍×這個值、記形少九成五×這個值）：猛扯拉不太長、會彈回去，慢拉一路變長。0 關掉", range: 0...1, step: 0.05),
+        TuneField(key: \.rateLo, name: "快扯變硬：多慢算慢拉（半徑／秒）", hint: "一般慢慢拉大約每秒 3 到 6 個半徑；量過設 1 的話一般的拉也會變硬、跟不上手", range: 0.2...10, step: 0.1),
+        TuneField(key: \.rateHi, name: "快扯變硬：多快算猛扯（半徑／秒）", hint: "", range: 2...20, step: 0.5),
+        TuneField(key: \.hapPull, name: "震動跟著拉力走 v2.54", hint: "（多米 11-22）抓著拉時持續震動，拉越長越強越銳利（3R 約一半、8R 約八成），猛扯被身體頂住時馬上變強。這是最強時的強度，0 關掉", range: 0...1, step: 0.05),
         TuneField(key: \.frameCling, name: "黏窗框 v2.54", hint: "（多米 11-22：只要能爬手機四邊，窗沿的取消）0：放在窗框旁邊不再黏上窗框，只有螢幕左、右、上邊會黏；1 回 v2.53", range: 0...1, step: 1),
         TuneField(key: \.edgeCling, name: "黏在螢幕四周 v2.51", hint: "（多米 11-22）1：慢慢放在螢幕左邊、右邊、上邊旁邊會黏住；0 只有窗框", range: 0...1, step: 1),
         TuneField(key: \.flow, name: "流：放著會慢慢往下塌 v2.52", hint: "（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影", range: 0...0.5, step: 0.01),

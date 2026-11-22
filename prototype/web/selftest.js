@@ -53,7 +53,7 @@
   //   照 v2.47、v2.48 的做法：舊項目一律關掉這五樣（量的是原本的行為），關掉之後剩 pullCalm（T61）不過，T61 的 SP 也一起關。v2.51 自己的行為還沒有專門的項目，只有 T63 g 量了捏邊緣往外拉
   // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
   const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k] };   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
-  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], endless: 0, frameCling: 1, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）
+  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）
   const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
@@ -1632,7 +1632,7 @@
       && r.f.moved === 0 && r.f.same
       && r.g.s4.sharp <= 110 && r.g.s7.sharp <= 110 && r.g.s4.inv <= 3 && r.g.s7.inv <= 3 && Math.max(r.g.s4old.sharp, r.g.s7old.sharp) > 120;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
-  // T65 v2.54 無限拉（多米 11-22：拉五公分只長三公分）。v2.54 的預設：往上拉 4R、斜拉 5.5R，被抓的那塊跟手指差不到 0.5R、身體拉到 5R 以上、
+  // T65 v2.54 無限拉（多米 11-22：拉五公分只長三公分）。v2.54b 補點、快扯變硬開著之後，拉著時細長三角形翻一點的最多 44 個（畫面看不出、記形不擋），門檻從 10 放到 60。v2.54 的預設：往上拉 4R、斜拉 5.5R，被抓的那塊跟手指差不到 0.5R、身體拉到 5R 以上、
   // 拉著時沒有翻面和交叉、放手 2 秒還留 3.5R 以上；同一套關掉無限拉（v2.53）身體只到 3.3R 以下（對照，證明量得到差別）。另外看黏窗框關掉：放在右窗框旁不黏
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
     const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, life2: 0 };
@@ -1653,7 +1653,7 @@
       for (let s = 1; s <= 60; s++) { ev('pointermove', 1, sx + (tx - sx) * s / 60, sy + (ty - sy) * s / 60); steps(1); } steps(40); ev('pointerup', 1, tx, ty); steps(30); r.jamb = { surf: SILL.surf, cling: CLING.on, side: CLING.side }; }
     res.T65_endless = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
-    res.PASS.endless = r.up.gap < .5 && r.up.held >= 5 && r.up.flips <= 10 && r.up.xs === 0 && r.up.after >= 3.5 && r.diag.held >= 5 && r.diag.xs === 0 && r.diag.after >= 3.5 && r.up.endX === 0 && r.diag.endX === 0
+    res.PASS.endless = r.up.gap < .5 && r.up.held >= 5 && r.up.flips <= 60 && r.up.xs === 0 && r.up.after >= 3.5 && r.diag.held >= 5 && r.diag.xs === 0 && r.diag.after >= 3.5 && r.up.endX === 0 && r.diag.endX === 0
       && r.upOld.held < 3.6 && !(r.jamb.cling && /jamb|ceil/.test(r.jamb.side));
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();

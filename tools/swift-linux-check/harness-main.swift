@@ -20,6 +20,8 @@ func apply(_ p: inout FeelParams, _ kv: [String]) {
         case "maxPull": p.maxPull = v
         case "life2": p.life2 = v
         case "endless": p.endless = v
+        case "remesh": p.remesh = v
+        case "rateK": p.rateK = v
         case "slide": p.slide = v
         case "capSlip": p.capSlip = v
         case "pullCreep": p.pullCreep = v
@@ -117,7 +119,7 @@ if args.count >= 2, args[1] == "pull" {
         let held = len()
         rig.touchEnded(id, time: clock)
         for _ in 0..<120 { rig.update(DT); clock += DT }
-        print(String(format: "dir %.1f,%.1f dist %.1f  finger %.2fR  held %.2fR  after2s %.2fR", dx, dy, dist, hypot(ex - g.x, ey - g.y) / R, held, len()))
+        print(String(format: "dir %.1f,%.1f dist %.1f  finger %.2fR  held %.2fR  after2s %.2fR  remesh %d (%.1f ms) N %d", dx, dy, dist, hypot(ex - g.x, ey - g.y) / R, held, len(), rig.remeshCount, rig.remeshMs, rig.N)); print(rig.remT.map { String(format: "%.1f", $0) })
         _ = tok
     }
 }

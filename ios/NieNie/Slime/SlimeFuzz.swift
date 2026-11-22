@@ -118,7 +118,7 @@ struct SlimeFuzz {
         var last: [ObjectIdentifier: (x: Double, y: Double)] = [:]
 
         func step(_ holding: Bool) {
-            let p0 = rig.labParticles()
+            let p0 = rig.labParticles(), rem0 = rig.remeshCount
             let u0 = ProcessInfo.processInfo.systemUptime
             rig.update(DT)
             let ms: Double = (ProcessInfo.processInfo.systemUptime - u0) * 1000
@@ -136,6 +136,7 @@ struct SlimeFuzz {
             // how much it jumps while the finger holds still: the largest change of a particle's velocity, the whole body's travel taken off
             let p1 = rig.labParticles(), n = min(p0.x.count, p1.x.count)
             guard n > 0 else { return }
+            if rig.remeshCount != rem0 { vx = nil; vy = []; return }   // v2.54: re-sampled this frame, the particles are a new set; no per-particle jump
             var ax = 0.0, ay = 0.0
             for i in 0..<n { ax += p1.x[i] - p0.x[i]; ay += p1.y[i] - p0.y[i] }
             ax /= Double(n); ay /= Double(n)

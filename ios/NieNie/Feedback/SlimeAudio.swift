@@ -94,11 +94,11 @@ final class SlimeAudio: SlimeSoundSource {
     ]
     // pull: st = stretch (radii), v = its rate of change (radii/s, smoothed 60 ms)
     private let pullOn = 0.2
-    private func pullGain(_ st: Double, _ v: Double) -> Double { 0.12 * Self.clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * min(1, v / 2.5) }
-    private func pullRate(_ st: Double) -> Double { 0.85 + 0.4 * tanh(st / 3) }
-    private func pullLowpass(_ st: Double) -> Double { 1000 + 3500 * tanh(st / 3) }
-    private func strandRate(_ st: Double, _ v: Double) -> Double { st > 0.4 ? (2 + 16 * tanh(st / 3)) * (0.25 + 0.75 * min(1, v / 2.5)) : 0 }
-    private func strandPlay(_ st: Double) -> Play { Play(gain: Self.rnd(0.12, 0.3), rate: (0.85 + 0.5 * tanh(st / 3)) * Self.rnd(0.92, 1.08), lowpass: 9000, deco: true) }
+    private func pullGain(_ st: Double, _ v: Double) -> Double { (0.12 + 0.18 * (1 - exp(-max(0, st - 0.6) / 4))) * Self.clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * min(1, v / 2.5) }   // v2.54: held still a long pull still hums a little
+    private func pullRate(_ st: Double) -> Double { 0.85 * pow(2, 16 * (1 - exp(-st / 5)) / 12) }   // v2.54 無限拉: keeps rising (tanh stopped at about 3R): 3 semitones at 1R, 7 at 3R, 11 at 6R, 14.5 at 12R, at most 16
+    private func pullLowpass(_ st: Double) -> Double { 1000 + 7000 * (1 - exp(-st / 5)) }
+    private func strandRate(_ st: Double, _ v: Double) -> Double { st > 0.4 ? (2 + 16 * (1 - exp(-st / 4))) * (0.25 + 0.75 * min(1, v / 2.5)) : 0 }
+    private func strandPlay(_ st: Double) -> Play { Play(gain: Self.rnd(0.12, 0.3), rate: 0.85 * pow(2, 18 * (1 - exp(-st / 5)) / 12) * Self.rnd(0.92, 1.08), lowpass: 9000, deco: true) }
     // rub: n = level / rubMax; ducks under the strand loop once pulled far
     private func rubDuck(_ st: Double) -> Double { Self.clamp(1 - (st - 0.3) / 0.7, 0, 1) }
 

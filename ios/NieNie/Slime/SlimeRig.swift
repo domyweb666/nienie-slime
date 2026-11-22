@@ -85,6 +85,11 @@ final class SlimeRig {
     private var X: [Double] = [], Y: [Double] = [], PX: [Double] = [], PY: [Double] = []
     private var Q0X: [Double] = [], Q0Y: [Double] = []   // original rest shape (zero mean)
     private var QX: [Double] = [], QY: [Double] = []     // remembered (plastic) rest shape
+    /// v2.54 補點: what the remembered shape returns to. The same as Q0 until the body is re-sampled; then Q0 becomes the remembered
+    /// shape of that moment (mesh, clusters and rest lengths are measured from it) and H0, carried over by interpolation, is the original lump.
+    private var H0X: [Double] = [], H0Y: [Double] = []
+    private var remN = 0, remN0 = 0, remLast = -9.0, remChk = 0.0
+    private(set) var remeshCount = 0, remeshMs = 0.0
     // v2.25 F4: QD is the reference shape with inertia (the body chases QD, QD chases Q on a spring); QV its velocity; QW how much a drag's acceleration pushes each particle
     private var QDX: [Double] = [], QDY: [Double] = [], QVX: [Double] = [], QVY: [Double] = [], QW: [Double] = []
     // v2.26 F6: the offset a stroke carries the whole body by; comfort adding up over strokes; F7: the trail in the body's frame; the highlight's neighbours
@@ -878,6 +883,7 @@ final class SlimeRig {
             QX[i] = Q0X[i]; QY[i] = Q0Y[i]
             X[i] = cx + Q0X[i]; Y[i] = cy + Q0Y[i]; PX[i] = X[i]; PY[i] = Y[i]
         }
+        H0X = Q0X; H0Y = Q0Y; remN = 0; remN0 = N; remLast = -9   // v2.54 補點
         for k in tent.indices {   // v2.27 tentSlip, tentBump, tentRest
             tent[k].all = (0..<N).filter { TID[$0] == k }
             tent[k].root = tent[k].all.filter { TUB[$0] < 0.08 }
@@ -946,7 +952,7 @@ final class SlimeRig {
 
     /// v2.29 防打結: Delaunay (Bowyer-Watson) over the rest shape, keeping the triangles whose centre is inside the boundary ring,
     /// wound counter-clockwise, with their rest areas. Port of the web's `buildMesh`.
-    private func buildMesh() {
+    private func buildMesh(fast: Bool = false) {
         let n = N
         guard n >= 3, bnd.count >= 3 else { TRI = []; TRA = []; return }
         var xs = Q0X + [0, 0, 0], ys = Q0Y + [0, 0, 0]
@@ -954,31 +960,39 @@ final class SlimeRig {
         for i in 0..<n { x0 = min(x0, xs[i]); x1 = max(x1, xs[i]); y0 = min(y0, ys[i]); y1 = max(y1, ys[i]) }
         let d = max(x1 - x0, y1 - y0) * 20
         xs[n] = x0 - d; ys[n] = y0 - d; xs[n + 1] = x1 + d; ys[n + 1] = y0 - d; xs[n + 2] = (x0 + x1) / 2; ys[n + 2] = y1 + d
-        struct Tri { let a, b, c: Int; let ux, uy, r: Double }
+        struct Tri { let a, b, c: Int; let ux, uy, r, right: Double }
         func circ(_ a: Int, _ b: Int, _ c: Int) -> Tri {
             let ax = xs[a], ay = ys[a], bx = xs[b], by = ys[b], cx = xs[c], cy = ys[c]
             let D: Double = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
             let A: Double = ax * ax + ay * ay, B: Double = bx * bx + by * by, C: Double = cx * cx + cy * cy
             let ux: Double = (A * (by - cy) + B * (cy - ay) + C * (ay - by)) / D
             let uy: Double = (A * (cx - bx) + B * (ax - cx) + C * (bx - ax)) / D
-            return Tri(a: a, b: b, c: c, ux: ux, uy: uy, r: (ax - ux) * (ax - ux) + (ay - uy) * (ay - uy))
+            let r: Double = (ax - ux) * (ax - ux) + (ay - uy) * (ay - uy)
+            return Tri(a: a, b: b, c: c, ux: ux, uy: uy, r: r, right: ux + r.squareRoot())
         }
-        var T = [circ(n, n + 1, n + 2)]
-        for i in 0..<n {
-            var keep: [Tri] = []
-            var E: [Int: (a: Int, b: Int, dup: Bool)] = [:]   // edges of the triangles this point falls into; an edge seen twice is inside the hole
+        // v2.54 (補點 rebuilds the mesh while held, so it has to be quick): points go in left to right; a triangle whose circle ends left of
+        // the current point can never be broken again and is set aside. The same triangulation, about ten times faster.
+        // fast only for the re-sample; building the body keeps the old insertion order (the triangle order sets the order the constraints
+        // run in each substep; measured on the web with the new order, T62's downward pull jittered 1.2 → 3.9)
+        let order: [Int] = fast ? (0..<n).sorted { xs[$0] < xs[$1] || (xs[$0] == xs[$1] && $0 < $1) } : Array(0..<n)
+        var T = [circ(n, n + 1, n + 2)], done: [Tri] = []
+        var keep: [Tri] = [], E: [(a: Int, b: Int, dup: Bool)] = []
+        for i in order {
+            keep.removeAll(keepingCapacity: true); E.removeAll(keepingCapacity: true)   // edges of the triangles this point falls into; an edge seen twice is inside the hole
+            let px = xs[i], py = ys[i]
             for q in T {
-                let ex = xs[i] - q.ux, ey = ys[i] - q.uy
+                if fast && q.right < px { done.append(q); continue }
+                let ex = px - q.ux, ey = py - q.uy
                 if ex * ex + ey * ey < q.r {
                     for (a, b) in [(q.a, q.b), (q.b, q.c), (q.c, q.a)] {
-                        let k = a < b ? a * 100000 + b : b * 100000 + a
-                        if let e = E[k] { E[k] = (e.a, e.b, true) } else { E[k] = (a, b, false) }
+                        if let k = E.firstIndex(where: { ($0.a == a && $0.b == b) || ($0.a == b && $0.b == a) }) { E[k].dup = true } else { E.append((a, b, false)) }
                     }
                 } else { keep.append(q) }
             }
-            T = keep
-            for e in E.values where !e.dup { T.append(circ(e.a, e.b, i)) }
+            swap(&T, &keep)
+            for e in E where !e.dup { T.append(circ(e.a, e.b, i)) }
         }
+        T += done
         let nb = bnd.count
         func inRing(_ x: Double, _ y: Double) -> Bool {
             var c = false
@@ -1082,7 +1096,7 @@ final class SlimeRig {
             var e = 0
             while e + 1 < m {
                 let i = EDG[e], j = EDG[e + 1]
-                let dx: Double = (QX[j] - Q0X[j]) - (QX[i] - Q0X[i]), dy: Double = (QY[j] - Q0Y[j]) - (QY[i] - Q0Y[i])
+                let dx: Double = (QX[j] - H0X[j]) - (QX[i] - H0X[i]), dy: Double = (QY[j] - H0Y[j]) - (QY[i] - H0Y[i])   // v2.54: against the original lump (H0), not the rest shape, which holds the corners after a re-sample
                 EDSX[i] += dx; EDSY[i] += dy; EDSX[j] -= dx; EDSY[j] -= dy
                 e += 2
             }
@@ -1098,6 +1112,249 @@ final class SlimeRig {
     /// v2.54 無限拉: a triangle pressed flat on the sill, or a long thin one that tipped over by a hair after a long pull, does not count as
     /// flipped (neither shows; counted, nothing of the pull was remembered and it shrank back on release). Web `flipTol`.
     private func flipTol(_ k: Int) -> Double { effParams.endless >= 0.5 && k / 3 < TRA.count ? -0.1 * TRA[k / 3] : 0 }
+    // MARK: - v2.54 快扯變硬、慢拉變軟 (web `rateStep`)
+
+    /// How fast the grabbing finger moves (radii a second; up in 0.05 s, down in 0.25 s) sets the body's stiffness while held: below
+    /// rateLo it is softest (shape matching ×(1−0.35·rateK)), above rateHi stiffest (×(1+2·rateK)), it remembers less (×(1−0.95·rateK)) and
+    /// the edge limits widen slower (×(1−0.5·rateK)): a yank barely stretches and springs back, a slow pull keeps growing and stays.
+    private var rateV = 0.0, rateG = 0.0
+    private(set) var rateS = 0.0
+    private var rateKA = 1.0, rateKC = 1.0, rateKG = 1.0
+    private func rateStep(_ dt: Double) {
+        let mat = effParams
+        var v = 0.0, held = false
+        for f in fingers.values where f.mode == .grab { held = true; v = max(v, hypot(f.vx, f.vy) / R) }
+        rateV += (v - rateV) * (1 - exp(-dt / (v > rateV ? 0.05 : 0.25)))
+        rateG += ((held ? 1 : 0) - rateG) * (1 - exp(-dt / 0.1))
+        let K: Double = mat.rateK > 0 ? mat.rateK : 0, lo: Double = mat.rateLo > 0 ? mat.rateLo : 4, hi: Double = max(lo + 0.1, mat.rateHi > 0 ? mat.rateHi : 14)
+        let x: Double = max(0, min(1, (rateV - lo) / (hi - lo)))
+        rateS = x * x * (3 - 2 * x)
+        let g = rateG * K
+        rateKA = 1 + g * (-0.35 + 2.35 * rateS); rateKC = 1 - 0.95 * g * rateS; rateKG = 1 - 0.5 * g * rateS
+    }
+
+    /// v2.54 拉力 (多米 11-22: the vibration follows how hard you pull): 0...1, from how long the pull is (a long pull keeps rising, about
+    /// 0.5 at 3R, 0.8 at 8R) plus how far the held patch trails the finger (a yank against the stiff body is felt at once).
+    var pullTension: Double {
+        guard isGrabbing else { return 0 }
+        let st = max(0, pullStretch - 0.3)
+        let len: Double = 1 - exp(-st / 4.5), lag: Double = min(1, CAPGAP / 0.8)
+        return min(1, 0.8 * len + 0.45 * lag * (0.4 + 0.6 * rateS))
+    }
+
+    // MARK: - v2.54 拉長時自動補點 (web `remeshCheck`, `remesh`)
+
+    /// The particle count was fixed when the body was built; pulled long, the points thin out: the outline turns into straight runs, long
+    /// thin triangles flip at a twitch, nothing is remembered. When an outline edge of the remembered shape (Q) is longer than remeshHi
+    /// point spacings, or an edge inside is past remeshStr × rest, the body is sampled again from the remembered shape (outline evenly,
+    /// a hex grid inside, the same spacing). Each new point finds its triangle in the old mesh and takes position, velocity, the return
+    /// target (H0) and the finger weights from its three corners, so nothing visibly jumps; mesh, clusters and rest lengths come from the
+    /// new shape (Q0 becomes the remembered shape) and CAPG returns to 1. Going back, points too close (outline under remeshLo spacings or
+    /// an edge under 0.45 × rest) with more points than at build time: sampled again, fewer. At most remeshMaxN × the build count.
+    /// Not while crossed, stuck to an edge, with fixed tentacles or a second lump.
+    private func remeshCheck(_ dt: Double) {
+        let mat = effParams
+        guard mat.remesh >= 0.5, mat.endless >= 0.5, tent.isEmpty, !b2On, !clingOn, !EDG.isEmpty, H0X.count == N, EDL.count * 2 == EDG.count else { return }
+        remChk += dt
+        guard remChk >= 0.1, t - remLast >= 0.2 else { return }
+        remChk = 0
+        let nb = bnd.count
+        var bmax = 0.0, bmin = 1e9
+        for k in 0..<nb { let i = bnd[k], j = bnd[(k + 1) % nb], d: Double = hypot(QX[j] - QX[i], QY[j] - QY[i]); bmax = max(bmax, d); bmin = min(bmin, d) }
+        var smax = 0.0, smin = 1e9, e = 0, k = 0
+        while e + 1 < EDG.count { let i = EDG[e], j = EDG[e + 1], l: Double = hypot(QX[i] - QX[j], QY[i] - QY[j]) / EDL[k]; smax = max(smax, l); smin = min(smin, l); e += 2; k += 1 }
+        let grow = bmax > (mat.remeshHi > 0 ? mat.remeshHi : 2.6) * h || smax > (mat.remeshStr > 0 ? mat.remeshStr : 2.8)
+        let shrink = remN > 0 && Double(N) > Double(remN0) * 1.05 && (bmin < (mat.remeshLo > 0 ? mat.remeshLo : 0.55) * h || smin < 0.45)
+        guard grow || shrink else { return }
+        // only at a clean moment: no flipped triangle, no crossing in the live body; going back, only while untouched (re-sampled during
+        // rough play too, the fuzz jumped twice as much and left twice as many corners)
+        if shrink && !grow && fingers.values.contains(where: { $0.mode != .none }) { return }
+        guard !ringCrossedQ(), !ringCrossed(), flipCount(X, Y) == 0 else { return }
+        let t0 = Date()
+        if remesh() { remN += 1; remeshCount += 1 }
+        remLast = t; remeshMs = Date().timeIntervalSince(t0) * 1000
+    }
+
+    private func ringCrossedQ() -> Bool {
+        let n = bnd.count
+        for i in 0..<n {
+            let a = bnd[i], b = bnd[(i + 1) % n]
+            var j = i + 2
+            while j < n {
+                if i == 0 && j == n - 1 { j += 1; continue }
+                let p = bnd[j], q = bnd[(j + 1) % n]
+                let d: Double = (QX[b] - QX[a]) * (QY[q] - QY[p]) - (QY[b] - QY[a]) * (QX[q] - QX[p])
+                if abs(d) > 1e-12 {
+                    let u: Double = ((QX[p] - QX[a]) * (QY[q] - QY[p]) - (QY[p] - QY[a]) * (QX[q] - QX[p])) / d
+                    let v: Double = ((QX[p] - QX[a]) * (QY[b] - QY[a]) - (QY[p] - QY[a]) * (QX[b] - QX[a])) / d
+                    if u > 0 && u < 1 && v > 0 && v < 1 { return true }
+                }
+                j += 1
+            }
+        }
+        return false
+    }
+
+    var remT = [0.0, 0, 0, 0, 0, 0]; private var remT0 = Date()
+    private func remesh() -> Bool {
+        remT0 = Date()
+        let nb = bnd.count
+        let P: [(Double, Double)] = bnd.map { (QX[$0], QY[$0]) }
+        var cum = [0.0]
+        for k in 1...nb { let a = P[k - 1], b = P[k % nb]; cum.append(cum[k - 1] + hypot(b.0 - a.0, b.1 - a.1)) }
+        let per = cum[nb], M = max(24, Int((per / (h * 1.05)).rounded()))
+        var pts: [(Double, Double)] = [], nbnd: [Int] = []
+        var j = 0
+        for m in 0..<M {
+            let tg = Double(m) / Double(M) * per
+            while j + 1 < cum.count - 1 && cum[j + 1] < tg { j += 1 }
+            let span = cum[j + 1] - cum[j], f: Double = span > 0 ? (tg - cum[j]) / span : 0, a = P[j], b = P[(j + 1) % nb]
+            nbnd.append(pts.count); pts.append((a.0 + (b.0 - a.0) * f, a.1 + (b.1 - a.1) * f))
+        }
+        func inP(_ x: Double, _ y: Double) -> Bool {
+            var c = false, jj = nb - 1
+            for i in 0..<nb {
+                let ax = P[i].0, ay = P[i].1, bx = P[jj].0, by = P[jj].1
+                if (ay > y) != (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax { c.toggle() }
+                jj = i
+            }
+            return c
+        }
+        var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
+        for q in P { x0 = min(x0, q.0); x1 = max(x1, q.0); y0 = min(y0, q.1); y1 = max(y1, q.1) }
+        // buckets (one point spacing) for "how far to the outline" and for finding each new point's old triangle
+        let cw = h, ncx = max(1, Int((x1 - x0) / cw) + 3), ncy = max(1, Int((y1 - y0) / cw) + 3)
+        func cell(_ x: Double, _ y: Double) -> (Int, Int) { (min(ncx - 1, max(0, Int((x - x0) / cw) + 1)), min(ncy - 1, max(0, Int((y - y0) / cw) + 1))) }
+        var bb = [[Int]](repeating: [], count: ncx * ncy)
+        for b in 0..<M { let c = cell(pts[b].0, pts[b].1); bb[c.1 * ncx + c.0].append(b) }
+        var gy = y0, row = 0
+        while gy <= y1 {
+            var gx = x0 + (row % 2 == 1 ? h / 2 : 0)
+            while gx <= x1 {
+                if inP(gx, gy) {
+                    var dm = 1e9
+                    let c = cell(gx, gy)
+                    for yy in max(0, c.1 - 1)...min(ncy - 1, c.1 + 1) { for xx in max(0, c.0 - 1)...min(ncx - 1, c.0 + 1) { for b in bb[yy * ncx + xx] { dm = min(dm, hypot(pts[b].0 - gx, pts[b].1 - gy)) } } }
+                    if dm > h * 0.7 { pts.append((gx, gy)) }
+                }
+                gx += h
+            }
+            gy += h * 0.87; row += 1
+        }
+        let n2 = pts.count
+        remT[0] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
+        guard Double(n2) <= Double(remN0) * (effParams.remeshMaxN > 0 ? effParams.remeshMaxN : 3), n2 >= 12 else { return false }
+        // each new point's triangle in the old mesh (in the remembered shape) and its barycentric weights; not found (a hair outside
+        // a concave bit of outline): the nearest triangle, weights clamped
+        let T = TRI, nt = T.count / 3
+        var tb = [[Int]](repeating: [], count: ncx * ncy)
+        for k in 0..<nt {
+            let a = T[3 * k], b = T[3 * k + 1], c = T[3 * k + 2]
+            let lo = cell(min(QX[a], QX[b], QX[c]), min(QY[a], QY[b], QY[c])), hi = cell(max(QX[a], QX[b], QX[c]), max(QY[a], QY[b], QY[c]))
+            for yy in lo.1...hi.1 { for xx in lo.0...hi.0 { tb[yy * ncx + xx].append(k) } }
+        }
+        var SA = [Int](repeating: 0, count: n2 * 3), SW = [Double](repeating: 0, count: n2 * 3)
+        for p in 0..<n2 {
+            let x = pts[p].0, y = pts[p].1
+            var best = -1, bs = -1e9, bw = (0.0, 0.0, 0.0)
+            let pc = cell(x, y), cand = tb[pc.1 * ncx + pc.0]
+            for pass in 0..<2 where best < 0 || (pass == 1 && bs < -0.05) {
+            for k in (pass == 0 ? cand : Array(0..<nt)) {
+                let a = T[3 * k], b = T[3 * k + 1], c = T[3 * k + 2], ax = QX[a], ay = QY[a]
+                let v0x = QX[b] - ax, v0y = QY[b] - ay, v1x = QX[c] - ax, v1y = QY[c] - ay, v2x = x - ax, v2y = y - ay
+                let den: Double = v0x * v1y - v1x * v0y
+                if abs(den) < 1e-9 { continue }
+                let v: Double = (v2x * v1y - v1x * v2y) / den, w: Double = (v0x * v2y - v2x * v0y) / den, u = 1 - v - w, mn = min(u, v, w)
+                if mn > bs { bs = mn; best = k; bw = (u, v, w); if mn >= 0 { break } }
+            }
+            }
+            guard best >= 0 else { return false }
+            let u = max(0, bw.0), v = max(0, bw.1), w = max(0, bw.2), sm = u + v + w > 0 ? u + v + w : 1
+            SA[3 * p] = T[3 * best]; SA[3 * p + 1] = T[3 * best + 1]; SA[3 * p + 2] = T[3 * best + 2]
+            SW[3 * p] = u / sm; SW[3 * p + 1] = v / sm; SW[3 * p + 2] = w / sm
+        }
+        remT[1] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
+        func ip(_ A: [Double]) -> [Double] {
+            var o = [Double](repeating: 0, count: n2)
+            for p in 0..<n2 { o[p] = A[SA[3 * p]] * SW[3 * p] + A[SA[3 * p + 1]] * SW[3 * p + 1] + A[SA[3 * p + 2]] * SW[3 * p + 2] }
+            return o
+        }
+        // fingers holding on: weight and offsets interpolated (a corner not held weighs 0, its offset is where it is from the finger now)
+        var fm: [(Finger, [Double], [Double], [Double], [Double], [Double])] = []
+        for f in fingers.values where !f.mem.isEmpty {
+            var w = [Double](repeating: 0, count: N), ox = [Double](repeating: 0, count: N), oy = ox, ux = ox, uy = ox
+            for i in 0..<N { ox[i] = X[i] - f.fx; oy[i] = Y[i] - f.fy }
+            for m in f.mem { w[m.i] = m.w; ox[m.i] = m.ox; oy[m.i] = m.oy; ux[m.i] = m.dx; uy[m.i] = m.dy }
+            fm.append((f, ip(w), ip(ox), ip(oy), ip(ux), ip(uy)))
+        }
+        func qAt(_ a: [Int]) -> (Double, Double)? {
+            guard !a.isEmpty else { return nil }
+            var x = 0.0, y = 0.0
+            for i in a { x += QX[i]; y += QY[i] }
+            return (x / Double(a.count), y / Double(a.count))
+        }
+        let eL = qAt(eyeL), eR = qAt(eyeR), hq = (hiIdx < N ? QX[hiIdx] : 0, hiIdx < N ? QY[hiIdx] : 0)
+        let nX = ip(X), nY = ip(Y), nPX = ip(PX), nPY = ip(PY), nH0X = ip(H0X), nH0Y = ip(H0Y), nEX = ip(EX), nEY = ip(EY)
+        let nQDX: [Double]? = QDX.count == N ? ip(QDX) : nil, nQDY: [Double]? = QDY.count == N ? ip(QDY) : nil
+        let nQVX: [Double]? = QVX.count == N ? ip(QVX) : nil, nQVY: [Double]? = QVY.count == N ? ip(QVY) : nil
+        let cg = clusters.indices.contains(gi) ? (clusters[gi].cs, clusters[gi].sn) : (1.0, 0.0)
+        N = n2; bnd = nbnd
+        X = nX; Y = nY; PX = nPX; PY = nPY; H0X = nH0X; H0Y = nH0Y; EX = nEX; EY = nEY
+        var mx = 0.0, my = 0.0
+        for p in pts { mx += p.0; my += p.1 }
+        mx /= Double(N); my /= Double(N)
+        Q0X = pts.map { $0.0 - mx }; Q0Y = pts.map { $0.1 - my }; QX = Q0X; QY = Q0Y
+        var hx = 0.0, hy = 0.0
+        for i in 0..<N { hx += H0X[i]; hy += H0Y[i] }
+        hx /= Double(N); hy /= Double(N)
+        for i in 0..<N { H0X[i] -= hx; H0Y[i] -= hy }
+        if let a = nQDX, let b = nQDY { QDX = a.map { $0 - mx }; QDY = b.map { $0 - my } } else { QDX = QX; QDY = QY }
+        let zero = [Double](repeating: 0, count: N)
+        QVX = nQVX ?? zero; QVY = nQVY ?? zero; QW = zero
+        GX = zero; GY = zero; GW = zero; RX = zero; RY = zero; GWT = zero; AW = zero
+        SX2 = zero; SY2 = zero
+        TU = zero; TUB = zero; KF = [Double](repeating: 1, count: N)
+        TID = [Int](repeating: -1, count: N); GRAB = [Bool](repeating: false, count: N)
+        clingAX = []; clingAY = []
+        for (f, w, ox, oy, ux, uy) in fm {
+            var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
+            for i in 0..<N where w[i] > 0.02 { mem.append((i, ox[i], oy[i], w[i], ux[i], uy[i])); GRAB[i] = true }
+            f.mem = mem
+        }
+        remT[2] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
+        buildClusters()
+        for c in clusters.indices { clusters[c].cs = cg.0; clusters[c].sn = cg.1 }
+        remT[3] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
+        bndL = (0..<bnd.count).map { k in let i = bnd[k], jj = bnd[(k + 1) % bnd.count]; return hypot(Q0X[jj] - Q0X[i], Q0Y[jj] - Q0Y[i]) }
+        bndL2 = (0..<bnd.count).map { k in let i = bnd[k], jj = bnd[(k + 2) % bnd.count]; return hypot(Q0X[jj] - Q0X[i], Q0Y[jj] - Q0Y[i]) }
+        BIDX = [Int](repeating: -1, count: N)
+        for k in 0..<bnd.count { BIDX[bnd[k]] = k }
+        buildRungs()
+        buildMesh(fast: true)
+        remT[4] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
+        func near(_ x: Double, _ y: Double, _ k: Int) -> [Int] {
+            var o: [(Double, Int)] = []
+            for i in 0..<N { o.append((hypot(QX[i] + mx - x, QY[i] + my - y), i)) }
+            o.sort { $0.0 < $1.0 }
+            return o.prefix(k).map { $0.1 }
+        }
+        hiIdx = near(hq.0, hq.1, 1).first ?? 0
+        do {
+            let hd = Dent(i: hiIdx, finger: nil), rr: Double = R * 0.3
+            for i in 0..<N where i != hiIdx {
+                let ox: Double = Q0X[i] - Q0X[hiIdx], oy: Double = Q0Y[i] - Q0Y[hiIdx]
+                if ox * ox + oy * oy < rr * rr { hd.nb.append((i, ox, oy)) }
+            }
+            hiDent = hd
+        }
+        if let e = eL { eyeL = near(e.0, e.1, 4) }
+        if let e = eR { eyeR = near(e.0, e.1, 4) }
+        dentList.removeAll()
+        CAPG = 1
+        remT[5] += Date().timeIntervalSince(remT0) * 1000
+        return true
+    }
+
     /// v2.54: pulled outward (0.6R on, fully at 1.8R) the shape is remembered faster (pullCreep) and as a whole (pullNearR), so the memory keeps
     /// up with the finger and a long pull does not shrink back on release; rubbing, scrubbing and pinching keep creep (measured: creep 30 all the
     /// time, the frames with a flipped triangle in the fuzz went from a tenth to four in ten). Web `pullK`.
@@ -1131,7 +1388,7 @@ final class SlimeRig {
                     if l > mx { mx = l }
                     e += 2; k += 1
                 }
-                if mx >= 0.93 * mat.stretchCap * CAPG { CAPG = min(mat.growMax > 0 ? mat.growMax : 12, CAPG * exp((mat.growK > 0 ? mat.growK : 1.5) * dt * min(1, gap / 0.4))) }
+                if mx >= 0.93 * mat.stretchCap * CAPG { CAPG = min(mat.growMax > 0 ? mat.growMax : 12, CAPG * exp((mat.growK > 0 ? mat.growK : 1.5) * rateKG * dt * min(1, gap / 0.4))) }
             }
         } else {
             let need: Double = mat.memCap > 0 ? max(1, QSTR / max(mat.memCap, 0.9 * mat.stretchCap)) : 1
@@ -1207,12 +1464,17 @@ final class SlimeRig {
     private func buildClusters() {
         clusters = []
         let cs = R * params.cSpace, cr = R * params.cRad
-        var cy = -2.6 * R
-        while cy <= 2.6 * R {
-            var cx = -2.6 * R
-            while cx <= 2.6 * R {
+        // v2.54 補點: a re-sampled long body reaches past ±2.6R; the same grid, extended to cover it (a normal body: the same clusters as before)
+        var qx0 = 0.0, qx1 = 0.0, qy0 = 0.0, qy1 = 0.0
+        for i in 0..<N { qx0 = min(qx0, Q0X[i]); qx1 = max(qx1, Q0X[i]); qy0 = min(qy0, Q0Y[i]); qy1 = max(qy1, Q0Y[i]) }
+        let gx0: Double = -2.6 * R - cs * ceil(max(0, -2.6 * R - (qx0 - cr)) / cs), gy0: Double = -2.6 * R - cs * ceil(max(0, -2.6 * R - (qy0 - cr)) / cs)
+        let gx1: Double = max(2.6 * R, qx1 + cr), gy1: Double = max(2.6 * R, qy1 + cr)
+        var cy = gy0
+        while cy <= gy1 {
+            var cx = gx0
+            while cx <= gx1 {
                 var idx: [Int] = []
-                for i in 0..<N where hypot(Q0X[i] - cx, Q0Y[i] - cy) < cr { idx.append(i) }
+                for i in 0..<N where abs(Q0X[i] - cx) < cr && abs(Q0Y[i] - cy) < cr && hypot(Q0X[i] - cx, Q0Y[i] - cy) < cr { idx.append(i) }
                 if idx.count >= 5 { clusters.append(Cluster(idx: idx, w: 1)) }
                 cx += cs
             }
@@ -2472,7 +2734,9 @@ final class SlimeRig {
         lastSdt = sdt
         if sillOn { sillStepPre() }   // v2.28 窗台
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
+        rateStep(dt)   // v2.54 快扯變硬
         capGrowStep(dt)   // v2.54 無限拉
+        remeshCheck(dt)   // v2.54 補點
         if sillOn { sillStep(dt) }   // v2.28 窗台: landing, the bowl, the hop, home
         shkStep(dt)   // v2.31 搖晃沉澱
         tentBump()
@@ -2497,7 +2761,7 @@ final class SlimeRig {
         damp = min(0.995, damp)
         if introOn && introPh == .air { damp = 1 }   // v2.17 intro: no damping in the air (clay's 0.94 takes 6% a substep, it would not lift off)
         if sillOn && sillAir { damp = 1 }   // v2.28 窗台: none in the air either, or it would not fall
-        let alpha = mat.alpha * (special ? 1.25 : 1)
+        let alpha = min(1, mat.alpha * (special ? 1.25 : 1) * rateKA)   // v2.54 快扯變硬、慢拉變軟
         let G: Double = sillOn ? (introOn ? R * introG : R * sillGrav * sillGVY) * dt * dt : (introOn ? R * introG * dt * dt : 0)   // v2.17 intro: gravity only while hopping in; v2.28 窗台: always; v2.30 it can turn (0 while it lifts itself)
         let Gh: Double = sillOn && !introOn ? R * sillGrav * sillGVX * dt * dt : 0
         // 1 Verlet
@@ -3044,7 +3308,7 @@ final class SlimeRig {
             // 揉回原形: the remembered shape eases back to the original over half a second; positions follow
             // through shape matching, so nothing jumps (手感精修提案 第 28 條)
             let kr = min(1, 6 * dt)
-            for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
+            for i in 0..<N { QX[i] += (H0X[i] - QX[i]) * kr; QY[i] += (H0Y[i] - QY[i]) * kr }
         } else if touched && !(mat.ringGuard > 0 && ringCrossed()) {   // no memory on a crossed frame: a crossing must not become the shape
             // only after dwelling: within `dwellLo` a light press or a quick flick springs back,
             // from `dwellHi` on kneading remembers at full speed (輕按回彈，揉捏即留形)
@@ -3054,7 +3318,7 @@ final class SlimeRig {
                 let x = max(0, min(1, (t - f.tDown - lo) / (hi - lo)))
                 g = max(g, x * x * (3 - 2 * x))
             }
-            let yl = mat.yield * R, kc: Double = min(1, (mat.creep + max(0, mat.pullCreep - mat.creep) * pullK(mat)) * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
+            let yl = mat.yield * R, kc: Double = min(1, (mat.creep + max(0, mat.pullCreep - mat.creep) * pullK(mat)) * rateKC * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
             // v2.24 pressLocal: while the finger has not moved off (0.15R) only the part near it remembers. With the whole body remembering, holding still wrote the
             // small shape-matching errors into the far edge, a 48° corner in 4 s (in Q itself); once it moves the whole body remembers as before, pulls keep their shape
             let plGrabs = fingers.values.filter { $0.mode == .grab }
@@ -3078,8 +3342,8 @@ final class SlimeRig {
                         if plOn { plw = 0; for f in plGrabs { let ax: Double = X[i] - f.fx, ay: Double = Y[i] - f.fy; plw = max(plw, exp(-(ax * ax + ay * ay) * plK)) } }
                         let s: Double = (1 - yl / dl) * kc * plw * (TID[i] >= 0 ? 1 - 0.85 * TU[i] * (1 - mat.tentMem) : 1)
                         QX[i] += dx * s; QY[i] += dy * s
-                        let ex = QX[i] - Q0X[i], ey = QY[i] - Q0Y[i], el = hypot(ex, ey), lim = R * mat.memMax   // clay 4R: pull long, spread flat
-                        if el > lim { QX[i] = Q0X[i] + ex * lim / el; QY[i] = Q0Y[i] + ey * lim / el }
+                        let ex = QX[i] - H0X[i], ey = QY[i] - H0Y[i], el = hypot(ex, ey), lim = R * mat.memMax   // clay 4R: pull long, spread flat
+                        if el > lim { QX[i] = H0X[i] + ex * lim / el; QY[i] = H0Y[i] + ey * lim / el }
                     }
                 }
             }
@@ -3088,7 +3352,7 @@ final class SlimeRig {
             // 12 s after release; relaxing shortens the strand and the knot comes undone
             let kr = min(1, (mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && mat.endless < 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.54 無限拉: a few flipped triangles in a long remembered shape no longer make all of it retreat fast (it lost half in 2 s); the no-flip guard opens them, a crossed ring still retreats fast   // v2.38: a flipped remembered shape too
             if kr > 0 {
-                for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
+                for i in 0..<N { QX[i] += (H0X[i] - QX[i]) * kr; QY[i] += (H0Y[i] - QY[i]) * kr }
             }
             if mat.flow > 0 && flowFree { flowStep(dt, mat.flow) }   // v2.52 A4 流
         }
@@ -3129,7 +3393,7 @@ final class SlimeRig {
         let n = bnd.count
         for k in 0..<n {
             let i = bnd[k], j = bnd[(k + 1) % n]
-            A += QX[i] * QY[j] - QX[j] * QY[i]; B += Q0X[i] * Q0Y[j] - Q0X[j] * Q0Y[i]
+            A += QX[i] * QY[j] - QX[j] * QY[i]; B += H0X[i] * H0Y[j] - H0X[j] * H0Y[i]
         }
         if abs(A) > 1e-6 {
             let f = (abs(B / A)).squareRoot()

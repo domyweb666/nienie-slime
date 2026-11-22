@@ -187,6 +187,15 @@ final class SlimeController: ObservableObject {
         // 提案第 15 條: sharpness rises when stretched, drops a little when squashing
         var contLevel: Double = min(1, level) * p.hapMax
         var contSharp: Double = p.hapSharp + p.hapSharpStretch * rig.stretchLevel - p.hapSharpSquash * rig.squashLevel
+        // v2.54 震動跟著拉力走 (多米 11-22): while pulling, a continuous rumble that grows with the tension (pull length, plus the patch
+        // trailing a yank) and gets sharper as it goes taut. Takes over when stronger than the deformation level.
+        if p.hapPull > 0 {
+            let tn = rig.pullTension
+            if tn > 0.02 {
+                let lv: Double = p.hapPull * (0.18 + 0.82 * tn)
+                if lv > contLevel { contLevel = lv; contSharp = 0.15 + 0.55 * tn }
+            }
+        }
         let pk = rig.purr * p.purr
         // v2.25 F5: the purr is the one thing left on the continuous channel: a low rumble swelling 3 times a second
         if p.purrRoll >= 0.5 && pk > 0.05 {

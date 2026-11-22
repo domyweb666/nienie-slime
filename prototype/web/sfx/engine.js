@@ -35,12 +35,12 @@
     },
     pull: {      // st 拉伸（半徑），v 拉伸的變化速度（半徑／秒，平滑 60 毫秒）
       on: 0.2,                                            // 拉不到 0.2R 不算拉
-      gain: (st, v) => 0.12 * clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * Math.min(1, v / 2.5),
-      rate: st => 0.85 + 0.4 * Math.tanh(st / 3),         // 越拉越細越高
-      lp: st => 1000 + 3500 * Math.tanh(st / 3),          // 越拉越亮
+      gain: (st, v) => (0.12 + 0.18 * (1 - Math.exp(-Math.max(0, st - 0.6) / 4))) * clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * Math.min(1, v / 2.5),   // v2.54：拉著不動也有一點聲，拉越長越清楚
+      rate: st => 0.85 * Math.pow(2, 16 * (1 - Math.exp(-st / 5)) / 12),   // 越拉越細越高。v2.54 無限拉：以前 3R 後就幾乎不再變高（tanh），現在一路往上，1R 高 3 個半音、3R 7 個、6R 11 個、12R 14.5 個，最多 16 個
+      lp: st => 1000 + 7000 * (1 - Math.exp(-st / 5)),    // 越拉越亮（v2.54 一路亮到 8 kHz）
       attack: 0.05, decay: 0.12,
-      strandRate: (st, v) => st > 0.4 ? (2 + 16 * Math.tanh(st / 3)) * (0.25 + 0.75 * Math.min(1, v / 2.5)) : 0,   // 每秒幾根
-      strand: st => ({ g: rnd(0.12, 0.3), r: (0.85 + 0.5 * Math.tanh(st / 3)) * rnd(0.92, 1.08), lp: 9000, deco: true }),
+      strandRate: (st, v) => st > 0.4 ? (2 + 16 * (1 - Math.exp(-st / 4))) * (0.25 + 0.75 * Math.min(1, v / 2.5)) : 0,   // 每秒幾根
+      strand: st => ({ g: rnd(0.12, 0.3), r: 0.85 * Math.pow(2, 18 * (1 - Math.exp(-st / 5)) / 12) * rnd(0.92, 1.08), lp: 9000, deco: true }),
     },
     rub: {       // L 0..1（已乘揉的音量上限）；拉遠了讓位給拉絲，不疊成一團
       rate: n => 0.94 + 0.12 * n, lp: n => 1400 + 2600 * n,   // n = L / 上限

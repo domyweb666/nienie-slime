@@ -37,15 +37,16 @@
     const M = { seed, g: [], flipFr: 0, flipMax: 0, qFlipMax: 0, xFr: 0, sharpMax: 0, strainMax: 0, qStrainMax: 0, jerkHold: 0, jerkHoldMean: 0, holdN: 0, nan: 0, frames: 0, worst: '' };
     let cur = '', vx = null, vy = null, still = 0, G = null; M.gs = [];
     const step = (holding) => {
-      const x0 = Float64Array.from(X), y0 = Float64Array.from(Y); const p0 = performance.now(); update(DT); const pm = performance.now() - p0; msSum += pm; if (pm > msMax) msMax = pm; M.frames++;
+      const x0 = Float64Array.from(X), y0 = Float64Array.from(Y), rem0 = typeof REM !== 'undefined' ? REM.n : 0; const p0 = performance.now(); update(DT); const remeshed = typeof REM !== 'undefined' && REM.n !== rem0; const pm = performance.now() - p0; msSum += pm; if (pm > msMax) msMax = pm; M.frames++;   // v2.54 remeshed：這一幀補過點，粒子換了一批，逐顆比的跳動不算
       const fc = inv(X, Y), qf = inv(QX, QY); if (fc > 0) M.flipFr++; if (G) { if (fc > G[1]) G[1] = fc; } if (fc > M.flipMax) { M.flipMax = fc; M.worst = cur; } if (qf > M.qFlipMax) M.qFlipMax = qf;
       if (M.frames % 2 === 0 && selfX() > 0) { M.xFr++; if (G) G[4]++; }
       const s = strain(X, Y); if (s > M.strainMax) M.strainMax = s; const qs = strain(QX, QY); if (qs > M.qStrainMax) M.qStrainMax = qs;
       // 手指停著時的跳動：扣整團平移後每顆速度變化的最大值
+      if (remeshed) { vx = null; vy = null; M.remesh = (M.remesh || 0) + 1; for (let i = 0; i < N; i++) if (!isFinite(X[i])) M.nan++; } else {
       let ax = 0, ay = 0; for (let i = 0; i < N; i++) { ax += X[i] - x0[i]; ay += Y[i] - y0[i]; } ax /= N; ay /= N;
       const nx = new Float64Array(N), ny = new Float64Array(N); let j = 0; for (let i = 0; i < N; i++) { nx[i] = X[i] - x0[i] - ax; ny[i] = Y[i] - y0[i] - ay; if (vx) { const d = Math.hypot(nx[i] - vx[i], ny[i] - vy[i]); if (d > j) j = d; } if (!isFinite(X[i])) M.nan++; }
       vx = nx; vy = ny; still = holding ? still + 1 : 0;
-      if (still > 40) { if (j > M.jerkHold) M.jerkHold = j; M.jerkHoldMean += j; M.holdN++; if (G) { G[2] += j; G[3]++; } }
+      if (still > 40) { if (j > M.jerkHold) M.jerkHold = j; M.jerkHoldMean += j; M.holdN++; if (G) { G[2] += j; G[3]++; } } }
     };
     const pick = () => { const a = rnd() * 6.283, rr = Math.sqrt(rnd()) * .95, c = globalC; let bi = 0, bd = 1e9; const tx = c.xc + Math.cos(a) * R * rr, ty = c.yc + Math.sin(a) * R * rr; for (let i = 0; i < N; i++) { const d = (X[i] - tx) ** 2 + (Y[i] - ty) ** 2; if (d < bd) { bd = d; bi = i; } } return scr(X[bi], Y[bi]); };
     const drag = (id, x0, y0, x1, y1, n) => { for (let s = 1; s <= n; s++) { const [x, y] = clampS(x0 + (x1 - x0) * s / n, y0 + (y1 - y0) * s / n); ev('pointermove', id, x, y); step(false); } return clampS(x1, y1); };
