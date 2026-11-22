@@ -276,8 +276,8 @@ struct FeelParams: Equatable, Codable {
     var shine: Double = 0             // 0: no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50
     var opaque: Double = 0.9          // how much the thick part of the body hides what is behind it. 0 = v2.50 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
     var lump: Double = 1              // irregular outline (web shape.js): heavy below, a bump leaning to one side on top, a smaller one low on the other side; 0 = the near-round blob of v2.50. Rebuilds the body
-    var strand: Double = 1            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
-    var tugEdge: Double = 0.42        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
+    var strand: Double = 0            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
+    var tugEdge: Double = 0        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
     var split: Double = 1             // the finger farther than splitAt×R from the body's centre for 0.4 s: the strand pinches and parts, the finger's end becomes a second small blob (no face). At most two. 0 off
     var splitAt: Double = 3.4
     var rejoin: Double = 6            // seconds left alone before the small blob crawls back and merges; dropped on the body it merges at once
@@ -285,7 +285,7 @@ struct FeelParams: Equatable, Codable {
     var bubbles: Double = 0           // v2.51: 0 (多米: no drops inside). small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
     // v2.52 (多米 11-22, 《虛擬手感》3-3 到 3-5 的決定；交辦 A、C 組). Web: the same keys in PRESETS
     var flow: Double = 0              // A4 流: left alone on the sill, the remembered shape slumps under gravity and spreads sideways, this share of its height a second (0.05 ≈ half in 14 s); a finger stops it at once. 0 = off (v2.51). Per material once 多米 has filmed his reference
-    var strandAt: Double = 1.6        // A1: with the strand on, how far the body itself stretches on the sill (radii); the rest of the way is the strand. No effect with the strand off.
+    var strandAt: Double = 2.4        // A1: with the strand on, how far the body itself stretches on the sill (radii); the rest of the way is the strand. No effect with the strand off.
                                       // v2.51 had 2.4 written in. Held by the edge (tugEdge: the body does not come along) the small grabbed patch had to stretch 2.4R by itself:
                                       // the outline folded to 135-178°, dozens of triangles turned over while held and on release, and the fuzz test's jump-while-held went
                                       // from 0.61 pt (v2.48) to 2.45. At 1.6 it is 0.61 again and the strand still reaches the finger (numbers in .vibe/代決清單.md)
@@ -695,7 +695,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
         TuneField(key: \.edgeCling, name: "黏在螢幕四周 v2.51", hint: "（多米 11-22）1：慢慢放在螢幕左邊、右邊、上邊旁邊會黏住；0 只有窗框", range: 0...1, step: 1),
         TuneField(key: \.flow, name: "流：放著會慢慢往下塌 v2.52", hint: "（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影", range: 0...0.5, step: 0.01),
-        TuneField(key: \.strandAt, name: "黏條開著時身體拉到多長 v2.52", hint: "黏條開著，窗台上身體本身最多拉到幾個半徑，再遠的部分是黏條。1.6（v2.52）：v2.51 的 2.4 捏著邊緣往外拉時，那一塊被拉到外框折起來（16 種拉法裡 7 種折超過 120 度；1.6 是 0 種）。2.4 回 v2.51。黏條關掉時這條不作用，身體照「拉伸上限」拉（黏土 7）", range: 1...8, step: 0.1),
+        TuneField(key: \.strandAt, name: "黏條開著時身體拉到多長 v2.52", hint: "黏條開著，窗台上身體本身最多拉到幾個半徑，再遠的部分是黏條。v2.53 預設回到 2.4（多米 11-22：1.6 拉起來不像整隻被拉、形狀留不住）。1.6（v2.52 試過）：v2.51 的 2.4 捏著邊緣往外拉時，那一塊被拉到外框折起來（16 種拉法裡 7 種折超過 120 度；1.6 是 0 種）。2.4 回 v2.51。黏條關掉時這條不作用，身體照「拉伸上限」拉（黏土 7）", range: 1...8, step: 0.1),
         TuneField(key: \.sillCap, name: "窗台上的拉伸上限（對照）v2.52", hint: "0：窗台不蓋掉拉伸上限（多米 11-22：黏土在窗台上也拉到 7）；3.2 回 v2.50（窗台上最多 3.2R、記形最多 2.6R）。只在黏條關著時作用，黏條開著看上面那條", range: 0...8, step: 0.1),
         TuneField(key: \.thin, name: "細絲：快到上限時圓角變小 v2.52", hint: "（多米 11-22：中間做法）1：拉到拉伸上限的六成起，外框的圓角慢慢變小，到上限時剩三成，拉細的那條看得到；0 關（v2.51，圓角固定）", range: 0...1, step: 1),
         TuneField(key: \.wbreath, name: "水的呼吸 v2.52", hint: "1：牠靜止時，透過身體看到的背景跟著呼吸輕輕變（彎的量 ±12%）；0 關（v2.51，靜止時折射是靜的）", range: 0...1, step: 1),

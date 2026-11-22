@@ -45,7 +45,7 @@ final class SlimeRig {
             // 7 and 5 were never used there and the panel showed a number the hand never felt. What is left is v2.51's strand: while it is on the
             // body itself stretches only to strandAt (the rest of the way is the strand; 多米 11-22: 不能破皮). With the strand off the
             // material's own numbers hold. sillCap > 0 is the control for v2.50 (the old cap), kept for blind tests and the selftest's old items.
-            if m.strand >= 0.5 { m.maxPull = min(m.maxPull, m.strandAt); m.memMax = min(m.memMax, m.strandAt + 0.2) }
+            if m.strand >= 0.5 { m.maxPull = min(m.maxPull, m.strandAt); m.memMax = min(m.memMax, 2.6) }   // v2.53: back to v2.51 (2.4 and 2.6); 1.6 and 1.8 left too little of the pull and of the shape it keeps (多米 11-22)
             else if m.sillCap > 0 { m.maxPull = min(m.maxPull, m.sillCap); m.memMax = min(m.memMax, 2.6) }
             m.upright = max(m.upright, 0.03)
         }

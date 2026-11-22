@@ -15,7 +15,7 @@ struct FeelKnob: Identifiable {
     let section: String
 
     /// The name of this set of defaults. Change it when a knob's default changes for any material; the stamp below catches it if you forget.
-    static let version = "v2.52"
+    static let version = "v2.53"
 
     static let main: [FeelKnob] = [
         FeelKnob(id: "alpha", key: \.alpha, name: "軟", hint: "按三秒，看周圍跟著塌多少。越右越硬", range: 0.05...0.8, step: 0.01, section: "捏下去"),

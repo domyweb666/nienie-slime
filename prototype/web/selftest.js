@@ -1572,7 +1572,7 @@
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   // T63 v2.52（多米 11-22，《虛擬手感》3-3 到 3-5 的交辦 A、B、C 組）。用真正的預設值（PRE47）在窗台上跑：
-  //   a 生效值（A1、A2）：黏條開著身體只拉到 strandAt（1.6），黏條關掉照材料自己的 7、記形 5，sillCap 3.2 回 v2.50；mat 本身沒被改、滑桿旁邊有字
+  //   a 生效值（A1、A2）：黏條開著身體只拉到 strandAt（v2.53 回到 2.4、記形 2.6；1.6 留成選項，g 測它），黏條關掉照材料自己的 7、記形 5，sillCap 3.2 回 v2.50；mat 本身沒被改、滑桿旁邊有字
   //   b 黏條關著從頭頂往上拉到畫面頂（A1 要守住的）：放手 2 秒後沒有 NaN、外框不交叉、記住的形狀沒有翻面、面積回 1±0.08；按住時翻面不超過 5 個；身體不比 3.2R 的對照短
   //   c 流（A4）：flow 0 放 10 秒記住的形狀不變；flow 0.2 放 10 秒，高度剩六成到七成五、寬度多兩成五以上、面積不漂、沒有翻面、外框不交叉；手指按著的 3 秒裡流不作用（跟按下那一刻把 flow 關掉的那次一樣）
   //   d 保險計數與物理毫秒（A5）：拉一段放手後有格數、四個比例都在 0 到 100
@@ -1592,7 +1592,7 @@
     const qArea = () => { let a = 0, b = 0; const n = bnd.length; for (let k = 0; k < n; k++) { const i = bnd[k], j = bnd[(k + 1) % n]; a += QX[i] * QY[j] - QX[j] * QY[i]; b += Q0X[i] * Q0Y[j] - Q0X[j] * Q0Y[i]; } return +(a / b).toFixed(3); };
     const rest = n => { for (let k = 0; k < n; k++) { LIFE.st = 'rest'; LIFE.until = t + 99; WANDER.moving = false; steps(1); } };
     // a
-    fresh({}); r.a = { on: [effPull(), effMem(), mat.maxPull, mat.memMax], note: !!effNote('maxPull') }; mat.strand = 0; r.a.off = [effPull(), effMem(), effNote('maxPull')]; mat.sillCap = 3.2; r.a.cap = [effPull(), effMem()];
+    fresh({ strand: 1 }); r.a = { on: [effPull(), effMem(), mat.maxPull, mat.memMax], note: !!effNote('maxPull') }; mat.strand = 0; r.a.off = [effPull(), effMem(), effNote('maxPull')]; mat.sillCap = 3.2; r.a.cap = [effPull(), effMem()];
     // b
     const pullUp = over => { fresh({ strand: 0, split: 0, ...over }); const A0 = areaNow(), c = globalC, [sx, sy] = scr(c.xc, c.yc - R * .6), ey = 30; ev('pointerdown', 1, sx, sy); steps(4); for (let s = 1; s <= 40; s++) { ev('pointermove', 1, sx, sy + (ey - sy) * s / 40); steps(1); } let iv = 0; for (let k = 0; k < 60; k++) { steps(1); iv = Math.max(iv, flipCount(X, Y)); }
       let top = 1e9, bot = -1e9; for (const i of bnd) { top = Math.min(top, Y[i]); bot = Math.max(bot, Y[i]); } const heldR = +((bot - top) / R).toFixed(2); ev('pointerup', 1, sx, ey); steps(120);
@@ -1615,13 +1615,13 @@
       const t1 = deskText(); mat.alpha = .5; DESK.slots = [null, null, null]; deskImport(t1); r.f = { moved: mv, same: t1 === deskText(), alpha: mat.alpha }; DESK.slots = S0; DESK.log = L0; DESK.base0 = B0; try { if (keep === null) localStorage.removeItem('nienie.feel'); else localStorage.setItem('nienie.feel', keep); } catch (_) {} }
     else r.f = { skipped: true, moved: 0, same: true };
     // g
-    const tug = (sd, at) => { fresh({ seed: sd, strandAt: at }); const c = globalC; let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] < Y[bi]) bi = i; const [sx, sy] = scr(X[bi], Y[bi] + R * .15), ey = Math.max(30, sy - R * 2.5); ev('pointerdown', 1, sx, sy); steps(4); let iv = 0, sh = 0; const see = () => { iv = Math.max(iv, inv()); sh = Math.max(sh, sharp()); };
+    const tug = (sd, at) => { fresh({ seed: sd, strandAt: at, strand: 1, tugEdge: .42 }); const c = globalC; let bi = -1; for (const i of bnd) if (bi < 0 || Y[i] < Y[bi]) bi = i; const [sx, sy] = scr(X[bi], Y[bi] + R * .15), ey = Math.max(30, sy - R * 2.5); ev('pointerdown', 1, sx, sy); steps(4); let iv = 0, sh = 0; const see = () => { iv = Math.max(iv, inv()); sh = Math.max(sh, sharp()); };
       for (let s = 1; s <= 40; s++) { ev('pointermove', 1, sx, sy + (ey - sy) * s / 40); steps(1); see(); } for (let k = 0; k < 45; k++) { steps(1); see(); } const f = fingers.get(1), tg = !!(f && f.tug); ev('pointerup', 1, sx, ey); for (let k = 0; k < 90; k++) { steps(1); see(); } return { inv: iv, sharp: sh, tug: tg }; };
     r.g = { s4: tug(4, 1.6), s7: tug(7, 1.6), s4old: tug(4, 2.4), s7old: tug(7, 2.4) };
     res.T63_v252 = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; mat = { ...PRESETS.clay }; setup();
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
     const okPct = v => v >= 0 && v <= 100;
-    res.PASS.v252 = r.a.on[0] === 1.6 && r.a.on[2] === 7 && r.a.on[3] === 5 && r.a.note && r.a.off[0] === 7 && r.a.off[1] === 5 && r.a.off[2] === null && r.a.cap[0] === 3.2 && r.a.cap[1] === 2.6
+    res.PASS.v252 = r.a.on[0] === 2.4 && r.a.on[1] === 2.6 && r.a.on[2] === 7 && r.a.on[3] === 5 && r.a.note && r.a.off[0] === 7 && r.a.off[1] === 5 && r.a.off[2] === null && r.a.cap[0] === 3.2 && r.a.cap[1] === 2.6
       && r.b.a1.eff === 7 && r.b.a1.nan === 0 && r.b.a1.selfX === 0 && r.b.a1.qFlips === 0 && Math.abs(r.b.a1.area - 1) < .08 && r.b.a1.invHeld <= 5 && r.b.a1.heldR >= r.b.cap.heldR
       && Math.abs(r.c.f0.b1[1] - r.c.f0.b0[1]) < .01 && r.c.f2.b1[1] < r.c.f0.b1[1] * .75 && r.c.f2.b1[1] > r.c.f0.b1[1] * .6 && r.c.f2.b1[0] > r.c.f0.b1[0] * 1.25 && Math.abs(r.c.f2.qArea - 1) < .02 && r.c.f2.qFlips === 0 && r.c.f2.selfX === 0
       && Math.abs(r.c.heldOn[0] - r.c.heldCut[0]) < .005 && Math.abs(r.c.heldOn[1] - r.c.heldCut[1]) < .005
