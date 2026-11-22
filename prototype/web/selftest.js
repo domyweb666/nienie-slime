@@ -52,6 +52,8 @@
   // v2.51（不規則外形、黏條、捏邊緣算拉、分裂、黏螢幕四周）推上去時沒跑過這份測試；11-22 補跑，63 項有 11 項不過（pressReal、pullForce、v227、v225、v224、sill、knot、walk、extreme、deco、pullCalm）。
   //   照 v2.47、v2.48 的做法：舊項目一律關掉這五樣（量的是原本的行為），關掉之後剩 pullCalm（T61）不過，T61 的 SP 也一起關。v2.51 自己的行為還沒有專門的項目，只有 T63 g 量了捏邊緣往外拉
   // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
+  const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k] };   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
+  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], endless: 0, frameCling: 1, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）
   const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
@@ -1630,9 +1632,33 @@
       && r.f.moved === 0 && r.f.same
       && r.g.s4.sharp <= 110 && r.g.s7.sharp <= 110 && r.g.s4.inv <= 3 && r.g.s7.inv <= 3 && Math.max(r.g.s4old.sharp, r.g.s7old.sharp) > 120;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T65 v2.54 無限拉（多米 11-22：拉五公分只長三公分）。v2.54 的預設：往上拉 4R、斜拉 5.5R，被抓的那塊跟手指差不到 0.5R、身體拉到 5R 以上、
+  // 拉著時沒有翻面和交叉、放手 2 秒還留 3.5R 以上；同一套關掉無限拉（v2.53）身體只到 3.3R 以下（對照，證明量得到差別）。另外看黏窗框關掉：放在右窗框旁不黏
+  { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
+    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, life2: 0 };
+    const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(65); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 65 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(120); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const wld = (sx, sy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(sx - q.left - v.x) / CAM.z + CAM.x, (sy - q.top - v.y) / CAM.z + CAM.y]; };
+    const inv = () => { let n = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if (.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < -.02 * TRA[k / 3]) n++; } return n; };
+    const len = (ux, uy) => { let a = -1e9, b = 1e9; for (const i of bnd) { const p = X[i] * ux + Y[i] * uy; a = Math.max(a, p); b = Math.min(b, p); } return +((a - b) / R).toFixed(2); };
+    const pull = (over, dx, dy, dist) => { fresh(over); const L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, c = globalC; let bi = 0, bd = -1e9; for (const i of bnd) { const p = (X[i] - c.xc) * ux + (Y[i] - c.yc) * uy; if (p > bd) { bd = p; bi = i; } }
+      const [sx, sy] = scr(X[bi] - ux * R * .3, Y[bi] - uy * R * .3), pr = R * CAM.z; ev('pointerdown', 1, sx, sy); steps(4); let ex = sx, ey = sy;
+      for (let s = 1; s <= 40; s++) { ex = Math.max(4, Math.min(innerWidth - 4, sx + ux * dist * pr * s / 40)); ey = Math.max(4, Math.min(innerHeight - 4, sy + uy * dist * pr * s / 40)); ev('pointermove', 1, ex, ey); steps(1); }
+      let flips = 0, xs = 0; for (let k = 0; k < 60; k++) { steps(1); flips = Math.max(flips, inv()); if (k % 10 === 0 && selfX() > 0) xs++; }
+      const f = [...fingers.values()][0]; let px = 0, py = 0, w = 0; for (const m of f.mem) { px += X[m[0]] * m[3]; py += Y[m[0]] * m[3]; w += m[3]; } const [fx, fy] = wld(ex, ey);
+      const o = { gap: +(Math.hypot(px / w - fx, py / w - fy) / R).toFixed(2), held: len(ux, uy), flips, xs }; ev('pointerup', 1, ex, ey); steps(120); o.after = len(ux, uy); o.endX = selfX(); return o; };
+    r.up = pull({}, 0, -1, 4); r.diag = pull({}, .5, -1, 5.5); r.upOld = pull({ endless: 0, slide: 1.5 }, 0, -1, 4);
+    // 黏窗框關著：把牠舉到右窗框旁邊慢慢放，不黏窗框（v2.53 會黏 rjamb）
+    { fresh({}); const g = SILL.g, c = globalC, [sx, sy] = scr(c.xc, c.yc), [tx, ty] = scr(g.jr - R * 1.05, g.gy + g.gh * .45); ev('pointerdown', 1, sx, sy); steps(4);
+      for (let s = 1; s <= 60; s++) { ev('pointermove', 1, sx + (tx - sx) * s / 60, sy + (ty - sy) * s / 60); steps(1); } steps(40); ev('pointerup', 1, tx, ty); steps(30); r.jamb = { surf: SILL.surf, cling: CLING.on, side: CLING.side }; }
+    res.T65_endless = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
+    res.PASS.endless = r.up.gap < .5 && r.up.held >= 5 && r.up.flips <= 10 && r.up.xs === 0 && r.up.after >= 3.5 && r.diag.held >= 5 && r.diag.xs === 0 && r.diag.after >= 3.5 && r.up.endX === 0 && r.diag.endX === 0
+      && r.upOld.held < 3.6 && !(r.jamb.cling && /jamb|ceil/.test(r.jamb.side));
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
-  Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去
+  Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); Object.assign(PRESETS, PRE54); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去
   for (const k in IMPS) delete IMPS[k]; Object.assign(IMPS, JSON.parse(IMPS0)); IMP.tr = IMP0.tr; IMP.w = IMP0.w; IMPD.tr = IMP.tr; IMPD.w = IMP.w; IMPSV.noSave = false;   // v2.34：熟還回去
   if (SFX) SFX.frame = sfxFrame0;
   WALK.noSave = false; walkLoad();

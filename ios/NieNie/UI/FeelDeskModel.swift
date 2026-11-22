@@ -15,12 +15,12 @@ struct FeelKnob: Identifiable {
     let section: String
 
     /// The name of this set of defaults. Change it when a knob's default changes for any material; the stamp below catches it if you forget.
-    static let version = "v2.53"
+    static let version = "v2.54"
 
     static let main: [FeelKnob] = [
         FeelKnob(id: "alpha", key: \.alpha, name: "軟", hint: "按三秒，看周圍跟著塌多少。越右越硬", range: 0.05...0.8, step: 0.01, section: "捏下去"),
         FeelKnob(id: "lag", key: \.lag, name: "黏滯（慢一拍）", hint: "慢拖一次、快拖一次，看被抓的那塊差多少", range: 0...0.3, step: 0.01, section: "捏下去"),
-        FeelKnob(id: "creep", key: \.creep, name: "留形", hint: "拉長放開，看形狀留多少。0 完全不留", range: 0...6, step: 0.1, section: "捏完"),
+        FeelKnob(id: "creep", key: \.creep, name: "留形", hint: "拉長放開，看形狀留多少。0 完全不留（v2.54 起往外拉長時另外加快，見隱藏面板「拉長時定型速度」）", range: 0...40, step: 0.5, section: "捏完"),
         FeelKnob(id: "recover", key: \.recover, name: "回原形", hint: "放著不碰，看多久退一半。越左越久", range: 0...1.5, step: 0.01, section: "捏完"),
         FeelKnob(id: "inertiaZ", key: \.inertiaZ, name: "彈：晃幾下", hint: "戳一下放開，數晃幾下才停。越左晃越多下", range: 0.05...1, step: 0.01, section: "放手"),
         FeelKnob(id: "inertiaHz", key: \.inertiaHz, name: "彈：晃多快", hint: "同一個手勢，看第一下多快（每秒幾下）", range: 0...6, step: 0.1, section: "放手"),
@@ -29,7 +29,7 @@ struct FeelKnob: Identifiable {
     static let more: [FeelKnob] = [
         FeelKnob(id: "pressSink", key: \.pressSink, name: "按下去沉多久", hint: "手指按著不動，凹下去要幾秒", range: 0.05...2, step: 0.05, section: "更多"),
         FeelKnob(id: "yield", key: \.yield, name: "多用力才留形", hint: "越左輕輕捏就留下形狀，越右要捏很大力", range: 0.02...1.5, step: 0.01, section: "更多"),
-        FeelKnob(id: "slide", key: \.slide, name: "拉多長整隻跟著走", hint: "拉長到這個長度（幾個半徑），再拉整隻被拖著走", range: 0...3, step: 0.1, section: "更多"),
+        FeelKnob(id: "slide", key: \.slide, name: "拉多長整隻跟著走", hint: "拉長到這個長度（幾個半徑），再拉整隻被拖著走。v2.54 黏土 4（以前 1.5，拉 1.5R 就整隻被拖走，看起來像拉不長）", range: 0...8, step: 0.1, section: "更多"),
         FeelKnob(id: "stick", key: \.stick, name: "黏手", hint: "慢慢抬手時，那塊多黏幾秒才放（候選 26 是 0.1）；0 關", range: 0...0.2, step: 0.02, section: "更多"),
         FeelKnob(id: "flow", key: \.flow, name: "流", hint: "放著不碰，每秒往下塌掉高度的幾成；0 不塌", range: 0...0.5, step: 0.01, section: "更多"),
     ]
@@ -81,6 +81,46 @@ struct FeelKnob: Identifiable {
 }
 
 /// One saved feel: the material it started from, the defaults it was tuned on, the 13 numbers.
+/// v2.54 手感風格 10 選 1 (多米 11-22: name the feels that are optimal in some mathematical or programming sense, and let me pick).
+/// Each is clay's defaults with a few knobs laid over, applied like a saved feel (no bump), so it can be saved to a slot and compared blind.
+/// Same ids, names, words and numbers as the web's `STYLES` in desk.js (change one, change the other). 韌 (maxPull) is not touched: with
+/// 無限拉 on it does nothing.
+struct FeelStyle: Identifiable {
+    let id: String
+    let name: String
+    let math: String   // the model behind it
+    let feel: String   // what the hand should notice
+    let k: [String: Double]
+
+    static let all: [FeelStyle] = [
+        FeelStyle(id: "crit", name: "臨界阻尼", math: "ζ＝1 的二階系統：沒有過衝、最快停下", feel: "放手不晃，一下就定住", k: ["inertiaZ": 1, "inertiaHz": 4, "lag": 0.05]),
+        FeelStyle(id: "jelly", name: "欠阻尼彈簧", math: "ζ≈0.15：能量每晃一下只掉一點", feel: "放手晃三四下才停，偏果凍", k: ["inertiaZ": 0.15, "inertiaHz": 3.4, "creep": 3, "recover": 0.5, "yield": 0.3, "alpha": 0.3, "lag": 0.05]),
+        FeelStyle(id: "maxwell", name: "麥斯威爾黏彈", math: "彈簧串阻尼：拉住不放，應力慢慢鬆掉", feel: "拉成什麼樣就留什麼樣，最像黏土", k: ["creep": 40, "recover": 0.02, "lag": 0.12, "inertiaZ": 0.7, "yield": 0.03]),
+        FeelStyle(id: "voigt", name: "凱文–沃伊特", math: "彈簧並阻尼：變形要時間，最後全部回去", feel: "慢一拍彈回原形，像記憶枕", k: ["creep": 4, "recover": 0.45, "lag": 0.2, "inertiaZ": 1, "alpha": 0.12]),
+        FeelStyle(id: "bingham", name: "賓漢塑性", math: "有降伏應力：力不夠是彈性，過了門檻才流動", feel: "輕碰彈回，用力捏才留形", k: ["yield": 0.5, "creep": 30, "alpha": 0.3, "inertiaZ": 0.4]),
+        FeelStyle(id: "drop", name: "表面張力水滴", math: "周長最小化：形狀往圓收", feel: "捏完自己慢慢收圓，像一滴水", k: ["recover": 0.3, "creep": 12, "alpha": 0.22, "inertiaZ": 0.45, "inertiaHz": 3.5]),
+        FeelStyle(id: "honey", name: "重力流蜂蜜", math: "薄膜流：高的地方往低的地方流", feel: "放著自己往下塌、攤開，拉起來很拖", k: ["flow": 0.12, "lag": 0.25, "recover": 0.02, "alpha": 0.12, "inertiaZ": 0.9]),
+        FeelStyle(id: "direct", name: "零延遲直接操控", math: "延遲 0、追手增益 1：手指在哪那塊就在哪", feel: "最跟手，沒有慢一拍", k: ["lag": 0, "alpha": 0.4, "pressSink": 0.1, "inertiaZ": 0.7]),
+        FeelStyle(id: "stickslip", name: "黏著–滑脫", math: "靜摩擦大於動摩擦：先黏住，力夠了一下滑開", feel: "抬手時黏住一下才放，有「拔起來」的感覺", k: ["stick": 0.15, "lag": 0.18, "yield": 0.05]),
+        FeelStyle(id: "lowpass", name: "一階低通追手", math: "指數平滑 τ＝0.3 秒：高頻抖動濾掉", feel: "像拖著一團有重量的東西，很穩", k: ["lag": 0.3, "alpha": 0.15, "inertiaZ": 0.5, "inertiaHz": 2.2, "slide": 2.5]),
+    ]
+
+    /// Clay's defaults for the 13 numbers, the strand off, this style's knobs on top.
+    var snap: FeelSnap {
+        let d = SlimeMaterial.clay.defaults
+        var k: [String: Double] = [:]
+        for id in FeelKnob.keys { k[id] = Double(FeelKnob.fmt(FeelKnob.get(d, id))) ?? FeelKnob.get(d, id) }
+        k["strand"] = 0
+        for (id, v) in self.k { k[id] = v }
+        return FeelSnap(base: SlimeMaterial.clay.rawValue, pv: FeelKnob.version, ps: FeelKnob.stamp, k: k)
+    }
+    /// The desk's numbers are exactly this style (the button lights up).
+    func matches(_ s: FeelSnap) -> Bool {
+        let m = snap
+        return s.base == m.base && FeelKnob.keys.allSatisfy { FeelKnob.fmt(s.k[$0] ?? 0) == FeelKnob.fmt(m.k[$0] ?? 0) }
+    }
+}
+
 struct FeelSnap: Codable, Equatable {
     var base: String
     var pv: String?
@@ -249,6 +289,7 @@ struct FeelEffective {
     /// "實際是 X（為什麼）", or that the slider does nothing right now; nil when the slider's own number is what is used.
     func note(_ key: KeyPath<FeelParams, Double>) -> String? {
         let v = set[keyPath: key], u = used[keyPath: key], sill = set.scene >= 0.5, strand = set.strand >= 0.5
+        if (key == \FeelParams.maxPull || key == \FeelParams.memMax) && set.endless >= 0.5 && grey[keyPath: key] == v { return "現在不作用（無限拉開著，沒有上限）" }   // v2.54
         if u != v {
             let why: String
             if grey[keyPath: key] != v { why = "灰盒開著" }

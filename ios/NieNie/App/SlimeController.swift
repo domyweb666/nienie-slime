@@ -496,6 +496,19 @@ final class SlimeController: ObservableObject {
         feelNote = "換成\(m.name)的預設值。"
     }
 
+    /// v2.54 手感風格: lay one of the ten over clay's defaults, like going to a saved feel (no bump).
+    func feelStyle(_ st: FeelStyle) {
+        guard feelBlind == nil else { return }
+        feelApply(st.snap)
+        feelNote = "套上「\(st.name)」：\(st.math)。\(st.feel)。不喜歡就按「回到預設」，喜歡的話存成一格，可以拿去跟別的盲比。"
+    }
+    /// The style the desk's numbers are exactly, if any.
+    var feelStyleNow: String? {
+        guard material == .clay else { return nil }
+        let cur = feelPick()
+        return FeelStyle.all.first { $0.matches(cur) }?.id
+    }
+
     func feelStore(_ i: Int) {
         guard feelSlots.indices.contains(i) else { return }
         feelSlots[i] = feelPick()

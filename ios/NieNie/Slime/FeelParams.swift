@@ -281,6 +281,12 @@ struct FeelParams: Equatable, Codable {
     var split: Double = 1             // the finger farther than splitAt×R from the body's centre for 0.4 s: the strand pinches and parts, the finger's end becomes a second small blob (no face). At most two. 0 off
     var splitAt: Double = 3.4
     var rejoin: Double = 6            // seconds left alone before the small blob crawls back and merges; dropped on the body it merges at once
+    var endless: Double = 1           // v2.54 無限拉 (多米 11-22: pulled 5 cm it grew 3 cm and stopped; it should stretch without end and stay under the finger): the finger never gives way, the soft limits (maxPull, memMax) are off, and each edge's hard limit widens by `capG` while the held patch cannot keep up; 0 = v2.53
+    var growK: Double = 1.5           // how fast the edge limits widen while the held patch lags the finger (e to this power a second)
+    var growMax: Double = 12          // the most the edge limits widen
+    var pullCreep: Double = 15        // pulled outward (0.6R on, fully at 1.8R) the remembered shape follows this fast instead of creep
+    var pullNearR: Double = 10        // and is measured in the whole body's frame this far around the finger (×R) instead of nearR
+    var frameCling: Double = 0        // v2.54 (多米 11-22: only the phone's four edges, no more window ledge): 1 = v2.53, set down by the window jambs or under the top bar it sticks to the frame
     var edgeCling: Double = 1         // set down slowly by the left, right or top edge of the screen it sticks there, the same suckers as on the window jambs; 0 = jambs only
     var bubbles: Double = 0           // v2.51: 0 (多米: no drops inside). small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
     // v2.52 (多米 11-22, 《虛擬手感》3-3 到 3-5 的決定；交辦 A、C 組). Web: the same keys in PRESETS
@@ -358,6 +364,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
             // free sculpting (多米 2026-11-01: pull it long, spread it flat like dough)
             p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 5; p.grabHold = 0.85   // v2.15: pull 7R, remember 5R (past about 8.5R long it shook; v2.13 20 and 12, v2.12 8 and 4)
             p.grabK = 1.2; p.nearR = 3   // pressFlat off since v2.12 (多米: take it out)
+            p.slide = 4   // v2.54: 1.5 → 4 (stretched 1.5R the whole body was dragged along and it looked like it would not stretch any more)
             p.pressSink = 0.2   // 多米 11-16 (0.8 before)
         }
         return p
@@ -571,7 +578,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）；v2.24 0.1，v2.23 0.05", range: 0...0.25, step: 0.01, section: "活物感"),
-        TuneField(key: \.slide, name: "D1' 拉到多長開始整團走（×半徑）", hint: "v2.21 拉力：先被拉長，拉長到這附近再拉就整團被拖著走（果凍 0.6、麻糬 0.9、黏土 1.5）；兩指往兩邊拉不會被拖走、照樣拉很長；0 回 v2.20（整團只跟三成五）", range: 0...3, step: 0.1),
+        TuneField(key: \.slide, name: "D1' 拉到多長開始整團走（×半徑）", hint: "v2.21 拉力：先被拉長，拉長到這附近再拉就整團被拖著走（果凍 0.6、麻糬 0.9、黏土 1.5，v2.54 起 4）；兩指往兩邊拉不會被拖走、照樣拉很長；0 回 v2.20（整團只跟三成五）", range: 0...8, step: 0.1),
         TuneField(key: \.drag, name: "D1 拖著走", hint: "抓著時身體的原位跟著手指移幾成（v2.20 0.35，約 0.25 秒跟上；放手停在被拖到的地方，甩著放手再滑一小段）；0 是 v2.19（只變形不位移）", range: 0...1, step: 0.05),
         TuneField(key: \.dentFade, name: "D2 凹痕退的時間（秒）", hint: "點一下放手後凹痕多久退完（按越久越慢，按 1 秒以上 2.5 倍）；10 是 v2.19（跟回原形一起退，黏土 15 秒退一半）", range: 0.2...10, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.imp, name: "印象 v2.20", hint: "1：它記得你這一次怎麼對它（熟、戒），關掉 app 或背景 10 分鐘歸零；底下 C1 到 C5 只在這裡是 1、活物 v2.19 也是 1 時有用；0 回 v2.19", range: 0...1, step: 1, section: "活物感"),
@@ -617,12 +624,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.pressFirst, name: "按壓第一幀比例", hint: "按下那一幀先到目標的幾成", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.pressRadiusGain, name: "接觸面積壓力", hint: "指腹壓扁（majorRadius 變大）再多攤多少；0 關，候選 9 是 1", range: 0...3, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.yield, name: "定型門檻（×半徑）", hint: "變形超過這個才開始留形", range: 0.02...1.5, step: 0.01, section: "按壓與記形"),
-        TuneField(key: \.creep, name: "定型速度", hint: "揉多快記住新形狀", range: 0...6, step: 0.1, section: "按壓與記形"),
+        TuneField(key: \.creep, name: "定型速度", hint: "揉多快記住新形狀（往外拉長時改用「拉長時定型速度」）", range: 0...40, step: 0.5, section: "按壓與記形"),
         TuneField(key: \.dwellLo, name: "定型停留起點", hint: "抓住幾秒後開始記形（秒）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.dwellHi, name: "定型停留終點", hint: "抓住幾秒後全速記形（秒）", range: 0...2, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.recover, name: "回原形速度", hint: "放著多快變回原樣；黏土 0.05（v2.14，放手 2 秒退一成、15 秒退一半），v2.8 到 v2.13 是 0.3，v2.7 是 0.03", range: 0...1.5, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.grabK, name: "抓住的力道", hint: "被抓那塊每小步往手指靠幾成（再乘距離權重）；以前 0.55，黏土 1.2 整塊跟手", range: 0.2...2, step: 0.05, section: "按壓與記形"),
-        TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住", range: 0.5...4, step: 0.1, section: "按壓與記形"),
+        TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住（v2.54 往外拉長時改用「拉長時記形範圍」）", range: 0.5...12, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.pressFlat, name: "一壓就攤平", hint: "1：從上半部往下壓時下面有看不見的桌面，壓多少扁多少；v2.12 起預設關", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.zoomMin, name: "鏡頭最遠", hint: "形狀變大時畫面自動縮小，最小縮到幾倍；0 不限制、也沒有牆（多米：鏡頭無限拉遠），1 關，v2.12 是 0.45", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.inertiaHz, name: "回彈每秒幾下", hint: "放手、甩、拖到一半停時整團晃的快慢；3 約 0.17 秒彈完第一下；0 回 v2.24（33 毫秒彈完）", range: 0...6, step: 0.1),
@@ -693,6 +700,11 @@ struct TuneField: Identifiable {
         TuneField(key: \.split, name: "拉到極限分成兩團 v2.51", hint: "手指離身體中心超過「分裂距離」再撐 0.4 秒，黏條中間收腰、斷開，手指那頭變成小的一團；最多兩團。0 關", range: 0...1, step: 1),
         TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "手指離身體中心多遠才算拉到極限", range: 2...8, step: 0.2),
         TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
+        TuneField(key: \.endless, name: "無限拉 v2.54", hint: "（多米 11-22：拉五公分只長三公分，要能無限擴張、跟手）1：手指不讓、拉伸上限不作用，邊拉滿了上限自己放寬，整條一起變長；0 回 v2.53", range: 0...1, step: 1),
+        TuneField(key: \.pullCreep, name: "無限拉：拉長時定型速度", hint: "往外拉開 0.6R 起慢慢換成這個速度（1.8R 全換）：記形追得上手指，放手才不會縮回一截。揉、刷、兩指擠照舊用「定型速度」", range: 0...60, step: 1),
+        TuneField(key: \.pullNearR, name: "無限拉：拉長時記形範圍", hint: "往外拉長時整條都用整身座標記形（×半徑）", range: 0.5...12, step: 0.1),
+        TuneField(key: \.growK, name: "無限拉：上限放寬多快", hint: "被抓的那塊跟不上手指時，每條邊的上限每秒放寬幾倍（e 的幾次方）", range: 0.2...6, step: 0.1),
+        TuneField(key: \.frameCling, name: "黏窗框 v2.54", hint: "（多米 11-22：只要能爬手機四邊，窗沿的取消）0：放在窗框旁邊不再黏上窗框，只有螢幕左、右、上邊會黏；1 回 v2.53", range: 0...1, step: 1),
         TuneField(key: \.edgeCling, name: "黏在螢幕四周 v2.51", hint: "（多米 11-22）1：慢慢放在螢幕左邊、右邊、上邊旁邊會黏住；0 只有窗框", range: 0...1, step: 1),
         TuneField(key: \.flow, name: "流：放著會慢慢往下塌 v2.52", hint: "（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影", range: 0...0.5, step: 0.01),
         TuneField(key: \.strandAt, name: "黏條開著時身體拉到多長 v2.52", hint: "黏條開著，窗台上身體本身最多拉到幾個半徑，再遠的部分是黏條。v2.53 預設回到 2.4（多米 11-22：1.6 拉起來不像整隻被拉、形狀留不住）。1.6（v2.52 試過）：v2.51 的 2.4 捏著邊緣往外拉時，那一塊被拉到外框折起來（16 種拉法裡 7 種折超過 120 度；1.6 是 0 種）。2.4 回 v2.51。黏條關掉時這條不作用，身體照「拉伸上限」拉（黏土 7）", range: 1...8, step: 0.1),

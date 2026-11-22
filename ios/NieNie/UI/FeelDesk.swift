@@ -11,6 +11,7 @@ struct FeelDesk: View {
     @State private var copiedText = ""
     @State private var showMore = false
     @State private var showLab = false
+    @State private var showStyles = true
     @FocusState private var askFocused: Bool
 
     private static let warn = Color(red: 0.70, green: 0.33, blue: 0.08)
@@ -43,6 +44,24 @@ struct FeelDesk: View {
                             }
                             Spacer(minLength: 0)
                         }
+                        DisclosureGroup(isExpanded: $showStyles) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(Array(stride(from: 0, to: FeelStyle.all.count, by: 2)), id: \.self) { r in
+                                    HStack(spacing: 6) {
+                                        ForEach(FeelStyle.all[r..<min(r + 2, FeelStyle.all.count)]) { st in
+                                            chip(st.name, on: controller.feelStyleNow == st.id) { controller.feelStyle(st) }
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+                                }
+                                Text("按一個就套到黏土上（只動幾個旋鈕，下面看得到）。每一種的數學在按下去後的說明裡。")
+                                    .font(.rounded(11.5, .medium)).foregroundStyle(Palette.inkSoft)
+                            }
+                            .padding(.top, 6)
+                        } label: {
+                            Text("手感風格（10 選 1，v2.54）").font(.rounded(13, .heavy))
+                        }
+                        .tint(Palette.ink)
                         ForEach(FeelKnob.sections, id: \.self) { section in
                             Text(section)
                                 .font(.rounded(12, .heavy))

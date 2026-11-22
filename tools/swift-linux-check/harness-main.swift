@@ -19,6 +19,12 @@ func apply(_ p: inout FeelParams, _ kv: [String]) {
         case "flow": p.flow = v
         case "maxPull": p.maxPull = v
         case "life2": p.life2 = v
+        case "endless": p.endless = v
+        case "slide": p.slide = v
+        case "capSlip": p.capSlip = v
+        case "pullCreep": p.pullCreep = v
+        case "frameCling": p.frameCling = v
+        case "creep": p.creep = v
         case "grey": if v >= 0.5 { p.greyBox() }
         default: print("unknown key \(a[0])")
         }
@@ -80,4 +86,38 @@ if args.count >= 3, args[1] == "desk" {
     print(b.line(choice: 0, a: s1, b: cur, question: "哪個比較軟", now: 41, date: Date(timeIntervalSince1970: 0)))
     print(b.reveal(choice: 0))
     print("units:", FeelKnob.unit("alpha", 0.18), FeelKnob.unit("recover", 0.05), FeelKnob.unit("flow", 0.05), FeelKnob.unit("lag", 0.22), FeelKnob.unit("recover", 1), FeelKnob.unit("stick", 0))
+}
+
+// v2.54 無限拉: the same pulls as the web's pull test. Grab 0.3R inside the edge facing the pull, drag dist·R over 40 frames, hold 60,
+// let go, 120 frames. Prints the body's length along the pull while held and 2 s after (in radii).
+if args.count >= 2, args[1] == "pull" {
+    final class Tok {}
+    var p = SlimeMaterial.clay.defaults
+    if !args.contains("--plain") { SlimeKind.taro.apply(&p) }
+    apply(&p, Array(args.dropFirst(2)).filter { !$0.hasPrefix("--") })
+    for (dx, dy, dist) in [(0.0, -1.0, 4.0), (0.5, -1.0, 5.5), (1.0, -1.0, 4.0), (0.0, -1.0, 2.0)] {
+        let rig = SlimeRig(params: p); rig.labNoSave = true; rig.seedRandom(7); rig.setup(width: 393, height: 852)
+        var clock = 0.0, DT = 1.0 / 60
+        for _ in 0..<120 { rig.update(DT); clock += DT }
+        let R = rig.labRadius, L = hypot(dx, dy), ux = dx / L, uy = dy / L
+        func len() -> Double { let b = rig.boundaryPoints(); var a = -1e9, c = 1e9; for q in b { let v = q.x * ux + q.y * uy; a = max(a, v); c = min(c, v) }; return (a - c) / R }
+        let b = rig.boundaryPoints(); var best = b[0]; var bv = -1e9
+        for q in b { let v = q.x * ux + q.y * uy; if v > bv { bv = v; best = q } }
+        let g = rig.toScreen(best.x - ux * R * 0.3, best.y - uy * R * 0.3)
+        let tok = Tok(), id = ObjectIdentifier(tok)
+        rig.touchBegan(id, x: g.x, y: g.y, time: clock)
+        for _ in 0..<4 { rig.update(DT); clock += DT }
+        var ex = g.x, ey = g.y
+        for s in 1...40 {
+            let nx = max(4, min(389, g.x + ux * dist * R * Double(s) / 40)), ny = max(4, min(848, g.y + uy * dist * R * Double(s) / 40))
+            rig.touchMoved(id, x: nx, y: ny, predictedX: nil, predictedY: nil, distance: hypot(nx - ex, ny - ey)); ex = nx; ey = ny
+            rig.update(DT); clock += DT
+        }
+        for _ in 0..<60 { rig.update(DT); clock += DT }
+        let held = len()
+        rig.touchEnded(id, time: clock)
+        for _ in 0..<120 { rig.update(DT); clock += DT }
+        print(String(format: "dir %.1f,%.1f dist %.1f  finger %.2fR  held %.2fR  after2s %.2fR", dx, dy, dist, hypot(ex - g.x, ey - g.y) / R, held, len()))
+        _ = tok
+    }
 }

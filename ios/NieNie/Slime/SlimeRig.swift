@@ -49,6 +49,8 @@ final class SlimeRig {
             else if m.sillCap > 0 { m.maxPull = min(m.maxPull, m.sillCap); m.memMax = min(m.memMax, 2.6) }
             m.upright = max(m.upright, 0.03)
         }
+        // v2.54 無限拉: the soft limits and the finger giving way are off (web effPull, effMem, effSlip); the edge limits widen in capGrowStep
+        if m.endless >= 0.5 { m.maxPull = Self.endlessLim; m.memMax = Self.endlessLim }
         return m
     }
     /// v2.52 A5: every random draw of the rig comes from here. Unseeded it is the system's generator, as before; the fuzz test seeds it
@@ -103,6 +105,15 @@ final class SlimeRig {
     private var bndL2: [Double] = []     // rest distance between ring particles two apart (no folding back)
     /// v2.48: each edge's rest length; what the hard limits pushed the held particles back by this substep (the finger gives way by it); who a wall or the sill stopped; the remembered shape's longest edge (times rest)
     private var EDL: [Double] = [], SLX: [Double] = [], SLY: [Double] = [], HIT: [Bool] = [], QSTR = 1.0
+    /// v2.54 無限拉 (多米 11-22: pulled 5 cm it grew 3 cm and would not go further; it should stretch without end, under the finger).
+    /// Measured, three things held it back: ① the finger gave way (capSlip 4): every mesh edge stops at 3× rest (stretchCap), the held patch
+    /// was pushed back and the finger's effective position moved back four times that, finger 4R, patch 2.5R; ② slide 1.5: stretched 1.5R
+    /// the whole body was dragged along; ③ the remembered shape stopped at 2.4× an edge (memCap) and shrank back to 2.5R on release.
+    /// With `endless` on the finger does not give way and the soft limits are off (`effective`); every edge's limit is multiplied by CAPG,
+    /// which grows by growK a second while edges are full and the held patch lags the finger, so the whole length grows together instead of
+    /// a few edges by the finger turning into a spike. Let go, CAPG only falls back to what the remembered shape still needs. Web `capGrowStep`.
+    static let endlessLim = 100.0
+    private(set) var CAPG = 1.0, CAPGAP = 0.0
     private var EDG: [Int] = [], EDEG: [Double] = [], EDSX: [Double] = [], EDSY: [Double] = []   // v2.47: the mesh's edges (two indices an edge, each once), how many meet at each particle, scratch for memSmoothStep
     private var TRI: [Int] = [], TRA: [Double] = []   // v2.29 防打結: the rest shape's triangle mesh (3 indices a triangle) and each rest area
     // v2.28 窗台 (多米 11-06): gravity, a sill to stand on, a bowl in the middle to sit in; v2.31 the bowl centred, the props pictures only.
@@ -928,6 +939,7 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
+        CAPG = 1; CAPGAP = 0   // v2.54
         sillInit()   // v2.28 窗台: last, it moves the body over the bowl and lets it drop
         shkReset()   // v2.31 搖晃沉澱: clear, the glitter in a pile
     }
@@ -1083,12 +1095,56 @@ final class SlimeRig {
     /// `grab` (the GRAB flags) lets the held particles move a quarter as much. One particle moves at most 0.4 spacing a call,
     /// so a triangle that flipped all the way does not fling the body. Port of the web's `meshGuard`.
     /// v2.38: corners of flipped triangles (no memory there) and how many are flipped (is the remembered shape flipped). Web `flipMarks`, `flipCount`.
+    /// v2.54 無限拉: a triangle pressed flat on the sill, or a long thin one that tipped over by a hair after a long pull, does not count as
+    /// flipped (neither shows; counted, nothing of the pull was remembered and it shrank back on release). Web `flipTol`.
+    private func flipTol(_ k: Int) -> Double { effParams.endless >= 0.5 && k / 3 < TRA.count ? -0.1 * TRA[k / 3] : 0 }
+    /// v2.54: pulled outward (0.6R on, fully at 1.8R) the shape is remembered faster (pullCreep) and as a whole (pullNearR), so the memory keeps
+    /// up with the finger and a long pull does not shrink back on release; rubbing, scrubbing and pinching keep creep (measured: creep 30 all the
+    /// time, the frames with a flipped triangle in the fuzz went from a tenth to four in ten). Web `pullK`.
+    private func pullK(_ mat: FeelParams) -> Double {
+        guard mat.endless >= 0.5 else { return 0 }
+        var m = 0.0
+        for f in fingers.values where f.mode == .grab && f.far { let x = max(0, min(1, (f.stretch - 0.6) / 1.2)); m = max(m, x * x * (3 - 2 * x)) }
+        return m
+    }
+    private func capG(_ mat: FeelParams) -> Double { mat.endless >= 0.5 ? CAPG : 1 }
+    /// Widened, the remembered shape's limit is nine tenths of the live body's (2.4 of 3 before), or it shrinks back to the memory limit on release.
+    private func memCapNow(_ mat: FeelParams) -> Double { mat.endless >= 0.5 && CAPG > 1 ? max(mat.memCap, 0.9 * mat.stretchCap) * CAPG : mat.memCap }
+    /// Once a frame after the physics: widen the edge limits while edges are full and the held patch lags its finger by more than 0.12R;
+    /// with no finger, fall back over about 0.6 s to what the remembered shape still needs.
+    private func capGrowStep(_ dt: Double) {
+        let mat = effParams
+        guard mat.endless >= 0.5, EDL.count * 2 == EDG.count, !EDL.isEmpty else { CAPG = 1; CAPGAP = 0; return }
+        var gap = 0.0, held = false
+        for f in fingers.values where f.mode == .grab && !f.mem.isEmpty {
+            held = true
+            var sx = 0.0, sy = 0.0, sw = 0.0
+            for m in f.mem { sx += (X[m.i] - m.ox) * m.w; sy += (Y[m.i] - m.oy) * m.w; sw += m.w }
+            if sw > 0 { gap = max(gap, hypot(sx / sw - f.fx, sy / sw - f.fy) / R) }
+        }
+        CAPGAP = gap
+        if held {
+            if gap > 0.12 && mat.stretchCap > 0 {
+                var mx = 0.0, e = 0, k = 0
+                while e + 1 < EDG.count {
+                    let i = EDG[e], j = EDG[e + 1], l: Double = hypot(X[i] - X[j], Y[i] - Y[j]) / EDL[k]
+                    if l > mx { mx = l }
+                    e += 2; k += 1
+                }
+                if mx >= 0.93 * mat.stretchCap * CAPG { CAPG = min(mat.growMax > 0 ? mat.growMax : 12, CAPG * exp((mat.growK > 0 ? mat.growK : 1.5) * dt * min(1, gap / 0.4))) }
+            }
+        } else {
+            let need: Double = mat.memCap > 0 ? max(1, QSTR / max(mat.memCap, 0.9 * mat.stretchCap)) : 1
+            if CAPG > need { CAPG += (need - CAPG) * (1 - exp(-dt / 0.6)) }
+            if CAPG < 1 { CAPG = 1 }
+        }
+    }
     private func flipMarks(_ AX: [Double], _ AY: [Double]) -> [Bool] {
         var b = [Bool](repeating: false, count: N)
         var k = 0
         while k + 2 < TRI.count {
             let a = TRI[k], p = TRI[k + 1], c = TRI[k + 2]
-            if (AX[p] - AX[a]) * (AY[c] - AY[a]) - (AY[p] - AY[a]) * (AX[c] - AX[a]) <= 0 { b[a] = true; b[p] = true; b[c] = true }
+            if (AX[p] - AX[a]) * (AY[c] - AY[a]) - (AY[p] - AY[a]) * (AX[c] - AX[a]) <= 2 * flipTol(k) { b[a] = true; b[p] = true; b[c] = true }
             k += 3
         }
         return b
@@ -1097,7 +1153,7 @@ final class SlimeRig {
         var n = 0, k = 0
         while k + 2 < TRI.count {
             let a = TRI[k], p = TRI[k + 1], c = TRI[k + 2]
-            if (AX[p] - AX[a]) * (AY[c] - AY[a]) - (AY[p] - AY[a]) * (AX[c] - AX[a]) <= 0 { n += 1 }
+            if (AX[p] - AX[a]) * (AY[c] - AY[a]) - (AY[p] - AY[a]) * (AX[c] - AX[a]) <= 2 * flipTol(k) { n += 1 }
             k += 3
         }
         return n
@@ -2416,6 +2472,7 @@ final class SlimeRig {
         lastSdt = sdt
         if sillOn { sillStepPre() }   // v2.28 窗台
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
+        capGrowStep(dt)   // v2.54 無限拉
         if sillOn { sillStep(dt) }   // v2.28 窗台: landing, the bowl, the hop, home
         shkStep(dt)   // v2.31 搖晃沉澱
         tentBump()
@@ -2723,7 +2780,7 @@ final class SlimeRig {
         if mat.stretchCap > 0 && !EDG.isEmpty {   // v2.48: the hard limits, a few rounds together with the no-flip guard
             let rounds = max(1, Int(mat.capIter))
             for _ in 0..<rounds {
-                let a: Bool = strainStep(&X, &Y, mat.capLo, mat.stretchCap, true, mat)
+                let a: Bool = strainStep(&X, &Y, mat.capLo, mat.stretchCap * capG(mat), true, mat)
                 let b: Bool = mat.noFlip > 0 ? meshGuard(&X, &Y, mat.noFlip, GRAB, mat) : false
                 if b { grdFlip = true }   // v2.52 A5
                 if !a && !b { break }
@@ -2776,6 +2833,10 @@ final class SlimeRig {
                 var sx = 0.0, sy = 0.0, sw = 0.0
                 for m in f.mem { sx += SLX[m.i] * m.w; sy += SLY[m.i] * m.w; sw += m.w }
                 if sw > 0 {
+                    if mat.endless >= 0.5, !clusters.isEmpty {   // v2.54 無限拉: the finger gives way outward and sideways, never back toward the body's centre (that was the pull that would not stretch)
+                        let rx: Double = f.fx - clusters[gi].xc, ry: Double = f.fy - clusters[gi].yc, rl: Double = hypot(rx, ry)
+                        if rl > 1e-6 { let d: Double = (sx * rx + sy * ry) / rl; if d < 0 { sx -= d * rx / rl; sy -= d * ry / rl } }
+                    }
                     let gx: Double = sx / sw * mat.capSlip, gy: Double = sy / sw * mat.capSlip
                     if abs(sx) + abs(sy) > sw * 0.02 { grdGive = true }   // v2.52 A5
                     f.slx += gx; f.sly += gy
@@ -2947,7 +3008,7 @@ final class SlimeRig {
         // nearMem: near the fingers (Gaussian, about 1.1R) the body is measured in the whole-body frame too. A pulled-out lump
         // reads as a rotation to the clusters and is cancelled (measured: a 0.9R pull remembered 7 pt)
         if mat.nearMem > 0 {
-            let g = clusters[gi], gs = fingers.values.filter { $0.mode == .grab }, k2 = 1 / (mat.nearR * mat.nearR * R * R)   // clay 3 = the whole lump
+            let g = clusters[gi], gs = fingers.values.filter { $0.mode == .grab }, nR: Double = mat.nearR + max(0, mat.pullNearR - mat.nearR) * pullK(mat), k2 = 1 / (nR * nR * R * R)   // clay 3 = the whole lump; v2.54 pulled out long, pullNearR
             if !gs.isEmpty {
                 for i in 0..<N {
                     var wf = 0.0
@@ -2993,7 +3054,7 @@ final class SlimeRig {
                 let x = max(0, min(1, (t - f.tDown - lo) / (hi - lo)))
                 g = max(g, x * x * (3 - 2 * x))
             }
-            let yl = mat.yield * R, kc: Double = min(1, mat.creep * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
+            let yl = mat.yield * R, kc: Double = min(1, (mat.creep + max(0, mat.pullCreep - mat.creep) * pullK(mat)) * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
             // v2.24 pressLocal: while the finger has not moved off (0.15R) only the part near it remembers. With the whole body remembering, holding still wrote the
             // small shape-matching errors into the far edge, a 48° corner in 4 s (in Q itself); once it moves the whole body remembers as before, pulls keep their shape
             let plGrabs = fingers.values.filter { $0.mode == .grab }
@@ -3025,7 +3086,7 @@ final class SlimeRig {
         } else {
             // crossed: relax at the v2.13 rate (0.3). With recover slowed to 0.05 the knot a 9R pull leaves in the tail stayed for
             // 12 s after release; relaxing shortens the strand and the knot comes undone
-            let kr = min(1, (mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.38: a flipped remembered shape too
+            let kr = min(1, (mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && mat.endless < 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.54 無限拉: a few flipped triangles in a long remembered shape no longer make all of it retreat fast (it lost half in 2 s); the no-flip guard opens them, a crossed ring still retreats fast   // v2.38: a flipped remembered shape too
             if kr > 0 {
                 for i in 0..<N { QX[i] += (Q0X[i] - QX[i]) * kr; QY[i] += (Q0Y[i] - QY[i]) * kr }
             }
@@ -3045,7 +3106,7 @@ final class SlimeRig {
         tentRest(dt, mat)
         if mat.memSmooth > 0 { memSmoothStep(dt, mat.memSmooth) }   // v2.47
         if mat.memCap > 0 && !EDG.isEmpty {   // v2.48: the remembered shape keeps to its own limits
-            for _ in 0..<3 { if !strainStep(&QX, &QY, mat.capLo, mat.memCap, false, mat) { break } }
+            for _ in 0..<3 { if !strainStep(&QX, &QY, mat.capLo, memCapNow(mat), false, mat) { break } }
         }
         if EDL.count * 2 == EDG.count {   // the remembered shape's longest edge, times rest (the pseudopods fade by it)
             var mq = 1.0, e = 0, k = 0
@@ -3439,7 +3500,7 @@ final class SlimeRig {
             clingStart(sd)
         } else if sillHeld && !sillGrab && !sillInBowl {
             sillWant = !noBowl && abs(sillRelX - g.bx) < g.cav * 0.9
-            if !sillWant && params.cling >= 0.5 && gcx > g.gx && gcx < g.jr && y1 < g.bt - 1 {
+            if !sillWant && params.cling >= 0.5 && params.frameCling >= 0.5 && gcx > g.gx && gcx < g.jr && y1 < g.bt - 1 {
                 var x0 = 1e9, x1 = -1e9, y0 = 1e9
                 for i in bnd { x0 = min(x0, X[i]); x1 = max(x1, X[i]); y0 = min(y0, Y[i]) }
                 let inFront = !noBowl && x0 < g.bx + g.bw / 2 && x1 > g.bx - g.bw / 2 && y1 > g.back + R * 0.5   // over the bowl it would vanish behind it

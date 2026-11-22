@@ -3,12 +3,12 @@
    存檔記預設版本，預設改了會問；匯出的字貼回來能原樣重現；量測一組（灰盒、純圓、圖層、讀數）。
    在 index.html 的主程式之後載入，用的是主程式的 mat、PRESETS、setMat、effNote、LAB、GRD、PHYS。手機版同一份規格在 ios/NieNie/UI/FeelDesk.swift，
    名字、範圍、匯出的格式兩邊要一樣（改一邊就改另一邊）。網頁沒有觸覺、只有約 60 fps，這裡調出來的數字只算起點（3-4 跳過條件）。 */
-const FEELVER='v2.53';   // 預設版本的名字：三種材料的旋鈕預設值有改就換；另外有一個從預設值算出來的指紋（deskStamp），忘了換名字也認得出來
+const FEELVER='v2.54';   // 預設版本的名字：三種材料的旋鈕預設值有改就換；另外有一個從預設值算出來的指紋（deskStamp），忘了換名字也認得出來
 // key、名字（底層詞）、參照點（怎麼捏來試）、最小、最大、一格、哪一組
 const KNOBS=[
   ['alpha','軟','按三秒，看周圍跟著塌多少。越右越硬',.05,.8,.01,'捏下去'],
   ['lag','黏滯（慢一拍）','慢拖一次、快拖一次，看被抓的那塊差多少',0,.3,.01,'捏下去'],
-  ['creep','留形','拉長放開，看形狀留多少。0 完全不留',0,6,.1,'捏完'],
+  ['creep','留形','拉長放開，看形狀留多少。0 完全不留（v2.54 起往外拉長時另外加快，見隱藏面板「拉長時定型速度」）',0,40,.5,'捏完'],
   ['recover','回原形','放著不碰，看多久退一半。越左越久',0,1.5,.01,'捏完'],
   ['inertiaZ','彈：晃幾下','戳一下放開，數晃幾下才停。越左晃越多下',.05,1,.01,'放手'],
   ['inertiaHz','彈：晃多快','同一個手勢，看第一下多快（每秒幾下）',0,6,.1,'放手'],
@@ -16,12 +16,28 @@ const KNOBS=[
 const MORE=[
   ['pressSink','按下去沉多久','手指按著不動，凹下去要幾秒',.05,2,.05],
   ['yield','多用力才留形','越左輕輕捏就留下形狀，越右要捏很大力',.02,1.5,.01],
-  ['slide','拉多長整隻跟著走','拉長到這個長度（幾個半徑），再拉整隻被拖著走',0,3,.1],
+  ['slide','拉多長整隻跟著走','拉長到這個長度（幾個半徑），再拉整隻被拖著走。v2.54 黏土 4（以前 1.5，拉 1.5R 就整隻被拖走，看起來像拉不長）',0,8,.1],
   ['stick','黏手','慢慢抬手時，那塊多黏幾秒才放（候選 26 是 0.1）；0 關',0,.2,.02],
   ['flow','流','放著不碰，每秒往下塌掉高度的幾成；0 不塌',0,.5,.01]];
 const DKEYS=[...KNOBS,...MORE].map(r=>r[0]).concat(['strand']);   // 一份存檔記這 13 個數字；黏條（strand）是開關，一起記才比得出「黏條」對「身體自己拉到 7」
 const DNAME=Object.fromEntries([...KNOBS,...MORE].map(r=>[r[0],r[1]]));DNAME.strand='黏條';
 const MATN={clay:'黏土',mochi:'麻糬',jelly:'果凍'};
+// v2.54 手感風格 10 選 1（多米 11-22：照數學或程式上可能的手感最佳化，取名字讓我選）。每一種都是黏土預設上蓋幾個旋鈕，按了就套，跟存檔、盲比、匯出同一套；
+// 名字、說明、數字跟手機版 FeelDeskModel.swift 的 FeelStyle.all 一樣（改一邊就改另一邊）。韌（maxPull）在無限拉開著時不作用，所以這裡都不動它
+const STYLES=[
+  ['crit','臨界阻尼','ζ＝1 的二階系統：沒有過衝、最快停下','放手不晃，一下就定住',{inertiaZ:1,inertiaHz:4,lag:.05}],
+  ['jelly','欠阻尼彈簧','ζ≈0.15：能量每晃一下只掉一點','放手晃三四下才停，偏果凍',{inertiaZ:.15,inertiaHz:3.4,creep:3,recover:.5,yield:.3,alpha:.3,lag:.05}],
+  ['maxwell','麥斯威爾黏彈','彈簧串阻尼：拉住不放，應力慢慢鬆掉','拉成什麼樣就留什麼樣，最像黏土',{creep:40,recover:.02,lag:.12,inertiaZ:.7,yield:.03}],
+  ['voigt','凱文–沃伊特','彈簧並阻尼：變形要時間，最後全部回去','慢一拍彈回原形，像記憶枕',{creep:4,recover:.45,lag:.2,inertiaZ:1,alpha:.12}],
+  ['bingham','賓漢塑性','有降伏應力：力不夠是彈性，過了門檻才流動','輕碰彈回，用力捏才留形',{yield:.5,creep:30,alpha:.3,inertiaZ:.4}],
+  ['drop','表面張力水滴','周長最小化：形狀往圓收','捏完自己慢慢收圓，像一滴水',{recover:.3,creep:12,alpha:.22,inertiaZ:.45,inertiaHz:3.5}],
+  ['honey','重力流蜂蜜','薄膜流：高的地方往低的地方流','放著自己往下塌、攤開，拉起來很拖',{flow:.12,lag:.25,recover:.02,alpha:.12,inertiaZ:.9}],
+  ['direct','零延遲直接操控','延遲 0、追手增益 1：手指在哪那塊就在哪','最跟手，沒有慢一拍',{lag:0,alpha:.4,pressSink:.1,inertiaZ:.7}],
+  ['stickslip','黏著–滑脫','靜摩擦大於動摩擦：先黏住，力夠了一下滑開','抬手時黏住一下才放，有「拔起來」的感覺',{stick:.15,lag:.18,yield:.05}],
+  ['lowpass','一階低通追手','指數平滑 τ＝0.3 秒：高頻抖動濾掉','像拖著一團有重量的東西，很穩',{lag:.3,alpha:.15,inertiaZ:.5,inertiaHz:2.2,slide:2.5}]];
+function styleSnap(id){const s=STYLES.find(x=>x[0]===id);if(!s)return null;const k={};for(const key of DKEYS)k[key]=+dfmt(PRESETS.clay[key]);k.strand=0;Object.assign(k,s[4]);return {base:'clay',k}}
+function styleApply(id){const s=STYLES.find(x=>x[0]===id),sn=styleSnap(id);if(!sn)return;deskApply(sn);DESK.style=id;deskSync();deskNote('套上「'+s[1]+'」：'+s[2]+'。'+s[3]+'。不喜歡就按「回到預設」，喜歡的話存成一格，可以拿去跟別的盲比。')}
+
 const DESK={slots:[null,null,null],log:[],base0:null,pv:FEELVER,ps:'',stale:null,blind:null,fsl:{},build:'網頁 '+FEELVER};
 
 const dfmt=v=>String(+(+v).toFixed(3));
@@ -93,6 +109,7 @@ function deskSync(){const B=DESK.blind,F2=DESK.fsl;
   for(const b of root.querySelectorAll('[data-m]'))b.setAttribute('aria-pressed',String(b.getAttribute('data-m')===curMat));
   for(const b of root.querySelectorAll('[data-go]'))b.disabled=!DESK.slots[+b.getAttribute('data-go')];
   for(const b of root.querySelectorAll('[data-blind]')){const [x,y]=b.getAttribute('data-blind').split(',').map(Number);b.disabled=!(DESK.slots[x]&&DESK.slots[y])}
+  {const cur=deskPick();for(const b of root.querySelectorAll('[data-style]')){const sn=styleSnap(b.getAttribute('data-style'));b.setAttribute('aria-pressed',String(curMat==='clay'&&DKEYS.every(k=>dfmt(sn.k[k])===dfmt(cur[k]))))}}   // v2.54：台上數字剛好是哪一種風格，那顆就亮
   const st=$('feel-strand');if(st){st.setAttribute('aria-pressed',String(mat.strand>=.5));st.textContent=mat.strand>=.5?'黏條 開':'黏條 關'}
   $('feel-main').hidden=!!B;$('feel-blind').hidden=!B;$('feel-io').hidden=!!B;if(B)$('feel-out').hidden=true;   // 盲比中連複製也收起來：複製出來的字會寫出現在是哪一組
   if(B)for(const b of root.querySelectorAll('[data-bs]'))b.setAttribute('aria-pressed',String(+b.getAttribute('data-bs')===B.cur));
@@ -105,6 +122,7 @@ function deskBuild(){const root=$('feel');if(!root)return;
   <div class="feel-row" id="feel-prompt" hidden><span id="feel-prompt-t"></span><button id="feel-usenew">用新預設</button><button id="feel-keep">留著我的</button></div>
   <div id="feel-main" class="feel-box">
     <div class="feel-row"><span>從哪個材質開始</span><button data-m="clay">黏土</button><button data-m="mochi">麻糬</button><button data-m="jelly">果凍</button></div>
+    <details id="feel-styles" open><summary>手感風格（10 選 1，v2.54）</summary><div class="feel-row feel-styles">${STYLES.map(s=>`<button data-style="${s[0]}" title="${s[2]}">${s[1]}</button>`).join('')}</div><p class="feel-note">按一個就套到黏土上（只動幾個旋鈕，下面看得到）。每一種的數學在按下去後的說明裡。</p></details>
     <div id="feel-sliders"></div>
     <div class="feel-row"><span>韌的另一半</span><button id="feel-strand"></button><small>開：身體只拉到穩定的長度，再遠是黏條。關：身體自己拉到「韌」那麼長。</small></div>
     <details><summary>更多（副旋鈕）</summary><div id="feel-more"></div></details>
@@ -130,7 +148,8 @@ function deskBuild(){const root=$('feel');if(!root)return;
   const open=on=>{root.classList.toggle('hidden',!on);$('b-feel').setAttribute('aria-expanded',String(on));if(on)deskSync()};
   $('b-feel').addEventListener('click',()=>open(root.classList.contains('hidden')));$('feel-close').addEventListener('click',()=>open(false));
   root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const a=n=>b.getAttribute(n);
-    if(a('data-m')){setMat(a('data-m'));DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('換成'+MATN[curMat]+'的預設值。')}
+    if(a('data-style')){styleApply(a('data-style'))}
+    else if(a('data-m')){setMat(a('data-m'));DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('換成'+MATN[curMat]+'的預設值。')}
     else if(a('data-save')!==null){const i=+a('data-save');DESK.slots[i]=deskSnap();deskSync();deskSave();deskNote('現在的手感存成 '+(i+1)+'。')}
     else if(a('data-go')!==null){const i=+a('data-go');deskApply(DESK.slots[i]);deskNote('換到 '+(i+1)+'（'+MATN[curMat]+'起點）。馬上捏，幾秒內再換另一個。')}
     else if(a('data-blind')){const [x,y]=a('data-blind').split(',').map(Number);blindStart(x,y)}
