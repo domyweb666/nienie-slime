@@ -204,7 +204,7 @@ struct FeelDesk: View {
     /// B4: the numbers on the desk were tuned on other defaults than this build's
     private func stalePrompt(_ stale: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("預設已更新：你存的數字是在「\(stale)」上調的，現在的預設是 \(FeelKnob.version)。")
+            Text("預設已更新到 \(FeelKnob.version)，現在用的是新預設。你之前存的數字是在「\(stale)」上調的，要用回去就按「留著我的」。")
                 .font(.rounded(12))
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {

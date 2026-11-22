@@ -273,8 +273,8 @@ struct FeelParams: Equatable, Codable {
     var absorb: Double = 0.68         // 0 the whole of it like clear water; 1 a strong colour in the middle
     var caustic: Double = 0           // v2.51: 0 (the ring under it read as a base). sitting, a patch of gathered light under it and a faint ring of shade; 0 off
     // v2.51 (多米 11-22). Web: the same keys in PRESETS
-    var shine: Double = 0             // 0: no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50
-    var opaque: Double = 0.9          // how much the thick part of the body hides what is behind it. 0 = v2.50 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
+    var shine: Double = 1             // 0: no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50
+    var opaque: Double = 0          // how much the thick part of the body hides what is behind it. 0 = v2.50 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
     var lump: Double = 1              // irregular outline (web shape.js): heavy below, a bump leaning to one side on top, a smaller one low on the other side; 0 = the near-round blob of v2.50. Rebuilds the body
     var strand: Double = 0            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
     var tugEdge: Double = 0        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried

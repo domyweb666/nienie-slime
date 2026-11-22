@@ -38,7 +38,7 @@ function deskStamp(){let s='';for(const m of ['clay','mochi','jelly'])for(const 
   let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return ('00000000'+h.toString(16)).slice(-8).slice(0,6)}
 function deskPick(){const o={};for(const k of DKEYS)o[k]=+dfmt(mat[k]);return o}
 function deskSnap(){return {base:curMat,pv:FEELVER,ps:deskStamp(),k:deskPick()}}
-function deskSave(){try{localStorage.setItem('nienie.feel',JSON.stringify({v:2,pv:DESK.pv,ps:DESK.ps,base:curMat,k:deskPick(),s:DESK.slots,log:DESK.log.slice(-60)}))}catch(_){}}
+function deskSave(){try{localStorage.setItem('nienie.feel',JSON.stringify({v:2,pv:DESK.pv,ps:DESK.ps,base:DESK.stale&&DESK.staleSnap?DESK.staleSnap.base:curMat,k:DESK.stale&&DESK.staleSnap?DESK.staleSnap.k:deskPick(),s:DESK.slots,log:DESK.log.slice(-60)}))}catch(_){}}
 // 套一份存檔：先換到它的材料，再蓋上 13 個數字。不彈、不出聲、不動牠（3-4：換的時候加的任何動作都會蓋在要比的東西上）
 function deskApply(sn){if(!sn||!sn.k)return;if(sn.base&&sn.base!==curMat&&PRESETS[sn.base])setMat(sn.base);
   for(const k of DKEYS)if(typeof sn.k[k]==='number'&&isFinite(sn.k[k]))mat[k]=sn.k[k];deskSync();deskSave()}
@@ -96,7 +96,7 @@ function deskSync(){const B=DESK.blind,F2=DESK.fsl;
   const st=$('feel-strand');if(st){st.setAttribute('aria-pressed',String(mat.strand>=.5));st.textContent=mat.strand>=.5?'黏條 開':'黏條 關'}
   $('feel-main').hidden=!!B;$('feel-blind').hidden=!B;$('feel-io').hidden=!!B;if(B)$('feel-out').hidden=true;   // 盲比中連複製也收起來：複製出來的字會寫出現在是哪一組
   if(B)for(const b of root.querySelectorAll('[data-bs]'))b.setAttribute('aria-pressed',String(+b.getAttribute('data-bs')===B.cur));
-  $('feel-prompt').hidden=!DESK.stale;if(DESK.stale)$('feel-prompt-t').textContent='預設已更新：你存的數字是在「'+DESK.stale+'」上調的，現在的預設是 '+FEELVER+'。';
+  $('feel-prompt').hidden=!DESK.stale;if(DESK.stale)$('feel-prompt-t').textContent='預設已更新到 '+FEELVER+'，現在用的是新預設。你之前存的數字是在「'+DESK.stale+'」上調的，要用回去就按「留著我的」。';
   const g=$('lab-grey'),c=$('lab-circle');if(g)g.setAttribute('aria-pressed',String(LAB.grey));if(c)c.setAttribute('aria-pressed',String(LAB.circle));
   for(const b of root.querySelectorAll('[data-layer]')){const k=b.getAttribute('data-layer'),dead=(k==='hi'&&!(mat.shine>0))||(k==='wet'&&!(mat.shine>0&&mat.wet>=.5))||(k==='caustic'&&!(mat.caustic>0))||(k==='bubbles'&&!(mat.bubbles>0))||(k==='refr'&&!(mat.water>0))||(k==='dent'&&!(mat.dent>=.5))||(k==='mood'&&!(mat.moodColor>0))||(k==='round'&&!(mat.round>0));
     b.setAttribute('aria-pressed',String(!LAB.off[k]&&!dead));b.disabled=dead;b.title=dead?'這一層現在的參數是 0，本來就沒畫':''}}
@@ -141,8 +141,8 @@ function deskBuild(){const root=$('feel');if(!root)return;
     else if(b.id==='lab-grey'){labGrey(!LAB.grey);deskSync()}
     else if(b.id==='lab-circle'){LAB.circle=!LAB.circle;LAB.pd=false;deskSync()}
     else if(b.id==='lab-reset'){GRD.reset();PHYS.max=0}
-    else if(b.id==='feel-usenew'){setMat(curMat);DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('換成新預設（'+MATN[curMat]+'）。存檔那幾格還留著，是舊預設上調的。')}
-    else if(b.id==='feel-keep'){DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();deskSync();deskSave();deskNote('留著你的數字。之後按「回到預設」可以看新預設。')}
+    else if(b.id==='feel-usenew'){setMat(curMat);DESK.stale=null;DESK.staleSnap=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('換成新預設（'+MATN[curMat]+'）。存檔那幾格還留著，是舊預設上調的。')}
+    else if(b.id==='feel-keep'){const o=DESK.staleSnap;DESK.staleSnap=null;if(o)deskApply(o);DESK.base0=deskSnap();DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();deskSync();deskSave();deskNote('留著你的數字。之後按「回到預設」可以看新預設。')}
     else if(b.id==='feel-def'){setMat(SLIMES[SLIME].mat);DESK.slots=[null,null,null];DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('回到預設（'+MATN[curMat]+'），三格存檔也清掉了。盲比紀錄留著。')}
     else if(b.id==='feel-copy'){const txt=deskText(),o=$('feel-out');o.value=txt;o.hidden=false;
       const ok=()=>deskNote('複製好了，貼給 Agent 就行。同一段字也在下面的框裡。'),bad=()=>{o.focus();o.select();deskNote('這個瀏覽器不讓直接複製，數值在下面的框裡：長按框裡的字，全選，拷貝。')};
@@ -155,8 +155,8 @@ function deskBuild(){const root=$('feel');if(!root)return;
 // 開 app 時：上次留在台上的數字回來。舊格式（v2.39：{base,v,A,B}）搬成新格式，A、B 變成存檔 1、2
 // 在別的預設上調的（指紋不一樣）：先記著是哪一版，問過多米「用新預設／留著我的」才換成現在的指紋；沒回答就關掉 app，下次還會再問
 function deskLoad(){DESK.ps=deskStamp();let s=null;try{s=JSON.parse(localStorage.getItem('nienie.feel')||'null')}catch(_){}
-  if(s&&s.v===2&&s.k){DESK.slots=[0,1,2].map(i=>(s.s||[])[i]||null);DESK.log=Array.isArray(s.log)?s.log:[];if((s.ps||'')!==DESK.ps){DESK.stale=s.pv||'舊版';DESK.pv=s.pv||'';DESK.ps=s.ps||''}deskApply({base:s.base,k:s.k})}
+  if(s&&s.v===2&&s.k){DESK.slots=[0,1,2].map(i=>(s.s||[])[i]||null);DESK.log=Array.isArray(s.log)?s.log:[];if((s.ps||'')!==DESK.ps){DESK.stale=s.pv||'舊版';DESK.pv=s.pv||'';DESK.ps=s.ps||'';DESK.staleSnap={base:s.base,k:s.k}}else deskApply({base:s.base,k:s.k})}   // v2.53: 舊預設上調的先不套，按「留著我的」才套
   else if(s&&s.v&&typeof s.v==='object'){const up=o=>o&&o.v?{base:o.base,pv:'v2.39',ps:'',k:{...Object.fromEntries(DKEYS.map(k=>[k,PRESETS[o.base]?PRESETS[o.base][k]:mat[k]])),...o.v}}:null;
-    DESK.slots=[up(s.A),up(s.B),null];DESK.stale='v2.39 到 v2.51 的調節台';DESK.pv='v2.39';DESK.ps='';deskApply(up(s))}
+    DESK.slots=[up(s.A),up(s.B),null];DESK.stale='v2.39 到 v2.51 的調節台';DESK.pv='v2.39';DESK.ps='';DESK.staleSnap=up(s)}
   DESK.base0=deskSnap();deskSync()}
 deskBuild();deskLoad();

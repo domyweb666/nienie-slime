@@ -418,12 +418,16 @@ final class SlimeController: ObservableObject {
     @Published var feelQuestion = ""
     @Published var feelNote = "一次只動一條，用那一條底下寫的手勢捏幾下。兩組要比，存成兩格再按盲比。"
     private var feelPv = FeelKnob.version, feelPs = FeelKnob.stamp   // the defaults the numbers on the desk were tuned on
+    /// v2.53: the numbers left on the desk when they were tuned on older defaults. Not applied until 多米 says 留著我的 (11-22: build 144 kept
+    /// v2.52's strand switched on from the stored desk, so the new pulling never showed)
+    private var feelStaleSnap: FeelSnap?
     private var feelBase0: FeelSnap?   // the desk as the app opened (or the material was last chosen): 「這次動過」 counts from here
 
     private func feelPick() -> FeelSnap { FeelSnap.pick(current, base: material.rawValue) }
 
     private func feelSave() {
-        let s = FeelDeskStore(pv: feelPv, ps: feelPs, base: material.rawValue, k: feelPick().k, s: feelSlots, log: Array(feelLog.suffix(60)))
+        let keep = feelStale != nil ? feelStaleSnap : nil
+        let s = FeelDeskStore(pv: feelPv, ps: feelPs, base: keep?.base ?? material.rawValue, k: keep?.k ?? feelPick().k, s: feelSlots, log: Array(feelLog.suffix(60)))
         if let d = try? JSONEncoder().encode(s) { UserDefaults.standard.set(d, forKey: Self.feelKey) }
     }
 
@@ -448,6 +452,8 @@ final class SlimeController: ObservableObject {
         if r.store.ps != FeelKnob.stamp {   // tuned on other defaults: keep that on record until 多米 answers, however many launches that takes
             feelStale = r.old ? "v2.39 到 v2.51 的調節台" : (r.store.pv.isEmpty ? "舊版" : r.store.pv)
             feelPv = r.store.pv; feelPs = r.store.ps
+            feelStaleSnap = FeelSnap(base: r.store.base, pv: nil, ps: nil, k: r.store.k).filled()
+            return   // start from this build's defaults; 留著我的 brings the stored numbers back
         }
         if let cur = FeelSnap(base: r.store.base, pv: nil, ps: nil, k: r.store.k).filled() { feelApply(cur) }
     }
@@ -484,7 +490,7 @@ final class SlimeController: ObservableObject {
         pushParams()
         activeSlot = nil
         rig.bump(1)
-        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        feelStale = nil; feelStaleSnap = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
         feelBase0 = feelPick()
         feelSave()
         feelNote = "換成\(m.name)的預設值。"
@@ -540,13 +546,15 @@ final class SlimeController: ObservableObject {
         params[material] = material.defaults
         pushParams()
         activeSlot = nil
-        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        feelStale = nil; feelStaleSnap = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
         feelBase0 = feelPick()
         feelSave()
         feelNote = "換成新預設（\(material.name)）。存檔那幾格還留著，是舊預設上調的。"
     }
     func feelKeepMine() {
-        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        let old = feelStaleSnap
+        feelStale = nil; feelStaleSnap = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        if let old { feelApply(old) }
         feelSave()
         feelNote = "留著你的數字。之後按「回到預設」可以看新預設。"
     }
@@ -557,7 +565,7 @@ final class SlimeController: ObservableObject {
         material = slime.material
         for m in SlimeMaterial.allCases { params[m] = m.defaults }
         feelSlots = [nil, nil, nil]
-        feelStale = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
+        feelStale = nil; feelStaleSnap = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
         pushParams()
         activeSlot = nil
         rig.bump(1)
