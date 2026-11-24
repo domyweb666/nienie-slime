@@ -1157,9 +1157,10 @@
     { const raw = localStorage.getItem('nienie.walk'), keep = WALK.noSave; clear(); WALK.items.push({ k: 'acorn', big: true, s: 3, a: .2 }); WALK.opens = 5; WALK.perm = 'ok'; WALK.bank = 123; WALK.noSave = false; walkSave(); clear(); walkLoad(); r.save = { n: WALK.items.length, k: WALK.items[0] && WALK.items[0].k, opens: WALK.opens, perm: WALK.perm, bank: WALK.bank }; WALK.noSave = keep; try { if (raw == null) localStorage.removeItem('nienie.walk'); else localStorage.setItem('nienie.walk', raw); } catch (_) {} }
     // 藍底不出門；白天、夜晚畫得出來，六種都畫
     clear(); mat = { ...SP, sill: 0 }; setup(); WALK.bank = 800; r.blue = walkCheck(); clear(); { const v0 = VIEW.bg, sk = VIEW.skin; fresh(); let err = null; try { for (const b of ['day', 'night']) { VIEW.bg = b; for (const k of WKINDS) walkSprite(k); WALK.items.push({ k: 'cap', big: false, s: 1, a: 0 }); WALK.bank = 800; WALK.dayN = 0; walkCheck(); draw(); WALK.stuck = null; if (SILL.route) routeEnd(true); } } catch (e) { err = String(e); } VIEW.bg = v0; VIEW.skin = sk; r.draw = err; }
+    fresh(); mat.walkShow = 0; WALK.bank = 5000; r.off = { trip: walkCheck(), stuck: !!WALK.stuck, bank: WALK.bank, route: !!SILL.route };   // v2.58 關著：不出門，步數留著
     clear(); res.T47_walk = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     const a = r.trip;
-    res.PASS.walk = a.small === false && a.noStuck && a.ok && a.s0.big === false && a.s0.plane === 'out' && Math.abs(a.s0.z - .8) < .01 && Math.abs(a.s0.y1 - g.oy) < 2 && a.s0.left === 0
+    res.PASS.walk = r.off.trip === false && !r.off.stuck && r.off.bank === 5000 && !r.off.route && a.small === false && a.noStuck && a.ok && a.s0.big === false && a.s0.plane === 'out' && Math.abs(a.s0.z - .8) < .01 && Math.abs(a.s0.y1 - g.oy) < 2 && a.s0.left === 0
       && a.a0.sec < 12 && a.a0.plane === 'room' && a.a0.bowl && a.a0.z > .97 && Math.abs(a.a0.y1 - g.bf) < 3 && a.a0.stuck && a.a0.selfX === 0 && r.big === true && r.cap.n === 3
       && r.pinch.off && r.pinch.inAir === 1 && r.pinch.n === 1 && r.pinch.inRange && r.pinch.fall === 0 && Math.abs(r.pinch.area) < .1 && r.pinch.selfX === 0
       && r.grabMid.plane === 'room' && !r.grabMid.route && r.grabMid.off && r.grabMid.n === 1 && r.idle.sec > 19 && r.idle.sec < 22 && r.idle.n === 1
@@ -1206,7 +1207,7 @@
 
   // T49 v2.32 興奮（多米 11-07：運動多牠就比較興奮；提案 興奮提案-暫定.md）。今天帶回 3 件 vs 0 件：藍底放著 90 秒休息少、走路幀數多、每一下衝得遠；休息時長直接抽 200 次比例 0.75／0.5；
   // 回家進碗之後小跳兩下（0 件不跳、路線中途被打斷不跳）；抓著拉、放手的數字兩邊一樣（手感不動，差 3% 以內）；自動：今天 0、1 件 → 0，2 件 → .5，3 件 → 1
-  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, shake: 0 };
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, walkShow: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, shake: 0 };
     const clear = () => { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; WALK.bank = 0; WALK.dayN = 0; WALK.day = ''; WALK.opens = 0; WALK.perm = ''; WALK.hopN = 0; };
     const fresh = (sd, over) => { Math.random = seeded(sd || 4901); clear(); mat = { ...SP, ...(over || {}) }; setup(); ESC.on = false; E2.tk.length = 0; E2.tkT = 0; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     // 藍底放著：休息佔幾成、走路（不算衝刺）時家每秒移幾 R、探了幾次
@@ -1259,7 +1260,7 @@
   // T52 v2.35 拿掉碗（多米 11-08）：bowl 0 時牠落在窗台正中間、不穿窗台；拉起來放手落回窗台，不會想進碗；閒著走回中間；
   // 走路回家從窗框下緣落到窗台、興奮時落地小跳兩下；envFrame 1 爬上窗框下緣再落回來，換層不跳；搖三下彈了不出窗台；亮粉散出去撿得完；
   // 有畫面時 draw 不出錯；放 1 分鐘全開不飛走不穿地板。T44 到 T49 的碗照樣用 bowl 1 量（面板 1 回 v2.34）
-  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, shake: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 0, props: 0, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, envFrame: 0, catPush: 0 };
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, walkShow: 1, shake: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 0, props: 0, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, envFrame: 0, catPush: 0 };
     const clear = () => { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; WALK.bank = 0; WALK.dayN = 0; WALK.day = ''; WALK.opens = 0; WALK.perm = ''; WALK.hopN = 0; };
     const fresh = (sd, over) => { Math.random = seeded(sd || 5201); clear(); mat = { ...SP, ...(over || {}) }; setup(); ESC.on = false; E2.tk.length = 0; E2.tkT = 0; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; };
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; };

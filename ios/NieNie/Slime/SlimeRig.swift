@@ -4564,6 +4564,7 @@ final class SlimeRig {
     /// Walked enough: one trip out and back. However far you walked it is one thing, three a day at most, so walking never becomes a chore.
     @discardableResult
     private func walkCheck() -> Bool {
+        guard params.walkShow >= 0.5 else { return false }   // v2.58 (QC-0007 #47): off, it does not go out; the steps stay banked
         guard sillOn, sillG != nil else { walkPending = sillOn; return false }   // the sill is not built yet: again on the first frame
         guard !sillGrab, walkStuck == nil else { return false }
         walkToday()
