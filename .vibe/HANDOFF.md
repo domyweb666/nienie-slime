@@ -31,7 +31,7 @@
 - [x] B：彙整報告、兩個反駁者查過、改完
 - [ ] C：湯圓餡要不要改小改淡｜多米決定後做，網頁＋Swift｜無
 - [ ] D：推上去、CI BUILD SUCCEEDED、TestFlight｜多米說才做｜依賴上面全部
-- [ ] W1：網頁 A1＋A2–A5＋參數登記＋調節台＋`?pull=`｜開關全 0 跟 v2.60 逐點相同、69 項過｜index.html｜無
+- [x] W1：網頁 A1＋A2–A5＋參數登記＋調節台＋`?pull=`｜開關全 0 跟 v2.60 逐點相同、69 項過｜index.html｜無
 - [x] B1：揉的音檔壓尖峰＋兩套都留｜四種手速每種大 10 dB 以上｜sfx-design、web/sfx、ios Resources｜無
 - [x] S1：Swift A1 皮＋FeelParams 全部參數｜逐行對網頁、複查過（不能編譯）｜JellySkin.*、SlimeView、FeelParams｜無
 - [ ] T：T70 破皮測試（A7 網頁）｜對 v2.60 會紅、兩套門檻｜selftest.js｜W1
