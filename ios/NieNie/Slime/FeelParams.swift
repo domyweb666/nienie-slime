@@ -293,6 +293,8 @@ struct FeelParams: Equatable, Codable {
     var remeshCalm: Double = 0.25     // v2.56 (11-23): for this long after a re-sample, each 1/60 s the body keeps remeshCalmK of its velocity relative to the whole (the new mesh settles instead of bouncing; held at 3R the 12 frames after a re-sample jerked 8 to 10). 0 = v2.55
     var remeshCalmK: Double = 0.2     // how much of that relative velocity is kept per 1/60 s while settling; 1 = no effect
     var remeshHome: Double = 1        // v2.58 (QC-0007 #46): let go, the body goes back to the mesh it was built with (its shape carried over); a re-sample no longer folds the return target. 0 = v2.57
+    var pullGive: Double = 0.3        // v2.58 (11-24): pulled outward (0.6R on, fully at 1.8R) the finger gives way at most this many radii instead of 2 (it piled up to 2R and the held patch trailed: a slanted 5.5R pull 1.6R behind, 3.3R at worst); rubbing, pressing and pinching as before. 0 = before
+    var memUntie: Double = 0.8        // v2.58 (11-24, QC-0007 #46): let go, the remembered outline crossed longer than this many seconds is undone fast, the memory's own limits left out until then; knotted over 0.6 s on a screen edge, it drops early. 0 = off
     var walkShow: Double = 0          // v2.58 (QC-0007 #47): 0 = it does not go out and brings nothing back, nothing from walks lies on the sill, no gift stone (what is saved stays saved); 1 = v2.57
     var remesh: Double = 1            // v2.54 拉長時自動補點: re-sample the body from the remembered shape when it is pulled long (see SlimeRig.remesh); 0 = only widen the limits
     var remeshHi: Double = 2.6        // an outline edge of the remembered shape longer than this many point spacings
@@ -772,6 +774,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.remeshCalm, name: "補點後站穩幾秒 v2.56", hint: "（11-23）補點之後新的網格要重新站穩，這段時間每一幀把身體各處相對整團的速度留兩成，彈不起來、慢慢落定。量過拉 2.5 到 4.5R 按住：每幀跳動平均 3 到 9.5 → 1.8 到 2.7。0 回 v2.55", range: 0...1, step: 0.05),
         TuneField(key: \.remeshCalmK, name: "站穩時速度留幾成 v2.56", hint: "每 1/60 秒身體各處相對整團的速度留多少；1 等於不作用", range: 0...1, step: 0.05),
         TuneField(key: \.remeshHome, name: "放手就換回原本的網格 v2.58", hint: "（QC-0007 #46：拉一下放手就一直抽搐）1：拉著時照樣補點，手一離開就換回建身體時的網格，形狀照樣帶回去；0 回 v2.57", range: 0...1, step: 1),
+        TuneField(key: \.pullGive, name: "往外拉時手指最多讓多少 v2.58", hint: "（11-24）往外拉開時，防翻面每次推一下手指就往旁邊讓一點，一路累積到 2 個半徑，那塊就不跟手（斜拉 5.5R 差 1.6R，最差 3.3R）。往外拉開 0.6R 起、1.8R 全算，手指讓的上限縮到這麼多個半徑；揉、壓、兩指擠照舊。0 回以前", range: 0...2, step: 0.05),
+        TuneField(key: \.memUntie, name: "打結多久就解開（秒）v2.58", hint: "（QC-0007 #46）放手後記住的形狀外框交叉超過這麼久，暫時關掉記憶的上下限和防翻面、快退到不交叉為止（不關的話保險會把結卡住，一直抖）；黏在螢幕側邊、身體打結超過 0.6 秒就提早掉下來。0 關", range: 0...3, step: 0.1),
         TuneField(key: \.walkShow, name: "走路帶東西回來 v2.58", hint: "（QC-0007 #47：石頭和花瓣去掉；走路回來那段一起關）0：不出門、不帶東西回來，窗台上不畫、不放送的石頭，存的東西和步數都還在；1 回 v2.57", range: 0...1, step: 1),
         TuneField(key: \.remesh, name: "拉長時自動補點 v2.54", hint: "（多米 11-22）記住的形狀外框點距超過 2.6 個點距、或身體裡有邊拉到原形 2.8 倍，就照現在的形狀重新撒點（點距不變，最多原本 3 倍）；退回去點太密時再撒一次變少。0：只放寬上限不補點", range: 0...1, step: 1),
         TuneField(key: \.rateK, name: "快扯變硬、慢拉變軟 v2.54", hint: "（多米 11-22）手指每秒移動不到 rateLo 個半徑最軟（硬度少三成五×這個值），超過 rateHi 最硬（硬度多兩倍×這個值、記形少九成五×這個值）：猛扯拉不太長、會彈回去，慢拉一路變長。0 關掉", range: 0...1, step: 0.05),
