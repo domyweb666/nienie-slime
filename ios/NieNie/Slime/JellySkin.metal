@@ -16,6 +16,47 @@ vertex VOut jelVertex(uint vid [[vertex_id]]) {
     return o;
 }
 
+// v2.61 A1 網格聯集的皮 (web: JELX.mode 9, jelMeshInit's VM FM VC FC): the mask drawn from the body's own triangles instead of its outline. Every triangle writes 1,
+// the capsules (the keep-alive line where it is thin) their own soft edge, all blended with max, so neither the winding nor the order matters.
+// Points are screen points, y down; u.xy = 2 / the mask's size.
+struct MeshOut { float4 pos [[position]]; };
+
+vertex MeshOut jelMeshVertex(uint vid [[vertex_id]], const device float2* p [[buffer(0)]], constant float4& u [[buffer(1)]]) {
+    MeshOut o;
+    o.pos = float4(p[vid].x * u.x - 1.0, 1.0 - p[vid].y * u.y, 0.0, 1.0);
+    return o;
+}
+
+fragment float4 jelMeshFragment(MeshOut in [[stage_in]]) {
+    return float4(1.0);
+}
+
+struct CapIn { float4 ab; float4 r; };   // the two ends; the radius in r.x (Swift: SkinMesh.Cap)
+struct CapOut { float4 pos [[position]]; float2 q; float4 sg [[flat]]; float rd [[flat]]; };
+
+vertex CapOut jelCapVertex(uint vid [[vertex_id]], uint iid [[instance_id]], const device CapIn* c [[buffer(0)]], constant float4& u [[buffer(1)]]) {
+    float2 p = float2(float(vid & 1u), float(vid >> 1) * 2.0 - 1.0);   // a strip of four: (0,-1) (1,-1) (0,1) (1,1)
+    float4 ab = c[iid].ab;
+    float r = c[iid].r.x;
+    float2 a = ab.xy, b = ab.zw, d = b - a;
+    float L = length(d);
+    float2 along = L > 1e-5 ? d / L : float2(1.0, 0.0);
+    float2 n = float2(-along.y, along.x);
+    float2 q = mix(a, b, p.x) + along * (p.x * 2.0 - 1.0) * (r + 1.0) + n * p.y * (r + 1.0);
+    CapOut o;
+    o.pos = float4(q.x * u.x - 1.0, 1.0 - q.y * u.y, 0.0, 1.0);
+    o.q = q;
+    o.sg = ab;
+    o.rd = r;
+    return o;
+}
+
+fragment float4 jelCapFragment(CapOut in [[stage_in]]) {
+    float2 a = in.sg.xy, ba = in.sg.zw - a, pa = in.q - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    return float4(clamp(in.rd + 0.5 - length(pa - ba * h), 0.0, 1.0));
+}
+
 struct BlurU { float2 d; float s; float pad; };
 
 fragment float4 jelBlur(VOut in [[stage_in]], texture2d<float> t [[texture(0)]], sampler sm [[sampler(0)]], constant BlurU& u [[buffer(0)]]) {

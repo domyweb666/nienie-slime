@@ -318,6 +318,21 @@ struct FeelParams: Equatable, Codable {
     var thin: Double = 0              // C1 細絲: 1 = from 60% of the effective stretch limit the outline's rounding shrinks, down to 30% at the limit, so a thinning strand of body shows; 0 = v2.51 (fixed rounding)
     var wbreath: Double = 0           // C2 水的呼吸: 1 = what is seen through the body bends ±12% with its breath (still, the refraction was static: glass, not water); 0 = v2.51
     var decoThru: Double = 1          // C3: 1 = the wind bell, the teru bozu and what it brought back from walks show through the body too (the baked background gets them every frame); 0 = v2.49 (fixed background only), to measure the cost
+    // v2.61 第一批 (.vibe/第一批-合約.md, 2026-11-25). Web: the same keys in PRESETS, the same for all three materials. 0 = build 158 for every one of them
+    var skinU: Double = 1             // A1 網格聯集的皮: 1 = the mask is the union of the body's triangles with a line of 0.12R where it is thin, so a figure 8 or a thin neck does not part, and what is clipped to the body follows; 0 = the outline path (v2.60)
+    var pullHold: Double = 0          // A3 拉長停住就定住: 1 = pulled long and the finger still, the remembered shape all but stops; 0 = it keeps growing slowly by itself
+    var pullWhole: Double = 0         // A4 往裡拉先整隻走: 1 = pulled towards the body's middle, the whole body goes along first, then it stretches; 0 = only the held patch goes in
+    var pullSoft: Double = 0          // A5 + A2 放手是收回去: 1 = let go long it is drawn back (fl 1.35, up 3, vc 6, bl 1.35, cg 1, gv 1); 0 = it springs, flees and shakes as before
+    var rough: Double = 1             // D1 只有快扯算欺負: 1 = only a fast yank counts as rough (it no longer adds trust, and adds no wariness); 0 = pulled out 1.5R for 0.5 s counts
+    var tapSoft: Double = 1           // D2 慢點不算攻擊: 1 = slow light taps are no attack; 0 = as before, three pokes in a second are, however light
+    var petSlow: Double = 1           // C3 慢摸累積: 1 = slow strokes add up, feeding only the purr and the trust; 0 = as before
+    var wakeSoft: Double = 1          // C1 輕碰慢慢醒: 1 = a light touch wakes it slowly, and just opened it stays up 40 s; 0 = as before (startled awake by any touch, asleep at 30 s)
+    var nearFast: Double = 1          // C2 聽節奏時照樣靠過來: 1 = it comes to the finger beside it while it listens for a rhythm too; 0 = as before
+    var greetLook: Double = 1         // C4 打開先看你: 1 = opened, it looks at you first; 0 = as before. The first batch does it on the web only: registered here, not wired yet (先不接)
+    var brJit: Double = 1             // C7 作息亂數: 1 = on; 0 = as before. Web only: 手機沒有大腦，不接
+    var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Web only: 手機沒有大腦，不接
+    var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
+    var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound

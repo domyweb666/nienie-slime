@@ -78,6 +78,10 @@ final class SlimeView: UIView {
     private let fogLayer = CAGradientLayer(), glowLayer = CAGradientLayer(), haloLayer = CAGradientLayer()
     // v2.28 果凍皮: the body as a lit jelly on Metal, under litGroup (the glitter and the eyes stay Core Animation); the blush with it
     private let jelly = JellySkin()
+    // v2.61 A1 網格聯集的皮: where the triangles come from (nil until SlimeRig hands them out), this frame's points, and the path the eyes and the filling are cut to
+    private let skinSrc: SkinMeshSource?
+    private let skinMesh = SkinMesh()
+    private var litPath: CGPath?
     private let blushLayers = [CAGradientLayer(), CAGradientLayer()]
     // v2.57 新六隻的招牌 (web drawFx): on the jelly skin, under the blush and the eyes, clipped to the body by litGroup
     private let fxGroup = CALayer()
@@ -113,6 +117,7 @@ final class SlimeView: UIView {
     init(rig: SlimeRig, colors: SlimeColors) {
         self.rig = rig
         self.colors = colors
+        skinSrc = (rig as AnyObject) as? SkinMeshSource   // v2.61 A1
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         isOpaque = true
@@ -686,9 +691,10 @@ final class SlimeView: UIView {
         } else { causticShade.isHidden = true; causticLight.isHidden = true }
     }
     /// v2.28 果凍皮: the Metal skin instead of the flat fill, outline, highlight, dents and trail (those stay for the flat control); the blush under the eyes.
-    private func drawJelly(body: CGPath, z: Double) {
+    private func drawJelly(body: CGPath, outline: [(x: Double, y: Double)], z: Double) {
         let on = jellyOn
         decoCost = 0
+        litPath = nil
         shadeLayer.isHidden = on; baseLayer.isHidden = on; highlightLayer.isHidden = on; outlineLayer.isHidden = on
         dentShadeLayer.isHidden = on || dentShadeLayer.isHidden; dentLitLayer.isHidden = on || dentLitLayer.isHidden
         if on { for l in dentLayers { l.isHidden = true }; for l in trailLayers { l.isHidden = true } }
@@ -760,11 +766,13 @@ final class SlimeView: UIView {
             j.setDynamic(sprites, around: body.boundingBoxOfPath.insetBy(dx: -R * 0.7, dy: -R * 0.7))
         } else { j.setDynamic([], around: .null) }
         decoCost = CACurrentMediaTime() - t0
+        let mesh = meshSkin(outline: outline, z: z)   // v2.61 A1
+        if let m = mesh { litPath = m.clip(body) }
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
                  skin: skin, round: round,
                  water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
                  shine: p.lookShine, opaque: p.lookOpaque,   // v2.60 (多米 11-24): opaque, no highlights, all ten; the panel's 外觀 chip (clear) makes them glossy and see-through
-                 extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"))
+                 extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"), mesh: mesh)
         drawWater(body: body, z: z)
         drawFx(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
@@ -779,6 +787,24 @@ final class SlimeView: UIView {
                 bl.colors = [pink0, pink1, pink2]; bl.locations = [0, 0.55, 1]
             }
         } else { for l in blushLayers { l.isHidden = true } }
+    }
+
+    /// v2.61 A1 網格聯集的皮 (web skinU): this frame's triangles and keep-alive lines in screen points. nil = the outline path, as up to v2.60
+    /// (skinU 0, a phone that cannot draw it, or no triangles to draw).
+    private func meshSkin(outline: [(x: Double, y: Double)], z: Double) -> SkinMesh? {
+        guard rig.params.skinU >= 0.5, let src = skinSrc, let j = jelly, j.meshReady else { return nil }
+        let o = rig.toScreen(0, 0), pts = rig.labParticles()   // the camera and the intro only scale and shift: where (0, 0) lands is the shift
+        guard skinMesh.update(src, x: pts.x, y: pts.y, ring: rig.bnd, outline: outline, zoom: z, ox: o.x, oy: o.y, R: rig.R * z) else { return nil }
+        let gv = rig.gooView
+        for s in gv.segs {
+            let a = rig.toScreen(s.x0, s.y0), b = rig.toScreen(s.x1, s.y1)
+            skinMesh.line(a.x, a.y, b.x, b.y, s.w * z)
+        }
+        if let b = gv.blob {
+            let c = rig.toScreen(b.x, b.y)
+            skinMesh.ellipse(c.x, c.y, b.rx * z, b.ry * z)
+        }
+        return skinMesh
     }
 
     /// v2.57 新六隻的招牌 (web drawFx): 蝶豆's purple spots, 湯圓's sesame core, 珍奶's pearls, 布丁's caramel cap. The same soft spots as the blush.
@@ -917,7 +943,7 @@ final class SlimeView: UIView {
         drawSpecks()
         updateScene()   // v2.28 窗台
         drawGlitter()   // v2.31 搖晃沉澱
-        drawJelly(body: bodyPath(P), z: z)   // v2.28 果凍皮
+        drawJelly(body: bodyPath(P), outline: P, z: z)   // v2.28 果凍皮
 
         var minX = 1e9, maxX = -1e9, maxY = -1e9
         for p in P { minX = min(minX, p.x); maxX = max(maxX, p.x); maxY = max(maxY, p.y) }
@@ -939,7 +965,7 @@ final class SlimeView: UIView {
 
         let body = bodyPath(P)
         shadeLayer.path = body
-        litMask.path = body
+        litMask.path = litPath ?? body   // v2.61 A1: cut to the mesh skin's own shape
         baseLayer.path = bodyPath(P, dx: -R * 0.07, dy: -R * 0.085)
 
         // dents (v2.15): the light comes from the upper left, so inside a dent the upper-left wall is in shade
