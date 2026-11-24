@@ -1,6 +1,6 @@
-# Handoff: 窗景 12 扇搬進 Swift，CI 編過，沒上過手機（2026-11-24，v2.59，先看這段）
+# Handoff: 窗景 12 扇搬進 Swift，TestFlight build 158 已上傳，等多米真機看（2026-11-24，v2.59，先看這段）
 
-> 多米 11-24 說合回並推：已快轉進 `feel-3x-panel-v1`（工作樹 `prototype/web/_wt`），推到 `a32088a`，PR #1 的 CI `BUILD SUCCEEDED`（run 45327524238）。沒發 TestFlight。
+> 多米 11-24 說合回並推：已快轉進 `feel-3x-panel-v1`（工作樹 `prototype/web/_wt`），推到 `a32088a`，PR #1 的 CI `BUILD SUCCEEDED`（run 45327524238）。TestFlight：第 157 次停在檢查 app 清單（只讀前 10 個，帳號的 app 超過了），改成讀 200 個（`a675590`，已推），第 158 次 `Upload succeeded`。
 
 ## 做了什麼
 - 資料：`tools/export-windows-ios.py` 開網頁把 `windows.js` 拆好的每層輸出成圖（1.5 倍、無損 webp 205 張）和時間表 `windows.json`，放 `ios/NieNie/Resources/win/`，共 2.5 MB。SVG 改了就重跑（約 4 分鐘）。`windows.js` 只加了資料欄位（`raw`、`tk`、`ty`、`pd`），畫面逐點沒變。
@@ -21,14 +21,14 @@
 - App Store 版的調節台從隱藏面板還開得到，窗景等於免費。上架前要換。
 
 ## 下一步從哪繼續
-1. 多米說發 → `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`。
-2. 真機看：12 扇白天夜晚、身體裡的折射、牠爬到窗外時的前後、每幀時間。
+1. 等多米裝 build 158 真機看：12 扇白天夜晚、身體裡的折射、牠爬到窗外時的前後、每幀時間。
 
 ## 工作包
 - [x] I1：輸出圖層與時間表
 - [x] I2：Swift 繪製、折射、選窗
 - [x] I3：CI 編譯（a32088a，BUILD SUCCEEDED）
-- [ ] H：TestFlight｜要多米說發
+- [x] H：TestFlight build 158 已上傳（v2.58、v2.58b、v2.59 一起）
+- 備註：Apple 說 2027 年 4 月起要用 iOS 27 SDK（Xcode 27）才能上傳
 
 ---
 
