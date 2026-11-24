@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.59（11-24）：加 T69（窗景）；跑的時候窗戶一律原本那扇，跑完還原
    v2.56（11-23）：加 T67（補點後站穩）；T65、T66 照慣例把它關掉。
    v2.52（11-22）：加 T63；舊項目釘住 v2.51 關掉、窗台拉伸上限回 3.2（見下面 PRE47 那段的說明）。
 
@@ -14,7 +15,7 @@
    用 PointerEvent 模擬手指。分頁在背景時 rAF 會被節流，所以不能靠動畫迴圈。 */
 (async () => {
   const realRAF = window.requestAnimationFrame;
-  const VIEW0 = { ...VIEW }; Object.assign(VIEW, { skin: 'flat', body: 'tent', face: 0, bg: 'blue' });   // v2.28 預覽：舊項目量的是 v2.27 的畫面與外形，跑完還原
+  const VIEW0 = { ...VIEW }; Object.assign(VIEW, { skin: 'flat', body: 'tent', face: 0, bg: 'blue', win: '' });   // v2.28 預覽：舊項目量的是 v2.27 的畫面與外形，跑完還原
   window.requestAnimationFrame = () => 0;
   await new Promise(r => setTimeout(r, 80));
   const log = [];
@@ -1712,6 +1713,19 @@
     res.T68_settle = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
     res.PASS.settle = r.avg[1] >= 2 * r.avg[0] && r.on.every(o => o.nan === 0 && o.h0 === 0) && r.on.some(o => o.rm > 0);
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T69 v2.59 窗景：12 扇每種都拆得出來、底圖不透明、會動的真的在動、減少動態停得住；只有夜晚的兩扇算夜晚；原本那扇還是三層；畫一遍不丟錯，身體折射看得到的畫布是新窗
+  { const bg0 = VIEW.bg, w0 = VIEW.win, f0 = WIN.fixed, r = { n: 0, still: [], clear: [], stop: [], draw: [], err: '' };
+    try { const g = sceneGeo(), shot = v => { const c = document.createElement('canvas'); c.width = 80; c.height = 98; const x = c.getContext('2d'); x.drawImage(cv, g.gx, g.gy, g.gw, g.gh * .56, 0, 0, 80, 98); return x.getImageData(0, 0, 80, 98).data; };
+      const diff = (a, b) => { let q = 0; for (let i = 0; i < a.length; i++) q += Math.abs(a[i] - b[i]); return q; };
+      for (const d of WINS) for (const k of d.only ? ['night'] : ['day', 'night']) { const id = d.id + '.' + k, v = await winCompile(d, k, g); r.n++;
+        const at = T => { WIN.fixed = T; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); winDraw(v); return shot(v); }, a = at(3), b = at(6.1), c = at(3);
+        if (!diff(a, b)) r.still.push(id); if (diff(a, c)) r.stop.push(id); let hole = 0; for (let i = 3; i < a.length; i += 4) if (a[i] < 250) hole++; if (hole > 98) r.clear.push(id + ' ' + hole); }
+      VIEW.bg = 'day'; VIEW.win = 'Tiandeng'; r.only = viewBg(); VIEW.win = 'Daotian'; r.back = viewBg(); VIEW.bg = 'blue'; VIEW.win = 'Tiandeng'; r.blue = viewBg();
+      WIN.fixed = 3; for (const id of ['', 'Daotian', 'Jingyu']) { VIEW.bg = 'day'; VIEW.win = id; let sc = sceneFor('day'); for (let i = 0; i < 100 && id && !(sc && sc.win && sc.win.id === id); i++) { await new Promise(o => setTimeout(o, 30)); sc = sceneFor('day'); } draw(); r.draw.push(id ? !!(sc.win && sc.win.id === id && sc.wall) : !!(sc.base && sc.sky && sc.wall)); }
+    } catch (e) { r.err = String(e); }
+    VIEW.bg = bg0; VIEW.win = w0; WIN.fixed = f0; res.T69_windows = r;
+    res.PASS.windows = r.err === '' && r.n === 22 && !r.still.length && !r.stop.length && !r.clear.length && r.only === 'night' && r.back === 'day' && r.blue === 'blue' && r.draw.length === 3 && r.draw.every(Boolean);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();

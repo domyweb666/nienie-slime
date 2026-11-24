@@ -33,12 +33,14 @@ function winTrack(e){
   return T=>{let p=(T-beg)/dur;p-=Math.floor(p);let i=0;while(i<n-2&&p>=keys[i+1])i++;
     const d=keys[i+1]-keys[i];let u=d>0?Math.min(1,Math.max(0,(p-keys[i])/d)):1;if(ez)u=ez[i](u);
     const a=vals[i],b=vals[i+1],o=[];for(let k=0;k<Math.max(a.length,b.length);k++){const p0=a[k]||0,p1=b[k]||0;o.push(p0+(p1-p0)*u)}return o}}
+// 矩陣用六個數字的陣列（每幀要乘幾十次，不產生 DOMMatrix）
+function winMul(m,n){return[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]]}
 function winMat(type,v){
-  if(type==='translate')return new DOMMatrix([1,0,0,1,v[0],v[1]||0]);
-  if(type==='scale')return new DOMMatrix([v[0],0,0,v[1]==null?v[0]:v[1],0,0]);
-  if(type==='skewX')return new DOMMatrix([1,0,Math.tan(v[0]*Math.PI/180),1,0,0]);
-  const a=v[0]*Math.PI/180,c=Math.cos(a),s=Math.sin(a),x=v[1]||0,y=v[2]||0;return new DOMMatrix([c,s,-s,c,x-c*x+s*y,y-s*x-c*y])}   // rotate
-function winStatic(s){let m=new DOMMatrix();for(const q of (s||'').matchAll(/(\w+)\(([^)]*)\)/g))m=m.multiply(winMat(q[1],q[2].trim().split(/[\s,]+/).map(Number)));return m}
+  if(type==='translate')return[1,0,0,1,v[0],v[1]||0];
+  if(type==='scale')return[v[0],0,0,v[1]==null?v[0]:v[1],0,0];
+  if(type==='skewX')return[1,0,Math.tan(v[0]*Math.PI/180),1,0,0];
+  const a=v[0]*Math.PI/180,c=Math.cos(a),s=Math.sin(a),x=v[1]||0,y=v[2]||0;return[c,s,-s,c,x-c*x+s*y,y-s*x-c*y]}   // rotate
+function winStatic(s){let m=[1,0,0,1,0,0];for(const q of (s||'').matchAll(/(\w+)\(([^)]*)\)/g))m=winMul(m,winMat(q[1],q[2].trim().split(/[\s,]+/).map(Number)));return m}
 
 /* ----- 拆層 ----- */
 const winIsAnim=e=>e.nodeName==='animate'||e.nodeName==='animateTransform';
@@ -57,7 +59,7 @@ function winFlat(svg){
     const s={...st,ops:[...st.ops],al:[...st.al],wrap:[...st.wrap]};let own=false;
     const tr=an.filter(a=>a.nodeName==='animateTransform'),by=n=>an.find(a=>a.getAttribute('attributeName')===n),oa=by('opacity'),da=by('stroke-dashoffset');
     if(tr.length){own=true;for(const a of tr){const ty=a.getAttribute('type'),f=winTrack(a),vs=(a.getAttribute('values')||'').split(';').map(Number);s.ops.push({fn:T=>winMat(ty,f(T)),max:ty==='scale'?Math.max(...vs):1})}}
-    else if(e.hasAttribute('transform')){own=true;const m=winStatic(e.getAttribute('transform'));s.ops.push({m,max:Math.hypot(m.a,m.b)})}
+    else if(e.hasAttribute('transform')){own=true;const m=winStatic(e.getAttribute('transform'));s.ops.push({m,max:Math.hypot(m[0],m[1])})}
     if(oa){own=true;const f=winTrack(oa);s.al.push({fn:T=>f(T)[0]})}
     else{const o=e.getAttribute('opacity')||winSt(e,'opacity');if(o&&+o!==1){own=true;s.al.push({v:+o})}}
     if(blend){own=true;s.op=blend==='plus-lighter'?'lighter':blend}
@@ -97,10 +99,10 @@ async function winCompile(d,kind,g){
       L.path=new Path2D(at('d'));L.stroke=/stroke="([^"]+)"/.exec(inner)[1];L.lw=+at('stroke-width');L.cap=at('stroke-linecap')||'butt';L.pat=at('stroke-dasharray').split(/[\s,]+/).map(Number);out.push(L);continue}
     const bb=winBox(inner,defs),sw=Math.max(0,...[...inner.matchAll(/stroke-width="([\d.]+)"/g)].map(m=>+m[1]),/<use/.test(inner)?9:0),pad=sw*.75+1.5,b={x:bb.x-pad,y:bb.y-pad,w:bb.width+pad*2,h:bb.height+pad*2};
     if(!it.ops.some(o=>o.fn)&&!it.clip){   // 位置固定：對齊像素，裁到窗洞，每幀直接貼
-      let M=new DOMMatrix([s,0,0,s,g.gx,g.gy]);for(const o of it.ops)M=M.multiply(o.m);
-      const p=[[b.x,b.y],[b.x+b.w,b.y],[b.x,b.y+b.h],[b.x+b.w,b.y+b.h]].map(([x,y])=>M.transformPoint(new DOMPoint(x,y))),px=p.map(q=>q.x),py=p.map(q=>q.y);
+      let M=[s,0,0,s,g.gx,g.gy];for(const o of it.ops)M=winMul(M,o.m);
+      const p=[[b.x,b.y],[b.x+b.w,b.y],[b.x,b.y+b.h],[b.x+b.w,b.y+b.h]],px=p.map(([x,y])=>M[0]*x+M[2]*y+M[4]),py=p.map(([x,y])=>M[1]*x+M[3]*y+M[5]);
       const x0=Math.max(X0,Math.floor(Math.min(...px))),y0=Math.max(Y0,Math.floor(Math.min(...py))),x1=Math.min(X1,Math.ceil(Math.max(...px))),y1=Math.min(Y1,Math.ceil(Math.max(...py)));if(x1<=x0||y1<=y0)continue;
-      const c=await winImg(`<g transform="matrix(${[M.a,M.b,M.c,M.d,M.e,M.f].join(' ')})">${inner}</g>`,defs,[x0,y0,x1-x0,y1-y0],x1-x0,y1-y0);
+      const c=await winImg(`<g transform="matrix(${M.join(' ')})">${inner}</g>`,defs,[x0,y0,x1-x0,y1-y0],x1-x0,y1-y0);
       const still=!it.al.some(a=>a.fn),fade=still?it.al.reduce((a,q)=>a*q.v,1):1,pv=out[out.length-1];
       if(still&&pv&&pv.flat&&(pv===out[0]||L.op==='source-over')){   // 前一層也不動：直接貼上去，少一層
         const nx=Math.min(pv.x,x0),ny=Math.min(pv.y,y0),nX=Math.max(pv.x+pv.c.width,x1),nY=Math.max(pv.y+pv.c.height,y1);
@@ -128,15 +130,15 @@ function winDraw(v){
   for(const L of v.items){
     let a=1;for(const q of L.al)a*=q.fn?q.fn(T):q.v;if(a<.004)continue;ctx.globalAlpha=Math.min(1,a);ctx.globalCompositeOperation=L.op;
     if(L.px){ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(L.c,L.x,L.y);continue}
-    let m=new DOMMatrix([g.s,0,0,g.s,g.gx,g.gy]),mc=null;for(let i=0;i<=L.ops.length;i++){if(L.clip&&L.clip.n===i)mc=m;if(i<L.ops.length)m=m.multiply(L.ops[i].fn?L.ops[i].fn(T):L.ops[i].m)}
-    if(L.path){ctx.save();ctx.setTransform(m);ctx.strokeStyle=L.stroke;ctx.lineWidth=L.lw;ctx.lineCap=L.cap;ctx.setLineDash(L.pat);ctx.lineDashOffset=L.dash(T);ctx.stroke(L.path);ctx.restore();continue}
-    if(mc){ctx.save();ctx.setTransform(mc);ctx.beginPath();ctx.arc(L.clip.x,L.clip.y,L.clip.r,0,Math.PI*2);ctx.clip()}
-    if(m.b===0&&m.c===0){   // 沒有轉：只貼窗洞裡看得到的那一塊
-      const X=m.a*L.bx+m.e,Y=m.d*L.by+m.f,sx=m.a*L.bw/L.c.width,sy=m.d*L.bh/L.c.height,x0=Math.max(X,v.X0),y0=Math.max(Y,v.Y0),x1=Math.min(X+sx*L.c.width,v.X1),y1=Math.min(Y+sy*L.c.height,v.Y1);
+    let m=[g.s,0,0,g.s,g.gx,g.gy],mc=null;for(let i=0;i<=L.ops.length;i++){if(L.clip&&L.clip.n===i)mc=m;if(i<L.ops.length)m=winMul(m,L.ops[i].fn?L.ops[i].fn(T):L.ops[i].m)}
+    if(L.path){ctx.save();ctx.setTransform(...m);ctx.strokeStyle=L.stroke;ctx.lineWidth=L.lw;ctx.lineCap=L.cap;ctx.setLineDash(L.pat);ctx.lineDashOffset=L.dash(T);ctx.stroke(L.path);ctx.restore();continue}
+    if(mc){ctx.save();ctx.setTransform(...mc);ctx.beginPath();ctx.arc(L.clip.x,L.clip.y,L.clip.r,0,Math.PI*2);ctx.clip()}
+    if(m[1]===0&&m[2]===0){   // 沒有轉：只貼窗洞裡看得到的那一塊
+      const X=m[0]*L.bx+m[4],Y=m[3]*L.by+m[5],sx=m[0]*L.bw/L.c.width,sy=m[3]*L.bh/L.c.height,x0=Math.max(X,v.X0),y0=Math.max(Y,v.Y0),x1=Math.min(X+sx*L.c.width,v.X1),y1=Math.min(Y+sy*L.c.height,v.Y1);
       if(x1>x0&&y1>y0&&sx>0&&sy>0){const u0=Math.max(0,Math.floor((x0-X)/sx)),v0=Math.max(0,Math.floor((y0-Y)/sy)),u1=Math.min(L.c.width,Math.ceil((x1-X)/sx)),v1=Math.min(L.c.height,Math.ceil((y1-Y)/sy));
         ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(L.c,u0,v0,u1-u0,v1-v0,X+u0*sx,Y+v0*sy,(u1-u0)*sx,(v1-v0)*sy)}}
-    else{const mx=L.bx+L.bw/2,my=L.by+L.bh/2,w=Math.abs(m.a)*L.bw+Math.abs(m.c)*L.bh,hh=Math.abs(m.b)*L.bw+Math.abs(m.d)*L.bh,cx=m.a*mx+m.c*my+m.e,cy=m.b*mx+m.d*my+m.f;
-      if(cx+w/2>v.X0&&cx-w/2<v.X1&&cy+hh/2>v.Y0&&cy-hh/2<v.Y1){ctx.setTransform(m);ctx.drawImage(L.c,L.bx,L.by,L.bw,L.bh)}}
+    else{const mx=L.bx+L.bw/2,my=L.by+L.bh/2,w=Math.abs(m[0])*L.bw+Math.abs(m[2])*L.bh,hh=Math.abs(m[1])*L.bw+Math.abs(m[3])*L.bh,cx=m[0]*mx+m[2]*my+m[4],cy=m[1]*mx+m[3]*my+m[5];
+      if(cx+w/2>v.X0&&cx-w/2<v.X1&&cy+hh/2>v.Y0&&cy-hh/2<v.Y1){ctx.setTransform(...m);ctx.drawImage(L.c,L.bx,L.by,L.bw,L.bh)}}
     if(mc)ctx.restore()}
   ctx.restore()}
 
@@ -144,7 +146,7 @@ function winDraw(v){
 function winUi(){
   const a=document.getElementById('v-wset'),b=document.getElementById('v-wins');if(!a||!b)return;const cur=winDef(VIEW.win),open=WIN.set;
   a.innerHTML=`<button data-w="" aria-pressed="${!cur}">原本</button>`+WINSETS.map((s,i)=>`<button data-ws="${i}" aria-expanded="${open===i}" aria-pressed="${!!cur&&cur.set===i}">${s}</button>`).join('');
-  b.parentElement.style.display=open<0?'none':'';b.innerHTML=open<0?'':WINS.filter(w=>w.set===open).map(w=>`<button data-w="${w.id}" aria-pressed="${!!cur&&cur.id===w.id}">${w.name}</button>`).join('')}
+  b.parentElement.style.display=open<0?'none':'';document.getElementById('view').classList.toggle('wopen',open>=0);b.innerHTML=open<0?'':WINS.filter(w=>w.set===open).map(w=>`<button data-w="${w.id}" aria-pressed="${!!cur&&cur.id===w.id}">${w.name}</button>`).join('')}
 function winPick(id){const d=winDef(id),o={win:d?d.id:''};if(d&&VIEW.bg==='blue')o.bg='day';viewSet(o);if(d)hint(d.name+'：'+d.line+(d.only?'（只有夜晚）':''))}
 document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.ws!=null){const i=+b.dataset.ws;WIN.set=WIN.set===i?-1:i;winUi()}
