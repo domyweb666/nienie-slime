@@ -110,6 +110,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <div class="vrow" style="display:none"><b>搖</b><span class="seg" data-k="shk"><button data-v="settle">沉澱</button><button data-v="eat">散出來吃回來</button></span></div>
   <div class="vrow"><b>聲音</b><span class="seg" data-k="amb"><button data-v="rain">雨</button><button data-v="fire">柴火</button><button data-v="noise">白噪音</button><button data-v="lofi">lofi</button></span></div>
   <div class="vrow vkeep"><b>背景</b><span class="seg" data-k="bg"><button data-v="blue">藍</button><button data-v="day">白天</button><button data-v="night">夜晚</button></span><button class="plain" id="v-toggle">收起</button></div>
+  <div class="vrow"><b>窗外</b><span class="seg" id="v-wset"></span></div>
+  <div class="vrow" style="display:none"><span class="seg" id="v-wins"></span></div>
 </div>
 
 <div class="hint" id="hint">捏它、拉它、揉它</div>
@@ -135,6 +137,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 
 <script src="sfx/engine.js"></script>
 <script src="shape.js"></script>
+<script src="windows.js"></script>
 <script>
 'use strict';
 /* =========================================================
@@ -1703,7 +1706,7 @@ function drCrash(p,base){if(!DRon()||!p.deco||drRecent(p.crashAt,4))return;p.cra
   if(amt<.02)return;DR.n.scare++;MOOD.scare=Math.min(1,MOOD.scare+amt);BMEM.ev.sc=Math.max(BMEM.ev.sc,MOOD.scare);
   if(SLP.on){if(amt>=.08){DR.n.wake++;wake(true)}}else{if(amt>=.08)voice('startle',Math.min(.9,.4+amt));FLN.at=t+.12;FLN.pre=LIFE.st==='rest'?'rest':'go';FLN.boost=1+amt;EYE.pulse=t+.12}
   DR.lookT=t+1.6;DR.lx=p.x;DR.ly=Math.min(p.y,SILL.g.fl)}
-function drCandleX(){if(!DRon()||VIEW.bg!=='night')return null;let p=null;for(const q of PROPS)if(q.im==='d_candle')p=q;
+function drCandleX(){if(!DRon()||viewBg()!=='night')return null;let p=null;for(const q of PROPS)if(q.im==='d_candle')p=q;
   if(!p||p.gone||p.fade||t-p.upT<=3||Math.abs(p.x-p.hx)>R*.3)return null;const g=SILL.g;return Math.max(g.l+R*.9,Math.min(g.bx,p.hx+p.hw+R*.85))}
 function drCatPick(){let b=null;for(const p of PROPS){if(!p.deco||p.gone||p.fade||p.held||p.alpha<1||Math.abs(p.a)>.1||Math.abs(p.x-p.hx)>4)continue;if(!b||b.im===DR.catLast)b=p}return b}
 function drCatOK(){return DRon()&&mat.decoCat>=.5&&DR.cats<2&&t-DR.catT>45&&IMP.tr>=.5&&(!MDon()||BRM()>.2)&&BRAIN.q>.6&&SILL.plane==='room'&&!SILL.inBowl&&brainSillFree()&&!fingers.size&&!!drCatPick()}
@@ -1765,7 +1768,7 @@ function brainStep(dt,engaged){const B=BRAIN;if(!BRon()){if(B.hudOn)brainHud(fal
   B.f=cl(Math.max(IMP.w,MOOD.scare)+.35*mb);   // 心情差：容易怕
   if(engaged)B.pre=null;
   if(SLP.on){B.z-=dt/mat.brSleepT;B.e+=dt/90}   // 睡覺：睏退掉，力氣回來
-  else{B.z+=dt/mat.brAwakeT*pz*(idleT>20?2:1)*(VIEW.bg==='night'?1.5:1);
+  else{B.z+=dt/mat.brAwakeT*pz*(idleT>20?2:1)*(viewBg()==='night'?1.5:1);
     if(LIFE.st==='rest'&&!engaged){B.q+=dt/BR_Q*(1+.5*mg);B.e+=dt/(BR_E*pz)*(1+exLevel())*(1+.5*mg)}}   // 閒著：越來越想找點事、越來越想動（今天你走很多路時更快）
   const ex=BRX.exert;if(ex>B.ex0+.05){B.z+=.25*(ex-B.ex0);B.e-=.3*(ex-B.ex0)}B.ex0=ex;   // 喘（跑完、逃完、被大力拉）：累一點、沒那麼想動
   if(engaged){B.s-=dt/(MOOD.c>.2?4:10);B.q-=dt/8}   // 被你碰著：想被摸退掉（輕揉退得快），注意力在你手上
@@ -2772,7 +2775,7 @@ function walkFake(n){WALK.bank+=n;walkCheck();walkSave()}
 function walkClear(){WALK.items.length=0;WALK.fall.length=0;WALK.leave.length=0;WALK.stuck=null;WALK.bank=0;WALK.dayN=0;WALK.day='';WALK.opens=0;WALK.perm='';walkSave()}
 // 東西的樣子（程式畫的佔位，之後換素材）
 const WSPR={};
-function walkSprite(k){const night=VIEW.bg==='night',key=k+(night?'n':'');if(WSPR[key])return WSPR[key];const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.translate(48,48);x.lineWidth=3;x.lineJoin='round';x.lineCap='round';const grad=(a,b)=>{const g=x.createLinearGradient(-20,-30,20,30);g.addColorStop(0,a);g.addColorStop(1,b);return g};
+function walkSprite(k){const night=viewBg()==='night',key=k+(night?'n':'');if(WSPR[key])return WSPR[key];const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.translate(48,48);x.lineWidth=3;x.lineJoin='round';x.lineCap='round';const grad=(a,b)=>{const g=x.createLinearGradient(-20,-30,20,30);g.addColorStop(0,a);g.addColorStop(1,b);return g};
   if(k==='stone'){x.fillStyle=grad('#c9c2b6','#8d8578');x.strokeStyle='#6e675c';x.beginPath();x.ellipse(0,4,36,27,-.12,0,Math.PI*2);x.fill();x.stroke();x.fillStyle='rgba(255,255,255,.4)';x.beginPath();x.ellipse(-12,-7,11,5,-.4,0,Math.PI*2);x.fill()}
   else if(k==='leaf'){x.fillStyle=grad('#a6c86b','#5f9142');x.strokeStyle='#467031';x.beginPath();x.moveTo(-38,24);x.bezierCurveTo(-30,-26,10,-38,38,-32);x.bezierCurveTo(36,0,8,34,-38,24);x.fill();x.stroke();x.beginPath();x.moveTo(-38,24);x.quadraticCurveTo(-4,0,28,-24);x.stroke()}
   else if(k==='petal'){x.fillStyle=grad('#ffd9e2','#f29ab2');x.strokeStyle='#d97a96';x.beginPath();x.moveTo(0,36);x.bezierCurveTo(-38,14,-30,-26,-6,-36);x.quadraticCurveTo(0,-28,6,-36);x.bezierCurveTo(30,-26,38,14,0,36);x.fill();x.stroke()}
@@ -2879,9 +2882,9 @@ function shkMotionInit(){if(SNW.motion||typeof DeviceMotionEvent==='undefined')r
 
 /* ---------- v2.28 預覽：果凍皮與切換列（多米 11-06：做成可以切換，實際看畫面再選）。只換畫面，不動物理；平塗、8 條、沒有臉、藍底就是 v2.27 ---------- */
 // 做法：外框畫成遮罩 → 模糊兩種半徑 → 當高度算法線 → 打光。不是 metaball：粒子再多也不影響，物理一行都不用改。
-const VIEW={skin:'A',body:'round',face:1,bg:'day',shut:0,shk:'settle',amb:'rain'};   // v2.40 amb：環境音 rain／fire／noise／lofi（多米 11-09：背景改成真實環境聲；11-22 加 noise 粉紅噪音）
+const VIEW={skin:'A',body:'round',face:1,bg:'day',win:'',shut:0,shk:'settle',amb:'rain'};   // v2.40 amb：環境音 rain／fire／noise／lofi（多米 11-09：背景改成真實環境聲；11-22 加 noise 粉紅噪音）
 VIEW.amb=VIEW0AMB();   // 11-22：重新整理後按鈕要亮在存的那個（原本聲音是對的，按鈕卻回到「雨」）
-try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;if(o.shk==='eat'||o.shk==='settle')VIEW.shk=o.shk;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
+try{const o=JSON.parse(localStorage.getItem('nienie.view')||'null');if(o){if(['blue','day','night'].includes(o.bg))VIEW.bg=o.bg;if(winDef(o.win))VIEW.win=o.win;if(o.shk==='eat'||o.shk==='settle')VIEW.shk=o.shk;VIEW.shut=o.shut?1:0}}catch(_){}   // 多米 11-06：身體要圓、要有臉；11-07：皮定 A 清透，不再是選項（B 奶凍的數字留著，亮粉揚起來時皮往那邊混）
 function viewOver(){const o={shakeMode:VIEW.shk==='eat'?1:0};if(VIEW.body==='round')Object.assign(o,{limbs:0,tentSlip:0,tentBump:0,tentAxis:.85});if(VIEW.face)o.eyes=1;if(VIEW.bg!=='blue')Object.assign(o,{sill:1,bodySize:.27,intro:0,introSwim:0});const qs=+new URLSearchParams(location.search).get('seed');if(qs>=1&&qs<=30)o.seed=qs;return o}   // ?seed=N：從 shapes.html 點進來試外形
 const JSKINS={
   A:{kEdge:.45,kCore:.42,aEdge:.52,aCore:.80,amb:.86,dif:.24,glow:.60,line:.38,nk:.95,shin:320,s0:.42,s1:.66,spec:.85,sheen:.12,arc:.92,wet:0},
@@ -3046,15 +3049,15 @@ function sceneLoad(){if(SCENE.loading)return;SCENE.loading=true;for(const n of D
 function bowlFront(kind){const a=SCENE.img;if(!a.bowl)return null;const key='front|'+kind;if(SCENE.cache[key])return SCENE.cache[key];const b=a.bowl,k=document.createElement('canvas');k.width=b.width;k.height=b.height;const c=k.getContext('2d');c.drawImage(b,0,0);
   c.globalCompositeOperation='destination-out';const ey=b.height*.308,rx=b.width*.424,ry=b.height*.26;c.beginPath();c.ellipse(b.width/2,ey,rx,ry,0,0,Math.PI*2);c.fill();c.fillRect(0,0,b.width,ey);
   if(kind==='night'){c.globalCompositeOperation='source-atop';c.fillStyle='rgba(38,42,92,.62)';c.fillRect(0,0,k.width,k.height)}c.globalCompositeOperation='source-over';SCENE.cache[key]=k;return k}
-function drawBowlFront(){if(!(SILL.on&&SILL.inBowl&&SILL.g))return;const k=bowlFront(VIEW.bg);if(!k)return;const g=SILL.g;ctx.drawImage(k,g.bx-g.bw/2,g.by,g.bw,g.bh)}
-function propImg(name){const a=SCENE.img[name];if(!a)return null;if(VIEW.bg!=='night')return a;const key='n|'+name;if(SCENE.cache[key])return SCENE.cache[key];const k=document.createElement('canvas');k.width=a.width;k.height=a.height;const c=k.getContext('2d');c.drawImage(a,0,0);c.globalCompositeOperation='source-atop';c.fillStyle='rgba(38,42,92,.62)';c.fillRect(0,0,k.width,k.height);SCENE.cache[key]=k;return k}
+function drawBowlFront(){if(!(SILL.on&&SILL.inBowl&&SILL.g))return;const k=bowlFront(viewBg());if(!k)return;const g=SILL.g;ctx.drawImage(k,g.bx-g.bw/2,g.by,g.bw,g.bh)}
+function propImg(name){const a=SCENE.img[name];if(!a)return null;if(viewBg()!=='night')return a;const key='n|'+name;if(SCENE.cache[key])return SCENE.cache[key];const k=document.createElement('canvas');k.width=a.width;k.height=a.height;const c=k.getContext('2d');c.drawImage(a,0,0);c.globalCompositeOperation='source-atop';c.fillStyle='rgba(38,42,92,.62)';c.fillRect(0,0,k.width,k.height);SCENE.cache[key]=k;return k}
 function propShadow(x,y,rx,ry,a){ctx.save();ctx.translate(x,y);ctx.scale(rx,ry);const sg=ctx.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,`rgba(120,70,40,${(.28*a).toFixed(3)})`);sg.addColorStop(1,'rgba(120,70,40,0)');ctx.fillStyle=sg;ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();ctx.restore()}
 // v2.31 擺飾當背景（多米 11-07：放回去，只是背景，不跟牠互動）：石頭盤在窗台左端、盆栽在右端，貼著窗台畫，沒有物理、沒有碰撞、抓不到。窗台層畫在牠後面，窗框層、窗外畫在牠前面（跟碗同一條規則）
 // 窗台上：放在窗台上的底部貼著 fl；掛著的從窗框上緣內側垂下來，繞頂端轉（風鈴被搖會晃，晴天娃娃跟著晃小一點）
 function decoPut(n,x,yb){const k=propImg('d_'+n);if(!k)return;const d=DECODEF[n],U=SILL.g.U,w=d.w*U,h=w*d.asp,y=yb+(d.sink||0)*U;propShadow(x,SILL.g.fl-2,w*.5,9*U,.8);ctx.drawImage(k,x-w/2,y-h,w,h)}
 function decoHang(n,x,yt,amp){const k=propImg('d_'+n);if(!k)return;const d=DECODEF[n],U=SILL.g.U,w=d.w*U,h=w*d.asp,u=t-DECO.kick,a=DREAL()&&HANG[n].on?HANG[n].a:u>=0&&u<6?amp*DECO.dir*Math.exp(-u/1.1)*Math.sin(u*2*Math.PI*1.4):0;ctx.save();ctx.translate(x,yt);ctx.rotate(a);ctx.drawImage(k,-w/2,0,w,h);ctx.restore()}
 function decoGlow(x,y,r){ctx.save();ctx.globalCompositeOperation='lighter';const gr=ctx.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,'rgba(255,190,110,.42)');gr.addColorStop(.35,'rgba(255,160,80,.16)');gr.addColorStop(1,'rgba(255,150,70,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore()}
-function decoDraw(){if(!(SILL.on&&SILL.g)||!(mat.deco>=.5))return;const g=SILL.g,U=g.U,lv=Math.round(mat.deco),night=VIEW.bg==='night';
+function decoDraw(){if(!(SILL.on&&SILL.g)||!(mat.deco>=.5))return;const g=SILL.g,U=g.U,lv=Math.round(mat.deco),night=viewBg()==='night';
   decoPut('cloth',g.bx,g.fl);
   if(DREAL()){if(lv>=2)decoHang('teru',g.gx+46*U,g.gy,.06);decoHang('bell',g.jr-46*U,g.gy,.22);return}   // v2.44：蠟燭和右端那件由 drawProps 畫
   const cw=DECODEF.candle.w*U,cx=g.l+cw/2+8;if(night){const k=SCENE.img.d_candleLit;if(k){const h=cw*DECODEF.candleLit.asp;propShadow(cx,g.fl-2,cw*.5,9*U,.8);ctx.drawImage(k,cx-cw/2,g.fl-h,cw,h);decoGlow(cx,g.fl-h*.78,150*U)}}else decoPut('candle',cx,g.fl);   // 夜晚點著：用沒調暗的那張，再加一圈暖光
@@ -3062,36 +3065,39 @@ function decoDraw(){if(!(SILL.on&&SILL.g)||!(mat.deco>=.5))return;const g=SILL.g
   decoHang('bell',g.jr-46*U,g.gy,.22)}
 function drawDeco(){decoDraw();if(!(SILL.on&&SILL.g)||!(mat.props>=.5&&mat.props<1.5))return;const g=SILL.g,U=g.U;for(const [im,x] of [['peb',g.l+PROPDEF.peb.wd*U/2+2],['succ',g.r-PROPDEF.succ.wd*U/2-2]]){const k=propImg(im);if(!k)continue;const d=PROPDEF[im],w=d.wd*U,h=w*d.asp;propShadow(x,g.fl-2,w*.52,11*U,1);ctx.drawImage(k,x-w/2,g.fl-h,w,h)}}
 function drawProps(dk){const S=SILL,g=S.g;if(!g)return;for(const p of PROPS){if(p.gone||p.alpha<=.01||(dk!=null&&!!p.deco!==dk))continue;const im=propImg(p.im);if(!im)continue;const near=Math.max(0,1-Math.abs(g.fl-(p.y+p.base))/(R*.8));if(near>0&&p.x>g.sl&&p.x<g.sr)propShadow(p.x,g.fl-2,p.w*.52*(1+.3*Math.abs(Math.sin(p.a))),11*g.U,near*p.alpha);
-    const lit=p.im==='d_candle'&&VIEW.bg==='night'&&t-p.upT>3&&SCENE.img.d_candleLit;
+    const lit=p.im==='d_candle'&&viewBg()==='night'&&t-p.upT>3&&SCENE.img.d_candleLit;
     ctx.save();ctx.globalAlpha=p.alpha;ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.drawImage(lit||im,-p.ox,-p.oy,p.w,p.h);ctx.restore();
     if(lit){const c=Math.cos(p.a),s=Math.sin(p.a),fy=-p.oy+p.h*.22;decoGlow(p.x-s*fy,p.y+c*fy,150*g.U*p.alpha)}}
   if(dk===true)return;const b=noBowl()?null:propImg('bowl');if(b){propShadow(g.bx,g.fl-2,g.bw*.52,11*g.U,1);ctx.drawImage(b,g.bx-g.bw/2,g.by,g.bw,g.bh)}}
 function drawFront(sc,env,pl){ctx.setTransform(DPR,0,0,DPR,0,0);if(env){if(pl!=='room'){if(pl==='out')ctx.drawImage(sc.wall,0,0,W,H);drawDeco();drawProps(true);drawItems();drawProps(false)}else drawBowlFront()}drawLoose()}   // 身體之後要蓋回來的：窗外的牆和窗框；窗框層、窗外時的擺飾、走路的東西、碗；碗裡的碗前緣
-function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
-  const w=Math.round(W*DPR),h=Math.round(H*DPR),sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
-  const s=Math.min(W/860,H/1130)*DPR,sillTop=h*.72,off=sillTop-1177*s,ox=(w-992*s)/2,gx=ox+156*s,gy=off+304*s,gw=680*s,gh=828*s,night=kind==='night';
+function sceneGeo(){const w=Math.round(W*DPR),h=Math.round(H*DPR),s=Math.min(W/860,H/1130)*DPR,sillTop=h*.72,off=sillTop-1177*s,ox=(w-992*s)/2;return{w,h,s,off,ox,gx:ox+156*s,gy:off+304*s,gw:680*s,gh:828*s}}
+function sceneRoom(g,tint){const room=document.createElement('canvas');room.width=g.w;room.height=g.h;const r=room.getContext('2d');r.fillStyle='#F2E7DC';r.fillRect(0,0,g.w,g.h);r.clearRect(g.gx,g.gy,g.gw,g.gh);r.drawImage(SCENE.img.plate,g.ox,g.off,992*g.s,1586*g.s);
+  if(tint){r.globalCompositeOperation='source-atop';r.fillStyle=tint;r.fillRect(0,0,g.w,g.h);r.globalCompositeOperation='source-over'}return room}
+// 回傳 base／sky／wall 三層；選了窗景時是 {win 窗外的層, wall 那扇的房間}，每幀由 winDraw 畫（windows.js）
+function sceneFor(kind){sceneLoad();const a=SCENE.img;if(!(a.plate&&a.bowl&&a.succ&&a.peb))return null;const d=winDef(VIEW.win),e=d&&winScene(d,kind);if(e)return e;const key=kind+'|'+W+'|'+H+'|'+DPR;if(SCENE.cache[key])return SCENE.cache[key];
+  const geo=sceneGeo(),{w,h,gx,gy,gw,gh}=geo,night=kind==='night',sky=document.createElement('canvas');sky.width=w;sky.height=h;const c=sky.getContext('2d');
   const g=c.createLinearGradient(0,gy,0,gy+gh);g.addColorStop(0,night?'#141B3D':'#9CCBF0');g.addColorStop(1,night?'#2F3A6B':'#DCEEF8');c.fillStyle=g;c.fillRect(gx,gy,gw,gh);
   if(night){c.fillStyle='rgba(255,255,255,.85)';let q=7;const rnd=()=>(q=(q*16807)%2147483647)/2147483647;for(let i=0;i<46;i++){c.beginPath();c.arc(gx+rnd()*gw,gy+rnd()*gh*.8,(.5+rnd()*1.1)*DPR,0,Math.PI*2);c.fill()}c.fillStyle='#F6EFC8';c.beginPath();c.arc(gx+gw*.74,gy+gh*.2,gw*.075,0,Math.PI*2);c.fill();c.fillStyle='#141B3D';c.beginPath();c.arc(gx+gw*.70,gy+gh*.185,gw*.068,0,Math.PI*2);c.fill()}
   else{c.fillStyle='rgba(255,255,255,.92)';for(const [cx,cy,r] of [[.26,.24,1],[.72,.14,.8],[.82,.5,1.15],[.3,.62,.7]]){const u=gw*.1*r,X0=gx+gw*cx,Y0=gy+gh*cy;for(const [dx,dy,rr] of [[-1.1,.2,.62],[-.3,-.25,.9],[.6,-.05,.75],[1.3,.25,.5]]){c.beginPath();c.arc(X0+dx*u,Y0+dy*u,rr*u,0,Math.PI*2);c.fill()}c.fillRect(X0-u*1.6,Y0+u*.1,u*3.3,u*.62)}}
   c.fillStyle=night?'rgba(30,40,80,.9)':'rgba(120,165,150,.45)';c.beginPath();c.moveTo(gx,gy+gh);for(let i=0;i<=40;i++){const q=i/40;c.lineTo(gx+gw*q,gy+gh*(.9-.035*Math.sin(q*9)-.02*Math.sin(q*21)))}c.lineTo(gx+gw,gy+gh);c.fill();
-  const room=document.createElement('canvas');room.width=w;room.height=h;const r=room.getContext('2d');r.fillStyle='#F2E7DC';r.fillRect(0,0,w,h);r.clearRect(gx,gy,gw,gh);r.drawImage(a.plate,ox,off,992*s,1586*s);
-  if(night){r.globalCompositeOperation='source-atop';r.fillStyle='rgba(38,42,92,.62)';r.fillRect(0,0,w,h);r.globalCompositeOperation='source-over'}
+  const room=sceneRoom(geo,night?'rgba(38,42,92,.62)':'');
   const base=document.createElement('canvas');base.width=w;base.height=h;const bc=base.getContext('2d');bc.drawImage(sky,0,0);bc.drawImage(room,0,0);return SCENE.cache[key]={base,sky,wall:room}}   // v2.30 拆層：牠在窗外時要畫在天空和牆中間；碗和擺飾每幀畫
 let fpsAcc=0,fpsN=0,fpsNow=60;function viewFps(dt){fpsAcc+=dt;fpsN++;if(fpsAcc>=.5){fpsNow=fpsN/fpsAcc;const el=document.getElementById('v-fps');if(el)el.textContent='· 每幀 '+(fpsAcc/fpsN*1000).toFixed(1)+' ms・物理 '+PHYS.ms.toFixed(1);fpsAcc=0;fpsN=0}}
 function viewSync(){const root=document.getElementById('view');root.classList.toggle('shut',!!VIEW.shut);document.getElementById('v-toggle').textContent=VIEW.shut?'切換':'收起';
-  root.querySelectorAll('.seg').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(VIEW[k])===b.dataset.v)))});
+  root.querySelectorAll('.seg[data-k]').forEach(g=>{const k=g.dataset.k,v=String(k==='bg'?viewBg():VIEW[k]);g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(v===b.dataset.v)))});winUi();
   try{localStorage.setItem('nienie.view',JSON.stringify(VIEW))}catch(_){}}
 function viewSet(o){const need=('body' in o&&o.body!==VIEW.body)||('face' in o&&o.face!==VIEW.face)||('bg' in o&&(o.bg==='blue')!==(VIEW.bg==='blue'));Object.assign(VIEW,o);viewSync();if('amb' in o&&SFX){SFX.init();SFX.setAmb(VIEW.amb)}if('shk' in o){mat.shakeMode=VIEW.shk==='eat'?1:0;if(!mat.shakeMode)shkAbsorb();syncSliders()}if(need){SLP.lastAny=t;chooseSlime(SLIME,false,false)}
   if(VIEW.skin!=='flat'&&JEL.fail)hint('這支手機不支援果凍皮，先用平塗')}
-document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg');if(!g)return;viewSet({[g.dataset.k]:b.dataset.v})});
+document.getElementById('view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='v-toggle'){VIEW.shut=VIEW.shut?0:1;viewSync();return}const g=b.closest('.seg[data-k]');if(!g)return;viewSet({[g.dataset.k]:b.dataset.v})});
 document.getElementById('view').addEventListener('pointerdown',e=>e.stopPropagation());
 
 function draw(){
   const css=getComputedStyle(document.documentElement),col=n=>css.getPropertyValue(n).trim();
   ctx.clearRect(0,0,W,H);
   // 背景
-  const sc=VIEW.bg==='blue'?null:sceneFor(VIEW.bg),env=sc&&SILL.on&&SILL.g,pl=env?SILL.plane:'room';
-  if(sc)ctx.drawImage(pl==='out'?sc.sky:sc.base,0,0,W,H);
+  const sc=VIEW.bg==='blue'?null:sceneFor(viewBg()),env=sc&&SILL.on&&SILL.g,pl=env?SILL.plane:'room';
+  if(sc&&sc.win){winDraw(sc.win);if(pl!=='out')ctx.drawImage(sc.wall,0,0,W,H)}   // 窗景：窗外 → 牆和窗框；牠在窗外時牆等身體畫完才蓋（drawFront）
+  else if(sc)ctx.drawImage(pl==='out'?sc.sky:sc.base,0,0,W,H);
   else{const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,col('--sky'));g.addColorStop(1,col('--sky2'));
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
   if(!FLOAT){ctx.fillStyle=col('--grass');ctx.fillRect(0,GROUND,W,H-GROUND);ctx.fillStyle=col('--grass-line');ctx.fillRect(0,GROUND,W,3)}
