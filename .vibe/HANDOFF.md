@@ -1,4 +1,4 @@
-# Handoff: 第一批動工中（多米 11-25：「完整版，照推薦」）（先看這段）
+# Handoff: 第一批程式寫完（網頁自測 71／71 兩次，Swift 沒編譯），剩全測與複查（2026-11-25，先看這段）
 
 > 多米 11-24 三題：① 還有哪些規劃沒做；② 十隻改回不透明；③ 兩個最大要求（手感好、真實寵物感）要極致優化還缺什麼。三題都有答案了。
 > 工作樹 `prototype/web/_wt`，分支 `feel-3x-panel-v1`。**沒推、沒發 TestFlight（多米說才做）。** 第一批的名字、預設、檔案分工在 `.vibe/第一批-合約.md`。
@@ -23,7 +23,7 @@
 
 ## ⏭️ 下一步從哪繼續
 1. 先讀 `.vibe/第一批-結果與待確認.md`（每包數字、待確認、進行中的代理）和 `.vibe/第一批-合約.md`。多米已答「完整版，照推薦」，不用再問 7 題。
-2. 看 W3b 有沒有結果：`git status`、`git log`。它只改 `prototype/web/index.html`、`selftest.js`，驗證順序：四項紅燈（v226、mem、decoBody、v252）→ C4 開頭三件事 → C7 數字 → 整份 selftest 連 T70、T71 跑 2 次 → 開關 0 重驗。沒跑完就照那份清單重派一個代理（規格：W3b 的交辦在上一個會話；腳本 `.vibe/audit-2026-11-24/v2.61/W3腳本/`）。收完就提交並把 W3 打勾。
+2. 網頁與手機的第一批程式都寫完、都提交了，沒有代理在跑。直接從 R 開始。`eyeTrue` 開後 T45 眼睛離外框 21→12 點，請反駁者一起查。
 3. R：一次派兩到三個只讀反駁者（網頁行為＋資料、Swift、規格與誇大），加一個全測代理（整份 selftest 3 次、混合 250 重量、T70 合併版、開關 0 逐點相同）。抓到的真錯派代理修，修完再跑一次全測。
 4. 修網頁 `desk.js` 的缺口（舊預設提示沒答時拉的三顆不存，`deskSave`、`feel-keep`，跟 S5 在手機修的同一個）。
 5. 更新 `.vibe/未做清單.md`、`.uiux/04-手感/參數表-暫定.md`、`CLAUDE.md` 加 v2.61（CLAUDE.md 是核心檔，改前先給多米看現況）。
@@ -39,7 +39,7 @@
 - [x] S1：Swift A1 皮＋FeelParams 全部參數｜逐行對網頁、複查過（不能編譯）｜JellySkin.*、SlimeView、FeelParams｜無
 - [x] T：T70 破皮測試（A7 網頁）｜對 v2.60 會紅、兩套門檻｜selftest.js｜W1
 - [x] W2：網頁 D1、D2、C3｜規劃檔各條驗法｜index.html、selftest.js｜W1、T
-- [ ] W3：（進行中提交 `a2a3b57`，W3b 收尾中：selftest 4 紅、C7 沒量、C4 起點；報告在 `v2.61/W3-移植說明.md`、腳本 `v2.61/W3腳本/`）網頁 C1、C2、C4、C7、B4、雨 0.3｜規劃檔各條驗法｜index.html、selftest.js｜W2、B1
+- [x] W3（含 W3b 收尾）：網頁第二段，71／71 自測兩次
 - [x] S2：Swift A2–A5｜SlimeRig｜W1、S1
 - [x] S3a：Swift D1、D2、C3（照 W2-移植說明）｜SlimeRig｜W2
 - [x] S5：修 Swift 複查抓到的（`v2.61/Swift複查.md`）＋補 tools/swift-linux-check｜UI、Controller、LabProbe、協定搬家｜S3a
