@@ -57,6 +57,7 @@
     // v2.40 環境音（多米 11-09：背景音改成真實環境聲，下雨、木材燃燒）：amb 'rain'／'fire'／'noise'／'lofi'（noise 是 11-22 加的粉紅噪音，只有底、沒有事件）。雨和柴火是「底＋零星事件」，
     // 底是兩分鐘無縫循環，事件照 amb.json 的頻率隨機冒出來（大小、左右、音高每次不同），聽不出循環。lofi 照舊
     // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
+    snd61: 1,   // v2.61 B1：揉的新循環（rub.loop61）和抓著時雨降到 0.3；0 回 rub.loop、0.6
     amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
   };
   // 一首可以無縫循環的 lofi（prototype/sfx-design/design_lofi.py，40 小節、76 BPM）。自己一條 gain 直接接輸出，不經過音效的 master；
@@ -128,7 +129,7 @@
       src.connect(g); tail.connect(S.bgmG); src.start(Math.max(at, c.currentTime));
     });
   }
-  function bgmTarget(grabbing) { return S.mode === 0 ? (grabbing ? S.bgmDuck : 1) : 0; }
+  function bgmTarget(grabbing) { return S.mode === 0 ? (grabbing ? (S.snd61 && S.amb === 'rain' ? 0.3 : S.bgmDuck) : 1) : 0; }
 
   function normManifest(m) {
     const out = {};
@@ -267,7 +268,7 @@
     if (pulling) { const lam = P.strandRate(stretch, S.v); if (Math.random() < lam * dt) one('pull.strand', P.strand(stretch)); }
     // 揉 loop
     const R = MAP.rub, L = clamp(st.rub || 0, 0, 1) * R.duck(stretch), n = S.rubMax > 0 ? clamp(L / S.rubMax, 0, 1) : 0;
-    if (L > 0.005 && !S.rubV) S.rubV = loopVoice('rub.loop');
+    if (L > 0.005 && !S.rubV) S.rubV = loopVoice(S.snd61 && S.buf['rub.loop61'] && S.buf['rub.loop61'].length ? 'rub.loop61' : 'rub.loop');
     if (S.rubV) {
       const V = S.rubV;
       V.g.gain.setTargetAtTime(L, c.currentTime, 0.06);

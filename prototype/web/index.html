@@ -217,7 +217,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
      v2.57 那個只管新六隻的 look6 拿掉，換成 clear：1 十隻都換回 v2.53b 到 v2.59 的亮面透明（shine 當 1、opaque 當 0），換史萊姆、換材質都留著。手感調節台的存檔只記 13 個旋鈕，不帶外觀
    - v2.61（多米 11-25：第一批完整版照推薦，規格 .uiux/04-手感/極致優化規劃-暫定.md、名字和預設 .vibe/第一批-合約.md）：皮 skinU 1，遮罩改畫身體自己那張三角網的聯集，薄的地方補一條保底線，身體裡的東西（餡、腮紅、眼睛）照這張遮罩剪；
      只接在清透皮那條畫法，平塗、別的皮、WebGL 開不起來時自動用舊外框。拉的三顆開關預設關：pullHold（拉長停住就定住）、pullWhole（往身體裡拉先搬整隻）、pullSoft（拉很長放手收回去：先不逃、回正限速、放手 0.8 秒限速、縮短了才換網格、手指在動才放寬上限、停住最多漂 0.3R）。
-     其他十個（rough tapSoft petSlow wakeSoft nearFast greetLook brJit bumpSoft eyeTrue snd61）登記在這裡，各自的行為另外接。十四個全 0 要跟 v2.60 逐點相同；換隻、換材質都留著（matKeep）。調節台多「這一批」一塊；拉的三顆進存檔，其他不進。
+     其他十個（rough tapSoft petSlow wakeSoft nearFast greetLook brJit bumpSoft eyeTrue snd61）各自的行為寫在 ROUGH、TAPK、PETK、WAKEK、lifeStep 的 hear、GREET、BRJ、SOFTB、eyeStep、sfx/engine.js。換隻的地方記性每隻分開（BMEMS，沒有開關）。十四個全 0 要跟 v2.60 逐點相同；換隻、換材質都留著（matKeep）。調節台多「這一批」一塊；拉的三顆進存檔，其他不進。
      網址 ?pull=0、?pull=1、?pull=hold,whole,soft 把拉的三顆鎖住（盲比用，畫面上不寫是哪一邊）。window.KPIOS=1 是測試掛鉤：窗台上的回家彈簧改成手機的值，平常不設
    ========================================================= */
 const cv=document.getElementById('cv');let ctx=cv.getContext('2d');   // v2.61：畫身體裡的東西時暫時換到暫存畫布（skinLayer），畫完換回來
@@ -963,7 +963,7 @@ function setup(){
   BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;BR.jw=0;BR.lift=0;POD.list=[];POD.clock=0;POD.next=.5;POD.E=[];POD.shift=0;FLAT.on=false;{const v=viewV();CAM.z=1;CAM.x=v.x;CAM.y=v.y;FOL.x=v.x;FOL.y=v.y;FOL.vx=0;FOL.vy=0;FOL.chase=false}INTRO.on=false;INTRO.sq=0;IV.s=1;IV.ox=0;IV.oy=0;Object.assign(MOOD,{c:0,a:0,strain:0,strainMax:0,scare:0,cowerUntil:-9,happyT:-9,wagT:-9,taps:[],tugX:0,tugY:0});ESC.on=false;PURR=0;PINCH.a=-1;PINCH.b=-1;DENTS.length=0;shkReset();
   brainReset();Object.assign(LIFE,{st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0,arrT:-9,arrOff:0});Object.assign(GAIT,{on:false,k:1,off:0,v:0});Object.assign(FLN,{at:-9,t0:-9,amp:0,H:1,s:1,last:0,tc:1,tcq:false,tpAt:-9});Object.assign(SHK,{at:-9,t0:-9,amp:0,th:0});Object.assign(BRX,{exert:0,sighNext:-1,sighCyc:-1,pauseUntil:-9,ampX:1});STR.k=1;PSM[0]=1;PSM[1]=0;PSM[2]=0;PSM[3]=1;LB=1;   // v2.19
   Object.assign(DRAG,{ox:0,oy:0,vx:0,vy:0,bx:0,by:0,gx:0,gy:0,slipT:0});LURE.on=false;LURE.sn=null;LIFE.ask=null;E4.on=false;E4.wait=-1;Object.assign(E2,{leanT:-9,nuzT0:-1,nuzO:0,nuzSaid:false,tkT:0,gigNext:0,nudgeT:-9});E2.tk.length=0;   // v2.22（E2、E4 的計時也歸零：時鐘倒回去時，留著的 gigNext 會讓它一直等不到下一次咯咯笑）：INTRO.sq 也要歸零：開心小跳跳到一半被 setup 打斷，壓扁量會一直留著，參考形狀永遠被撐開（量過 −0.053，T28 放手 2 秒剩 0.76，原本 0.89）   // v2.20：重建時手指直接清掉、不經過放手，偏移不歸零的話家會一直歪（量過：舊測試跟著歪，T31 按住 3 秒移 61 點，原本 30）
-  CAMR.st=0;CAMR.until=-9;E2.leanO=0;eyeSetup();EYE.pose=null;EYE.cx=0;EYE.cy=0;EYE.ck=1;Object.assign(SLP,{on:false,k:0,askAt:-9,nearT:0});Object.assign(ECHO,{st:'idle',i:0,joyUntil:-9});ECHO.taps.length=0;SWIM.on=false;   // v2.23
+  CAMR.st=0;CAMR.until=-9;E2.leanO=0;eyeSetup();EYE.pose=null;EYE.cx=0;EYE.cy=0;EYE.ck=1;Object.assign(SLP,{on:false,k:0,askAt:-9,nearT:0,slow:false,tap:null,n:0,rollT:-9,rollO:0});Object.assign(ECHO,{st:'idle',i:0,joyUntil:-9});ECHO.taps.length=0;SWIM.on=false;   // v2.23
   {let A=0;const n=bnd.length;for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];A+=X[a]*Y[b]-X[b]*Y[a]}A0=Math.abs(A)/2}
   CAPG=1;CAPGAP=0;   // v2.54
   sillInit();
@@ -1124,11 +1124,12 @@ function down(e){
   if(grab&&mat.pressFlat>0){let y0=1e9,y1=-1e9;for(const i of bnd){y0=Math.min(y0,Y[i]);y1=Math.max(y1,Y[i])}
     if(p.y<globalC.yc){f.flatOn=true;f.h0=Math.max(R*.5,y1-y0);f.bot=y1;f.flat=1}}
   if(grab){ESC.on=false;f.gentleT=0;f.strainT=0}
-  if(grab){SWIM.on=false;wake(true)}   // v2.23：游過來途中被抓就不打招呼；睡著被碰嚇醒
+  GREET.st='';   // v2.61 C4：一碰就不看了，照平常
+  if(grab){SWIM.on=false;if(!(SLP.on&&softTouch(f)))wake(true)}   // v2.23：游過來途中被抓就不打招呼；睡著被碰嚇醒   // v2.61 C1（wakeSoft）：熟的先等 0.25 秒看是不是輕碰
   if(!grab){if(SLP.on){let db=1e9;for(const i of bnd)db=Math.min(db,Math.hypot(X[i]-p.x,Y[i]-p.y));if(db<R*2)wake(false);ECHO.taps.length=0}else echoTap(p.x,p.y)}   // v2.23：睡著時點旁邊叫醒它（這下不算節奏）；醒著時點空白處給 C6 聽   // v2.18：抓住就停下逃跑
   // v2.19：抓到就收回正在探的偽足、停下來；A5 凹痕照上面馬上出現，0.1 到 0.25 秒後它自己縮一下；A7 碰它旁邊的空白處（3R 內），0.3 秒後轉過去探
-  if(grab&&LV('lifeFlinch')&&!(FLN.at>t)){FLN.at=t+(.1+.15*Math.random())*(IV2('impC5')?1-.5*IMP.w:1);FLN.pre=LIFE.st;FLN.tpAt=FLN.at}   // pre：被碰之前在做什麼（休息時縮得大）；v2.20 C5 戒高時縮得早
-  if(grab&&mat.life2>=.5){cutSniffs();GAIT.on=false;GAIT.k=1;WANDER.moving=false;LIFE.st='rest';LIFE.until=-1;LIFE.ask=null}
+  if(grab&&LV('lifeFlinch')&&!(FLN.at>t)&&!SLP.on){FLN.at=t+(.1+.15*Math.random())*(IV2('impC5')?1-.5*IMP.w:1);FLN.pre=LIFE.st;FLN.tpAt=FLN.at}   // pre：被碰之前在做什麼（休息時縮得大）；v2.20 C5 戒高時縮得早
+  if(grab&&mat.life2>=.5){cutSniffs();GAIT.on=false;GAIT.k=1;WANDER.moving=false;LIFE.st=SLP.on?'sleep':'rest';LIFE.until=-1;LIFE.ask=null}
   const lure=!grab&&(IV2('impC1')||IV2('impC2'));if(lure)f.lure=true;   // v2.20：按在空白處的手指交給 C1、C2（lureStep），不再只探一下
   if(!grab&&!lure&&LV('lifeAttend')){let db=1e9;for(const i of bnd)db=Math.min(db,Math.hypot(X[i]-p.x,Y[i]-p.y));if(db<R*3)LIFE.att={at:t+.3,x:p.x,y:p.y,blank:true}}
   if(grab&&IV2('impC4')&&t<IMP.askUntil){f.gentleT=.7;MOOD.c=Math.max(MOOD.c,.5);IMP.tr=Math.min(1,IMP.tr+.05);IMP.askUntil=-9}   // C4 討摸時你又來摸：呼嚕 0.3 秒就來（平常要揉 1 秒）
@@ -1684,7 +1685,7 @@ function moodRelease(f){if(!(mat.emo>=.5))return;
     else{FLN.tc=1;FLN.tcq=false;MOOD.scare=Math.min(1,MOOD.scare+.45);MOOD.c=Math.max(-1,MOOD.c-.1);MOOD.cowerUntil=Math.max(MOOD.cowerUntil,t+.5)}   // v2.61 D2（tapSoft）：一秒內不滿三下只是碰一下，不嚇、不扣舒服、不縮著（嚇沒漲，心情和這格的記性就不會扣）
     if(MOOD.taps.length>=3){let ux=globalC.xc-f.ax,uy=globalC.yc-f.ay,ul=Math.hypot(ux,uy);if(ul<R*.1){const a=Math.random()*2*Math.PI;ux=Math.cos(a);uy=Math.sin(a)}else{ux/=ul;uy/=ul}
       flee(ux,uy,W*.28*mat.flee);MOOD.taps=[];MOOD.c=Math.max(-1,MOOD.c-.3);MOOD.a=1}return}
-  if((f.gentleT||0)>1&&MOOD.c>.35&&!fingers.size){MOOD.happyT=t;MOOD.wagT=t+.1;hop();voice('happy',.8)}}
+  if((f.gentleT||0)>1&&MOOD.c>.35&&!fingers.size&&!SLP.on){MOOD.happyT=t;MOOD.wagT=t+.1;hop();voice('happy',.8)}}
 function flee(ux,uy,dist){if(!(dist>0))return;const l=Math.hypot(ux,uy)||1;ux/=l;uy/=l;
   Object.assign(ESC,{on:true,t0:t,T:Math.max(.6,dist/(R*2.4)),sx:HOMEX,sy:HOMEY,dx:HOMEX+ux*dist,dy:HOMEY+uy*dist*.8});WANDER.moving=false;MOOD.scare=Math.min(1,MOOD.scare+.5)}
 // 開心小跳：開場的跳只跳一下、不走遠（mini：碰它照常抓）
@@ -1790,11 +1791,11 @@ function drCat(){const p=drCatPick();if(!p){LIFE.until=t+restDur();return}const 
 function drStep(dt){const U=DR.push;if(!U)return;const p=U.p;if(!DRon()||SILL.route!==U.route||p.gone||p.held||p.fell){DR.push=null;return}
   const s=LIFE.sns.length?LIFE.sns[LIFE.sns.length-1]:null;if(!s||s.cut>0||sniffEnv(s)<.6)return;
   p.vx=U.side*R*.2;p.lastHit=t;p.catT=t;p.selfT=t}
-const BRAIN={m:.15,mS:.15,pre:null,ev:{h:-9,j:-9,w:0,sc:0},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:0,seed:20261114,hudAt:0,naps:0,selfWake:0};
+const BRAIN={m:.15,mS:.15,pre:null,ev:{h:-9,j:-9,w:0,sc:0},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:0,seed:20261114,hudAt:0,naps:0,selfWake:0,zAt:.5,jA:1,jS:1,slp:false};   // v2.61 C7（brJit）：zAt 睏到多少才想睡、jA 這一輪醒著睏得多快、jS 這一覺睡多快醒，每一輪重抽
 const BRon=()=>mat.life2>=.5&&mat.brain>=.5;
 const MDon=()=>BRon()&&mat.mood>=.5,BRM=()=>MDon()?BRAIN.m:0,BRMS=()=>MDon()?BRAIN.mS:0;   // v2.42 心情（關著時一律當 0）
 function brnd(){BRAIN.seed=(Math.imul(BRAIN.seed,1664525)+1013904223)>>>0;return BRAIN.seed/4294967296}
-function brainReset(){drReset();Object.assign(BRAIN,{m:.15,mS:.15,pre:null,ev:{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:t})}   // 每次打開、換一隻都從同一個起點：跟你離開多久無關
+function brainReset(){drReset();Object.assign(BRAIN,{m:.15,mS:.15,pre:null,ev:{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:t,zAt:.5,jA:1,jS:1,slp:false})}   // 每次打開、換一隻都從同一個起點：跟你離開多久無關
 // v2.43 記性（大腦第 3 片）。記地方：窗台從左到右五格（原本六格，家剛好落在第 3、4 格的交界，在家被嚇會記到隔壁那格；五格時家在正中間那格的中央），每格 -1（被嚇過）到 1（被摸得舒服）。記你：side -1（你常摸左邊）到 1（右邊）。
 // 喜歡的跨天留著，討厭的三天退完（存在瀏覽器 nienie.brain，跟熟一樣每 3 秒有變才寫）。擺飾的記性等擺飾變成真的物體（第 4 片）。
 const BMEM={cell:[0,0,0,0,0],side:0,ev:{h:-9,w:0,sc:0},dirty:false,at:-9,leans:0,ts:0};
@@ -1817,11 +1818,17 @@ function brainMem(dt){const E=BMEM.ev;if(!MMon()||SILL.plane!=='room'){E.h=MOOD.
   if(MOOD.scare>E.sc)memAdd(k,-.5*(MOOD.scare-E.sc));E.sc=MOOD.scare;
   memSave(false)}
 function memTouch(f){if(!MMon()||MOOD.strainMax>.15)return;const sx=Math.max(-1,Math.min(1,(f.ax-globalC.xc)/R));BMEM.side+=(sx-BMEM.side)*.15;BMEM.dirty=true}   // 放手時記：這次是從哪一邊摸的（扯的不算）
-function memSave(force){if(IMPSV.noSave||!BMEM.dirty)return;if(!force&&t-BMEM.at<3&&BMEM.at<=t)return;BMEM.at=t;BMEM.dirty=false;
-  try{localStorage.setItem('nienie.brain',JSON.stringify({id:SLIMES[SLIME].id,cell:BMEM.cell.map(v=>+v.toFixed(3)),side:+BMEM.side.toFixed(3),ts:Date.now()}))}catch(_){}}
-function memLoad(){try{const o=JSON.parse(localStorage.getItem('nienie.brain')||'null');if(!o||!Array.isArray(o.cell)||o.cell.length!==5||o.id!==SLIMES[SLIME].id)return;
-    const d=memDecay({cell:o.cell.map(v=>isFinite(+v)?Math.max(-1,Math.min(1,+v)):0),side:isFinite(+o.side)?Math.max(-1,Math.min(1,+o.side)):0},Math.max(0,(Date.now()-(+o.ts||0))/864e5));
-    BMEM.cell=d.cell;BMEM.side=d.side}catch(_){}}
+// v2.61 C7（未做 31）：每隻分開記。以前只有一份，換隻不重讀，A 的記性直接變成 B 的，3 秒後還寫到 B 名下、把 A 存的蓋掉；熟的牠換回來時，戒從 0 變回原本的值也被當成「剛剛在這格被嚇」。
+// 現在換隻時先收起這隻的（memPut）、換成那隻的（memGet），存的時候十隻一起存（all）；外面那層 id、cell、side 留著，舊格式讀得懂
+const BMEMS={};
+function memPut(){BMEMS[SLIMES[SLIME].id]={cell:BMEM.cell.map(v=>+v.toFixed(3)),side:+BMEM.side.toFixed(3),ts:Date.now()}}
+function memGet(){const m=BMEMS[SLIMES[SLIME].id],d=m?memDecay(m,Math.max(0,(Date.now()-m.ts)/864e5)):{cell:[0,0,0,0,0],side:0};BMEM.cell=d.cell.slice();BMEM.side=d.side;BMEM.offerAt=-99;BMEM.leans=0;BMEM.dirty=false}
+function memSync(){Object.assign(BMEM.ev,{h:MOOD.happyT,w:IMP.w,sc:MOOD.scare});Object.assign(BRAIN.ev,{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare})}   // 換隻後戒、開心、被嚇換成那隻的，不算「剛剛發生」
+function memSave(force){if(IMPSV.noSave||!BMEM.dirty)return;if(!force&&t-BMEM.at<3&&BMEM.at<=t)return;BMEM.at=t;BMEM.dirty=false;memPut();
+  try{const m=BMEMS[SLIMES[SLIME].id];localStorage.setItem('nienie.brain',JSON.stringify({id:SLIMES[SLIME].id,cell:m.cell,side:m.side,ts:m.ts,all:BMEMS}))}catch(_){}}
+function memLoad(){try{const o=JSON.parse(localStorage.getItem('nienie.brain')||'null');if(!o)return;
+    const put=(id,m)=>{if(m&&Array.isArray(m.cell)&&m.cell.length===5&&SLIMES.some(q=>q.id===id))BMEMS[id]={cell:m.cell.map(v=>isFinite(+v)?Math.max(-1,Math.min(1,+v)):0),side:isFinite(+m.side)?Math.max(-1,Math.min(1,+m.side)):0,ts:+m.ts||0}};
+    if(o.all)for(const id in o.all)put(id,o.all[id]);put(o.id,o);memGet()}catch(_){}}
 // 想被摸、熟、而且記得你常摸哪邊：把那一邊靠過來、伸一下偽足、看你（跟「來找你」搶同一個需求，15 秒內不重複）
 function memCanOffer(){return MMon()&&mat.imp>=.5&&IMP.tr>=.4&&Math.abs(BMEM.side)>=.3&&t-(BMEM.offerAt||-99)>15&&!fingers.size}
 function memOffer(){const a=BMEM.side>0?0:Math.PI;E2.leanT=t;E2.leanA=a;E2.leanS=1;startSniff(a,.5,.5,1,.6);EYE.user=t+1.6;BMEM.leans++;BMEM.offerAt=t;BRAIN.s=Math.max(0,BRAIN.s-.2);LIFE.until=t+2.4}
@@ -1837,12 +1844,15 @@ function brainMood(dt){const B=BRAIN,E=B.ev;if(!MDon()){B.m=B.mS=.15;return}
   B.m=Math.max(-1,Math.min(1,B.m));B.mS+=(B.m-B.mS)*(1-Math.exp(-dt/2))}   // mS：畫面上用的，2 秒跟上，姿勢不會跳
 function brainFlinch(){const m=BRM();return 1+.6*Math.max(0,-m)-.3*Math.max(0,m)}   // 心情差被碰縮得大，心情好縮得小
 function brainStep(dt,engaged){const B=BRAIN;if(!BRon()){if(B.hudOn)brainHud(false);return}
-  const cl=v=>Math.max(0,Math.min(1,v)),idleT=t-Math.max(lastTouch,SLP.lastAny),pz=mat.restMul||1;
+  const cl=v=>Math.max(0,Math.min(1,v)),idleT=idleSec(),pz=mat.restMul||1;
   brainMood(dt);brainMem(dt);const mg=Math.max(0,BRM()),mb=Math.max(0,-BRM());
   B.f=cl(Math.max(IMP.w,MOOD.scare)+.35*mb);   // 心情差：容易怕
   if(engaged)B.pre=null;
-  if(SLP.on){B.z-=dt/mat.brSleepT;B.e+=dt/90}   // 睡覺：睏退掉，力氣回來
-  else{B.z+=dt/mat.brAwakeT*pz*(idleT>20?2:1)*(viewBg()==='night'?1.5:1);
+  const jit=mat.brJit>=.5;
+  if(!jit){B.zAt=.5;B.jA=B.jS=1;B.slp=SLP.on}
+  else if(B.slp!==SLP.on){B.slp=SLP.on;if(SLP.on)B.jS=BRJ.s0+(BRJ.s1-BRJ.s0)*brnd()**2;else{B.jA=BRJ.a0*Math.pow(BRJ.a1/BRJ.a0,brnd());B.zAt=BRJ.z0+(BRJ.z1-BRJ.z0)*brnd();B.e*=BRJ.e0+(1-BRJ.e0)*brnd();B.q=Math.max(B.q,BRJ.q*brnd());LIFE.until=Math.max(LIFE.until,t+1.5+BRJ.lie*brnd()**2)}}   // v2.61 C7：每一輪的作息重抽；醒來想做什麼不一定（有時先張望、有時先賴一下）
+  if(SLP.on){B.z-=dt/mat.brSleepT*B.jS;B.e+=dt/(jit?180:90)}   // 睡覺：睏退掉，力氣回來
+  else{B.z+=dt/mat.brAwakeT*B.jA*pz*(idleT>20?2:1)*(viewBg()==='night'?1.5:1);
     if(LIFE.st==='rest'&&!engaged){B.q+=dt/BR_Q*(1+.5*mg);B.e+=dt/(BR_E*pz)*(1+exLevel())*(1+.5*mg)}}   // 閒著：越來越想找點事、越來越想動（今天你走很多路時更快）
   const ex=BRX.exert;if(ex>B.ex0+.05){B.z+=.25*(ex-B.ex0);B.e-=.3*(ex-B.ex0)}B.ex0=ex;   // 喘（跑完、逃完、被大力拉）：累一點、沒那麼想動
   if(engaged){B.s-=dt/(MOOD.c>.2?4:10);B.q-=dt/8}   // 被你碰著：想被摸退掉（輕揉退得快），注意力在你手上
@@ -1852,13 +1862,14 @@ function brainStep(dt,engaged){const B=BRAIN;if(!BRon()){if(B.hudOn)brainHud(fal
   if(brainAtHome())B.homeAt=t;
   B.act=DR.push?'推東西':SLP.on?'睡覺':B.pre&&B.pre.k==='sleep'?'想睡了':(B.pre&&B.pre.k==='greet')||B.want==='greet'?'看著你':ESC.on?'逃跑':engaged?'被你碰著':E4.on?'來找你':LURE.on?'注意你的手指':ECHO.st!=='idle'?'回你的節奏':LIFE.st==='look'?'張望':(LIFE.st==='go'||LIFE.st==='arrive'||GAIT.on||(SILL.on&&SILL.route))?'走':'休息';
   brainHud(mat.brainHud>=.5)}
+const BRJ={a0:.3,a1:2.6,s0:.45,s1:2.4,z0:.4,z1:.75,e0:.15,q:.9,lie:9};   // v2.61 C7：a 醒著睏得多快的倍數（越大越快睏）、s 睡著多快睡飽的倍數、z 睏到多少才睡、e 醒來想動至少留幾成、q 醒來好奇最多多少、lie 醒來最多賴幾秒
 const BR_Q=30,BR_E=90,BR_GO=.5,BR_REST=.35,BR_NAMES={rest:'休息',look:'張望',go:'走',sleep:'睡覺',greet:'來找你',offer:'把你常摸的那邊靠過來',cat:'去推東西'};
 function sleepOK(){return IV3('sleep')&&!SLP.on&&LIFE.st==='rest'&&!fingers.size&&!E4.on&&ECHO.st==='idle'&&!SWIM.on&&!(SNW.cloud>.03)&&!SNW.loose.length}
 function e4OK(){return IV3('e4')&&!E4.on&&IMP.tr>.5&&E4.count<3+Math.round(2*exLevel())&&t-E4.lastT>40&&!fingers.size&&t-lastTouch>6}
 // 休息到時間：五個需求各算一個分數（怕會壓住睡、來找你、走，推高張望），最高的贏；都不到 0.35 就繼續休息。分數接近時加一點亂數挑
-function brainPick(canGo){const B=BRAIN,n=()=>(brnd()-.5)*.16,calm=1-B.f,idleT=t-Math.max(lastTouch,SLP.lastAny);
+function brainPick(canGo){const B=BRAIN,n=()=>(brnd()-.5)*.16,calm=1-B.f,idleT=idleSec(),opening=mat.wakeSoft>=.5&&t>=SLP.openT&&t-SLP.openT<(mat.sleepAfter||40);
   const c=[['rest',BR_REST,'都不高',0],['look',B.q+.3*B.f+n(),'好奇',B.q],['go',canGo?B.e*(1-.5*B.z)*(1-.5*B.f)*(1+.3*BRM())+n()+(MMon()&&SILL.plane==='room'&&BMEM.cell[memCellAt(globalC.xc)]<-.3?.4:0):-1,'想動',B.e],
-    ['sleep',sleepOK()&&idleT>8&&B.z>.5?B.z*calm+n():-1,'睏',B.z],['greet',e4OK()?B.s*calm+n():-1,'想被摸',B.s],['offer',memCanOffer()?B.s*calm*.9+n():-1,'想被摸',B.s],['cat',drCatOK()?B.q*calm+.15+n():-1,'好奇',B.q]];   // v2.46 推東西排最後：條件不成立時不抽亂數，前面幾項抽到的數字跟 v2.45 一樣
+    ['sleep',!opening&&sleepOK()&&idleT>8&&B.z>B.zAt?B.z*calm+n():-1,'睏',B.z],['greet',e4OK()?B.s*calm+n():-1,'想被摸',B.s],['offer',memCanOffer()?B.s*calm*.9+n():-1,'想被摸',B.s],['cat',drCatOK()?B.q*calm+.15+n():-1,'好奇',B.q]];   // v2.46 推東西排最後：條件不成立時不抽亂數，前面幾項抽到的數字跟 v2.45 一樣
   let b=c[0];for(const x of c)if(x[1]>b[1])b=x;B.want=b[0];B.why=b[0]==='rest'?'五個都不高，繼續休息':b[2]+' '+b[3].toFixed(2)+' 最高，'+BR_NAMES[b[0]];return b[0]}
 // 窗台上：家是窗台正中間的布墊。v2.40 閒著每 10 秒自動走回中間；大腦開著時改成牠自己決定：想動就沿著窗台走到別的地方待著，睏了先走回布墊再睡，沒事做又離家 20 秒以上才慢慢走回去
 function brainAtHome(){const S=SILL;return !S.on||!S.g||(S.plane==='room'&&Math.abs(globalC.xc-memHomeX())<R*.3)}
@@ -1939,6 +1950,7 @@ function moveHome(dx,dy,dt){if(SILL.on){if(SILL.tanV)dx=0;else dy=0}if(dx===0&&d
 function lifeRelease(f){const st=SB(f);   // v2.20：拖著走時用身體真的被拉開的量（拖它走一大段不算大力拉）
   if(LV('lifeFlinch')&&st>1)Object.assign(SHK,{at:t+.3,amp:Math.min(1,.4+(st-1)/1.5)});
   if(LV('lifeBreath')&&st>1.5)BRX.exert=Math.max(BRX.exert,Math.min(1,.3+(st-1.5)*.35));
+  if(SLP.on){LIFE.st='sleep';return}   // v2.61 C1：很熟、只翻一下沒醒
   if(LV('lifeAttend')&&!ESC.on&&!INTRO.on&&Math.hypot(f.fx-globalC.xc,f.fy-globalC.yc)>R*.4)LIFE.att={at:t+.5,x:f.fx,y:f.fy,blank:false};
   LIFE.st='rest';LIFE.until=t+1.5+2*Math.random()}
 function tapCap(a){FLN.tc=Math.max(TAPK.lo*mat.flinchAmp,Math.min(FLN.tc,a*TAPK.k))}
@@ -1968,9 +1980,11 @@ function lifeStep(dt,idle,engaged){
   if(engaged||ESC.on||INTRO.on){if(GAIT.on||LIFE.st==='go'){GAIT.on=false;WANDER.moving=false;LIFE.st='rest';LIFE.until=-1}return}
   if(!free)return;
   if(SLP.on){const lf=IV2('impC1')||IV2('impC2')?lureFinger():null;SLP.nearT=lf?SLP.nearT+dt:0;if(SLP.nearT>1.2)wake(false);return}   // v2.23 B2：睡著什麼都不決定；手指放旁邊 1.2 秒慢慢醒
-  if(ECHO.st!=='idle')return;   // v2.23 C6：在聽你的節奏、在回你：停在原地
+  const hear=ECHO.st==='listen'&&mat.nearFast>=.5;   // v2.61 C2（nearFast）：還在聽（手指可能就是要放著），照樣看旁邊的手指、靠過去；在回你的時候才停
+  if(ECHO.st!=='idle'&&!hear)return;   // v2.23 C6：在聽你的節奏、在回你：停在原地
   if(LIFE.st==='rest'&&!BRon()&&sleepTry())return;   // v2.41 大腦開著：睡不睡由 brainRest 決定
   const lured=lureStep(dt);   // v2.20 C1 C2：手指放在旁邊時交給 lureStep
+  if(hear&&!lured)return;
   const e4=!lured&&e4Step(dt);   // v2.22 E4：熟的時候一陣子沒碰，游到前面跟你打招呼
   // v2.20 C4 討摸：往你手指離開的地方伸偽足，離得遠就挪過去
   if(!lured&&!e4&&LIFE.ask&&t>=LIFE.ask.at){const a=LIFE.ask;LIFE.ask=null;voice('ask',.6);const dx=a.x-globalC.xc,dy=a.y-globalC.yc,d=Math.hypot(dx,dy)||1e-6,ang=Math.atan2(dy,dx);
@@ -2002,7 +2016,7 @@ function e1Step(){if(!IV3('e1'))return;let g=null;for(const f of fingers.values(
   if(MOOD.strain>.5&&!g.saidProt){g.saidProt=true;voice('protest',.8)}
   if(PURR>.3&&!g.saidPurr){g.saidPurr=true;if(!E2.nuzSaid&&!(PET.on&&PET.said))voice('mmm',.6);if(PET.on)PET.said=true}}   // 已經在蹭、哼過了就不再哼
 // E2 點一下（0.25 秒內、沒拉開）：被戳那一縮之後，它朝你的手指傾一下、「噗」一聲；戒的往反方向傾
-function e2Release(f){if(!IV3('e2'))return;if(!(t-f.tDown<.25&&(f.stretch||0)<.3))return;
+function e2Release(f){if(!IV3('e2')||SLP.on)return;if(!(t-f.tDown<.25&&(f.stretch||0)<.3))return;
   E2.leanT=t+.3;E2.leanA=Math.atan2(f.fy-globalC.yc,f.fx-globalC.xc);E2.leanS=IMP.w>.4||BRM()<-.35?-1:1;if(BRM()>.35)MOOD.wagT=t+.35;voice('poke',.7)}
 // E2 每幀：按著不動 0.35 秒往手指推一下；手指放著不動 0.8 秒開始蹭；搔癢扭來扭去，撥超過 3 秒掙脫躲開
 function e2Step(dt){if(!IV3('e2')){E2.nuzT0=-1;return}
@@ -2051,7 +2065,22 @@ function tint(c,shade){if(LAB.off.mood||c[0]!=='#'||c.length<7)return c;const A=
 // 看哪裡（gx、gy 是 −1 到 1，最多偏 0.06R）：抓著的手指 → 旁邊的手指 → 你點節奏的地方 → 「看你」（正中）→ 要去吃的黏液 → 走路的方向 → 正在探的方向 → 自己東看西看（四成五看你）
 // 表情只用眼睛的形狀：睜開（會眨眼、被捏瞇一點、受驚瞬間閉一下、戒的時候睜大）、∩（呼嚕、開心、打招呼、你回它一樣的節奏）、> <（被扯想逃、搔癢、逃走那一下）、∪（睡著）
 const EYE={sqU:-9,blink:1,L:[],R:[],d0:1,gx:0,gy:0,sacT:0,sx:0,sy:0,user:-9,mode:'open',openD:1,wideD:1,blinkT:-9,nextBlink:2,pulse:-9,dx:0,dy:0,dk:0};
-const SLP={on:false,k:0,lastAny:-99,wakeT:-9,askAt:-9,nearT:0};
+const SLP={on:false,k:0,lastAny:-99,wakeT:-9,askAt:-9,nearT:0,openT:-99,slow:false,tap:null,n:0,rollT:-9,rollD:1,rollO:0};   // v2.61 C1：openT 哪一刻打開（換隻）的；slow 這次是慢慢醒；tap 睡著時碰牠的那根手指（還在看是輕碰還是猛按）；n 這一覺被輕碰幾次；roll 翻一下
+// v2.61 C1（wakeSoft，多米：睡著輕碰就嚇醒）。熟（跟 lureStep 同一條：tr > 0.25 而且比 w 多 0.1）的牠睡著被碰，先不醒，看落下 T 秒：手快過每秒 v 個半徑、或拖開超過 st 個半徑是猛按，照舊嚇醒；
+// 不然慢慢醒（閉著的眼睛用 slow 秒的時間常數睜開、不縮、不睜大）。很熟（deep）只翻一下（重心挪 roll 個半徑再回來，roT 秒）不醒，一覺第 n 次、按住 hold 秒、或之後拖開超過 st 才慢慢醒。不熟的照舊
+const WAKEK={v:4,st:.8,T:.25,deep:.7,roll:.05,roT:1.4,n:3,hold:1.2,slow:.5};
+function softTouch(f){if(!(mat.wakeSoft>=.5&&IMP.tr>.25&&IMP.tr-IMP.w>.1)||MOOD.taps.filter(x=>t-x<1).length>=2)return false;   // 一秒內第三下是連戳，照舊
+  if(SLP.tap&&SLP.tap.f!==f)return false;SLP.tap={f,t0:t,done:false};return true}
+function tapJudge(){const q=SLP.tap;if(!q)return;const f=q.f;if(!SLP.on){SLP.tap=null;return}
+  const here=fingers.get(f.id)===f&&(f.mode==='grab'||t-f.hitT<.1),hv=Math.hypot(f.vxS,f.vyS)*CAM.z/R,off=Math.hypot(f.x-f.ax,f.y-f.ay)/R;
+  if(!q.done){if(hv>=WAKEK.v||off>WAKEK.st){SLP.tap=null;wake(true);return}
+    if(here&&t-q.t0<WAKEK.T)return;
+    q.done=true;SLP.n++;
+    if(IMP.tr>WAKEK.deep&&SLP.n<WAKEK.n){SLP.rollT=t;SLP.rollO=0;SLP.rollD=f.ax>=globalC.xc?1:-1}else{SLP.tap=null;wake(false,false,true);return}}
+  if(!here){SLP.tap=null;return}
+  if(f.yank)wake(true);else if(t-q.t0>WAKEK.hold||off>WAKEK.st)wake(false,false,true)}
+function rollStep(dt){if(SLP.rollT<0)return;const u=(t-SLP.rollT)/WAKEK.roT,o=u>=0&&u<1?R*WAKEK.roll*(REDUCED?.5:1)*Math.sin(Math.PI*u)**2*SLP.rollD:0,d=o-SLP.rollO;SLP.rollO=o;if(d!==0)moveHome(d,0,dt);if(u>=1||u<0)SLP.rollT=-9}
+const idleSec=()=>t-Math.max(lastTouch,SLP.lastAny,mat.wakeSoft>=.5&&SLP.openT<=t?SLP.openT:-99);   // 多久沒人理牠。v2.61 C1：剛打開從打開那一刻算起（以前開機時 lastTouch 是 -10，等於打開前 10 秒，所以 30 秒就睡）
 const ECHO={taps:[],st:'idle',x:0,y:0,beats:[],i:0,t0:0,prev:null,prevT:-99,same:false,joyUntil:-9};
 const SWIM={on:false,t0:0};
 function eyeSetup(){EYE.L=[];EYE.R=[];
@@ -2064,8 +2093,9 @@ function eyeStep(dt){if(!(mat.eyes>=.5)||!EYE.L.length)return;
   const tow=(x,y)=>{const dx=x-cx,dy=y-cy,d=Math.hypot(dx,dy)||1,k=Math.min(1,d/(R*1.2));return[dx/d*k,dy/d*k]};
   let g=null,pf=null;for(const f of fingers.values()){if(f.mode==='grab'){if(!g)g=f}else if(!pf)pf=f}
   let o=null;
-  if(g)o=tow(g.fx,g.fy);else if(pf)o=tow(pf.fx,pf.fy);
+  if(g||pf){const q=g||pf;o=mat.eyeTrue>=.5?tow(q.x,q.y):tow(q.fx,q.fy)}   // v2.61 B4（eyeTrue）：看手指現在的位置，不看慢一拍（lag）的那根
   else if(ECHO.st!=='idle')o=tow(ECHO.x,ECHO.y);
+  else if(GREET.st==='wait'&&GREET.open)o=[0,.9];else if(t<GREET.until)o=[0,0];   // v2.61 C4：往下掉的時候看著下面，落地轉過來看你
   else if(t<DR.lookT&&!SLP.on&&DRon())o=tow(DR.lx,DR.ly);   // v2.46 東西動了、響了：看過去
   else if(t<EYE.user||SLP.on)o=[0,0];
   else if(ESC.on)o=tow(ESC.dx,ESC.dy);
@@ -2088,7 +2118,7 @@ function eyeStep(dt){if(!(mat.eyes>=.5)||!EYE.L.length)return;
   if(SNW.k>.02&&!g)open=Math.min(open,1-.85*SNW.k*Math.min(1,Math.max(0,(SNW.cloud-.06)/.3)));   // v2.31 沉澱時閉著眼帶你呼吸，清了才睜開
   {const u=t-FLN.t0;if(FLN.amp>.02&&u>=0&&u<.22&&ECHO.st!=='play')open=Math.min(open,.3)}
   if(BRAIN.pre&&BRAIN.pre.k==='sleep'&&BRon())open=Math.min(open,.45);   // v2.42 前兆：要睡了，眼睛半閉
-  if(IMP.w>.5||MOOD.scare>.3||t-SLP.wakeT<.8||BRM()<-.35||(DRon()&&drRecent(DR.wideT,.8)))wide=1.18;
+  if(IMP.w>.5||MOOD.scare>.3||t-SLP.wakeT<.8&&!SLP.slow||BRM()<-.35||(DRon()&&drRecent(DR.wideT,.8)))wide=1.18;
   {const u=t-EYE.pulse;if(u>=0&&u<.15)wide*=1+.15*Math.sin(Math.PI*u/.15)}
   if(mode==='open'&&t>=EYE.nextBlink&&!SLP.on){EYE.blinkT=t;EYE.nextBlink=t+(Math.random()<.2?.32:(2+4*Math.random())*(1-.3*exLevel()))}
   {const u=t-EYE.blinkT,b=u<0?1:u<.07?1-u/.07:u<.11?0:u<.21?(u-.11)/.1:1;
@@ -2123,15 +2153,29 @@ function drawEyes(col){if(!(mat.eyes>=.5)||!EYE.L.length)return;
     if(h<w*.35){ctx.beginPath();ctx.moveTo(x-w,y);ctx.lineTo(x+w,y);ctx.stroke();continue}
     ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,Math.PI*2);ctx.fill();
     if(h>w*.7){ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(x-w*.32,y-h*.4,w*.34,0,Math.PI*2);ctx.fill()}}}
+// v2.61 C4（greetLook，多米：打開、切回來都先看你）：打開、換隻等落地（窗台），切回來等 0.35 秒，轉過來看你、眨一下，看完再做別的。跟離開多久無關。睡著就慢慢醒（不出聲）。碰牠就不看了。不出聲、不動身體，只有眼睛
+const GREET={st:'',open:false,at:-9,t0:-9,until:-9,blurT:-9,air:false},GREETK={land:.2,back:.35,look:1.4,blink:.25,max:8};
+function greetArm(open){if(!(mat.greetLook>=.5&&mat.life2>=.5&&mat.eyes>=.5)||fingers.size||GREET.st==='wait')return;Object.assign(GREET,{st:'wait',open,t0:t,until:-9,air:false,at:open?-9:t+GREETK.back});
+  if(!open&&SLP.on)wake(false,true,true)}
+function greetStep(){const G=GREET;if(G.st!=='wait')return;
+  if(!(mat.greetLook>=.5)||fingers.size||t<G.t0||t-G.t0>GREETK.max){G.st='';return}
+  if(G.open&&G.at<0){if(SILL.on&&(SILL.air||SILL.route)||INTRO.on||SWIM.on){G.air=true;return}if(SILL.on&&!G.air&&t-G.t0<.1)return;G.at=t+GREETK.land}   // 打開：落地那一刻起算
+  if(G.open&&LIFE.st==='rest')LIFE.until=Math.max(LIFE.until,G.at+GREETK.look+.1);
+  if(t<G.at)return;
+  G.st='';G.until=t+GREETK.look;EYE.user=Math.max(EYE.user,G.until);EYE.blinkT=t+GREETK.blink;EYE.nextBlink=Math.max(EYE.nextBlink,t+GREETK.blink+1.2);
+  if(LIFE.st==='rest'&&!SLP.on)LIFE.until=Math.max(LIFE.until,G.until+.1+.6*Math.random())}
+function brainJit(){if(!(mat.greetLook>=.5)||!BRon())return;const B=BRAIN,r=Math.random;B.seed=(r()*4294967296)>>>0;B.z=.15+.3*r();B.q=.05+.65*r();B.e=.05+.65*r();B.s=.4*r()*IMP.tr}   // 打開（換隻、離開十分鐘回來）時四個需求的起點加亂數：開頭三件事不再每次一樣
 // B2 睡著：40 秒沒人碰（點空白處也算碰）而且在休息，就慢慢睡著（1.6 秒時間常數閉眼、攤軟、呼吸慢一倍半）。碰它嚇醒（縮大 1.6 倍、睜大、「嗯？」），手指放旁邊 1.2 秒慢慢醒
 function sleepTry(){if(!IV3('sleep')||SLP.on)return false;
-  if(t-Math.max(lastTouch,SLP.lastAny)<(mat.sleepAfter||40)||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03||SNW.loose.length)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
+  if(idleSec()<(mat.sleepAfter||40)||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03||SNW.loose.length)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
   SLP.on=true;LIFE.st='sleep';cutSniffs();return true}
-function wake(sharp,self){if(!SLP.on)return;SLP.on=false;SLP.wakeT=t;SLP.nearT=0;LIFE.st='rest';LIFE.until=t+1.5+Math.random();EYE.blinkT=t;
+function wake(sharp,self,slow){if(!SLP.on)return;SLP.on=false;SLP.wakeT=t;SLP.nearT=0;SLP.slow=!!slow;SLP.n=0;SLP.tap=null;LIFE.st='rest';LIFE.until=t+1.5+Math.random();EYE.blinkT=t;
   if(sharp){voice.last=-9;voice('startle',.8);FLN.at=t+.05;FLN.pre='rest';FLN.boost=1.6;if(MDon())BRAIN.m-=.1}if(!self)SLP.askAt=t+(sharp?.45:.3)}
 function sleepStep(dt){if(!IV3('sleep')&&SLP.on)wake(false);
-  if(SLP.on)for(const f of fingers.values())if(t-f.hitT<.05){wake(true);break}   // 從外面推進來碰到它
-  SLP.k+=((SLP.on?1:0)-SLP.k)*(1-Math.exp(-dt/(SLP.on?1.6:.25)));if(SLP.k<1e-3&&!SLP.on)SLP.k=0;
+  tapJudge();
+  if(SLP.on)for(const f of fingers.values())if(t-f.hitT<.05&&!(SLP.tap&&SLP.tap.f===f)&&!softTouch(f)){wake(true);break}   // 從外面推進來碰到它
+  rollStep(dt);
+  SLP.k+=((SLP.on?1:0)-SLP.k)*(1-Math.exp(-dt/(SLP.on?1.6:SLP.slow?WAKEK.slow:.25)));if(SLP.k<1e-3&&!SLP.on)SLP.k=0;
   if(SLP.on&&SLP.k>.8){if(!(SLP.snoreAt>0))SLP.snoreAt=t+1+2*Math.random();else if(t>=SLP.snoreAt){SLP.snoreAt=t+4+3*Math.random();sfxPlay('fx.snore',.5)}}else SLP.snoreAt=0;   // v2.50 睡著的呼吸聲，4 到 7 秒一次
   if(SLP.askAt>0&&t>=SLP.askAt){SLP.askAt=-9;voice.last=-9;voice('ask',.6);EYE.user=t+1.2}}
 // C6：空白處點 2 到 8 下，每個間隔 0.12 到 1.2 秒；停下來（1.4 倍最長間隔、至少 0.8 秒）它看著你點的地方想 0.35 秒，再照同樣的次數和間隔一縮一縮回你（每下「噗」，iPhone 每下輕震）。
@@ -2186,7 +2230,7 @@ function impLoad(){if(!(PRESETS.clay.trKeep>=.5))return;try{const o=JSON.parse(l
 function impSave(force){if(IMPSV.noSave||!(mat.trKeep>=.5)||!(mat.imp>=.5))return;if(!force&&t-IMPSV.at<3&&IMPSV.at<=t)return;IMPSV.at=t;   // IMPSV.at>t：時鐘倒回，照寫
   IMPS[SLIMES[SLIME].id]={tr:IMP.tr,w:IMP.w};const o={};for(const k in IMPS)o[k]=+IMPS[k].tr.toFixed(3);const s=JSON.stringify({v:1,tr:o});if(s===IMPSV.last)return;IMPSV.last=s;try{localStorage.setItem('nienie.imp',s)}catch(_){}}
 // 回到前景：離開超過 10 分鐘，戒歸零；熟留下來關掉時（trKeep 0）跟 v2.33 一樣熟也歸零
-function impBack(away){if(!(away>6e5))return;brainReset();if(mat.trKeep>=.5)Object.assign(IMP,{w:0,has:false,askUntil:-9});else impReset()}
+function impBack(away){if(!(away>6e5))return;brainReset();brainJit();if(mat.trKeep>=.5)Object.assign(IMP,{w:0,has:false,askUntil:-9});else impReset()}
 impLoad();memLoad();
 /* ---------- v2.20 拖著走（D1）、凹痕退快（D2）、印象與它對你的反應（C1 到 C5） ---------- */
 // 跟手幾成：D1 的 drag；C3 熟的跟得多、戒的跟得少；扯到想逃時跟得少（輕輕拖會跟、用力扯會抵抗）
@@ -2265,7 +2309,7 @@ function impRelease(f){memTouch(f);if(!(mat.imp>=.5))return;const w0=IMP.w;IMP.l
   if(IMP.w>w0)IMP.w=w0+(IMP.w-w0)*(mat.wRate||1);   // v2.23 個性：戒得快慢
   IMP.tr=Math.max(0,Math.min(1,IMP.tr));IMP.w=Math.max(0,Math.min(1,IMP.w))}
 // C4 討摸：揉到呼嚕放手（開心小跳那一下），0.9 秒後往你手指離開的地方伸偽足、離得遠就挪過去；5 秒內再碰，呼嚕來得快（down）
-function impAsk(f){if(!IV2('impC4')||ESC.on||IMP.tr<.2)return;if(!((f.gentleT||0)>1&&MOOD.c>.35&&!fingers.size))return;
+function impAsk(f){if(!IV2('impC4')||ESC.on||SLP.on||IMP.tr<.2)return;if(!((f.gentleT||0)>1&&MOOD.c>.35&&!fingers.size))return;
   IMP.askUntil=t+5;LIFE.att=null;LIFE.ask={at:t+.9,x:f.fx,y:f.fy}}
 // 每幀：輕揉、呼嚕、輕輕拖它走會熟起來；戒 3 分鐘退一半。熟不隨時間退（你沒來它不會變冷淡）
 function impStep(dt){if(!(mat.imp>=.5))return;
@@ -2313,7 +2357,8 @@ function lureStep(dt){const on1=IV2('impC1'),on2=IV2('impC2');if(!on1&&!on2){if(
   else if(mode==='back'){if(!LURE.backed&&dist<R*2.6&&!GAIT.on){LURE.backed=true;gaitTo(f.fx-ux*R*3,f.fy-uy*R*3,false)}}
   if(!GAIT.on&&!WANDER.moving&&LIFE.st!=='arrive')LIFE.st='look';
   return true}
-document.addEventListener('visibilitychange',()=>{if(document.hidden){IMP.hiddenAt=performance.now();impSave(true);memSave(true)}else if(IMP.hiddenAt>0)impBack(performance.now()-IMP.hiddenAt)});   // 背景 10 分鐘：印象歸零（v2.34 熟留下來時只歸零戒）
+document.addEventListener('visibilitychange',()=>{if(document.hidden){IMP.hiddenAt=performance.now();impSave(true);memSave(true)}else{if(IMP.hiddenAt>0)impBack(performance.now()-IMP.hiddenAt);if(IMP.hiddenAt>0)greetArm(false)}});
+addEventListener('blur',()=>{GREET.blurT=performance.now()});addEventListener('focus',()=>{if(GREET.blurT>0&&!document.hidden){GREET.blurT=-9;greetArm(false)}});   // v2.61 C4：視窗切走再切回來（分頁沒藏起來）也看你   // 背景 10 分鐘：印象歸零（v2.34 熟留下來時只歸零戒）
 addEventListener('pagehide',()=>impSave(true));
 function update(dt){
   GRD.fold();t+=dt;
@@ -2397,7 +2442,7 @@ function update(dt){
     sfxRub(fingers.size?Math.min(1,sp/5)*.7:0);
     // 拉絲 loop、細絲、餘韻都在這裡跟著物理走（拉伸用拉最長那根抓的手指）
     let stMax=0,grabbing=false;for(const f of fingers.values())if(f.mode==='grab'){grabbing=true;stMax=Math.max(stMax,f.stretch||0)}stMax=Math.max(stMax,PAIR.stR);   // v2.38 兩指拉開也算拉絲
-    if(SFX)SFX.frame(dt,{rub:sfxRubLevel,stretch:stMax,grabbing})}
+    if(SFX){SFX.snd61=mat.snd61>=.5?1:0;SFX.frame(dt,{rub:sfxRubLevel,stretch:stMax,grabbing})}}
   shkStep(dt);   // v2.31 搖晃沉澱
   // 活物感：沒人碰才開，放手後 1 秒內淡入
   // v2.19 A4：只有真的碰到身體（抓著、推到）才算碰；按在空白處不會整隻凍住
@@ -2478,6 +2523,7 @@ function update(dt){
   impStep(dt);   // v2.20 印象
   e1Step();e2Step(dt);   // v2.22
   sleepStep(dt);echoStep(dt);   // v2.23 B2 睡著、C6 節奏
+  greetStep();   // v2.61 C4
   if(SILL.on)sillStepPre();
   brainStep(dt,engaged);   // v2.41 大腦：需求漲落
   if(mat.life2>=.5)lifeStep(dt,idle,engaged);   // v2.19：休息／張望／出發／到了＋一縮一衝＋縮一下、甩一甩＋探（lifeRest、lifeGait 都關時照 v2.18 的走走停停）
@@ -2761,17 +2807,24 @@ function hangStep(dt){for(const n in HANG){const q=HANG[n];if(!q.on)continue;con
     if(q.held==null&&Math.abs(q.a)<.002&&Math.abs(q.va)<.02){q.a=0;q.va=0}}}
 // v2.45 擺飾變真第 2 片：牠推東西，東西不推牠。每一幀看牠的點有哪些落在東西裡，用這些點「真的移動了多少」（跟上一幀比，走路那種整團平移也算；Verlet 的 X-PX 看不到表演位移）
 // 去帶東西：東西的速度往牠那一塊的速度靠，靠多快看蓋住多少、東西多重。慢的帶不動（輸給窗台的摩擦），快的撞飛。牠的點一個都不改
+// v2.61 C7（bumpSoft）：牠自己走路、探、睡著攤開碰到的（沒有手指在身上、最後一次碰牠 1.5 秒以前、不在空中、不是牠在推東西），只晃一下：角度最多 lean、位置最多挪 move 個半徑，碰完 hold 秒內都夾著。你抓著牠撞、甩過去、手指推的，照舊會倒
+const SOFTB={lean:.16,move:.08,hold:1.6,k:.12,w:1.6};
+function selfMove(){if(!(mat.bumpSoft>=.5)||SILL.air||SILL.hop||SILL.grab||t>=lastTouch&&t-lastTouch<1.5)return false;for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'||f.mode==='push'&&t-f.hitT<.5&&!f.lure)return false;return true}
+function softHold(p){if(!drRecent(p.softT,SOFTB.hold)||p.held||p.tip||drRecent(p.fingT,1.2)||drRecent(p.catT,2))return;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a)),m=R*SOFTB.move;
+  if(Math.abs(w)>SOFTB.lean){p.a-=w-Math.sign(w)*SOFTB.lean;if(p.va*w>0)p.va=0}
+  if(p.x>p.softX+m){p.x=p.softX+m;if(p.vx>0)p.vx=0}else if(p.x<p.softX-m){p.x=p.softX-m;if(p.vx<0)p.vx=0}}
 const DB={x:null,y:null,n:0,ok:false,stat:{n:0,v:0}};
 function decoBody(dt){if(!DREAL()||!(mat.decoBody>=.5)){DB.ok=false;return}
   if(!DB.x||DB.n!==N){DB.x=new Float64Array(N);DB.y=new Float64Array(N);DB.n=N;DB.ok=false}
   let ok=DB.ok&&SILL.plane==='room';const lim=R*.4;if(ok)for(let i=0;i<N;i+=7)if(Math.abs(X[i]-DB.x[i])>lim||Math.abs(Y[i]-DB.y[i])>lim){ok=false;break}   // 重擺、換層那種瞬間移動不算
-  if(ok){const K=14*(mat.decoPush==null?1:mat.decoPush),vc=3000;
+  if(ok){const K=14*(mat.decoPush==null?1:mat.decoPush),vc=3000,self=selfMove();
     for(const p of PROPS){if(!p.deco||p.gone||p.alpha<.6||p.held||(DRon()&&drRecent(p.catT,1.5)))continue;const r2=p.r*p.r;let n=0,sx=0,sy=0,tq=0,ux=0,uy=0;   // v2.46 牠正在推的那件：偽足縮回來時不把它帶回來
       for(let i=0;i<N;i++){const dx=X[i]-p.x,dy=Y[i]-p.y;if(dx*dx+dy*dy>r2||!propIn(p,X[i],Y[i],0))continue;
         const vx=Math.max(-vc,Math.min(vc,(X[i]-DB.x[i])/dt)),vy=Math.max(-vc,Math.min(vc,(Y[i]-DB.y[i])/dt)),rx=vx-(p.vx-p.va*dy),ry=vy-(p.vy+p.va*dx);n++;sx+=rx;sy+=ry;ux+=vx;uy+=vy;tq+=dx*ry-dy*rx}
-      if(!n)continue;const cov=Math.min(1,n/5),k=K*(100/p.m)*cov*dt,us=Math.hypot(ux,uy)/n,ex=us>1?ux/n/us:0,ey=us>1?uy/n/us:0,ru=Math.max(0,sx/n*ex+sy/n*ey),mx=ru*ex,my=ru*ey,sp=ru;   // 只往牠移動的方向推：牠停下來不會把東西煞住（不然甩過去只會帶著走一小段，撞不飛）
-      p.vx+=mx*k;if(my>0||sp>R*3)p.vy+=my*k*.5;p.va+=tq/n/(p.I/p.m)*k*.6;if(p.tc)p.va+=mx*k/p.base*.6;DB.stat.last=[p.im,n,sp];   // 站在窗台上：底被窗台卡住、上面被帶著走，所以往被帶的方向晃   // 往上只有很快才帶得起來：牠慢慢站起來不會把東西吸上去
-      if(sp>R*.5){p.lastHit=t;p.selfT=t}if(sp>R*2.2)propKnock(p,Math.min(1,sp/(R*9)));if(sp>DB.stat.v){DB.stat.v=sp;DB.stat.n=n}}
+      if(!n)continue;const soft=self&&!p.tip;if(soft){if(!drRecent(p.softT,SOFTB.hold))p.softX=p.x;p.softT=t}else p.softT=null;const cov=Math.min(1,n/5),k=K*(100/p.m)*cov*dt,us=Math.hypot(ux,uy)/n,ex=us>1?ux/n/us:0,ey=us>1?uy/n/us:0,ru=Math.max(0,sx/n*ex+sy/n*ey),mx=ru*ex,my=ru*ey,sp=ru;   // 只往牠移動的方向推：牠停下來不會把東西煞住（不然甩過去只會帶著走一小段，撞不飛）
+      if(soft){p.vx+=mx*k*SOFTB.k;if(p.tc)p.va=Math.max(-SOFTB.w,Math.min(SOFTB.w,p.va+mx*k/p.base*.6))}else{
+      p.vx+=mx*k;if(my>0||sp>R*3)p.vy+=my*k*.5;p.va+=tq/n/(p.I/p.m)*k*.6;if(p.tc)p.va+=mx*k/p.base*.6}DB.stat.last=[p.im,n,sp];   // 站在窗台上：底被窗台卡住、上面被帶著走，所以往被帶的方向晃   // 往上只有很快才帶得起來：牠慢慢站起來不會把東西吸上去
+      if(sp>R*.5){p.lastHit=t;p.selfT=t}if(sp>R*2.2&&!(soft&&drRecent(p.softK,6))){if(soft)p.softK=t;propKnock(p,Math.min(1,sp/(R*9)))}if(sp>DB.stat.v){DB.stat.v=sp;DB.stat.n=n}}
     for(const nm in HANG){const q=HANG[nm];if(!q.on||q.held!=null)continue;const c=Math.cos(q.a),sn=Math.sin(q.a);let n=0,sw=0;
       for(let i=0;i<N;i++){const dx=X[i]-q.x,dy=Y[i]-q.y;if(dy<0||dy>q.h+4||Math.abs(dx)>q.h)continue;const lx=c*dx+sn*dy,ly=-sn*dx+c*dy;if(Math.abs(lx)>q.w/2||ly<q.h*.25||ly>q.h)continue;
         n++;sw+=-((X[i]-DB.x[i])/dt*c+(Y[i]-DB.y[i])/dt*sn)/ly}
@@ -2806,7 +2859,7 @@ function propsStep(dt){const S=SILL,g=S.g,G0=R*SILLG,bwr=g.bx+g.bw*.48,bwy=g.by+
       if(wy>g.fl&&wy<g.fl+R*.5&&wx>g.sl&&wx<g.sr){p.y-=(wy-g.fl)*.7;touch++;const vn=p.vy+p.va*rx;if(vn>0){const e=vn>R*1.5?.15:0,j=-(1+e)*vn/(1/p.m+rx*rx/p.I);p.vy+=j/p.m;p.va+=j*rx/p.I;
           const vt=p.vx-p.va*ry,lim=PROP_MU*Math.abs(j),jt=Math.max(-lim,Math.min(lim,-vt/(1/p.m+ry*ry/p.I)));p.vx+=jt/p.m;p.va-=ry*jt/p.I;if(vn>R*1.2)propKnock(p,vn/(R*9))}}
       if(!p.deco&&wx<bwr&&wy>bwy&&wy<g.fl+1){p.x+=(bwr-wx)*.7;const vn=p.vx-p.va*ry;if(vn<0){const j=-1.1*vn/(1/p.m+ry*ry/p.I);p.vx+=j/p.m;p.va-=ry*j/p.I;if(-vn>R*1.2)propKnock(p,-vn/(R*9))}}}
-    p.tc=touch;if(p.deco&&!p.held&&touch>=2){const f=PROP_MU*G0*dt;p.vx=Math.abs(p.vx)<=f?0:p.vx-Math.sign(p.vx)*f}   // v2.45 平放著滑會被窗台磨停（原本只有落地那一下有摩擦，一推就滑出窗台）
+    softHold(p);p.tc=touch;if(p.deco&&!p.held&&touch>=2){const f=PROP_MU*G0*dt;p.vx=Math.abs(p.vx)<=f?0:p.vx-Math.sign(p.vx)*f}   // v2.45 平放著滑會被窗台磨停（原本只有落地那一下有摩擦，一推就滑出窗台）
     if(touch){p.vx*=.9985;p.va*=.994;if(!p.held&&touch>=2&&Math.abs(p.vx)+Math.abs(p.vy)<7&&Math.abs(p.va)<.22){p.vx=0;p.vy=0;p.va=0;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a));if(Math.abs(w)<.08)p.a-=w*.2}}   // 兩個點著地才算停；只差一點點就慢慢躺平，不留歪的
     if(p.deco&&Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)))>.6)p.upT=t;   // 蠟燭倒了火就熄，扶正 3 秒後再亮
     if(p.deco&&!p.held){const w=Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)));if(w>.6&&!p.tip){p.tip=true;drCrash(p,.35);sfxPlay('fx.topple',.7)}else if(w<.3)p.tip=false}   // v2.46 倒下那一下（歪過 0.6 算倒，回到 0.3 以內才算站回來，在邊緣晃不會算兩次）
@@ -3325,12 +3378,12 @@ function frame(now){
 // v2.23 收集：底部換成四隻史萊姆；材質改到面板（對照用，顏色、外形、個性照現在這隻）
 function applySlimeColors(s){const st=document.documentElement.style;['--body','--shade','--line','--hi','--eye'].forEach((k,i)=>st.setProperty(k,s.c[i]))}
 let hintT=null;function hint(s){const h=$('hint');h.textContent=s;h.classList.remove('off');clearTimeout(hintT);hintT=setTimeout(()=>h.classList.add('off'),2600)}
-function chooseSlime(i,intro,say){if(mat.imp>=.5)IMPS[SLIMES[SLIME].id]={tr:IMP.tr,w:IMP.w};
+function chooseSlime(i,intro,say){if(mat.imp>=.5)IMPS[SLIMES[SLIME].id]={tr:IMP.tr,w:IMP.w};memSave(true);memPut();
   const s=SLIMES[i],one0=mat?mat.one:null,clr0=mat?mat.clear:0,keep61=matKeep(mat);SLIME=i;try{localStorage.setItem('nienie.slime',s.id)}catch(_){}
   mat={...PRESETS[s.mat],seed:s.seed,...s.p,...viewOver(),...keep61};if(one0!=null&&one0<.5)mat.one=one0;if(clr0>=.5)mat.clear=clr0;curMat=s.mat;labRegrey();applySlimeColors(s);   // v2.52：面板把「一隻為主」關掉之後，換史萊姆不要又把底部那排收起來（原本換一次就被材質預設值蓋回 1）。v2.60：clear 是十隻一起換，也留著
   for(let k=0;k<SLIMES.length;k++)$('s-'+k).setAttribute('aria-pressed',String(k===i));
-  setup();fxReset();impReset();const o=IMPS[s.id];if(o){IMP.tr=o.tr;IMP.w=o.w}IMPD.tr=IMP.tr;IMPD.w=IMP.w;
-  syncSliders();if(intro)startIntro();if(say)hint(s.name+'：'+s.desc)}
+  setup();fxReset();impReset();const o=IMPS[s.id];if(o){IMP.tr=o.tr;IMP.w=o.w}IMPD.tr=IMP.tr;IMPD.w=IMP.w;memGet();memSync();
+  syncSliders();if(intro){startIntro();SLP.openT=t;GREET.st='';brainJit();greetArm(true)}if(say)hint(s.name+'：'+s.desc)}
 SLIMES.forEach((s,k)=>{const b=document.createElement('button');b.id='s-'+k;b.setAttribute('aria-pressed','false');b.innerHTML=`<i style="background:${s.c[0]}"></i>${s.name}`;
   b.addEventListener('click',()=>{if(k!==SLIME)chooseSlime(k,true,true)});$('slimes').appendChild(b)});
 function setMat(name){const s=SLIMES[SLIME],clr0=mat.clear;mat={...PRESETS[name],seed:s.seed,...s.p,...viewOver(),...matKeep(mat)};if(clr0>=.5)mat.clear=clr0;curMat=name;labRegrey();syncSliders()}

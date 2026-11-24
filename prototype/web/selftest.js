@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.61（11-25）：加 T71（W3：睡醒、手指放旁邊、打開先看你、眼睛、換隻記憶）
    v2.61（11-25）：加 T70（破皮，真的畫出來讀畫面），多跑約 8 到 9 分鐘；window.T70LONG = 1 跑長版
    v2.59（11-24）：加 T69（窗景）；跑的時候窗戶一律原本那扇，跑完還原
    v2.56（11-23）：加 T67（補點後站穩）；T65、T66 照慣例把它關掉。
@@ -28,6 +29,7 @@
   // 走路：測試不准碰使用者存的東西；窗框下緣的東西會擋手指，先清空
   WALK.noSave = true; WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null;
   // v2.34 熟留下來：測試不准碰使用者存的熟（chooseSlime、切背景都會寫），跑完原樣還回去
+  SLP.openT = -99;   // v2.61 C1：時鐘歸零的項目不算「剛打開」（剛打開 40 秒不睡），不然量打盹的 T55 到 T57 等不到
   IMPSV.noSave = true; const IMP0 = { tr: IMP.tr, w: IMP.w }, IMPS0 = JSON.stringify(IMPS);
   const realRandom0 = Math.random, sfxFrame0 = SFX && SFX.frame;
   if (SFX) SFX.frame = (...a) => { const r = Math.random; Math.random = realRandom0; try { return sfxFrame0.apply(SFX, a); } finally { Math.random = r; } };
@@ -1738,6 +1740,22 @@
     VIEW.bg = bg0; VIEW.win = w0; WIN.fixed = f0; res.T69_windows = r;
     res.PASS.windows = r.err === '' && r.n === 22 && !r.still.length && !r.stop.length && !r.clear.length && r.only === 'night' && r.back === 'day' && r.blue === 'blue' && r.draw.length === 3 && r.draw.every(Boolean);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T71 v2.61 W3（C1 輕碰慢慢醒、C2 聽節奏也靠過來、C4 打開先看你、B4 眼睛看真手指、C7 換隻記憶不串），窗台、芋圓、真正的預設；每條關掉開關都要回到舊的（證明量得到）
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    const fresh = (over, tr) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(71); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = tr || 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; Object.assign(BRAIN, { seed: 71 }); brainReset(); };
+    const tap = (over, tr) => { fresh(over, tr); steps(120); SLP.on = true; LIFE.st = 'sleep'; BRAIN.z = .9; steps(300); IMP.tr = tr; log.splice(0); const f0 = FLN.t0, q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(8); ev('pointerup', 1, q[0], q[1]); steps(40); return { on: SLP.on, startle: log.some(x => x[0] === 'voice.startle'), flinch: FLN.t0 !== f0 }; };
+    r.wake = { mid: tap({}, .5), deep: tap({}, .95), strange: tap({}, 0), off: tap({ wakeSoft: 0 }, .95) };
+    const near = (over, tr) => { fresh(over, tr); steps(240); LIFE.st = 'rest'; LIFE.until = 1e9; cutSniffs(); steps(60); let at = -1; const q = sc(globalC.xc + R * 2, globalC.yc - R * .8); ev('pointerdown', 1, q[0], q[1]); for (let i = 0; i < 90 && at < 0; i++) { steps(1); if (LIFE.sns.some(x => !(x.cut > 0))) at = +((i + 1) / 60).toFixed(2); } ev('pointerup', 1, q[0], q[1]); return at; };
+    r.near = { on0: near({}, 0), on8: near({}, .8), off: near({ nearFast: 0 }, .8) };
+    const eye = over => { fresh(over, 0); steps(240); let q = sc(globalC.xc - R * 1.2, globalC.yc - R * 1.6); ev('pointerdown', 1, q[0], q[1]); steps(60); q = sc(globalC.xc + R * 1.2, globalC.yc - R * 1.6); ev('pointermove', 1, q[0], q[1]); let n = 0; while (EYE.gx < 0 && n < 60) { steps(1); n++; } ev('pointerup', 1, q[0], q[1]); return n; };
+    r.eye = { on: eye({}), off: eye({ eyeTrue: 0 }) };
+    const greet = over => { fresh(over, 0); greetArm(true); let at = -1; for (let i = 0; i < 90 && at < 0; i++) { steps(1); if (EYE.user > t) at = +((i + 1) / 60).toFixed(2); } return at; };
+    r.greet = { on: greet({}), off: greet({ greetLook: 0 }) };
+    { fresh({}, 0); BMEM.cell = [0, .6, 0, 0, -.4]; BMEM.side = -.5; IMP.w = .6; VIEW.bg = VIEW0.bg; const c0 = BMEM.cell.slice(); chooseSlime(3, false, false); const z = BMEM.cell.every(v => v === 0) && BMEM.side === 0, w3 = IMP.w; steps(5); const z2 = BMEM.cell.every(v => v === 0); chooseSlime(2, false, false); steps(5); r.mem = { clean: z && z2, back: BMEM.cell.every((v, i) => Math.abs(v - c0[i]) < .01) && BMEM.side === -.5, m: +BRAIN.m.toFixed(2), w: +IMP.w.toFixed(2) }; for (const k of ['peach']) delete BMEMS[k]; delete IMPS.peach; }
+    Object.assign(VIEW, view0); SLIME = sl0; BMEM.cell = M0.cell; BMEM.side = M0.side; BMEM.dirty = false; IMP.tr = I0.tr; IMP.w = I0.w; GREET.st = ''; res.T71_w3 = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    res.PASS.w3 = !r.wake.mid.on && !r.wake.mid.startle && !r.wake.mid.flinch && r.wake.deep.on && !r.wake.deep.startle && r.wake.strange.startle && r.wake.off.startle && r.near.on0 > 0 && r.near.on0 <= .45 && r.near.on8 > 0 && r.near.on8 <= .45 && r.near.off > .9
+      && r.eye.on * 2 < r.eye.off && r.greet.on > 0 && r.greet.on <= .6 && r.greet.off < 0 && r.mem.clean && r.mem.back && Math.abs(r.mem.m - .15) < .02; }
+
   // T70 v2.61 破皮（A7）。前面 69 項把皮釘成平塗、不讀畫面，看不到破皮。這項換成預設的清透皮、窗台、芋圓，真的畫出來，每 2 格讀 JEL.h2（畫面一半大、模糊過的遮罩，門檻 0.46 跟著色器同一個）：
   // 裂：0.004R² 以上的皮有兩塊以上（碰到螢幕邊的最多算一塊）；洞：0.002R² 以上、四面都是皮；突變：外框上一點離上一次的皮超過「這兩格外框最多走的」加 4 點加 0.12R。一組手勢只要有一格就算那組中。
   // 手勢：最糟四種各 10 次（抓中間往右、往左快扯到螢幕邊；抓中間往右下快扯 3R；兩指水平快拉到螢幕邊；種子固定），隨手拉（身上任一點、任一方向、0.5R 到螢幕邊、每秒 3 到 25R、按住 0.3 到 3 秒）。
