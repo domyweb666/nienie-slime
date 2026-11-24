@@ -12,7 +12,7 @@
 ## 驗過
 - 離線重畫（`tools/check-windows-ios.py`，WebGL、跟 Metal 同一組混合式）跟網頁同一秒比 88 格：1.5 倍平均差最大 0.34，縮到 1.2 倍最大 0.54（滿分 255）。沒有 mipmap，縮小的樣子要看真機。
 - 網頁 `winDraw` 改前改後 88 格逐點相同。
-- @@SELFTEST@@
+- 網頁整份 selftest 一次，69 項全過。最終的圖用 iPhone 的倍率（1.37）再比一次（T=7.7），22 種平均差最大 0.50。
 
 ## 沒驗、要注意
 - **Swift 沒編譯過**，要推上去跑 CI。編不過先看 `WindowScene.swift`。
