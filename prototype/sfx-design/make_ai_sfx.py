@@ -10,6 +10,9 @@ app 的聲音是分層的（engine.js、SlimeAudio.swift），每層要的是 0.
           voice.mmm／ask／gulp／hello（這幾種沒有生 AI 版）、prop、ding
 
 檔名一律 ai-<類>-<層>-NN.wav，design_sfx.py 的清理只刪 press/pull/release/rub/settle 開頭的，不會刪到。
+v2.61 B1：多一層 rub.loop61（ai-rub-loop61-NN.wav）＝同一批揉的原始檔，先壓尖峰再對齊音量（tame_loop）。
+舊的 rub.loop 不動、兩套並存，播放端用 snd61 挑；level() 也不動，所以其他音檔逐位元組不變。
+
 **design_sfx.py 重跑會把 manifest.json 改回全合成，重跑之後要再跑這支。**
 用法：python make_ai_sfx.py [--src 素材資料夾]      寫進 prototype/web/sfx/ 與 ios/NieNie/Resources/
 每次結果都一樣（固定挑法，沒有亂數）。
@@ -21,6 +24,7 @@ import sys
 
 import numpy as np
 from scipy.io import wavfile
+from scipy.ndimage import convolve1d, maximum_filter1d
 from scipy.signal import butter, sosfiltfilt
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -29,9 +33,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 WEB = os.path.join(ROOT, 'prototype', 'web', 'sfx')
 IOS = os.path.join(ROOT, 'ios', 'NieNie', 'Resources')
-SRC = os.path.join(os.path.dirname(ROOT), '素材', 'higgsfield', 'slime')
-EL_SRC = os.path.join(os.path.dirname(ROOT), '素材', 'elevenlabs', 'slime', '_opus')
+
+
+def find_assets():
+    """素材在專案資料夾的上一層；在工作樹裡跑（prototype/web/_wt）就一路往上找。"""
+    d = os.path.dirname(ROOT)
+    while not os.path.isdir(os.path.join(d, '素材')) and os.path.dirname(d) != d:
+        d = os.path.dirname(d)
+    return os.path.join(d, '素材')
+
+
+SRC = os.path.join(find_assets(), 'higgsfield', 'slime')
+EL_SRC = os.path.join(find_assets(), 'elevenlabs', 'slime', '_opus')
 PEAK_CAP_DB = -8.0
+TAME_PEAK_DB = -13.4   # v2.61 壓過的循環：取樣峰值上限。CLAUDE.md v3 定最大 −12；循環音會重新取樣成 48 kHz，留 1.4 dB 讓重取樣後的真峰值也不過 −12
+TAME_WIN_S = 0.03      # 增益先看前後各 15 毫秒的最大值再用 30 毫秒的窗平均：比尖峰早 30 毫秒慢慢降、慢慢回，起音的形狀不動
+TAME_KNEE_DB = 6.0
 
 
 def load(path):
@@ -155,6 +172,26 @@ def level(y, target_rms_db):
     return y
 
 
+def tame_loop(y, target_rms_db):
+    """v2.61 B1：先壓尖峰再對齊 RMS（level() 是尖峰超過就整段降，AI 的揉很尖，被降掉 4 到 13 dB）。
+    前後對稱的柔和限幅（軟膝、增益用 Hann 窗平均），頭尾繞回去算，循環接縫跟沒壓的一樣；不加淡入淡出。
+    增益反覆解到 RMS 剛好是目標，峰值一定不超過 TAME_PEAK_DB（增益是窗內每一點要求的平均，不會比任何一點要求的大）。"""
+    w = int(TAME_WIN_S * SR) | 1
+    h = np.hanning(w + 2)[1:-1]
+    h /= h.sum()
+    pk = maximum_filter1d(np.abs(y), w, mode='wrap')
+    g, k = 1.0, TAME_KNEE_DB
+    for _ in range(200):
+        d = db(pk * g) - TAME_PEAK_DB
+        over = np.where(d < -k / 2, 0, np.where(d > k / 2, d, (d + k / 2) ** 2 / (2 * k)))
+        z = y * g * convolve1d(10 ** (-over / 20), h, mode='wrap')
+        e = target_rms_db - db(rms(z))
+        if abs(e) < 0.001:
+            break
+        g *= 10 ** (e * 0.8 / 20)
+    return z
+
+
 def ref_rms(manifest, kind, layer):
     """同一層現有合成音的 RMS 中位數（有聲音的部分），當作 AI 版的目標音量。
     讀資料夾裡 <類>-<層>-NN.wav 的合成檔（manifest 換成 ai- 之後合成檔還留著），重跑也量得到。"""
@@ -243,6 +280,8 @@ def main():
     onset_layer('voice', 'startle', E('as-startle'), 6, 0.4, 6, 0.4, fout=0.12)
     # 揉的 loop：兩條
     plan[('rub', 'loop')] = [make_loop(S[i][slice(*segments(S[i], 40, 0.5, 0.5, 9)[0])]) for i in E('rub')]
+    # v2.61 B1：同樣四條原始檔再做一組壓過尖峰的（音量在下面另外對）
+    plan[('rub', 'loop61')] = [y.copy() for y in plan[('rub', 'loop')]]
     # 場景（fx.*）：走、爬、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣
     onset_layer('fx', 'crawl', E('crawl'), 8, 0.45, 6, 0.3, fout=0.12)
     onset_layer('fx', 'climb', E('climb'), 8, 0.5, 6, 0.3, fout=0.12)
@@ -279,12 +318,14 @@ def main():
             tgt = ref_rms(manifest, 'prop', 'glass')
         elif (kind, layer) == ('voice', 'tear'):
             tgt = ref_rms(manifest, 'release', 'wet') + 3
+        elif (kind, layer) == ('rub', 'loop61'):
+            tgt = ref_rms(manifest, 'rub', 'loop')
         else:
             tgt = ref_rms(manifest, kind, layer)
         names = []
         for k, y in enumerate(outs):
             name = 'ai-%s-%s-%02d.wav' % (kind, layer, k + 1)
-            files[name] = level(y, tgt)
+            files[name] = tame_loop(y, tgt) if layer == 'loop61' else level(y, tgt)
             names.append(name)
         layers[(kind, layer)] = names
         print('  %-14s 目標 RMS %.1f dB' % (kind + '.' + layer, tgt))
