@@ -296,6 +296,11 @@ final class SlimeRig {
     private var introMini = false
     /// Purr strength 0...1 (the controller turns it into soft taps).
     private(set) var purr = 0.0
+    // v2.61 D1 (rough): how hard it tugs back. The same sum as moodStrain but whatever the speed (web MOOD.tugS): a slow pull is no rough play any more,
+    // yet the body still leans back, so a long pull keeps its shape. 0 while rough is off
+    private var moodTugS = 0.0
+    // v2.61 C3 (petSlow): how much it has been stroked slowly (g), when last, being stroked now, hummed already (web PET)
+    private var petG = 0.0, petLast = -9.0, petOn = false, petSaid = false
     // v2.19 活物感 (多米 build 73: no sense of life, it does not read as a creature; .uiux/04-手感/活物感提案-暫定.md).
     // rest / look / go / arrive (A1, A2). sniffs: pseudopods reaching out to sniff (a = screen angle, L length, T1 out, T2 hold, T3 back;
     // cut: touched or flinching, drawn in within 0.15 s); att: a point queued to sniff at (A7); lifeWrg: wriggle share; goFade: the
@@ -314,6 +319,8 @@ final class SlimeRig {
     // flinch (A5): at = when, t0 = started, amp, H = habituation (×0.55 a flinch, back with a 7 s time constant), s = current scale,
     // pre = what it was doing before the touch (resting flinches more)
     private var flAt = -9.0, flT0 = -9.0, flAmp = 0.0, flH = 1.0, flS = 1.0, flPre = LifeState.rest
+    // v2.61 D2 (tapSoft; web FLN.tc, tcq, tpAt): the most a flinch from your touch may be (1 = no limit), a light tap whose flinch has not come yet, when the flinch your touch set off is due
+    private var flTc = 1.0, flTapQ = false, flTapAt = -9.0
     private var shkAt = -9.0, shkT0 = -9.0, shkAmp = 0.0, shkTh = 0.0      // shaking off after a hard pull; th = how far it is turned now
     // breath (A6): exert = panting 0...1 (4 s time constant, 8...10 s to normal); a sigh every 30...90 s, then a 1 s pause
     private var exert = 0.0, sighNext = -1.0, sighCyc = -1, pauseUntil = -9.0, brAmpX = 1.0, brCyc = 0
@@ -411,6 +418,7 @@ final class SlimeRig {
     /// comfortable → happy (stand tall, wag, hop); a quick one (under 0.25 s, not pulled) → a poke: flinch, the third within 1 s darts aside.
     private func moodRelease(_ f: Finger) {
         guard params.emo >= 0.5 else { return }
+        // v2.61 D1 (rough): only a yank ever raises moodStrainMax (moodStep), so a slow pull takes neither of the next two branches; a yank still held long stops at A5, any other yank runs
         if params.pullSoft >= 0.5 && moodStrainMax > 0.15 && memLen() > PullSet.noFlee * HRC[HRX.count] {   // v2.61 A5 (fl): still pulled long, it does not run yet (only the scare)
             moodStrainMax = 0; moodScare = min(1, moodScare + 0.5)
             return
@@ -420,7 +428,13 @@ final class SlimeRig {
         }
         if t - f.tDown < 0.25 && f.stretch < 0.3 {
             taps = taps.filter { t - $0 < 1 }; taps.append(t)
-            moodScare = min(1, moodScare + 0.45); moodA = min(1, moodA + 0.3); moodC = max(-1, moodC - 0.1); cowerUntil = max(cowerUntil, t + 0.5)
+            moodA = min(1, moodA + 0.3)
+            if params.tapSoft >= 0.5 && taps.count < 3 {   // v2.61 D2 (tapSoft): fewer than three within a second is just a touch: no scare, no comfort lost, no cowering; the flinch gets smaller
+                if flAt > 0 && flAt == flTapAt { flTapQ = true } else if flT0 > f.tDown { tapCap(flAmp) }
+            } else {
+                flTc = 1; flTapQ = false
+                moodScare = min(1, moodScare + 0.45); moodC = max(-1, moodC - 0.1); cowerUntil = max(cowerUntil, t + 0.5)
+            }
             if taps.count >= 3 {
                 var ux = clusters[gi].xc - f.ax, uy = clusters[gi].yc - f.ay
                 let ul = hypot(ux, uy)
@@ -450,8 +464,74 @@ final class SlimeRig {
     /// Every frame: the mood follows the hand (the most stretched grabbing finger), the purr, home while fleeing.
     private var tickOn: Bool { Double(tkTimes.count) >= params.tickRev }   // v2.24
     private static let grainTimes: [Double] = [0.06, 0.13, 0.21, 0.30], grainGains: [Double] = [0.8, 0.6, 0.42, 0.28]   // v2.25 F5
+    // MARK: v2.61 D1 D2 C3 (.uiux/04-手感/極致優化規劃-暫定.md; web ROUGH, TAPK, PETK)
+    /// D1 (rough), a yank: the hand at v (R a second on the screen, 30 ms smoothed) or more, heading outward, the patch pulled open past st (R).
+    private enum RoughSet { static let v: Double = 6, st: Double = 0.8 }
+    private var roughOn: Bool { params.rough >= 0.5 }
+    /// D2 (tapSoft): each light tap caps the next flinch at k of this one, eased off over T s, never below lo × flinchAmp.
+    private enum TapSet { static let k: Double = 0.93, T: Double = 90, lo: Double = 0.3 }
+    private func tapCap(_ a: Double) { flTc = max(TapSet.lo * params.flinchAmp, min(flTc, a * TapSet.k)) }
+    /// C3 (petSlow), one for one with the web's PETK but for the centimetre: screen points ÷ ptPerCm, as rubSpeed has it (the web counts an R as 1.8 cm).
+    private enum PetSet {
+        static let ptPerCm: Double = 60
+        static let lo0: Double = 0.5, lo: Double = 1, hi: Double = 10, hi0: Double = 14   // cm a second: lo to hi counts in full, fading out to lo0 and hi0
+        static let rate: Double = 2.5, cap: Double = 0.8, top: Double = 3                 // added a second; at most on one pass (so one pass never purrs); at most in all
+        static let rin: Double = 1.1, rout: Double = 1.25, c0: Double = 0.35              // R from the centre as it was: counts within rin; held past rout it is a pull and all of it is taken back; setting out within c0 does not count
+        static let gap: Double = 0.6, fade: Double = 0.6                                  // still stroking this long after the last bit; lost a second after that
+    }
+    private func petReset() { petG = 0; petLast = -9; petOn = false; petSaid = false }
+    /// Every frame, at the start of moodStep (web `petStep`). Grab or stroke is judged as before; this only counts how much it has been stroked, slow ones too, and feeds the purr and the trust.
+    /// A pass setting out from the middle, or heading outward (within 60 degrees), does not count: strokeJudge's rule; turning back starts another pass.
+    private func petStep(_ dt: Double) {
+        petOn = false
+        guard params.petSlow >= 0.5 else {
+            petReset()
+            for q in fingers.values { q.pt = nil }
+            return
+        }
+        var f: Finger?
+        for q in fingers.values where q.mode == .grab || (q.mode == .stroke && q.on) { f = q }
+        let n: Int = fingers.count   // a second finger anywhere on the screen: no counting, no purr
+        var pull = false
+        if let f, n == 1, clusters.indices.contains(gi) {
+            let x: Double = f.rawX, y: Double = f.rawY
+            var p: Finger.PetPath = f.pt ?? Finger.PetPath(cx: clusters[gi].xc, cy: clusters[gi].yc, sx: x, sy: y, px: x, py: y)
+            let dl: Double = hypot(x - p.sx, y - p.sy)
+            if dl >= p.ml {
+                p.ml = dl; p.px = x; p.py = y
+            } else {
+                let back: Double = hypot(x - p.px, y - p.py), turn: Double = (x - p.px) * (p.px - p.sx) + (y - p.py) * (p.py - p.sy)
+                if back > R * 0.15 && turn < 0 {
+                    p.sx = p.px; p.sy = p.py; p.ml = hypot(x - p.sx, y - p.sy); p.px = x; p.py = y; p.run = 0
+                }
+            }
+            let d: Double = hypot(x - p.cx, y - p.cy) / R
+            let rx: Double = p.sx - p.cx, ry: Double = p.sy - p.cy, rl: Double = hypot(rx, ry)
+            let mx: Double = x - p.sx, my: Double = y - p.sy, ml: Double = hypot(mx, my)
+            let along: Double = ml > 1e-6 ? (rx * mx + ry * my) / (rl * ml) : 0
+            let away: Bool = rl < R * PetSet.c0 || along > 0.5
+            let v: Double = hypot(f.vxS, f.vyS) * camZ / PetSet.ptPerCm
+            if f.mode == .grab && d > PetSet.rout && !p.out { p.out = true; petG = max(0, petG - p.sum); p.sum = 0 }
+            pull = p.out || (away && ml > R * 0.3) || f.yank
+            let counts: Bool = !pull && !away && d < PetSet.rin && v > PetSet.lo0
+            if v > PetSet.hi0 {
+                petG = max(0, petG - 3 * dt)
+            } else if counts && !tickOn && moodStrain < 0.05 && !escOn {
+                let up: Double = (v - PetSet.lo0) / (PetSet.lo - PetSet.lo0), down: Double = (PetSet.hi0 - v) / (PetSet.hi0 - PetSet.hi)
+                let add: Double = PetSet.rate * dt * min(1, min(up, down))
+                let a: Double = max(0, min(PetSet.cap - p.run, min(PetSet.top - petG, add)))
+                petG += a; p.run += a; p.sum += a; petLast = t
+            }
+            f.pt = p
+        }
+        if t - petLast > PetSet.gap || petLast > t { petG = max(0, petG - PetSet.fade * dt) }
+        let lately: Bool = t >= petLast && t - petLast < PetSet.gap
+        petOn = petG > 1 && !pull && n < 2 && lately && !tickOn
+        if petG < 0.5 { petSaid = false }
+    }
     private func moodStep(_ dt: Double) {
-        guard params.emo >= 0.5 else { moodStrain = 0; tugX = 0; tugY = 0; purr = 0; escOn = false; return }
+        guard params.emo >= 0.5 else { moodStrain = 0; moodTugS = 0; tugX = 0; tugY = 0; purr = 0; escOn = false; petReset(); return }
+        petStep(dt)   // v2.61 C3
         var g: Finger?
         for f in fingers.values where f.mode == .grab { if g == nil || bodyStretch(f) > bodyStretch(g!) { g = f } }
         if let g {
@@ -461,9 +541,17 @@ final class SlimeRig {
             let rubOK: Bool = v24 ? (spPt < params.rubSpeed * 60 && !tickOn) : sp < 2
             g.gentleT = st < 0.6 && rubOK ? g.gentleT + dt * (rubbing ? 2 : 1) : max(0, g.gentleT - 2 * dt)
             if g.gentleT > 1 { moodC = min(1, moodC + (rubbing ? 0.6 : 0.35) * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5)) }
-            g.strainT = st > 1.5 ? g.strainT + dt : max(0, g.strainT - dt)
+            let rough: Bool = !roughOn || g.yank   // v2.61 D1 (rough): only once this grab has been yanked
+            g.strainT = st > 1.5 && rough ? g.strainT + dt : max(0, g.strainT - dt)
             let sv = max(0, min(1, (g.strainT - 0.5) / 1))
             moodStrain += (sv - moodStrain) * (1 - exp(-dt / 0.15)); moodStrainMax = max(moodStrainMax, moodStrain)
+            if roughOn {   // v2.61 D1: the tug back goes by how far and how long, fast or slow
+                g.tugT = st > 1.5 ? g.tugT + dt : max(0, g.tugT - dt)
+                let tv: Double = max(0, min(1, g.tugT - 0.5))
+                moodTugS += (tv - moodTugS) * (1 - exp(-dt / 0.15))
+            } else {
+                g.tugT = 0; moodTugS = 0
+            }
             if moodStrain > 0 { moodC = max(-1, moodC - 0.6 * dt * moodStrain); moodA = min(1, moodA + 0.8 * dt * moodStrain) }
             if !clusters.isEmpty {
                 let px = g.fx - clusters[gi].xc, py = g.fy - clusters[gi].yc, pl = hypot(px, py)
@@ -471,6 +559,7 @@ final class SlimeRig {
             }
         } else {
             moodStrain *= exp(-dt / 0.2)
+            moodTugS = roughOn ? moodTugS * exp(-dt / 0.2) : 0   // v2.61 D1
             let k = 1 - exp(-dt / 6)
             if stkG > 1 && t - stkLast < 0.05 {   // v2.26 F6: a stroke counts as comfort; the finger is on it half the time, so it rises twice as fast as a rub
                 moodC = min(1, moodC + 1.2 * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5))
@@ -479,10 +568,12 @@ final class SlimeRig {
             }
         }
         moodScare *= exp(-dt / 0.8)
-        let tg = moodStrain * R * 0.35; tugX = -pullDX * tg; tugY = -pullDY * tg   // tug of war: you can still pull it
+        let tugBy: Double = roughOn ? moodTugS : moodStrain   // v2.61 D1
+        let tg = tugBy * R * 0.35; tugX = -pullDX * tg; tugY = -pullDY * tg   // tug of war: you can still pull it
         let gentleNow: Bool = g != nil ? g!.gentleT > 1 : (stkG > 1 && t - stkLast < 0.6)
         let pt: Double = gentleNow && moodC > 0.2 ? min(1, (moodC - 0.2) / 0.5) : 0
-        purr += (pt - purr) * (1 - exp(-dt * (1 + 0.4 * exLevel()) / 0.3))   // v2.32: excited, the purr comes sooner
+        let pt2: Double = petOn ? max(pt, min(1, (petG - 1) / 0.5)) : pt   // v2.61 C3: slow strokes purr too
+        purr += (pt2 - purr) * (1 - exp(-dt * (1 + 0.4 * exLevel()) / 0.3))   // v2.32: excited, the purr comes sooner
         if escOn {
             let p = min(1, (t - escT0) / escT), e = 1 - pow(1 - p, 3)
             let nx = escSX + (escDX - escSX) * e, ny = escSY + (escDY - escSY) * e
@@ -655,6 +746,11 @@ final class SlimeRig {
         var radius = 0.0                             // UITouch.majorRadius, points (0 = unknown)
         var r0 = 0.0, prS = 0.0                      // radius baseline at landing, smoothed radius pressure 0...1 (提案第 9 條)
         var gentleT = 0.0, strainT = 0.0             // v2.18: how long it has been a gentle stroke / a hard pull
+        var tugT = 0.0, vMax = 0.0, yank = false     // v2.61 D1 (rough): pulled open this long, fast or slow (the tug back); the fastest this grab has been (R a second on screen, never decays); has it been yanked
+        /// v2.61 C3 (petSlow), one stroke there and back. c = the body's centre when it was first counted (it stays put), s = where this pass set out, p = its farthest point, ml = how far that is;
+        /// run = added on this pass, sum = added by this finger, out = pulled too far, nothing more counts
+        struct PetPath { var cx, cy, sx, sy, px, py: Double; var ml = 0.0, run = 0.0, sum = 0.0, out = false }
+        var pt: PetPath? = nil
         var hitT = -9.0, stillT = 0.0                // v2.19: last time a push touched the body (A4); how long it has been held still (breath tap)
         var ex = 0.0, ey = 0.0, sb = -1.0            // v2.20: the limited stretch vector; how far the body itself is pulled open (minus what followed), −1 = not yet
         var lure = false, edge = 0.0                 // v2.20 C1 C2: landed on empty space (left to lureStep); distance to the body's edge
@@ -947,6 +1043,7 @@ final class SlimeRig {
         introOn = false; introSq = 0; ivS = 1; ivOX = 0; ivOY = 0
         moodC = 0; moodA = 0; moodStrain = 0; moodStrainMax = 0; moodScare = 0; cowerUntil = -9; happyT = -9; wagT = -9; taps = []
         tugX = 0; tugY = 0; escOn = false; purr = 0
+        moodTugS = 0; petReset(); flTc = 1; flTapQ = false; flTapAt = -9   // v2.61 D1 D2 C3 (the fingers' own go with the fingers)
         dentList.removeAll()
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
@@ -2027,7 +2124,7 @@ final class SlimeRig {
         // v2.19: caught, the sniffing pseudopods draw in and it stops walking; A5 the dent still shows at once (below) and 0.1...0.25 s
         // later it flinches by itself; A7 a touch on empty space within 3R makes it turn and sniff that way 0.3 s later
         // v2.20 C5: wary, it flinches sooner
-        if grab && lv(params.lifeFlinch) && !(flAt > t) { flAt = t + (0.1 + Double.random(in: 0..<0.15, using: &rng)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt }
+        if grab && lv(params.lifeFlinch) && !(flAt > t) { flAt = t + (0.1 + Double.random(in: 0..<0.15, using: &rng)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt; flTapAt = flAt }   // flTapAt: v2.61 D2
         if grab && params.life2 >= 0.5 { cutSniffs(); gaitOn = false; gaitK = 1; wanderMoving = false; lifeSt = .rest; lifeUntil = -1; askOn = false }
         let lure = !grab && allowed && (iv2(params.impC1) || iv2(params.impC2))   // v2.20: a finger on empty space goes to C1, C2 (lureStep), not just one sniff
         if !grab && allowed && !lure && lv(params.lifeAttend) {
@@ -2249,7 +2346,7 @@ final class SlimeRig {
         let tgtC: Double = max(cl((moodC - 0.1) / 0.45), t - happyT < 2 ? 1 : 0, !fingers.isEmpty && tickOn ? 0.7 : 0)
         mcC += (tgtC - mcC) * q
         var st = 0.0, yk = 0.0
-        for f in fingers.values where f.mode == .grab {
+        for f in fingers.values where f.mode == .grab && (!roughOn || f.yank) {   // v2.61 D1 (rough): only a yanked one reads red
             st = max(st, bodyStretch(f))
             yk = max(yk, hypot(f.vxS, f.vyS) / R)
         }
@@ -2265,6 +2362,7 @@ final class SlimeRig {
         f.mode = .grab
         f.ax = f.rawX; f.ay = f.rawY; f.x = f.rawX; f.y = f.rawY; f.fx = f.rawX; f.fy = f.rawY
         f.stretch = 0; f.ex = 0; f.ey = 0; f.sb = 0; f.step = 0; f.hold = 0; f.press = 0; f.pressOn = false; f.peak = 0; f.on = false; f.far = false
+        f.vMax = 0; f.yank = false   // v2.61 D1
         f.tGrab = t; f.grainI = 0; f.grR = 0
         if clusters.indices.contains(gi) { f.r0x = f.rawX - clusters[gi].xc; f.r0y = f.rawY - clusters[gi].yc }   // v2.61 A4
         fingerGrab(f, id: id, x: f.rawX, y: f.rawY)
@@ -2585,6 +2683,13 @@ final class SlimeRig {
             if f.mode == .grab {
                 let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
                 f.stretch = st; f.ex = ex; f.ey = ey
+                if roughOn {   // v2.61 D1 (rough): the fastest this grab has been, and whether it has been yanked (fast, outward, pulled open; stays so until it lets go)
+                    let hv: Double = hypot(f.vxS, f.vyS) * camZ / R, outward: Double = ex * f.vxS + ey * f.vyS
+                    if hv > f.vMax { f.vMax = hv }
+                    if !f.yank && hv >= RoughSet.v && st > RoughSet.st && outward > 0 { f.yank = true }
+                } else {
+                    f.vMax = 0; f.yank = false
+                }
                 if step > f.step && st > 0.35 {
                     onEvent?(.pull(gain: min(1, 0.4 + st / 2), rate: 1 - 0.08 * min(1, st / 1.5)))
                 }
@@ -4968,11 +5073,18 @@ final class SlimeRig {
         swimGreet()   // v2.23: swum home, say hello
         // A5 flinch when its time comes (resting before the touch ×1.2, walking ×0.8; comfortable half; each flinch ×0.55, back with 7 s)
         flH += (1 - flH) * (1 - exp(-dt / 7))
+        if params.tapSoft >= 0.5 { flTc = min(1, flTc * exp(dt / TapSet.T)) } else { flTc = 1; flTapQ = false }   // v2.61 D2
         if flAt > 0 && t >= flAt {
+            let byTap: Bool = params.tapSoft >= 0.5 && flAt == flTapAt
             flAt = -9
             if lv(params.lifeFlinch) {
                 let pre: Double = (flPre == .rest ? 1.2 : (flPre == .go ? 0.8 : 1)) * flBoost
-                let a = params.flinchAmp * pre * (moodC > 0.3 ? 0.5 : 1) * flH * (reduceMotion ? 0.5 : 1) * (iv2(params.impC5) ? 1 + 1.2 * impWary : 1)   // v2.20 C5
+                var a = params.flinchAmp * pre * (moodC > 0.3 ? 0.5 : 1) * flH * (reduceMotion ? 0.5 : 1) * (iv2(params.impC5) ? 1 + 1.2 * impWary : 1)   // v2.20 C5
+                if byTap {   // v2.61 D2: the more light taps, the smaller
+                    a = min(a, flTc)
+                    if flTapQ { tapCap(a) }
+                }
+                flTapQ = false
                 flAmp = a; flT0 = t; flH *= 0.55; flBoost = 1; cutSniffs()
                 if lv(params.lifeBreath) { exert = max(exert, 0.1 + 2 * a) }   // a quick breath in with it
             }
@@ -5431,11 +5543,13 @@ final class SlimeRig {
         guard params.imp >= 0.5 else { return }
         impLX = f.fx; impLY = f.fy; impHas = true
         let w0 = impWary
-        let quick = t - f.tDown < 0.25 && f.stretch < 0.3, nTaps = taps.filter { t - $0 < 1 }.count + 1, fling = f.peak / R > 6
-        if moodStrainMax > 0.15 { impWary += 0.15 + 0.25 * moodStrainMax; impTrust -= 0.15 }
-        else if quick { impWary += nTaps >= 3 ? 0.2 : 0.04; if nTaps >= 3 { impTrust -= 0.1 } }
+        let quick = t - f.tDown < 0.25 && f.stretch < 0.3, nTaps = taps.filter { t - $0 < 1 }.count + 1
+        let rough: Bool = roughOn, hard: Bool = rough && f.vMax >= RoughSet.v, fling: Bool = !rough && f.peak / R > 6   // v2.61 D1 (rough): hard = the hand was fast once this grab; a fling adds no wariness of its own
+        let tapW: Double = nTaps >= 3 ? 0.2 : (params.tapSoft >= 0.5 ? 0 : 0.04)   // v2.61 D2 (tapSoft): fewer than three a second add none
+        if moodStrainMax > 0.15 { if !rough { impWary += 0.15 + 0.25 * moodStrainMax; impTrust -= 0.15 } }   // v2.61 D1: yanked it still runs (moodRelease); wariness and trust stay put
+        else if quick { impWary += tapW; if nTaps >= 3 { impTrust -= 0.1 } }
         else if fling { impWary += 0.1; impTrust -= 0.05 }
-        else { impWary *= 0.8; if iv3(params.e3) && f.dragMax > R * 0.5 { impTrust += 0.12 } }   // v2.22 E3: led along gently, a little more trust
+        else { if !(rough && f.yank) { impWary *= 0.8 }; if iv3(params.e3) && f.dragMax > R * 0.5 && !hard { impTrust += 0.12 } }   // v2.22 E3: led along gently, a little more trust
         if impWary > w0 { impWary = w0 + (impWary - w0) * params.wRate }   // v2.23 personality: how fast it turns wary
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
     }
@@ -5455,10 +5569,21 @@ final class SlimeRig {
             let st = bodyStretch(g), sp = hypot(g.vxS, g.vyS) / R
             let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate   // v2.22 E3: trust grows three times faster (5 s of stroking shows); v2.23 personality
             if g.gentleT > 1 { impTrust += (0.04 + 0.04 * purr) * dt * e3m; impWary -= 0.05 * dt * e3m }
-            else if st < 1.2 && sp > 0.3 && sp < 3 && moodStrain < 0.05 && hypot(dragOX, dragOY) > R * 0.3 { impTrust += 0.02 * dt * e3m }
+            else if st < 1.2 && sp > 0.3 && sp < 3 && moodStrain < 0.05 && hypot(dragOX, dragOY) > R * 0.3 {
+                let hard: Bool = roughOn && g.vMax >= RoughSet.v   // v2.61 D1 (rough): led along gently only
+                if !hard { impTrust += 0.02 * dt * e3m }
+            }
         } else if stkG > 1 && t - stkLast < 0.05 {   // v2.26 F6: strokes build trust too
             let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate
             impTrust += (0.04 + 0.04 * purr) * dt * e3m; impWary -= 0.05 * dt * e3m
+        }
+        if petOn && t - petLast < 0.05 {   // v2.61 C3 (petSlow): slow strokes build trust too (not on a frame the rub or the stroke above already counted); the wariness stays put
+            let rubbed: Bool = (g?.gentleT ?? 0) > 1
+            let stroked: Bool = g == nil && stkG > 1 && t - stkLast < 0.05
+            if !rubbed && !stroked {
+                let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate
+                impTrust += (0.04 + 0.04 * purr) * dt * e3m
+            }
         }
         impWary *= exp(-dt / (260 * (params.wFade > 0 ? params.wFade : 1)))   // v2.57 wFade: 布丁 is scared easily and forgets fast
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
@@ -5574,11 +5699,19 @@ final class SlimeRig {
     private func e1Step() {
         guard iv3(params.e1) else { return }
         guard let g = firstGrab() else {
-            if purr > 0.3 && stkG > 1 && !stkSaid && t - stkLast < 0.6 { stkSaid = true; voice("mmm", 0.6) }   // v2.26 F6
+            if purr > 0.3 && stkG > 1 && !stkSaid && t - stkLast < 0.6 {   // v2.26 F6
+                stkSaid = true
+                if !(petOn && petSaid) { voice("mmm", 0.6) }   // v2.61 C3: one hum a spell of slow strokes, not one each
+                if petOn { petSaid = true }
+            }
             return
         }
         if moodStrain > 0.5 && !g.saidProt { g.saidProt = true; voice("protest") }
-        if purr > 0.3 && !g.saidPurr { g.saidPurr = true; if !nuzSaid { voice("mmm", 0.6) } }   // already nuzzling and hummed: not again
+        if purr > 0.3 && !g.saidPurr {
+            g.saidPurr = true
+            if !nuzSaid && !(petOn && petSaid) { voice("mmm", 0.6) }   // already nuzzling and hummed: not again; v2.61 C3: nor within one spell of slow strokes
+            if petOn { petSaid = true }
+        }
     }
     /// E2 a tap (under 0.25 s, not pulled): after the flinch it leans toward your finger and says "pu"; wary, it leans away.
     private func e2Release(_ f: Finger) {
@@ -5729,7 +5862,7 @@ final class SlimeRig {
             eyeDX += (tx - eyeDX) * kd; eyeDY += (ty - eyeDY) * kd; eyeDK += (dk - eyeDK) * kd
         }
         eyePoseStep(dt)   // v2.29: keep the face inside the body
-        if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
+        if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 && (!roughOn || g.yank) { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
         let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil || t - snwLast < 1.2   // v2.31: shaken, ∩ like on a ride
         let squeeze = moodStrain > 0.4 || tickOn || (escOn && t - escT0 < 0.5) || t < eyeSqU
         let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
