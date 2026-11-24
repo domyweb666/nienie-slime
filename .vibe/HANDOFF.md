@@ -8,7 +8,7 @@
 - **① `.vibe/未做清單.md`**：115 條（沒開工 38、做一半 13、做好等多米驗 14、等多米決定 19、擱置 10、多米說不做 7、被取代 8、其實做完 6），六段，給多米看的。
 
 ## 🚧 還沒做完
-- **③ 稽核**：Workflow `wf_1783b949-8ba`（八題：F1 破皮量測、F2 畫皮、F3 延遲鏈、F4 回饋覆蓋、P1 行為量測、P2 刺激反應與情緒、P3 動物行為學、P4 前例）在上一個會話的背景跑。每題筆記寫在 `C:\Users\fcharlie\AppData\Local\Temp\claude\667dbbd50c5b7948\415881cf-6a7b-41c2-85af-00bf46311a7d\scratchpad\audit\{F1..F4,P1..P4}.md`，有背景指令會複製到 `.vibe/audit-2026-11-24/`。缺哪份就補跑那題（題目全文在會話紀錄的 workflow 腳本 `slime-feel-pet-audit-wf_1783b949-8ba.js`）。
+- **③ 稽核**：Workflow `wf_1783b949-8ba`（八題：F1 破皮量測、F2 畫皮、F3 延遲鏈、F4 回饋覆蓋、P1 行為量測、P2 刺激反應與情緒、P3 動物行為學、P4 前例）在上一個會話的背景跑。每題筆記寫在 `C:\Users\fcharlie\AppData\Local\Temp\claude\667dbbd50c5b7948\415881cf-6a7b-41c2-85af-00bf46311a7d\scratchpad\audit\{F1..F4,P1..P4}.md`，有背景指令會複製到 `.vibe/audit-2026-11-24/`。22:17 已寫完 F3、P2、P3、P4，其餘四題還在那個會話背景跑，**先不要補跑**（會重複、會撞 8981、8985 埠）；過 11-25 00:30 還缺才補跑那題（題目全文在會話紀錄的 workflow 腳本 `slime-feel-pet-audit-wf_1783b949-8ba.js`）。
 - 彙整成 `.uiux/04-手感/極致優化規劃-暫定.md`，回答③。
 
 ## 📌 已查清、下次別再查
