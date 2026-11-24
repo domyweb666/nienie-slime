@@ -1,0 +1,28 @@
+const R1={};const set=(o)=>{for(const k in PRESETS)Object.assign(PRESETS[k],o);Object.assign(mat,o)};
+const ON=Object.fromEntries(KEYS61.map(k=>[k,PRESETS.clay[k]])),OFF=K61.all0;const med=a=>{a=a.slice().sort((x,y)=>x-y);return a.length?+a[a.length>>1].toFixed(3):null};
+// C4：四種熟各 20 種子
+for(const [nm,o] of [['off',OFF],['on',ON]]){set(o);for(const tr of [0,.3,.6,.9]){const us=[],eye=[],first=[],snd=[],sl=[],third={};let seen=0;
+  for(let s=1;s<=20;s++){open(s*17+3,{tr});let u=null,e=null;const pk=[];const op=brainPick;brainPick=c=>{const w=op(c);if(w!=='rest')pk.push(w);return w};let n10=0,zz=null;
+    steps(60*60,i=>{const q=(i+1)/60;if(q<40){if(u==null&&EYE.user>t)u=q;if(u!=null&&e==null&&Math.hypot(EYE.gx,EYE.gy)<.15)e=q}if(zz==null&&SLP.on)zz=q});brainPick=op;
+    if(u!=null)us.push(u);if(u!=null&&u<.8)seen++;if(e!=null)eye.push(e);const key=pk.slice(0,3).join(',');third[key]=(third[key]||0)+1;snd.push(LOG.filter(x=>x[0]<3).map(x=>x[1]).join('+'));if(zz!=null)sl.push(zz)}
+  R1['C4 '+nm+' tr'+tr]={look:us.length,in08:seen,medUser:med(us),medEye:med(eye),maxEye:+Math.max(...eye).toFixed(2),first3:Object.entries(third).sort((a,b)=>b[1]-a[1]).slice(0,4),kinds:Object.keys(third).length,snd3s:[...new Set(snd)],sleepMin:sl.length?+Math.min(...sl).toFixed(1):null,nSleep:sl.length}}}
+// C1
+const asleep=()=>{SLP.on=true;LIFE.st='sleep';BRAIN.z=.9;steps(420)};
+for(const [nm,o] of [['off',OFF],['on',ON]]){set(o);for(const tr of [0,.5,.95]){const r=[];for(let s=1;s<=5;s++){open(900+s,{tr});steps(120);asleep();LOG.length=0;IMP.tr=tr;const k0=SLP.k;let wk=null,f0=FLN.t0,wide=0,xs=[];const p=scr(globalC.xc+(s-3)*R*.15,globalC.yc),cx=globalC.xc;FLN.H=1;ev('pointerdown',1,p[0],p[1]);if(!SLP.on)wk=0;
+    for(let i=0;i<150;i++){if(i===(s<=3?8:36))ev('pointerup',1,p[0],p[1]);steps(1);if(wk==null&&!SLP.on)wk=+((i+1)/60).toFixed(2);wide=Math.max(wide,EYE.wideD);xs.push(globalC.xc-cx)}
+    r.push({slp:SLP.on?1:0,wk,fl:FLN.t0!==f0?+FLN.amp.toFixed(3):0,st:LOG.some(x=>x[1]==='voice.startle')?1:0,v:LOG.filter(x=>/voice/.test(x[1])).map(x=>x[1].slice(6)).join('+'),wide:+wide.toFixed(2),dx:+(Math.max(...xs.map(Math.abs))/R).toFixed(3)})}
+  R1['C1 輕碰 '+nm+' tr'+tr]=r.map(x=>JSON.stringify(x))}}
+set(ON);{ // 很熟連碰三次
+  open(77,{tr:.95});steps(120);asleep();const o=[];for(let k=0;k<3;k++){IMP.tr=.95;const p=scr(globalC.xc,globalC.yc);ev('pointerdown',1,p[0],p[1]);steps(8);ev('pointerup',1,p[0],p[1]);steps(200);o.push(SLP.on?1:0)}R1['C1 很熟三次還在睡']=o;
+  for(const tr of [.5,.95]){open(78,{tr});steps(120);asleep();IMP.tr=tr;LOG.length=0;const p=scr(globalC.xc,globalC.yc);ev('pointerdown',1,p[0],p[1]);let wk=null;for(let i=0;i<60;i++){ev('pointermove',1,p[0]+Math.min(i,14)*R*.12*CAM.z,p[1]);steps(1);if(wk==null&&!SLP.on)wk=+((i+1)/60).toFixed(2)}ev('pointerup',1,p[0],p[1]);R1['C1 猛按 tr'+tr]={wk,fl:+FLN.last.toFixed(3),st:LOG.some(x=>x[1]==='voice.startle')}}
+  for(const tr of [.95]){open(79,{tr});steps(120);asleep();IMP.tr=tr;LOG.length=0;const p=scr(globalC.xc,globalC.yc);ev('pointerdown',1,p[0],p[1]);let wk=null;steps(120,i=>{if(wk==null&&!SLP.on)wk=+((i+1)/60).toFixed(2)});ev('pointerup',1,p[0],p[1]);R1['C1 很熟按住']={wk,st:LOG.some(x=>x[1]==='voice.startle')}}}
+for(const [nm,o] of [['off',OFF],['on',ON]]){set({...o,brain:0});open(5,{tr:0});let z=null;steps(60*60,i=>{if(z==null&&SLP.on)z=(i+1)/60});R1['C1 大腦關 剛打開幾秒睡 '+nm]=z;open(5,{tr:0});SLP.openT=-99;set({brain:1})}
+// C2
+for(const [nm,o] of [['off',OFF],['on',ON]]){set(o);for(const tr of [0,.8]){const r=[];for(const d of [1.6,2.2,3])for(const sd of [1,2,3]){open(300+sd,{tr});steps(240);IMP.tr=tr;LIFE.until=t+99;LIFE.st='rest';cutSniffs();steps(40);LIFE.until=t+99;const a=-.35,p=scr(globalC.xc+Math.cos(a)*R*d,globalC.yc+Math.sin(a)*R*d);let m=null;const x0=globalC.xc;ev('pointerdown',1,p[0],p[1]);steps(120,i=>{if(m==null&&LIFE.sns.some(q=>!(q.cut>0)&&sniffEnv(q)>.02))m=+((i+1)/60).toFixed(2)});ev('pointerup',1,p[0],p[1]);r.push(m)}R1['C2 '+nm+' tr'+tr]=r.join(' ')}
+  const ec=[];for(const tr of [0,.8])for(let n=2;n<=8;n++)for(const sd of [1,2,3]){open(400+sd*9+n,{tr});steps(240);IMP.tr=tr;LIFE.until=t+99;LIFE.st='rest';const p=scr(globalC.xc+R*1.9,globalC.yc-R*.8);let b=0,last=ECHO.beatT;const nb=()=>{if(ECHO.beatT!==last){last=ECHO.beatT;b++}};for(let k=0;k<n;k++){ev('pointerdown',1,p[0],p[1]);steps(6,nb);ev('pointerup',1,p[0],p[1]);steps(18,nb)}steps(420,nb);ec.push(b===n?0:n+':'+b)}R1['C2 敲 '+nm]={全部:ec.length,錯:ec.filter(x=>x)}}
+// B4：空白處、抓著，1 Hz 左右 1R，眼珠跟「手指在的方向」的延遲（互相關）
+const lagOf=(a,b)=>{let best=0,bv=-1e9;const n=a.length;const m=x=>x.reduce((p,c)=>p+c,0)/x.length,ma=m(a),mb=m(b);for(let L=0;L<60;L++){let v=0,q=0,w=0;for(let i=60;i<n;i++){v+=(b[i]-mb)*(a[i-L]-ma);q+=(a[i-L]-ma)**2;w+=(b[i]-mb)**2}v/=Math.sqrt(q*w);if(v>bv){bv=v;best=L}}return Math.round(best*1000/240)};
+for(const [nm,o] of [['off',OFF],['on',ON]]){set(o);for(const grab of [0,1]){const r=[];for(const hz of [.5,1,1.5]){open(60,{tr:.1});steps(240);const c=[globalC.xc,globalC.yc],a=[],b=[];const off=grab?0:-1.6;const A=grab?.5:1;let p=scr(c[0],c[1]+off*R);ev('pointerdown',1,p[0],p[1]);for(let i=0;i<60*8;i++){const fx=Math.sin(2*Math.PI*hz*i/60)*A*R;p=scr(c[0]+fx,c[1]+off*R);ev('pointermove',1,p[0],p[1]);const g0=EYE.gx;steps(1);const [lx,ly]=eyeAt(EYE.L),[rx,ry]=eyeAt(EYE.R),ex=(lx+rx)/2,ey=(ly+ry)/2,f=fingers.get(1);const dx=f.x-ex,dy=f.y-ey,d=Math.hypot(dx,dy)||1,tx=dx/d*Math.min(1,d/(R*1.2));for(let k=0;k<4;k++){a.push(tx);b.push(g0+(EYE.gx-g0)*(k+1)/4)}}ev('pointerup',1,p[0],p[1]);steps(30);
+   // 手指目標也內插到 240
+   const a2=a.slice();for(let i=4;i<a.length;i+=4)for(let k=0;k<4;k++)a2[i+k]=a[i-1]+(a[i]-a[i-1])*(k+1)/4;r.push(lagOf(a2,b))}R1['B4 '+nm+(grab?' 抓著':' 空白處')]=r.join('/')}}
+return R1;

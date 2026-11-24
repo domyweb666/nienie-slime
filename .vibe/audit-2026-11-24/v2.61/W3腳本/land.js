@@ -1,0 +1,1 @@
+const out=[];for(const tr of [0,.9])for(let s=1;s<=3;s++){open(s*17+3,{tr});const r=[];steps(90,i=>{const b=box();r.push([i+1,+(SILL.g.fl-b.y1).toFixed(1),+(globalC.yc).toFixed(1),SILL.air?1:0,SILL.hop?1:0])});out.push({tr,s,log:LOG.slice(),r:r.filter((x,i)=>i%6===0),user:EYE.user})}return out;

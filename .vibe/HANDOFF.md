@@ -36,7 +36,7 @@
 - [x] S1：Swift A1 皮＋FeelParams 全部參數｜逐行對網頁、複查過（不能編譯）｜JellySkin.*、SlimeView、FeelParams｜無
 - [x] T：T70 破皮測試（A7 網頁）｜對 v2.60 會紅、兩套門檻｜selftest.js｜W1
 - [x] W2：網頁 D1、D2、C3｜規劃檔各條驗法｜index.html、selftest.js｜W1、T
-- [ ] W3：網頁 C1、C2、C4、C7、B4、雨 0.3｜規劃檔各條驗法｜index.html、selftest.js｜W2、B1
+- [ ] W3：（進行中提交 `a2a3b57`，W3b 收尾中：selftest 4 紅、C7 沒量、C4 起點；報告在 `v2.61/W3-移植說明.md`、腳本 `v2.61/W3腳本/`）網頁 C1、C2、C4、C7、B4、雨 0.3｜規劃檔各條驗法｜index.html、selftest.js｜W2、B1
 - [x] S2：Swift A2–A5｜SlimeRig｜W1、S1
 - [x] S3a：Swift D1、D2、C3（照 W2-移植說明）｜SlimeRig｜W2
 - [ ] S5：修 Swift 複查抓到的（`v2.61/Swift複查.md`）＋補 tools/swift-linux-check｜UI、Controller、LabProbe、協定搬家｜S3a
