@@ -6,6 +6,20 @@ final class SlimeView: UIView {
     let rig: SlimeRig
     var colors: SlimeColors { didSet { applyColors(animated: !rig.reduceMotion) } }
     var kind: SlimeKind = .honey { didSet { tintKey = .min } }   // v2.57: its signature (purple, fog), its own skin, the new six's look switch
+    /// v2.59 窗景: the scene outside the window, "" = the original one
+    var winId = "" {
+        didSet {
+            guard winId != oldValue else { return }
+            winFailSaid = ""
+            windows?.forgetFailures()
+        }
+    }
+    /// The picked window could not be loaded; the original one stays
+    var onWindowFail: (() -> Void)?
+    private var windows: WindowRenderer?      // made the first time a window is picked
+    private var windowsTried = false
+    private var winShown: WindowStage?        // what is drawn now (the last one, while the next one loads)
+    private var winFailSaid = ""
     /// Fires once per frame, after the rig stepped, so sound/haptics read the same state as the picture.
     var onFrame: ((_ dt: Double) -> Void)?
     var usePredictedTouches = true
@@ -523,22 +537,33 @@ final class SlimeView: UIView {
         let all: [CALayer] = [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup, bowlFrontLayer, bellLayer, teruLayer]
         guard kind > 0, let g = rig.sillG, bounds.width > 0, bounds.height > 0 else {
             for l in all { l.isHidden = true }
+            windowHide()
             skyLayer.isHidden = false
             for l in speckLayers { l.isHidden = false }
             jelly?.setBackground(key: "none", images: [])   // v2.49: no room behind it, so no water skin (the v2.48 one)
             return
         }
         let p = rig.params, decoLv = Int(p.deco.rounded())
-        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))|\(rig.noBowl)|\(p.props >= 0.5)|\(decoLv)"
+        // v2.59 窗景: what is outside the window, and the colour it gives the wall by day
+        let stage: WindowStage? = windowStage(night: kind == 2)
+        var tint: UIColor?
+        if let st = stage, kind == 1, !st.night { tint = st.def.dayColor }
+        let winTag: String = stage == nil ? "" : "|win" + (tint == nil ? "" : (stage?.def.id ?? ""))
+        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))|\(rig.noBowl)|\(p.props >= 0.5)|\(decoLv)" + winTag
         if key != sceneKey {
             guard let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g, bowl: !rig.noBowl, props: p.props >= 0.5, deco: decoLv) else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
                 for l in all { l.isHidden = true }
+                windowHide()
                 skyLayer.isHidden = false
                 return
             }
             sceneKey = key
-            skyImgLayer.contents = imgs.sky.cgImage; wallLayer.contents = imgs.wall.cgImage; propsLayer.contents = imgs.props.cgImage
-            jelly?.setBackground(key: key, images: [imgs.sky.cgImage, imgs.wall.cgImage, imgs.props.cgImage].compactMap { $0 })   // v2.49: the room behind it, for the water skin to bend
+            var wall: UIImage = imgs.wall
+            if let t = tint { wall = SceneArt.tintedWall(imgs.wall, tint: t, key: key) }
+            skyImgLayer.contents = imgs.sky.cgImage; wallLayer.contents = wall.cgImage; propsLayer.contents = imgs.props.cgImage
+            var behind: [CGImage?] = [wall.cgImage, imgs.props.cgImage]
+            if stage == nil { behind.insert(imgs.sky.cgImage, at: 0) }
+            jelly?.setBackground(key: key, images: behind.compactMap { $0 }, clear: stage != nil)   // v2.49: the room behind it, for the water skin to bend
             bowlFrontLayer.contents = imgs.bowlFront.cgImage
             bowlFrontLayer.frame = CGRect(x: g.bx - g.bw / 2, y: g.by, width: g.bw, height: g.bh)
             bellImage = imgs.bell?.cgImage; teruImage = imgs.teru?.cgImage
@@ -554,6 +579,13 @@ final class SlimeView: UIView {
         skyLayer.isHidden = true
         for l in speckLayers { l.isHidden = true }
         for l in all { l.isHidden = false }
+        if let st = stage, let r = windows {
+            r.place(CGRect(x: g.gx, y: g.gy, width: g.gw, height: g.gh), scale: window?.screen.scale ?? UIScreen.main.scale)
+            r.layer.isHidden = false
+            r.draw(st, still: rig.reduceMotion)
+            skyImgLayer.isHidden = r.settled   // until the layer has its first pictures the original sky stays behind it
+            jelly?.windowOn = true
+        } else { windowHide() }
         // who is in front: on the sill the room is behind it; behind the bowl the bowl and the things are in front; outside the wall is too (it shows through the window only)
         let plane = rig.sillPlane
         skyImgLayer.zPosition = -4
@@ -571,6 +603,42 @@ final class SlimeView: UIView {
         place(backSprites, in: &itemLayers, group: itemsGroup, world: false, night: night)
         place(rig.walkWorldSprites, in: &stuckLayers, group: stuckGroup, world: true, night: night)
         if labGrey { itemsGroup.isHidden = true; stuckGroup.isHidden = true }   // v2.52 灰盒: only the room stays
+    }
+    /// v2.59 窗景: the stage to draw; nil = the original window (none picked, the first one still loading, or it could not be loaded)
+    private func windowStage(night: Bool) -> WindowStage? {
+        guard let d = WindowLibrary.def(winId) else {
+            if winShown != nil { winShown = nil }
+            windows?.clear()
+            return nil
+        }
+        if !windowsTried {
+            windowsTried = true
+            if let j = jelly, let r = WindowRenderer(device: j.device, queue: j.queue) {
+                r.layer.zPosition = -4   // the sky picture's place, over it
+                layer.insertSublayer(r.layer, above: skyImgLayer)
+                windows = r
+                j.windows = r
+            }
+        }
+        guard let r = windows else { windowFail("no Metal"); return nil }
+        switch r.request(d, night: night) {
+        case .ready(let s): winShown = s
+        case .waiting: break   // the last one stays meanwhile
+        case .failed(let why):
+            winShown = nil
+            windowFail(why)
+        }
+        return winShown
+    }
+    private func windowFail(_ why: String) {
+        guard winFailSaid != winId else { return }
+        winFailSaid = winId
+        NSLog("[windows] reason: %@", why as NSString)
+        DispatchQueue.main.async { [weak self] in self?.onWindowFail?() }
+    }
+    private func windowHide() {
+        jelly?.windowOn = false
+        if let r = windows, !r.layer.isHidden { r.layer.isHidden = true }
     }
     private func place(_ sprites: [SlimeRig.WalkSprite], in pool: inout [CALayer], group: CALayer, world: Bool, night: Bool) {
         while pool.count < sprites.count && pool.count < 16 {

@@ -30,9 +30,10 @@ function winTrack(e){
   const at=n=>e.getAttribute(n),nums=s=>s.trim().split(/[\s,]+/).map(Number),vals=(at('values')?at('values').split(';'):[at('from'),at('to')]).map(nums),n=vals.length;
   const dur=parseFloat(at('dur')),beg=parseFloat(at('begin')||'0'),keys=at('keyTimes')?at('keyTimes').split(';').map(Number):vals.map((_,i)=>i/(n-1));
   const ez=at('calcMode')==='spline'?at('keySplines').split(';').map(s=>winEase(nums(s))):null;
-  return T=>{let p=(T-beg)/dur;p-=Math.floor(p);let i=0;while(i<n-2&&p>=keys[i+1])i++;
+  const run=T=>{let p=(T-beg)/dur;p-=Math.floor(p);let i=0;while(i<n-2&&p>=keys[i+1])i++;
     const d=keys[i+1]-keys[i];let u=d>0?Math.min(1,Math.max(0,(p-keys[i])/d)):1;if(ez)u=ez[i](u);
-    const a=vals[i],b=vals[i+1],o=[];for(let k=0;k<Math.max(a.length,b.length);k++){const p0=a[k]||0,p1=b[k]||0;o.push(p0+(p1-p0)*u)}return o}}
+    const a=vals[i],b=vals[i+1],o=[];for(let k=0;k<Math.max(a.length,b.length);k++){const p0=a[k]||0,p1=b[k]||0;o.push(p0+(p1-p0)*u)}return o};
+  run.raw={d:dur,b:beg,k:keys,v:vals,e:at('calcMode')==='spline'?at('keySplines').split(';').map(nums):null};return run}   // raw：時間表原本的數字，只給 tools/export-windows-ios.py 輸出 iOS 用，網頁不讀
 // 矩陣用六個數字的陣列（每幀要乘幾十次，不產生 DOMMatrix）
 function winMul(m,n){return[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]]}
 function winMat(type,v){
@@ -58,15 +59,15 @@ function winFlat(svg){
       for(const l of out){l.tint.push(e.getAttribute('fill'));l.shut=true}return}
     const s={...st,ops:[...st.ops],al:[...st.al],wrap:[...st.wrap]};let own=false;
     const tr=an.filter(a=>a.nodeName==='animateTransform'),by=n=>an.find(a=>a.getAttribute('attributeName')===n),oa=by('opacity'),da=by('stroke-dashoffset');
-    if(tr.length){own=true;for(const a of tr){const ty=a.getAttribute('type'),f=winTrack(a),vs=(a.getAttribute('values')||'').split(';').map(Number);s.ops.push({fn:T=>winMat(ty,f(T)),max:ty==='scale'?Math.max(...vs):1})}}
+    if(tr.length){own=true;for(const a of tr){const ty=a.getAttribute('type'),f=winTrack(a),vs=(a.getAttribute('values')||'').split(';').map(Number);s.ops.push({ty,tk:f.raw,fn:T=>winMat(ty,f(T)),max:ty==='scale'?Math.max(...vs):1})}}
     else if(e.hasAttribute('transform')){own=true;const m=winStatic(e.getAttribute('transform'));s.ops.push({m,max:Math.hypot(m[0],m[1])})}
-    if(oa){own=true;const f=winTrack(oa);s.al.push({fn:T=>f(T)[0]})}
+    if(oa){own=true;const f=winTrack(oa);s.al.push({tk:f.raw,fn:T=>f(T)[0]})}
     else{const o=e.getAttribute('opacity')||winSt(e,'opacity');if(o&&+o!==1){own=true;s.al.push({v:+o})}}
     if(blend){own=true;s.op=blend==='plus-lighter'?'lighter':blend}
     const cp=/url\(#(\w+)\)/.exec(e.getAttribute('clip-path')||'');
     if(cp){own=true;const c=svg.querySelector('#'+cp[1]+' circle');s.clip={n:s.ops.length,x:+c.getAttribute('cx'),y:+c.getAttribute('cy'),r:+c.getAttribute('r')}}
     if(own)s.key='k'+(++uid);
-    if(e.nodeName!=='g'){const c=e.cloneNode(true);for(const k of [...c.children])k.remove();for(const k of ['transform','opacity','style','clip-path'])c.removeAttribute(k);if(da){const f=winTrack(da);s.dash=T=>f(T)[0]}emit(c,s);return}
+    if(e.nodeName!=='g'){const c=e.cloneNode(true);for(const k of [...c.children])k.remove();for(const k of ['transform','opacity','style','clip-path'])c.removeAttribute(k);if(da){const f=winTrack(da);s.dash=T=>f(T)[0];s.dash.tk=f.raw}emit(c,s);return}
     const pa=[...e.attributes].filter(a=>!['transform','opacity','style','clip-path'].includes(a.name));
     if(pa.length){if(!own)s.key='k'+(++uid);s.wrap.push(pa.map(a=>`${a.name}="${a.value}"`).join(' '))}
     for(const k of kids)walk(k,s)};
@@ -96,7 +97,7 @@ async function winCompile(d,kind,g){
     const inner=winTint(it.wrap.map(a=>`<g ${a}>`).join('')+it.nodes.map(e=>ser.serializeToString(e)).join('')+it.wrap.map(()=>'</g>').join(''),it.tint),defs=winTint(defs0,it.tint);
     const L={ops:it.ops,al:it.al,op:it.op||'source-over',clip:it.clip,dash:it.dash};
     if(it.dash){const e=it.nodes[0],at=k=>e.getAttribute(k);   // 瀑布的虛線：三條直線，每幀直接描
-      L.path=new Path2D(at('d'));L.stroke=/stroke="([^"]+)"/.exec(inner)[1];L.lw=+at('stroke-width');L.cap=at('stroke-linecap')||'butt';L.pat=at('stroke-dasharray').split(/[\s,]+/).map(Number);out.push(L);continue}
+      L.pd=at('d');L.path=new Path2D(L.pd);L.stroke=/stroke="([^"]+)"/.exec(inner)[1];L.lw=+at('stroke-width');L.cap=at('stroke-linecap')||'butt';L.pat=at('stroke-dasharray').split(/[\s,]+/).map(Number);out.push(L);continue}
     const bb=winBox(inner,defs),sw=Math.max(0,...[...inner.matchAll(/stroke-width="([\d.]+)"/g)].map(m=>+m[1]),/<use/.test(inner)?9:0),pad=sw*.75+1.5,b={x:bb.x-pad,y:bb.y-pad,w:bb.width+pad*2,h:bb.height+pad*2};
     if(!it.ops.some(o=>o.fn)&&!it.clip){   // 位置固定：對齊像素，裁到窗洞，每幀直接貼
       let M=[s,0,0,s,g.gx,g.gy];for(const o of it.ops)M=winMul(M,o.m);

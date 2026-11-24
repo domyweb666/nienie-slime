@@ -92,6 +92,7 @@ struct ContentView: View {
             .padding(.top, 14)
             .padding(.bottom, 18)
         }
+        .onChange(of: controller.toastGen) { _, _ in showTimedHint(controller.toastText) }   // v2.59 窗景
         .alert("牠想跟你出門", isPresented: $controller.walkAsk) {   // 走路: asked only when the gift stone is tapped; 先不要 keeps the stone and never asks again
             Button("先不要") { controller.walkAnswer(false) }
             Button("好") { controller.walkAnswer(true) }
@@ -207,8 +208,10 @@ struct ContentView: View {
     }
 
     /// Its name and personality for 2.6 s.
-    private func showSlimeHint(_ k: SlimeKind) {
-        hintText = "\(k.name)：\(k.desc)"
+    private func showSlimeHint(_ k: SlimeKind) { showTimedHint("\(k.name)：\(k.desc)") }
+
+    private func showTimedHint(_ text: String) {
+        hintText = text
         hintGen += 1
         let gen = hintGen
         withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showHint = true }

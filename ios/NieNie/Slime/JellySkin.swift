@@ -26,8 +26,11 @@ final class JellySkin {
         return o
     }
 
-    private let device: MTLDevice
-    private let queue: MTLCommandQueue
+    let device: MTLDevice            // v2.59: the window scenes draw on the same queue, so the skin sees this frame's window
+    let queue: MTLCommandQueue
+    /// v2.59 窗景: with a window scene on, `bg` is the room with the hole see-through, and the window's picture is put behind it on the GPU each frame
+    var windows: WindowRenderer?
+    var windowOn = false
     private let blurPSO: MTLRenderPipelineState, lightPSO: MTLRenderPipelineState
     private let sampler: MTLSamplerState
     private var mask: MTLTexture?, h1: MTLTexture?, h2: MTLTexture?, q1: MTLTexture?, q2: MTLTexture?
@@ -85,7 +88,8 @@ final class JellySkin {
 
     /// v2.49: the pictures behind the body, back to front, each stretched over the whole view (the room is baked that way). Nothing is redrawn while `key` stays the same.
     /// An empty list (the plain blue sky, pictures missing) turns the water skin off: it falls back to the v2.48 skin.
-    func setBackground(key: String, images: [CGImage]) {
+    /// v2.59 `clear`: nothing under the pictures (the window's hole stays see-through).
+    func setBackground(key: String, images: [CGImage], clear: Bool = false) {
         guard W > 0, H > 0 else { return }
         if key == bgKey { return }
         bgKey = key
@@ -93,8 +97,10 @@ final class JellySkin {
         guard !images.isEmpty else { bg = nil; return }
         let info = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: W * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info), let data = ctx.data else { bg = nil; return }
-        ctx.setFillColor(red: 0.78, green: 0.88, blue: 0.96, alpha: 1)
-        ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+        if clear { ctx.clear(CGRect(x: 0, y: 0, width: W, height: H)) } else {
+            ctx.setFillColor(red: 0.78, green: 0.88, blue: 0.96, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+        }
         for im in images { ctx.draw(im, in: CGRect(x: 0, y: 0, width: W, height: H)) }   // an unflipped bitmap context: memory row 0 is the picture's top row, like the mask
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: W, height: H, mipmapped: false)
         d.usage = [.shaderRead]; d.storageMode = .shared
@@ -168,6 +174,8 @@ final class JellySkin {
         for e in extra { ctx.addPath(e); ctx.fillPath() }
         mask.replace(region: MTLRegionMake2D(0, 0, W, H), mipmapLevel: 0, withBytes: data, bytesPerRow: ctx.bytesPerRow)
         guard let cmd = queue.makeCommandBuffer(), let drawable = layer.nextDrawable() else { return }
+        var room: MTLTexture? = bg
+        if windowOn, let b = bg { room = windows?.mix(into: cmd, room: b) }   // v2.59: nil until the window has been drawn once
         // 2 the blurs: small for the edge, large for the inner shading
         let s1 = Float(max(0.6, rpx * 0.07 / 2) * (round > 0 ? round : 1)), s2 = Float(max(0.6, rpx * 0.42 / 8))
         func blur(_ src: MTLTexture, _ dst: MTLTexture, _ dx: Float, _ dy: Float, _ s: Float) {
@@ -205,7 +213,7 @@ final class JellySkin {
         let sh = Float(max(0, min(1, shine))), hi: Float = hiOff ? 0 : sh
         u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec * hi, skin.sheen * hi))
         u.append(SIMD4<Float>(skin.arc * hi, round > 0 ? 0.46 : 0, rimOff ? 0 : skin.wet * sh, 0))
-        let wv: Float = bg != nil ? Float(max(0, min(1, water))) * min(1, skin.wet) : 0   // v2.49: no baked room, no water skin
+        let wv: Float = room != nil ? Float(max(0, min(1, water))) * min(1, skin.wet) : 0   // v2.49: no baked room, no water skin
         u.append(SIMD4<Float>(wv, Float(refr), Float(absorb), Float(max(0, min(1, opaque)))))
         let rp = MTLRenderPassDescriptor()
         rp.colorAttachments[0].texture = drawable.texture
@@ -214,7 +222,7 @@ final class JellySkin {
         rp.colorAttachments[0].storeAction = .store
         if let enc = cmd.makeRenderCommandEncoder(descriptor: rp) {
             enc.setRenderPipelineState(lightPSO)
-            enc.setFragmentTexture(mask, index: 0); enc.setFragmentTexture(h2, index: 1); enc.setFragmentTexture(q2, index: 2); enc.setFragmentTexture(bg ?? mask, index: 3)
+            enc.setFragmentTexture(mask, index: 0); enc.setFragmentTexture(h2, index: 1); enc.setFragmentTexture(q2, index: 2); enc.setFragmentTexture(room ?? mask, index: 3)
             enc.setFragmentSamplerState(sampler, index: 0)
             u.withUnsafeBytes { raw in enc.setFragmentBytes(raw.baseAddress!, length: raw.count, index: 0) }
             enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)

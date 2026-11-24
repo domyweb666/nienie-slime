@@ -185,7 +185,12 @@ final class SlimeRig {
     struct GlitterView { let cloud, glow, cx, cy: Double; let dots: [(x: Double, y: Double, r: Double, c: Int, a: Double)] }
     private var builtScene = -1.0
     /// 0 blue (floating), 1 day, 2 night: what the view draws behind it
-    var sceneKind: Int { Int(params.scene.rounded()) }
+    /// v2.59 窗景: a window that only has a night is open; the chosen background stays as it was
+    var winNight = false
+    var sceneKind: Int {
+        let k = Int(params.scene.rounded())
+        return k > 0 && winNight ? 2 : k
+    }
     /// v2.35 拿掉碗 (多米 11-08): it lives in the middle of the sill; the bowl is not drawn, not in the way, nothing to fall into
     var noBowl: Bool { sillOn && params.bowl < 0.5 }
     /// v2.37 擺飾: the wind bell swings after a shake (amp in radians), decaying over a few seconds
@@ -2425,7 +2430,7 @@ final class SlimeRig {
         guard N > 0 else { return }
         guardFold()   // v2.52 A5
         t += dt
-        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens || params.scene != builtScene {
+        if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens || (params.scene >= 0.5) != (builtScene >= 0.5) {   // v2.59: day to night does not rebuild it (as on the web)
             setup(width: W, height: H)
         } else if params.cSpace != builtSpace || params.cRad != builtRad {
             buildClusters()

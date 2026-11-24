@@ -26,6 +26,11 @@ final class SlimeController: ObservableObject {
         didSet { UserDefaults.standard.set(ambience, forKey: "nienie.amb"); sound.setAmbience(ambience) }
     }
     @Published private(set) var reduceMotion = UIAccessibility.isReduceMotionEnabled
+    /// v2.59 窗景: the scene outside the window ("" = the original one), kept in UserDefaults
+    @Published private(set) var winId = ""
+    /// A line for the hint at the top (and the desk's own line, the hint is hidden while the desk is open)
+    @Published private(set) var toastText = ""
+    @Published private(set) var toastGen = 0
     /// Blind-test slots (3-4 做法五): two saved parameter sets, switched by number only, kept in UserDefaults.
     @Published private(set) var activeSlot: Int?
     @Published private(set) var slotSaved: [Int: Bool] = [:]
@@ -60,6 +65,10 @@ final class SlimeController: ObservableObject {
         rig = SlimeRig(params: start)
         rig.fx = saved.fx   // v2.57 its signature
         rig.reduceMotion = reduceMotion
+        if let w = WindowLibrary.def(UserDefaults.standard.string(forKey: "nienie.win") ?? "") {   // v2.59 an id this build does not know: the original window
+            winId = w.id
+            rig.winNight = w.only
+        }
         rig.onEvent = { [weak self] e in self?.handle(e) }
         rig.onGiftTap = { [weak self] in self?.walkAsk = true }
         // v2.34 熟留下來: each slime's saved trust comes back before anything can store a 0 over it; wariness starts at 0
@@ -380,6 +389,43 @@ final class SlimeController: ObservableObject {
         UserDefaults.standard.set(true, forKey: "nienie.picked")
         select(k)
     }
+
+    // MARK: - v2.59 窗景 (多米 11-24). Nothing is bought here: no price, no count.
+
+    private func toast(_ s: String) {
+        toastText = s
+        toastGen += 1
+        feelNote = s
+    }
+    /// Day or night, for every material (the scene is not part of a slime's numbers); the body is not rebuilt
+    private func setScene(_ v: Double) {
+        for m in SlimeMaterial.allCases {
+            var p = params[m] ?? m.defaults
+            p.scene = v
+            params[m] = p
+        }
+        pushParams()
+        activeSlot = nil
+    }
+    /// "" = the original window
+    func pickWindow(_ id: String) {
+        let d: WindowDef? = WindowLibrary.def(id)
+        winId = d?.id ?? ""
+        UserDefaults.standard.set(winId, forKey: "nienie.win")
+        rig.winNight = d?.only ?? false
+        if d != nil && current.scene < 0.5 { setScene(1) }   // the blue background has no window to look out of
+        toast(d?.said ?? "換回原本那扇窗")
+    }
+    func pickNight(_ night: Bool) {
+        setScene(night ? 2 : 1)
+        if !night, let d = WindowLibrary.def(winId), d.only { toast("這扇窗只有夜晚") }
+    }
+    /// What is on screen: 0 blue, 1 day, 2 night (a night-only window is open: night)
+    var sceneShown: Int {
+        let k = Int(current.scene.rounded())
+        return k > 0 && (WindowLibrary.def(winId)?.only ?? false) ? 2 : k
+    }
+    func windowFailed() { toast("這扇窗沒載進來，先放原本那扇") }
 
     /// Panel only: the same slime on another material (blind tests).
     func selectMaterial(_ m: SlimeMaterial) {

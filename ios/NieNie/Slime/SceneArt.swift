@@ -37,6 +37,21 @@ enum SceneArt {
         }
     }
 
+    private static var tintedWalls: [(key: String, image: UIImage)] = []
+    /// v2.59 窗景: the wall and the window's frame lean a little to the scene's colour by day (the candle, the jar and the bell do not). Two are kept.
+    static func tintedWall(_ wall: UIImage, tint: UIColor, key: String) -> UIImage {
+        if let c = tintedWalls.first(where: { $0.key == key }) { return c.image }
+        let im = UIGraphicsImageRenderer(size: wall.size, format: format(scale: wall.scale)).image { c in
+            wall.draw(at: .zero)
+            c.cgContext.setBlendMode(.sourceAtop)
+            tint.setFill()
+            c.cgContext.fill(CGRect(origin: .zero, size: wall.size))
+        }
+        tintedWalls.append((key: key, image: im))
+        if tintedWalls.count > 2 { tintedWalls.removeFirst() }
+        return im
+    }
+
     /// kind 1 = day, 2 = night. nil when the pictures are missing from the bundle.
     static func make(kind: Int, size: CGSize, g: SlimeRig.SillGeo, bowl: Bool = false, props oldProps: Bool = false, deco: Int = 1) -> Images? {
         let key = "\(kind)|\(size.width)|\(size.height)|\(bowl)|\(oldProps)|\(deco)"

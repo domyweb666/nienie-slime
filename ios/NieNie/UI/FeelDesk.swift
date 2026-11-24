@@ -12,6 +12,7 @@ struct FeelDesk: View {
     @State private var showMore = false
     @State private var showLab = false
     @State private var showStyles = true
+    @State private var winSet = -1   // v2.59 窗景: which set is open, -1 none
     @FocusState private var askFocused: Bool
 
     private static let warn = Color(red: 0.70, green: 0.33, blue: 0.08)
@@ -44,6 +45,7 @@ struct FeelDesk: View {
                                 chip(k.name, on: controller.slime == k) { controller.pickSlime(k) }
                             }
                         }
+                        windowBox   // v2.59
                         HStack(spacing: 6) {
                             Text("從哪個材質開始").font(.rounded(12)).foregroundStyle(Palette.inkSoft)
                             ForEach([SlimeMaterial.clay, .mochi, .jelly]) { m in
@@ -124,6 +126,46 @@ struct FeelDesk: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(.white)
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
         .frame(maxWidth: 460)
+    }
+
+    // MARK: - v2.59 窗景
+
+    /// The original window and the three sets; a set opens its four. Day and night below (the scenes look different in each).
+    @ViewBuilder private var windowBox: some View {
+        let all: [WindowDef] = WindowLibrary.all
+        if !all.isEmpty {
+            let now: WindowDef? = WindowLibrary.def(controller.winId)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("窗外").font(.rounded(13, .heavy))
+                HStack(spacing: 6) {
+                    chip("原本", on: now == nil) { controller.pickWindow("") }
+                        .accessibilityLabel("窗外：原本")
+                        .accessibilityAddTraits(now == nil ? .isSelected : [])
+                    ForEach(0..<WindowLibrary.setNames.count, id: \.self) { i in
+                        chip(WindowLibrary.setNames[i], on: now?.set == i) { winSet = winSet == i ? -1 : i }
+                            .accessibilityLabel("窗外：" + WindowLibrary.setNames[i])
+                            .accessibilityValue(winSet == i ? "展開" : "收起")
+                    }
+                    Spacer(minLength: 0)
+                }
+                if winSet >= 0 {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), alignment: .leading, spacing: 6) {
+                        ForEach(all.filter { $0.set == winSet }, id: \.id) { w in
+                            chip(w.name, on: now?.id == w.id) { controller.pickWindow(w.id) }
+                                .accessibilityHint(w.line)
+                                .accessibilityAddTraits(now?.id == w.id ? .isSelected : [])
+                        }
+                    }
+                }
+                HStack(spacing: 6) {
+                    chip("白天", on: controller.sceneShown == 1) { controller.pickNight(false) }
+                        .accessibilityAddTraits(controller.sceneShown == 1 ? .isSelected : [])
+                    chip("夜晚", on: controller.sceneShown == 2) { controller.pickNight(true) }
+                        .accessibilityAddTraits(controller.sceneShown == 2 ? .isSelected : [])
+                    Spacer(minLength: 0)
+                }
+            }
+        }
     }
 
     // MARK: - The knobs

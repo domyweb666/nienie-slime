@@ -1,3 +1,38 @@
+# Handoff: 窗景 12 扇搬進 Swift，寫完還沒編譯（2026-11-24，v2.59，先看這段）
+
+> 工作樹 `E:/捏捏史萊姆/_wt-窗景`，分支 `window-scenes-v1`，從 `feel-3x-panel-v1` 的 `d2a010b` 接著做。**沒推、沒合回、沒發 TestFlight、沒編譯過。**
+
+## 做了什麼
+- 資料：`tools/export-windows-ios.py` 開網頁把 `windows.js` 拆好的每層輸出成圖（1.5 倍、無損 webp 205 張）和時間表 `windows.json`，放 `ios/NieNie/Resources/win/`，共 2.5 MB。SVG 改了就重跑（約 4 分鐘）。`windows.js` 只加了資料欄位（`raw`、`tk`、`ty`、`pd`），畫面逐點沒變。
+- Swift：新檔 `Slime/WindowScene.swift`（解析、時間表、Metal 繪製）、`WindowScene.metal`。每層一個四邊形，四種疊色用固定混合，畫到窗洞大小的離屏圖，再貼到自己的 `CAMetalLayer`（zPosition -4，原本天空的位置）。背景載入，載好才換；失敗留原本那扇，`NSLog "[windows] reason:"`，畫面跳一句。
+- 身體折射：開窗景時 `JellySkin.bg` 改成窗洞透明的房間，`WindowRenderer.mix` 每幀在 GPU 把窗景墊到後面，1 倍。沒開窗景時路徑沒變。
+- 牆：白天照 `day` 染牆和窗框（`SceneArt.tintedWall`）。只有夜晚的兩扇：`rig.winNight`，`sceneKind` 回 2，`params.scene` 不改。
+- 選窗在調節台（`FeelDesk.windowBox`），選了記在 `nienie.win`。沒有價格和購買。
+
+## 驗過
+- 離線重畫（`tools/check-windows-ios.py`，WebGL、跟 Metal 同一組混合式）跟網頁同一秒比 88 格：1.5 倍平均差最大 0.34，縮到 1.2 倍最大 0.54（滿分 255）。沒有 mipmap，縮小的樣子要看真機。
+- 網頁 `winDraw` 改前改後 88 格逐點相同。
+- @@SELFTEST@@
+
+## 沒驗、要注意
+- **Swift 沒編譯過**，要推上去跑 CI。編不過先看 `WindowScene.swift`。
+- iPhone 沒看過：幀時間、發熱、記憶體（雪地夜晚約 45 MB，兩張一起最多約 80 MB）、換窗那幾幀牆比窗外早變夜晚。
+- 網頁「夜晚睏得快 1.5 倍」用的 `brAwakeT` Swift 沒有，沒加。
+- App Store 版的調節台從隱藏面板還開得到，窗景等於免費。上架前要換。
+
+## 下一步從哪繼續
+1. 多米說合、推 → `prototype/web/_wt` 裡 `git merge --ff-only window-scenes-v1`，`git push origin feel-3x-panel-v1`，看 PR #1 的 CI。
+2. 編過、多米說發 → `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`。
+3. 真機看：12 扇白天夜晚、身體裡的折射、牠爬到窗外時的前後、每幀時間。
+
+## 工作包
+- [x] I1：輸出圖層與時間表
+- [x] I2：Swift 繪製、折射、選窗
+- [ ] I3：CI 編譯｜BUILD SUCCEEDED｜ios/｜要多米說推
+- [ ] H：TestFlight｜要多米說發
+
+---
+
 # Handoff: 窗景 v2.59 已合回 `feel-3x-panel-v1`（本機，沒推），等多米決定推與 TestFlight（2026-11-24，先看這段）
 
 > 工作樹 `prototype/web/_wt`，分支 `feel-3x-panel-v1`。多米 11-24 說合回，已快轉到 `ed21f96`（`window-scenes-v1` 停在這裡，留著當紀錄）。**沒推。**
