@@ -1,6 +1,6 @@
-# Handoff: 窗景 v2.59 已併入最新的 v2.58b，網頁全過，等多米決定合回與 TestFlight（2026-11-24 12:05，先看這段）
+# Handoff: 窗景 v2.59 已合回 `feel-3x-panel-v1`（本機，沒推），等多米決定推與 TestFlight（2026-11-24，先看這段）
 
-> 工作樹 `E:/捏捏史萊姆/_wt-窗景`，分支 `window-scenes-v1`。**這條沒推。** `feel-3x-panel-v1` 的工作樹（`prototype/web/_wt`）這次沒動，另一個對話還開著。
+> 工作樹 `prototype/web/_wt`，分支 `feel-3x-panel-v1`。多米 11-24 說合回，已快轉到 `ed21f96`（`window-scenes-v1` 停在這裡，留著當紀錄）。**沒推。**
 
 ## 現況
 - `feel-3x-panel-v1` 的 v2.58b（`e2d5eb9`）11-24 11:48 已推，PR #1 的 CI 過：**Swift BUILD SUCCEEDED**（run 45322076106；只有一個原本就不影響的警告，`SlimeView.swift:778` `paths` 可改 `let`）。**沒發 TestFlight。** 下面那段寫的「沒推」「C 還沒做」是舊的。
@@ -8,20 +8,20 @@
 - 驗證：整份 selftest 三輪，69 項三輪全過（739 秒）；原本窗景那條沒過的 T65 也過（往上拉平均 0.30 到 0.32R，斜拉 0.71 到 0.83R）。截圖看過原本白天夜晚、六扇新窗、新窗前往上拉和放手，console 沒有錯誤。
 
 ## 等多米決定
-1. `window-scenes-v1` 要不要合回 `feel-3x-panel-v1`（現在是快轉，不會有衝突）。合了要推才上 PR。
+1. 要不要推。只動網頁和文件，`ios/` 沒變，推了 CI 編的東西跟 `e2d5eb9` 一樣。
 2. v2.58b 要不要發 TestFlight。多米說發才發。
 3. 網頁看過窗景，才動 Swift。
 
 ## 下一步從哪繼續
 1. `git fetch --all`，看 `origin/feel-3x-panel-v1` 有沒有比 `e2d5eb9` 新的；有就再併一次、再跑 selftest。
-2. 多米說合 → 在 `prototype/web/_wt` 裡 `git merge --ff-only window-scenes-v1`。
+2. 多米說推 → 在 `prototype/web/_wt` 裡 `git push origin feel-3x-panel-v1`。
 3. 多米說發 → `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`（repo `domyweb666/nienie-slime`）。
 4. 多米看過網頁的窗景 → Swift：在網頁上把每層輸出成圖，再照抄時間表（見下一段「沒做、要注意」）。
 
 ## 工作包
 - [x] C：Swift 編譯（v2.58b CI 過）
 - [x] F：v2.58b 併進窗景分支，selftest 三輪
-- [ ] G：合回 `feel-3x-panel-v1`｜`--ff-only` 成功、selftest 過｜無｜要多米說合
+- [x] G：合回 `feel-3x-panel-v1`（快轉，內容就是三輪全過的那一份）
 - [ ] H：TestFlight｜上傳成功｜無｜要多米說發
 - [ ] I：窗景搬 Swift｜CI 過、12 扇截圖跟網頁一致｜ios/、素材｜多米看過網頁之後
 
