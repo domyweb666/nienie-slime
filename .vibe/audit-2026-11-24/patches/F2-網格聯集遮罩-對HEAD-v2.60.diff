@@ -1,0 +1,135 @@
+--- a/prototype/web/index.html
++++ b/prototype/web/index.html
+@@ -2437,6 +2437,7 @@
+   plasticity(dt);
+   twitch(L);
+   eyeStep(dt);   // v2.23
++  dspStep(dt);
+ }
+ 
+ /* ---------- 繪圖（平塗卡通） ---------- */
+@@ -2903,6 +2904,55 @@
+ // v2.31 皮：平常 A 清透；亮粉揚起來時照濁度往 B 奶凍混（霧霧的）；沉澱清了那一刻多一點發光
+ function jelSkin(){const a=jelSkin0(),k=SLIMES[SLIME].sk;return k&&VIEW.skin==='A'?{...a,...k}:a}   // v2.52 每隻可以有自己的皮（仙草邊緣不發白）
+ function jelSkin0(){let a=JSKINS[VIEW.skin]||JSKINS.A;if(mat.wet>=.5&&a===JSKINS.A)a=JSKINS.W;if(!(mat.shake>=.5)||!(mat.glit>=.5)||(SNW.cloud<=.001&&SNW.glow<=.001))return a;const b=JSKINS.B,o={},c=Math.min(1,SNW.cloud);for(const k in a)o[k]=a[k]+(b[k]-a[k])*c;o.glow=Math.min(1,o.glow+.5*SNW.glow);o.sheen+=.1*SNW.glow;o.kEdge+=.15*SNW.glow;return o}
++const JELX={mode:0,wmin:.12,wthr:.09,thinOpq:0,smooth:0,ms:0};   // mode 0 現在（外框路徑）；1 網格聯集；2 聯集＋最細保底（裡面的邊畫成膠囊）
++/* 顯示用的位置（1€ 濾波：慢的時候抹掉抖，快的時候不延遲）；補點時照三角形權重換過去 */
++const DSP={n:0,x:null,y:null,dx:null,dy:null,t:-1,px:null,py:null};
++function dspStep(dt){if(!(JELX.smooth>0)){DSP.n=0;return}
++  if(DSP.n!==N){DSP.n=N;DSP.x=Float64Array.from(X);DSP.y=Float64Array.from(Y);DSP.px=Float64Array.from(X);DSP.py=Float64Array.from(Y);DSP.dx=new Float64Array(N);DSP.dy=new Float64Array(N);return}
++  let mx=0,my=0;for(let i=0;i<N;i++){mx+=X[i]-DSP.px[i];my+=Y[i]-DSP.py[i]}mx/=N;my/=N;   // 整團平移不濾
++  const a=fc=>{const tau=1/(6.2832*fc);return 1/(1+tau/dt)},ad=a(3),beta=JELX.beta||.06,mc=JELX.minc||4;
++  for(let i=0;i<N;i++){DSP.x[i]+=mx;DSP.y[i]+=my;const vx=(X[i]-DSP.px[i]-mx)/dt,vy=(Y[i]-DSP.py[i]-my)/dt;DSP.dx[i]+=(vx-DSP.dx[i])*ad;DSP.dy[i]+=(vy-DSP.dy[i])*ad;const k=a(mc+beta*Math.hypot(DSP.dx[i],DSP.dy[i]));DSP.x[i]+=(X[i]-DSP.x[i])*k;DSP.y[i]+=(Y[i]-DSP.y[i])*k;DSP.px[i]=X[i];DSP.py[i]=Y[i]}}
++function jelMeshInit(gl,prog){const VM=`#version 300 es
++in vec2 p;uniform vec2 t;void main(){gl_Position=vec4(p.x*t.x-1.,1.-p.y*t.y,0.,1.);}`,FM=`#version 300 es
++precision mediump float;out vec4 o;void main(){o=vec4(1.);}`,VC=`#version 300 es
++in vec2 p;in vec4 ab;in float rr;uniform vec2 t;uniform float uR;out vec2 q;flat out vec4 sg;flat out float rd;void main(){float r=uR*rr;rd=r;vec2 a=ab.xy,b=ab.zw,d=b-a;float L=length(d);vec2 u=L>1e-5?d/L:vec2(1.,0.),n=vec2(-u.y,u.x);q=mix(a,b,p.x)+u*(p.x*2.-1.)*(r+1.)+n*p.y*(r+1.);sg=ab;gl_Position=vec4(q.x*t.x-1.,1.-q.y*t.y,0.,1.);}`,FC=`#version 300 es
++precision highp float;in vec2 q;flat in vec4 sg;flat in float rd;out vec4 o;void main(){float r=rd;if(r<.05)discard;vec2 a=sg.xy,ba=sg.zw-a,pa=q-a;float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-6),0.,1.);o=vec4(clamp(r+.5-length(pa-ba*h),0.,1.));}`;
++  const M=JEL.mesh={pm:prog(VM,FM),pc:prog(VC,FC),n:-1,key:null};M.ut=gl.getUniformLocation(M.pm,'t');M.ct=gl.getUniformLocation(M.pc,'t');M.cr=gl.getUniformLocation(M.pc,'uR');
++  M.va=gl.createVertexArray();gl.bindVertexArray(M.va);M.vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,M.vb);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);M.ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,M.ib);
++  M.vc=gl.createVertexArray();gl.bindVertexArray(M.vc);M.qb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,M.qb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,-1,1,-1,0,1,1,1]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);M.eb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,M.eb);const l=gl.getAttribLocation(M.pc,'ab');M.l=l;gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,4,gl.FLOAT,false,0,0);gl.vertexAttribDivisor(l,1);M.rb2=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,M.rb2);const l2=gl.getAttribLocation(M.pc,'rr');gl.enableVertexAttribArray(l2);gl.vertexAttribPointer(l2,1,gl.FLOAT,false,0,0);gl.vertexAttribDivisor(l2,1);
++  gl.bindVertexArray(null)}
++function jelRad(gl,M,n){const L=M.radN||0;gl.bindBuffer(gl.ARRAY_BUFFER,M.rb2);if(M.rad&&M.radOn)gl.bufferData(gl.ARRAY_BUFFER,M.rad,gl.DYNAMIC_DRAW);else{const c=Math.max(EDG.length/2,n);if(!M.one||M.one.length<c)M.one=new Float32Array(c+512).fill(1);gl.bufferData(gl.ARRAY_BUFFER,M.one,gl.DYNAMIC_DRAW)}}
++// 每個外框點往裡量到對面外框多遠（像素），算要不要保底：T 大於 .26R 不用、小於 .16R 全開
++function jelThick(M,v,nb,Rz){const T=M.T&&M.T.length>=nb?M.T:(M.T=new Float32Array(nb+64)),cap=.3*Rz;
++  for(let k=0;k<nb;k++){const b=bnd[k],nxs=M.nx[2*k]+M.nx[2*((k+nb-1)%nb)],nys=M.nx[2*k+1]+M.nx[2*((k+nb-1)%nb)+1],d=Math.hypot(nxs,nys);let t=cap;if(d<1e-4){T[k]=0;continue}const nx=nxs/d,ny=nys/d,x=v[2*b],y=v[2*b+1];
++    for(let m=0;m<nb;m++){if(m===k||(m+1)%nb===k)continue;const a=bnd[m],c=bnd[(m+1)%nb],ax=v[2*a]-x,ay=v[2*a+1]-y,bx=v[2*c]-x,by=v[2*c+1]-y;if(Math.min(ax*ax+ay*ay,bx*bx+by*by)>(cap+60)*(cap+60))continue;const ex=bx-ax,ey=by-ay,den=nx*ey-ny*ex;if(Math.abs(den)<1e-9)continue;const tt=(ax*ey-ay*ex)/den,u=(ax*ny-ay*nx)/den;if(tt>.5&&u>=0&&u<=1&&tt<t)t=tt}
++    T[k]=t}
++  return T}
++function jelMeshMask(tr,k,grow){const gl=JEL.gl,M=JEL.mesh,n=N;
++  if(!M.v||M.v.length<n*2)M.v=new Float32Array((n+256)*2);const v=M.v,XX=JELX.mode===6&&DSP.n===n?DSP.x:X,YY=JELX.mode===6&&DSP.n===n?DSP.y:Y,nb=bnd.length,A=tr.a*k,B=tr.b*k,C=tr.c*k,D=tr.d*k,E=tr.e*k,F=tr.f*k,tf=(i,x,y)=>{v[2*i]=A*x+C*y+E;v[2*i+1]=B*x+D*y+F;grow(x,y,R*.08)};
++  for(let i=0;i<n;i++)if(BIDX[i]<0)tf(i,XX[i],YY[i]);
++  for(let i=0;i<nb;i++){const a=bnd[(i+nb-1)%nb],b=bnd[i],c=bnd[(i+1)%nb];tf(b,XX[a]*.25+XX[b]*.5+XX[c]*.25,YY[a]*.25+YY[b]*.5+YY[c]*.25)}
++  if(M.W!==W||M.H!==H){M.W=W;M.H=H;if(M.rb){gl.deleteRenderbuffer(M.rb);gl.deleteFramebuffer(M.fb);gl.deleteFramebuffer(M.ft)}
++    M.rb=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,M.rb);gl.renderbufferStorageMultisample(gl.RENDERBUFFER,4,gl.RGBA8,W,H);M.fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,M.fb);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,M.rb);
++    M.tx=gl.createTexture();JEL.params(gl,M.tx);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,W,H,0,gl.RGBA,gl.UNSIGNED_BYTE,null);M.ft=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,M.ft);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,M.tx,0)}
++  gl.bindFramebuffer(gl.FRAMEBUFFER,M.fb);gl.viewport(0,0,W,H);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.BLEND);gl.blendEquation(gl.MAX);gl.blendFunc(gl.ONE,gl.ONE);
++  gl.bindVertexArray(M.va);gl.bindBuffer(gl.ARRAY_BUFFER,M.vb);gl.bufferData(gl.ARRAY_BUFFER,v.subarray(0,n*2),gl.DYNAMIC_DRAW);
++  if(M.key!==TRI){M.key=TRI;M.all=Int32Array.from(EDG);M.rad=new Float32Array(EDG.length/2);M.nb=new Int32Array(n);for(let i=0;i<n;i++){if(BIDX[i]>=0){M.nb[i]=BIDX[i];continue}let bd=1e18,bk=0;for(let q2=0;q2<nb;q2++){const e=(Q0X[bnd[q2]]-Q0X[i])**2+(Q0Y[bnd[q2]]-Q0Y[i])**2;if(e<bd){bd=e;bk=q2}}M.nb[i]=bk}M.g=new Float32Array(nb);M.allv=new Float32Array(EDG.length*2);{const nei=Array.from({length:n},()=>[]);for(let e=0;e<EDG.length;e+=2){nei[EDG[e]].push(EDG[e+1]);nei[EDG[e+1]].push(EDG[e])}M.t3=new Int32Array(nb).fill(-1);const em=new Map();bnd.forEach((b,q2)=>em.set(b+'_'+bnd[(q2+1)%nb],q2));for(let q2=0;q2<TRI.length;q2+=3)for(const [a2,b2,c2] of [[0,1,2],[1,2,0],[2,0,1]]){const u=TRI[q2+a2],w=TRI[q2+b2],z=TRI[q2+c2];let e2=em.get(u+'_'+w);if(e2==null)e2=em.get(w+'_'+u);if(e2!=null)M.t3[e2]=z}}M.pv=new Float32Array(n*4);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,M.ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,Uint16Array.from(TRI),gl.STATIC_DRAW);const L=[];for(let e=0;e<EDG.length;e+=2)if(BIDX[EDG[e]]<0&&BIDX[EDG[e+1]]<0)L.push(EDG[e],EDG[e+1]);M.ie=Int32Array.from(L);M.ev=new Float32Array(L.length*2)}
++  const rg=JELX.mode===7||JELX.mode===8;gl.colorMask(true,!rg,!rg,!rg);gl.useProgram(M.pm);gl.uniform2f(M.ut,2/W,2/H);gl.drawElements(gl.TRIANGLES,TRI.length,gl.UNSIGNED_SHORT,0);
++  if(JELX.mode===2){const I=M.ie,ev=M.ev;for(let e=0;e<I.length;e+=2){const i=I[e],j=I[e+1];ev[2*e]=v[2*i];ev[2*e+1]=v[2*i+1];ev[2*e+2]=v[2*j];ev[2*e+3]=v[2*j+1]}
++    gl.bindVertexArray(M.vc);gl.bindBuffer(gl.ARRAY_BUFFER,M.eb);gl.bufferData(gl.ARRAY_BUFFER,ev,gl.DYNAMIC_DRAW);jelRad(gl,M,n);gl.useProgram(M.pc);gl.uniform2f(M.ct,2/W,2/H);gl.uniform1f(M.cr,R*Math.sqrt(Math.abs(A*D-B*C))*JELX.wmin/2);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,I.length/2)}
++  const zz=Math.sqrt(Math.abs(A*D-B*C));
++  gl.colorMask(!rg,true,!rg,!rg);M.radOn=false;if(JELX.mode===3||JELX.mode===6||rg||JELX.mode===9){const I=M.all,ev=M.allv,rr=R*zz*(rg?JELX.wthr:JELX.wmin)/2,IX=M.ix&&M.ix.length>=2*n?M.ix:(M.ix=new Float32Array(2*n+512));IX.set(v.subarray(0,2*n));
++    const NX=M.nx&&M.nx.length>=2*nb?M.nx:(M.nx=new Float32Array(2*nb+256));for(let k2=0;k2<nb;k2++){const i=bnd[k2],j=bnd[(k2+1)%nb],q2=M.t3[k2];let nx=0,ny=0;if(q2>=0){const ex=v[2*j]-v[2*i],ey=v[2*j+1]-v[2*i+1],tx=v[2*q2]-v[2*i],ty=v[2*q2+1]-v[2*i+1],s2=ex*ty-ey*tx>=0?1:-1,l=Math.hypot(ex,ey)||1;nx=-ey/l*s2;ny=ex/l*s2}NX[2*k2]=nx;NX[2*k2+1]=ny}
++    for(let k2=0;k2<nb;k2++){const b=bnd[k2],p2=(k2+nb-1)%nb;let ax=NX[2*k2]+NX[2*p2],ay=NX[2*k2+1]+NX[2*p2+1];const d=Math.hypot(ax,ay);if(d<1e-4)continue;IX[2*b]+=ax/d*rr;IX[2*b+1]+=ay/d*rr}
++    {const w0=worldWalls(),cl=(v0,lo,hi)=>v0<lo?lo:v0>hi?hi:v0,xl=isFinite(w0.l)?A*w0.l+E+rr:-1e9,xr=isFinite(w0.r)?A*w0.r+E-rr:1e9,yb=isFinite(w0.b)?D*w0.b+F-rr:1e9;if(Math.abs(B)<1e-9&&Math.abs(C)<1e-9&&xl<xr)for(let i=0;i<n;i++)if(IX[2*i+1]>yb)IX[2*i+1]=yb}   // 貼牆的線往裡挪一個半徑，不然裁掉一半又變細
++    if(JELX.mode===9){const Rz=R*zz,T=jelThick(M,v,nb,Rz),g=M.g;for(let k2=0;k2<nb;k2++)g[k2]=Math.max(0,Math.min(1,(.26*Rz-T[k2])/(.10*Rz)));for(let e=0;e<I.length;e+=2){const a=M.nb[I[e]],b2=M.nb[I[e+1]];M.rad[e/2]=Math.max(g[a],g[b2])}M.radOn=true}
++    for(let e=0;e<I.length;e+=2){const i=I[e],j=I[e+1];ev[2*e]=IX[2*i];ev[2*e+1]=IX[2*i+1];ev[2*e+2]=IX[2*j];ev[2*e+3]=IX[2*j+1]}
++    const wl=worldWalls(),X0=isFinite(wl.l)?A*wl.l+E:0,X1=isFinite(wl.r)?A*wl.r+E:W,Y1=isFinite(wl.b)?D*wl.b+F:H,sc=(x0,y0,x1,y1)=>gl.scissor(Math.max(0,Math.floor(x0)),Math.max(0,Math.floor(H-y1)),Math.ceil(Math.min(W,x1)-Math.max(0,x0)),Math.ceil(Math.min(H,y1)-Math.max(0,y0)));gl.enable(gl.SCISSOR_TEST);sc(X0,0,X1,Math.max(1,Math.min(H,Y1+1)));
++    gl.bindVertexArray(M.vc);gl.bindBuffer(gl.ARRAY_BUFFER,M.eb);gl.bufferData(gl.ARRAY_BUFFER,ev,gl.DYNAMIC_DRAW);jelRad(gl,M,n);gl.useProgram(M.pc);gl.uniform2f(M.ct,2/W,2/H);gl.uniform1f(M.cr,rr);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,I.length/2);gl.disable(gl.SCISSOR_TEST)}
++  if(JELX.mode===5){gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);const pv=M.pv;for(let i=0;i<n;i++){pv[4*i]=pv[4*i+2]=v[2*i];pv[4*i+1]=pv[4*i+3]=v[2*i+1]}gl.bindVertexArray(M.vc);gl.bindBuffer(gl.ARRAY_BUFFER,M.eb);gl.bufferData(gl.ARRAY_BUFFER,pv.subarray(0,4*n),gl.DYNAMIC_DRAW);jelRad(gl,M,n);gl.useProgram(M.pc);gl.uniform2f(M.ct,2/W,2/H);gl.uniform1f(M.cr,h*zz*(JELX.disc||.8));gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,n)}
++  gl.colorMask(true,true,true,true);gl.bindVertexArray(null);gl.disable(gl.BLEND);gl.blendEquation(gl.FUNC_ADD);
++  gl.bindFramebuffer(gl.READ_FRAMEBUFFER,M.fb);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,M.ft);gl.blitFramebuffer(0,0,W,H,0,0,W,H,gl.COLOR_BUFFER_BIT,gl.NEAREST);return M.tx}
+ const JEL={gl:null,c:null,m:null,mc:null,fail:false,w:0,h:0,dpr:0};
+ function jelInit(){if(JEL.fail)return false;const c=document.createElement('canvas'),gl=c.getContext('webgl2',{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false});
+   if(!gl){JEL.fail=true;return false}
+@@ -2914,9 +2964,9 @@
+   FS=`#version 300 es
+ precision highp float;in vec2 v;out vec4 o;
+ uniform sampler2D M,B1,B2,BG;uniform vec2 res;uniform float rpx;uniform vec4 uD[6];uniform int nD;
+-uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc,rnd,wet,water,refr,absorb,opq;
++uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc,rnd,wet,water,refr,absorb,opq,thinOpq,thr;
+ float H1(vec2 uv){float h=.45*smoothstep(0.,1.,texture(B1,uv).r);vec2 px=uv*res;for(int i=0;i<nD;i++){vec2 q=(px-uD[i].xy)/uD[i].z;h-=uD[i].w*.24*exp(-dot(q,q)*1.6);}return h;}
+-void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05,rnd+.05,texture(B1,v).r):smoothstep(.18,.82,m);if(cov<=0.){o=vec4(0.);return;}   /* v2.47 rnd：外框改用模糊過的遮罩切，尖角、細刺自己變圓，凹進去的地方像水一樣連起來 */
++void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05,rnd+.05,texture(B1,v).r):smoothstep(.18,.82,m);float thG=thr>0.?texture(M,v).g*(thr>1.5?1.:1.-smoothstep(.14,.28,texture(B2,v).r)):0.;cov=max(cov,smoothstep(.25,.75,thG));if(cov<=0.){o=vec4(0.);return;}   /* v2.47 rnd：外框改用模糊過的遮罩切，尖角、細刺自己變圓，凹進去的地方像水一樣連起來 */
+   vec2 e=2./res,E=8./res;float gx=(H1(v+vec2(e.x,0.))-H1(v-vec2(e.x,0.)))/4.+.55*(texture(B2,v+vec2(E.x,0.)).r-texture(B2,v-vec2(E.x,0.)).r)/16.,gy=(H1(v+vec2(0.,e.y))-H1(v-vec2(0.,e.y)))/4.+.55*(texture(B2,v+vec2(0.,E.y)).r-texture(B2,v-vec2(0.,E.y)).r)/16.;
+   vec3 n=normalize(vec3(-gx*rpx*nk,-gy*rpx*nk,1.)),L=normalize(vec3(-.5,.72,.9)),Hv=normalize(L+vec3(0.,0.,1.));
+   float b1=texture(B1,v).r,b2=texture(B2,v).r,thick=smoothstep(.08,.8,b2),fres=pow(1.-n.z,2.);
+@@ -2926,7 +2976,7 @@
+   /* v2.49 看得出是水（多米 11-16：要看得出來是由水份組成的，95% 是水）：身體後面的東西透過牠看得到，而且被彎曲（邊緣彎最多，像隔著水滴看）；
+      薄的地方幾乎沒顏色，厚的地方才染上牠的顏色；背光那側的內緣聚一道亮光；邊緣反射天光 */
+   if(water>0.){vec2 ro=-n.xy*rpx*refr/res*(.3+.7*thick);vec3 bg=texture(BG,v+ro).rgb;vec3 T=mix(vec3(1.),cCore,clamp(thick*absorb+.05,0.,1.));
+-    vec3 w=bg*T+cGlow*smoothstep(.15,.8,tr)*(.2+.8*fres)*glow*.5;w=mix(w,col,clamp(smoothstep(.03,.35,thick)*opq,0.,1.));   /* v2.51 厚的地方蓋掉後面的東西 */
++    vec3 w=bg*T+cGlow*smoothstep(.15,.8,tr)*(.2+.8*fres)*glow*.5;w=mix(w,mix(col,mix(cEdge,cCore,.55)*amb,thinOpq*(1.-smoothstep(.05,.5,thick))*.75),clamp(max(smoothstep(.03,.35,thick),thinOpq*max(smoothstep(.50,.64,b1),smoothstep(.3,.8,thG)))*opq,0.,1.));   /* v2.51 厚的地方蓋掉後面的東西 */
+     w*=1.-.16*smoothstep(.2,.55,fres)*(1.-smoothstep(.55,.9,fres));w=mix(w,vec3(.95,.98,1.),fres*.3);c=mix(c,vec4(w,1.),water);}
+   c=mix(c,vec4(cLine,1.),(1.-smoothstep(.5,.66,b1))*line);
+   float nh=max(dot(n,Hv),0.);c.rgb+=vec3(pow(nh,shin*.22)*sheen*(1.-thick*.4))*c.a;
+@@ -2942,9 +2992,9 @@
+   const q=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+   JEL.float=!!(gl.getExtension('EXT_color_buffer_float')||gl.getExtension('EXT_color_buffer_half_float'));gl.disable(gl.BLEND);
+   JEL.uB={};for(const n of ['t','d','s'])JEL.uB[n]=gl.getUniformLocation(JEL.pB,n);
+-  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc','rnd','wet','BG','water','refr','absorb','opq'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
++  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc','rnd','wet','BG','water','refr','absorb','opq','thinOpq','thr'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
+   JEL.tM=gl.createTexture();JEL.params(gl,JEL.tM);JEL.tBG=gl.createTexture();JEL.params(gl,JEL.tBG);JEL.bc=document.createElement('canvas');JEL.b2=JEL.bc.getContext('2d');
+-  JEL.gl=gl;JEL.c=c;JEL.mc=document.createElement('canvas');JEL.m=JEL.mc.getContext('2d',{willReadFrequently:false});JEL.w=0;
++  jelMeshInit(gl,prog);gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);JEL.gl=gl;JEL.c=c;JEL.mc=document.createElement('canvas');JEL.m=JEL.mc.getContext('2d',{willReadFrequently:false});JEL.w=0;
+   c.addEventListener('webglcontextlost',e=>{e.preventDefault();JEL.gl=null});
+   c.addEventListener('webglcontextrestored',()=>{jelInit()});
+   return true}
+@@ -2970,12 +3020,12 @@
+ function jelBreath(){return mat.wbreath>=.5?1+(REDUCED?.06:.12)*Math.sin(6.2832*BR.phase):1}
+ function jelRender(P,tr,col){const gl=JEL.gl,m=JEL.m,sk=jelSkin(),k=1/DPR,zoom=Math.sqrt(Math.abs(tr.a*tr.d-tr.b*tr.c))*k,rpx=R*zoom;
+   // 1. 遮罩（一倍解析度就夠，放大時靠 smoothstep 收邊）
+-  m.setTransform(1,0,0,1,0,0);m.fillStyle='#000';m.fillRect(0,0,W,H);m.setTransform(tr.a*k,tr.b*k,tr.c*k,tr.d*k,tr.e*k,tr.f*k);m.fillStyle='#fff';
+-  jelPath(m,P);m.fill();
++  if(!JELX.mode){m.setTransform(1,0,0,1,0,0);m.fillStyle='#000';m.fillRect(0,0,W,H);m.setTransform(tr.a*k,tr.b*k,tr.c*k,tr.d*k,tr.e*k,tr.f*k);m.fillStyle='#fff';
++  jelPath(m,P);m.fill()}
+   let ax=1e9,ay=1e9,bx=-1e9,by=-1e9;const grow=(x,y,r)=>{if(x-r<ax)ax=x-r;if(x+r>bx)bx=x+r;if(y-r<ay)ay=y-r;if(y+r>by)by=y+r};
+   for(const q of P)grow(q[0],q[1],0);
+-  extraMask(m,grow);   // v2.51 黏條、小的那團
+-  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,JEL.tM);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,JEL.mc);
++  let TM=JEL.tM;if(JELX.mode){TM=jelMeshMask(tr,k,grow);JEL.tMesh=TM}else{extraMask(m,grow);   // v2.51 黏條、小的那團
++  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,JEL.tM);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,JEL.mc)}
+   // 2. 只算身體附近（螢幕座標）
+   const toX=(x,y)=>(tr.a*x+tr.c*y+tr.e)*k,toY=(x,y)=>(tr.b*x+tr.d*y+tr.f)*k,cs=[[ax,ay],[bx,ay],[ax,by],[bx,by]],pad=rpx*1.4+6;
+   let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const c of cs){const X0=toX(c[0],c[1]),Y0=toY(c[0],c[1]);x0=Math.min(x0,X0);x1=Math.max(x1,X0);y0=Math.min(y0,Y0);y1=Math.max(y1,Y0)}
+@@ -2984,15 +3034,15 @@
+   gl.enable(gl.SCISSOR_TEST);
+   const blur=(src,dst,dx,dy,sg)=>{gl.bindFramebuffer(gl.FRAMEBUFFER,dst.f);gl.viewport(0,0,dst.w,dst.h);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);area(dst.w,dst.h);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(JEL.uB.t,0);gl.uniform2f(JEL.uB.d,dx,dy);gl.uniform1f(JEL.uB.s,sg);gl.drawArrays(gl.TRIANGLES,0,3)};
+   gl.useProgram(JEL.pB);const s1=Math.max(.6,rpx*.07/2)*jelRound(),s2=Math.max(.6,rpx*.42/8);
+-  blur(JEL.tM,JEL.h1,1/JEL.h1.w,0,s1);blur(JEL.h1.tx,JEL.h2,0,1/JEL.h2.h,s1);blur(JEL.tM,JEL.q1,1/JEL.q1.w,0,s2);blur(JEL.q1.tx,JEL.q2,0,1/JEL.q2.h,s2);
++  blur(TM,JEL.h1,1/JEL.h1.w,0,s1);blur(JEL.h1.tx,JEL.h2,0,1/JEL.h2.h,s1);blur(TM,JEL.q1,1/JEL.q1.w,0,s2);blur(JEL.q1.tx,JEL.q2,0,1/JEL.q2.h,s2);
+   // 3. 打光
+   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,JEL.c.width,JEL.c.height);gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);area(JEL.c.width,JEL.c.height);
+-  gl.useProgram(JEL.pF);const U=JEL.uF;[[JEL.tM,U.M],[JEL.h2.tx,U.B1],[JEL.q2.tx,U.B2]].forEach(([tx,u],i)=>{gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,tx);gl.uniform1i(u,i)});
++  gl.useProgram(JEL.pF);const U=JEL.uF;[[TM,U.M],[JEL.h2.tx,U.B1],[JEL.q2.tx,U.B2]].forEach(([tx,u],i)=>{gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,tx);gl.uniform1i(u,i)});
+   gl.uniform2f(U.res,W,H);gl.uniform1f(U.rpx,rpx);
+   // v2.49：這一刻畫布上已經畫好的背景（場景、擺飾、東西）縮成一倍貼圖，給皮折射用。只在水的皮開著時才傳
+   const wat=(sk.wet||0)>0&&mat.water>0&&!LAB.off.refr?Math.min(1,mat.water):0;
+   if(wat>0){JEL.b2.setTransform(1,0,0,1,0,0);JEL.b2.drawImage(cv,0,0,W,H);gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,JEL.tBG);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,JEL.bc);gl.uniform1i(U.BG,3)}
+-  gl.uniform1f(U.water,wat);gl.uniform1f(U.refr,mat.refr*jelBreath());gl.uniform1f(U.absorb,mat.absorb);gl.uniform1f(U.opq,lookOpaque());
++  gl.uniform1f(U.water,wat);gl.uniform1f(U.refr,mat.refr*jelBreath());gl.uniform1f(U.absorb,mat.absorb);gl.uniform1f(U.opq,lookOpaque());gl.uniform1f(U.thinOpq,JELX.thinOpq);gl.uniform1f(U.thr,JELX.mode===7?1:JELX.mode===8?2:0);
+   const ds=new Float32Array(24);let nd=0;for(const d of LAB.off.dent?[]:DENTS){const r=R*mat.dentSize*d.d;if(r<.5||nd>=6)continue;const x=X[d.i],y=Y[d.i];ds[nd*4]=toX(x,y);ds[nd*4+1]=H-toY(x,y);ds[nd*4+2]=r*zoom*1.2;ds[nd*4+3]=Math.min(1,d.d);nd++}
+   gl.uniform4fv(U.uD,ds);gl.uniform1i(U.nD,nd);
+   const b=jelColor(tint(col('--body'))),sh=jelColor(tint(col('--shade'),true)),ln=jelColor(col('--line'));

@@ -1,0 +1,162 @@
+--- a/prototype/web/index.html
++++ b/prototype/web/index.html
+@@ -215,7 +215,7 @@
+    - v2.49（多米 11-16：水份是要看得出來牠由水組成，95% 是水）：water 1。畫皮之前把畫布上已經畫好的背景縮成一倍貼圖（JEL.tBG）傳給著色器：透過身體看到的背景照法線偏移（refr，邊緣彎最多）、照厚度染上牠的顏色（absorb，薄的地方幾乎沒顏色）、背光那側內緣聚一道亮光、邊緣反射天光。drawCaustic：坐著時底下一塊聚起來的亮光和一圈淡影；drawBubbles：6 顆黏在身體裡粒子上的小氣泡。切換列的「搖」那排藏起來了
+    ========================================================= */
+ const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+-const $=id=>document.getElementById(id);
++const $=id=>document.getElementById(id);window.F1X={};
+ const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ 
+ const PRESETS={
+@@ -758,10 +758,11 @@
+ function pullK(){if(!(mat.endless>=.5))return 0;let m=0;for(const f of fingers.values())if(f.mode==='grab'&&f.far){const x=Math.max(0,Math.min(1,((f.stretch||0)-.6)/1.2));m=Math.max(m,x*x*(3-2*x))}return m}   // 拉開 0.6R 起、1.8R 全開
+ function effSlip(){return mat.capSlip}
+ function giveK(f){if(!(mat.endless>=.5)||!(mat.pullGive>0)||f.mode!=='grab')return 0;const c=globalC,mx=f.x-f.ax,my=f.y-f.ay,d=Math.hypot(mx,my)/R;if(d<.6)return 0;const ox=f.x-c.xc,oy=f.y-c.yc,ol=Math.hypot(ox,oy);if(ol<R||mx*ox+my*oy<=0)return 0;const u=Math.min(1,(d-.6)/1.2);return u*u*(3-2*u)}   // v2.58b 往外拉開多少（0.6R 起、1.8R 全算），手指讓的上限照這個縮到 pullGive
++function f1Moving(){for(const f of fingers.values())if(f.mode==='grab'&&Math.hypot(f.vxS||0,f.vyS||0)>R*.3)return true;return false}
+ function capGrowStep(dt){if(!(mat.endless>=.5)||!EDG.length){CAPG=1;CAPGAP=0;return}
+   let gap=0,held=false;for(const f of fingers.values()){if(f.mode!=='grab'||!f.mem||!f.mem.length)continue;held=true;let sx=0,sy=0,sw=0;for(const m of f.mem){const w=m[3];sx+=(X[m[0]]-m[1])*w;sy+=(Y[m[0]]-m[2])*w;sw+=w}if(sw>0)gap=Math.max(gap,Math.hypot(sx/sw-f.fx,sy/sw-f.fy)/R)}
+   CAPGAP=gap;
+-  if(held){if(gap>.12&&mat.stretchCap>0){let m=0;for(let e=0,k=0,n=EDG.length;e<n;e+=2,k++){const i=EDG[e],j=EDG[e+1],l=Math.hypot(X[i]-X[j],Y[i]-Y[j])/EDL[k];if(l>m)m=l}
++  if(held){if(gap>.12&&mat.stretchCap>0&&(!F1X.cg||f1Moving())){let m=0;for(let e=0,k=0,n=EDG.length;e<n;e+=2,k++){const i=EDG[e],j=EDG[e+1],l=Math.hypot(X[i]-X[j],Y[i]-Y[j])/EDL[k];if(l>m)m=l}
+       if(m>=.93*mat.stretchCap*CAPG)CAPG=Math.min(mat.growMax||12,CAPG*Math.exp((mat.growK||1.5)*RATE.kg*dt*Math.min(1,gap/.4)))}}
+   else{const need=mat.memCap>0?Math.max(1,QSTR/Math.max(mat.memCap,.9*mat.stretchCap)):1;if(CAPG>need)CAPG+=(need-CAPG)*(1-Math.exp(-dt/.6));if(CAPG<1)CAPG=1}}
+ /* v2.54 拉長時自動補點（多米 11-22）。粒子數是建身體時定死的，拉長之後點越來越疏：外框變成幾段直線、細長的三角形一抖就翻面、記不住形。
+@@ -770,9 +771,11 @@
+    之後網格、區塊、靜止長度都從新的形狀算（Q0 換成記住的形狀），拉伸上限從這裡重新量，CAPG 歸回 1。
+    退回去的時候反過來：外框邊短到 remeshLo 個點距以下、或身體裡有邊被壓到原形四成五以下，而且點比原本多，再撒一次，點數跟著變少。
+    點數最多原本的 remeshMaxN 倍。有交叉、黏在邊上、有固定觸手、有第二團時不補。0 回 v2.54 前半（只放寬上限，不補點）。 */
++function f1Per(){let s=0;const n=bnd.length;for(let k=0;k<n;k++){const i=bnd[k],j=bnd[(k+1)%n];s+=Math.hypot(QX[j]-QX[i],QY[j]-QY[i])}return s}
++let F1C0=1,F1CT=-9;function f1Ease(){if(!(F1X.ce>0)||F1CT<0||t<F1CT)return 1;const u=Math.min(1,(t-F1CT)/F1X.ce);return F1C0+(1-F1C0)*u*u*(3-2*u)}
+ function remeshCheck(dt){if(!(mat.remesh>=.5&&mat.endless>=.5)||TENT.length||B2.on||CLING.on||!EDG.length||!H0X||H0X.length!==N)return;
+   REM.chk+=dt;if(REM.chk<.1||t-REM.last<.2)return;REM.chk=0;
+-  if(mat.remeshHome>=.5&&![...fingers.values()].some(f=>f.mode!=='none')){if(REM.n>0&&HB.length===bnd.length&&remesh(true)){REM.n=0;REM.calm=t+(mat.remeshCalm||0);REM.last=t}return}
++  if(mat.remeshHome>=.5&&![...fingers.values()].some(f=>f.mode!=='none')){if(REM.n>0&&HB.length===bnd.length&&(!F1X.bg||!ringCrossed()&&!ringCrossedQ()&&flipCount(X,Y)<=(F1X.bg>1?0:2))&&(!(F1X.bl>0)||f1Per()<F1X.bl*HRC[HRX.length])&&remesh(true)){REM.n=0;REM.calm=t+(mat.remeshCalm||0);REM.last=t}return}
+   const nb=bnd.length;let bmax=0,bmin=1e9;for(let k=0;k<nb;k++){const i=bnd[k],j=bnd[(k+1)%nb],d=Math.hypot(QX[j]-QX[i],QY[j]-QY[i]);if(d>bmax)bmax=d;if(d<bmin)bmin=d}
+   let smax=0,smin=1e9;for(let e=0,k=0,n=EDG.length;e<n;e+=2,k++){const i=EDG[e],j=EDG[e+1],l=Math.hypot(QX[i]-QX[j],QY[i]-QY[j])/EDL[k];if(l>smax)smax=l;if(l<smin)smin=l}
+   const grow=bmax>(mat.remeshHi||2.6)*h||smax>(mat.remeshStr||2.8),home=mat.remeshHome>=.5,shrink=!home&&REM.n>0&&N>REM.N0*1.05&&(bmin<(mat.remeshLo||.55)*h||smin<.45);
+@@ -830,7 +833,7 @@
+   const nQX=back?ip(QX):null,nQY=back?ip(QY):null;
+   const eL=EYE.L&&EYE.L.length?qAt(EYE.L):null,eR=EYE.R&&EYE.R.length?qAt(EYE.R):null,hq=[QX[hiIdx]||0,QY[hiIdx]||0];
+   const nX=ip(X),nY=ip(Y),nPX=ip(PX),nPY=ip(PY),nH0X=ip(H0X),nH0Y=ip(H0Y),nQDX=QDX&&QDX.length===N?ip(QDX):null,nQDY=QDY&&QDY.length===N?ip(QDY):null,nQVX=QVX&&QVX.length===N?ip(QVX):null,nQVY=QVY&&QVY.length===N?ip(QVY):null,nEX=ip(EX),nEY=ip(EY);
+-  const cgx=globalC.cs,cgy=globalC.sn;
++  const cgx=globalC.cs,cgy=globalC.sn,f1gx=globalC.xc,f1gy=globalC.yc;let f1mx=0,f1my=0;for(let i=0;i<N;i++){f1mx+=X[i];f1my+=Y[i]}f1mx/=N;f1my/=N;
+   N=n2;bnd=nbnd;
+   X=nX;Y=nY;PX=nPX;PY=nPY;H0X=nH0X;H0Y=nH0Y;EX=nEX;EY=nEY;
+   Q0X=new Float64Array(N);Q0Y=new Float64Array(N);QX=new Float64Array(N);QY=new Float64Array(N);
+@@ -852,7 +855,8 @@
+   const near=(x,y,k)=>{const o=[];for(let i=0;i<N;i++)o.push([Math.hypot(QX[i]+mx-x,QY[i]+my-y),i]);o.sort((a,b)=>a[0]-b[0]);return o.slice(0,k).map(q=>q[1])};
+   hiIdx=near(hq[0],hq[1],1)[0];{const nb2=[],rr=R*.3;for(let i=0;i<N;i++){const ox=Q0X[i]-Q0X[hiIdx],oy=Q0Y[i]-Q0Y[hiIdx];if(i!==hiIdx&&ox*ox+oy*oy<rr*rr)nb2.push([i,ox,oy])}HIF.i=hiIdx;HIF.nb=nb2}
+   if(eL)EYE.L=near(eL[0],eL[1],4);if(eR)EYE.R=near(eR[0],eR[1],4);
+-  DENTS.length=0;CAPG=1;
++  if(F1X.hs){let a=0,b=0;for(let i=0;i<N;i++){a+=X[i];b+=Y[i]}const sx=a/N-f1mx,sy=b/N-f1my;HOMEX+=sx;HOMEY+=sy;if(CPX!=null){CPX+=sx;CPY+=sy}globalC.xc=f1gx+sx;globalC.yc=f1gy+sy}
++  DENTS.length=0;CAPG=1;if(F1X.ce>0){if(back){F1CT=-9}else{let m=0;for(let e=0,k=0,n=EDG.length;e<n;e+=2,k++){const i=EDG[e],j=EDG[e+1],l=Math.hypot(X[i]-X[j],Y[i]-Y[j])/EDL[k];if(l>m)m=l}F1C0=Math.min(1,m*1.02/mat.stretchCap);F1CT=t}}
+   if(back){let m=1;for(let e=0,k=0;e<EDG.length;e+=2,k++)m=Math.max(m,Math.hypot(QX[EDG[e]]-QX[EDG[e+1]],QY[EDG[e]]-QY[EDG[e+1]])/EDL[k]);QSTR=m;CAPG=mat.memCap>0?Math.max(1,Math.min(mat.growMax||12,m/Math.max(mat.memCap,.9*mat.stretchCap))):1}   // 換回原本的網格時形狀還是長的：上限放寬到剛好容得下，不會一放手就縮掉一截
+   return true}
+ function effPull(){if(mat.endless>=.5)return ENDLESS_LIM;return !SILL.on?mat.maxPull:mat.strand>=.5?Math.min(mat.maxPull,mat.strandAt):mat.sillCap>0?Math.min(mat.maxPull,mat.sillCap):mat.maxPull}
+@@ -1006,7 +1010,7 @@
+ function buildClusters(){
+   // 區塊：重疊的圓，蓋滿身體。區塊越小越軟、越像果凍；越大越像一塊
+   clusters=[];
+-  const cs=R*mat.cSpace,cr=R*mat.cRad;
++  const cs=R*mat.cSpace;let cr=R*mat.cRad;if(F1X.rc>0&&bnd.length&&HRX.length){let s0=0;const n=bnd.length;for(let k=0;k<n;k++){const i=bnd[k],j=bnd[(k+1)%n];s0+=Math.hypot(Q0X[j]-Q0X[i],Q0Y[j]-Q0Y[i])}cr*=Math.min(F1X.rc,Math.max(1,s0/HRC[HRX.length]))}
+   // v2.54 補點：補過點的長身體會超出 ±2.6R，同一張格子往外延伸蓋住它（平常的身體區塊跟以前一樣）
+   let qx0=0,qx1=0,qy0=0,qy1=0;for(let i=0;i<N;i++){qx0=Math.min(qx0,Q0X[i]);qx1=Math.max(qx1,Q0X[i]);qy0=Math.min(qy0,Q0Y[i]);qy1=Math.max(qy1,Q0Y[i])}
+   const gx0=-2.6*R-cs*Math.ceil(Math.max(0,-2.6*R-(qx0-cr))/cs),gy0=-2.6*R-cs*Math.ceil(Math.max(0,-2.6*R-(qy0-cr))/cs),gx1=Math.max(2.6*R,qx1+cr),gy1=Math.max(2.6*R,qy1+cr);
+@@ -1076,7 +1080,7 @@
+   if(hang){sfxInit();f.hang=hang;hang.held=e.pointerId;hangRing(hang,.3);fingers.set(e.pointerId,f);try{cv.setPointerCapture(e.pointerId)}catch(_){}$('hint').classList.add('off');return}
+   if(prop){sfxInit();f.prop=prop;prop.held={id:e.pointerId,ox:prop.x-p.x,oy:prop.y-p.y};{const c=Math.cos(prop.a),s=Math.sin(prop.a),dx=p.x-prop.x,dy=p.y-prop.y;prop.held.lx=c*dx+s*dy;prop.held.ly=-s*dx+c*dy}prop.lastHit=t;prop.fade=0;prop.alpha=1;fingers.set(e.pointerId,f);try{cv.setPointerCapture(e.pointerId)}catch(_){}$('hint').classList.add('off');return}
+   sfxInit();if(grab)sfxPlay('press',.7)
+-  if(grab)fingerGrab(f,p);
++  if(grab){f.r0x=p.x-globalC.xc;f.r0y=p.y-globalC.yc;fingerGrab(f,p)}
+   // 一壓就攤平（2026-11-01 多米想看看）：從身體上半部按下去才算「壓」，記下當時的高度與底部（看不見的桌面就在底部）
+   if(grab&&mat.pressFlat>0){let y0=1e9,y1=-1e9;for(const i of bnd){y0=Math.min(y0,Y[i]);y1=Math.max(y1,Y[i])}
+     if(p.y<globalC.yc){f.flatOn=true;f.h0=Math.max(R*.5,y1-y0);f.bot=y1;f.flat=1}}
+@@ -1144,7 +1148,7 @@
+   const gx=globalC.xc,gy=globalC.yc,ox=rx-gx,oy=ry-gy,ol=Math.hypot(ox,oy)||1,fx=f.x-rx,fy=f.y-ry,fl=Math.hypot(fx,fy)||1,back=(ox*fx+oy*fy)/(ol*fl)<.2;   // 繞到身體後面也滑開：觸手會橫跨身體，一樣會抖
+   if(!back&&fl>=mat.tentSlip*rest)return false;letGo(f);return true}
+ // 摸到一半停住（或 Swift 的接觸面變大）：手指底下那塊被抓住，從這裡接著拉
+-function strokeGrab(f){f.mode='grab';f.ax=f.x;f.ay=f.y;f.fx=f.x;f.fy=f.y;f.stretch=0;f.ex=0;f.ey=0;f.sb=0;f.step=0;f.hold=0;f.press=0;f.pressOn=false;f.peak=0;f.on=false;fingerGrab(f,{x:f.x,y:f.y});sfxPlay('press',.35);dragRebase()}
++function strokeGrab(f){f.mode='grab';f.ax=f.x;f.ay=f.y;f.fx=f.x;f.fy=f.y;f.stretch=0;f.ex=0;f.ey=0;f.sb=0;f.step=0;f.hold=0;f.press=0;f.pressOn=false;f.peak=0;f.on=false;f.r0x=f.x-globalC.xc;f.r0y=f.y-globalC.yc;fingerGrab(f,{x:f.x,y:f.y});sfxPlay('press',.35);dragRebase()}
+ function trailAdd(f){const g=globalC,cs=g.cs==null?1:g.cs,sn=g.sn||0,px=f.x-g.xc,py=f.y-g.yc;TRAIL.push({x:cs*px+sn*py,y:-sn*px+cs*py,t0:t,n:f.tDown});if(TRAIL.length>64)TRAIL.shift()}
+ // 每幀：判斷、摸與抓互換、痕跡、整團被帶走的偏移（連上一幀一起平移，不留速度，家也跟著走）
+ function strokeStep(dt){if(!(mat.strokeV>0&&mat.inertiaHz>0)){for(const f of [...fingers.values()])if(f.mode==='stroke')strokeGrab(f)}
+@@ -1250,7 +1254,7 @@
+   if(SLP.k>0){POSX*=1+.05*SLP.k;POSY*=1-.07*SLP.k}   // v2.23 B2：睡著攤軟一點
+   if(SHK.t0>0&&t>=SHK.t0&&t<SHK.t0+.6)TRM+=R*.025*SHK.amp*Math.exp(-(t-SHK.t0)/.2)*(REDUCED?.5:1);   // v2.19 甩一甩時輪廓也抖
+   // 1 積分（Verlet）
+-  for(let i=0;i<N;i++){const vx=(X[i]-PX[i])*damp,vy=(Y[i]-PY[i])*damp;PX[i]=X[i];PY[i]=Y[i];X[i]+=vx+Gh*dt*dt;Y[i]+=vy+G*dt*dt}
++  if(F1X.ad&&SILL.on&&SILL.air&&!(INTRO.on&&INTRO.ph==='air')){let mx=0,my=0;for(let i=0;i<N;i++){mx+=X[i]-PX[i];my+=Y[i]-PY[i]}mx/=N;my/=N;const dd=mat.damp;for(let i=0;i<N;i++){const vx=mx+(X[i]-PX[i]-mx)*dd,vy=my+(Y[i]-PY[i]-my)*dd;PX[i]=X[i];PY[i]=Y[i];X[i]+=vx+Gh*dt*dt;Y[i]+=vy+G*dt*dt}}else if(F1X.vc>0&&!fingers.size&&t-lastTouch<(F1X.vcT||.8)&&!INTRO.on&&!SILL.hop){const lim=F1X.vc*R*dt;for(let i=0;i<N;i++){let vx=(X[i]-PX[i])*damp,vy=(Y[i]-PY[i])*damp;const sp=Math.hypot(vx,vy);if(sp>lim){vx*=lim/sp;vy*=lim/sp}PX[i]=X[i];PY[i]=Y[i];X[i]+=vx+Gh*dt*dt;Y[i]+=vy+G*dt*dt}}else for(let i=0;i<N;i++){const vx=(X[i]-PX[i])*damp,vy=(Y[i]-PY[i])*damp;PX[i]=X[i];PY[i]=Y[i];X[i]+=vx+Gh*dt*dt;Y[i]+=vy+G*dt*dt}
+   // 2 手指（GWT：這一小步每顆粒子被抓的權重，給形狀匹配用）
+   GWT.fill(0);if(SLX){SLX.fill(0);SLY.fill(0)}
+   for(const f of fingers.values()){
+@@ -1359,7 +1363,7 @@
+   // 回正：轉回頭朝上。純運動學（位置與前一幀一起轉，不留速度），所以不會過衝、不會翻身；抓著時加強
+   const gAng=Math.atan2(globalC.sn,globalC.cs);
+   const grabbing=fingers.size>0;
+-  const rotK=-gAng*Math.min(.2,grabbing?Math.min(mat.upright*mat.anchor*mat.gripRot,mat.gripUp>=0?mat.gripUp:1):mat.upright);   // v2.29 gripUp：抓著時身體要轉得動，不然被拉過去的那條只能纏在身上（窗台上原本每小步轉回 20%）
++  let rotK=-gAng*Math.min(.2,grabbing?Math.min(mat.upright*mat.anchor*mat.gripRot,mat.gripUp>=0?mat.gripUp:1):mat.upright);if(F1X.up>0&&!grabbing){let rm=0;for(const i of bnd){const q=(X[i]-cx)**2+(Y[i]-cy)**2;if(q>rm)rm=q}const lim=F1X.up*R*dt/Math.max(R*.5,Math.sqrt(rm));rotK=Math.max(-lim,Math.min(lim,rotK))}   // v2.29 gripUp：抓著時身體要轉得動，不然被拉過去的那條只能纏在身上（窗台上原本每小步轉回 20%）
+   if(rotK!==0){const c=Math.cos(rotK),sn=Math.sin(rotK);
+     for(let i=0;i<N;i++){if(GRAB[i])continue;
+       let dx=X[i]-cx,dy=Y[i]-cy;X[i]=cx+dx*c-dy*sn;Y[i]=cy+dx*sn+dy*c;
+@@ -1413,7 +1417,7 @@
+         const delta=(hmin-s)*.5,wq=(GRAB[q.a]||GRAB[q.b])?.3:1,wg=(GRAB[g.a]||GRAB[g.b])?.3:1,sw=wq+wg;
+         X[q.a]+=ux*delta*wq/sw;Y[q.a]+=uy*delta*wq/sw;X[q.b]+=ux*delta*wq/sw;Y[q.b]+=uy*delta*wq/sw;
+         X[g.a]-=ux*delta*wg/sw;Y[g.a]-=uy*delta*wg/sw;X[g.b]-=ux*delta*wg/sw;Y[g.b]-=uy*delta*wg/sw}}}
+-  if(mat.stretchCap>0&&EDG.length){for(let q=0,n=mat.capIter||2;q<n;q++){const a=strainStep(X,Y,mat.capLo,mat.stretchCap*capG(),true),b=mat.noFlip>0?meshGuard(X,Y,mat.noFlip,true):0;if(b)GRD._f=1;if(!a&&!b)break}}   // v2.48 每一小塊的硬上下限，跟防翻面一起多做幾輪
++  if(mat.stretchCap>0&&EDG.length){for(let q=0,n=mat.capIter||2;q<n;q++){const a=strainStep(X,Y,mat.capLo,mat.stretchCap*capG()*f1Ease(),true),b=mat.noFlip>0?meshGuard(X,Y,mat.noFlip,true):0;if(b)GRD._f=1;if(!a&&!b)break}}   // v2.48 每一小塊的硬上下限，跟防翻面一起多做幾輪
+   else if(mat.noFlip>0){if(meshGuard(X,Y,mat.noFlip,true))GRD._f=1}   // v2.29 防打結：放在碰撞之前，碰撞最後算，身體才不會陷進地板
+   // 4 回家（懸空時較強），邊界，地面
+   const hx=HOMEX+MOOD.tugX+DRAG.ox+Lamp*mat.life*R*.035*Math.sin(tl*2*Math.PI/7.3),hy=HOMEY+MOOD.tugY+DRAG.oy-BR.lift+(FLOAT&&mat.jelly<.5?Lamp*mat.life*R*.05*Math.sin(tl*2*Math.PI/4.7):0);   // 水母模式不再另外上下飄，上下只跟呼吸
+@@ -1443,7 +1447,7 @@
+   // 上下限每一小步推回來、手指下一小步又拉過去，兩邊搶，就是抽搐和翻面的來源（量過：抓頭頂往下拉 2R，翻 50 到 74 個三角形）。
+   // 窗台、地板、牆把那塊擋回來的量也算（手指拖到窗台下面時，那塊被地板每一小步頂回來，量過每幀跳 18 點）
+   if(mat.stretchCap>0&&effSlip()>0&&SLX)for(const f of fingers.values()){if(f.mode!=='grab'||!f.mem.length)continue;let sx=0,sy=0,sw=0;for(const m of f.mem){const i=m[0],w=m[3];sx+=SLX[i]*w;sy+=SLY[i]*w;sw+=w}
+-    if(sw>0){const cs=effSlip();if(mat.endless>=.5){const gc=globalC,rx=f.fx-gc.xc,ry=f.fy-gc.yc,rl=Math.hypot(rx,ry);if(rl>1e-6){const d=(sx*rx+sy*ry)/rl;if(d<0){sx-=d*rx/rl;sy-=d*ry/rl}}}   // v2.54 無限拉：手指只往外、往旁邊讓，不往身體中心退（往中心退就是「拉不長」）
++    if(sw>0&&!(F1X.gv&&F1S>.25&&Math.hypot(sx,sy)>0&&(f.slx||0)*sx+(f.sly||0)*sy>0&&Math.hypot(f.slx||0,f.sly||0)>R*(F1X.gvL||.3))){const cs=effSlip();if(mat.endless>=.5){const gc=globalC,rx=f.fx-gc.xc,ry=f.fy-gc.yc,rl=Math.hypot(rx,ry);if(rl>1e-6){const d=(sx*rx+sy*ry)/rl;if(d<0){sx-=d*rx/rl;sy-=d*ry/rl}}}   // v2.54 無限拉：手指只往外、往旁邊讓，不往身體中心退（往中心退就是「拉不長」）
+       const s0x=f.slx||0,s0y=f.sly||0,gk=giveK(f),mx=Math.max(R*(2+((mat.pullGive||0)-2)*gk),gk>0?Math.min(R*2,Math.hypot(s0x,s0y)):0);f.slx=s0x+sx/sw*cs;f.sly=s0y+sy/sw*cs;const l=Math.hypot(f.slx,f.sly);if(l>mx){f.slx*=mx/l;f.sly*=mx/l}if(gk>0){f.fx+=f.slx-s0x;f.fy+=f.sly-s0y}else{f.fx+=sx/sw*cs;f.fy+=sy/sw*cs}if(Math.abs(sx)+Math.abs(sy)>sw*.02)GRD._g=1}}
+ }
+ // 蠕動不重複（2026-11-01 多米真機回報：一直是同一個樣子在晃）：輪廓的 2 到 5 階變形，每階兩個係數各跟一條平滑亂數走
+@@ -1472,7 +1476,7 @@
+   for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];
+     for(let s=2;s<=5;s++){const j=(i+s)%n,p=bnd[j],q=bnd[(j+1)%n];if(TID[a]!==TID[p])continue;
+       if(!segX(X[a],Y[a],X[b],Y[b],X[p],Y[p],X[q],Y[q]))continue;
+-      for(let m=1;m<=s;m++){const c=bnd[(i+m)%n],f=m/(s+1),tx=X[a]+(X[q]-X[a])*f,ty=Y[a]+(Y[q]-Y[a])*f,dx=tx-X[c],dy=ty-Y[c];X[c]+=dx;Y[c]+=dy;PX[c]+=dx;PY[c]+=dy}
++      for(let m=1;m<=s;m++){const c=bnd[(i+m)%n],f=m/(s+1),tx=X[a]+(X[q]-X[a])*f,ty=Y[a]+(Y[q]-Y[a])*f,dx0=tx-X[c],dy0=ty-Y[c],dl0=Math.hypot(dx0,dy0),kk0=F1X.uk>0&&dl0>h*F1X.uk?h*F1X.uk/dl0:1,dx=dx0*kk0,dy=dy0*kk0;X[c]+=dx;Y[c]+=dy;PX[c]+=dx;PY[c]+=dy}
+       break}}}
+ function ringGuard(){const nb=bnd.length,dm=h*.45,far=dm*4,kv=mat.stretchCap>0?1-mat.capVel:0;
+   for(let k=0;k<nb;k++){const p=bnd[k],xp=X[p],yp=Y[p];
+@@ -1501,6 +1505,7 @@
+   if(!(a1-a0>(q1-q0)*.65))return;
+   const k=Math.min(.2,mat.flow*dt),bm=(b0+b1)/2;
+   for(let i=0;i<N;i++){const a=QX[i]*dx+QY[i]*dy,b=QX[i]*dy-QY[i]*dx,a2=a1-(a1-a)*(1-k),b2=bm+(b-bm)*(1+k);QX[i]=a2*dx+b2*dy;QY[i]=a2*dy-b2*dx}}
++let F1S=0;function f1Creep(dt){F1S=f1Moving()?0:F1S+dt;const g0=F1S<.25?1:Math.max(F1X.crMin||.02,1-(F1S-.25)/.25);return 1-pullK()*(1-g0)}
+ function plasticity(dt){
+   // 每顆粒子在「參考座標」裡現在的位置（只用旋轉反推，平均各區塊）
+   RX.fill(0);RY.fill(0);
+@@ -1533,7 +1538,7 @@
+     // 只有抓住一陣子才開始記形：dwellLo 秒內純彈性（輕按、快彈都回彈），dwellHi 秒後全速（揉捏即留形）
+     let g=0;const lo=mat.dwellLo,hi=Math.max(lo+1e-3,mat.dwellHi);
+     for(const f of grabs){const x=Math.max(0,Math.min(1,(t-f.tDown-lo)/(hi-lo)));g=Math.max(g,x*x*(3-2*x))}
+-    const yl=mat.yield*R,kc=Math.min(1,(mat.creep+Math.max(0,(mat.pullCreep||0)-mat.creep)*PK)*RATE.kc*dt*g)*(mat.rubSpeed>0&&tickOn()?0:1);   // v2.24：搔癢不是在塑形，不記形（全身在扭，記下來外框會折）
++    const yl=mat.yield*R,kc=Math.min(1,(mat.creep+Math.max(0,(mat.pullCreep||0)-mat.creep)*PK)*RATE.kc*dt*g)*(mat.rubSpeed>0&&tickOn()?0:1)*(F1X.cr?f1Creep(dt):1);   // v2.24：搔癢不是在塑形，不記形（全身在扭，記下來外框會折）
+     // v2.24 pressLocal：手指還沒拖開（0.15R 內）時只有手指附近記形。整團都記的話，按著不動會把形狀匹配的小誤差記進遠端的邊，按 4 秒折出 48 度的尖角（Q 本身就折了）；拖開之後照舊整團記，拉的留形不動
+     for(const f of grabs)if(!f.far&&Math.hypot(f.x-f.ax,f.y-f.ay)>R*.15)f.far=true;
+     const plOn=mat.pressLocal>=.5&&grabs.every(f=>!f.far),plK=1/(.49*R*R);
+@@ -1632,6 +1637,7 @@
+ // v2.18 心情的事件：放手時看這一抓是哪一種。拉扯（撐過 0.5 秒）→ 往拉的反方向逃；輕揉 1 秒以上而且舒服 → 開心（挺高、偽足搖、小跳）；
+ // 很快的一下（0.25 秒內、沒拉開）→ 戳：縮一下，1 秒內第 3 下就往旁邊閃
+ function moodRelease(f){if(!(mat.emo>=.5))return;
++  if(MOOD.strainMax>.15&&F1X.fl&&f1Per()>F1X.fl*HRC[HRX.length]){MOOD.strainMax=0;MOOD.scare=Math.min(1,MOOD.scare+.5);return}
+   if(MOOD.strainMax>.15){flee(-MOOD.px,-MOOD.py,W*(.45+.35*MOOD.strainMax)*mat.flee);MOOD.strainMax=0;return}
+   if(t-f.tDown<.25&&(f.stretch||0)<.3){MOOD.taps=MOOD.taps.filter(x=>t-x<1);MOOD.taps.push(t);MOOD.scare=Math.min(1,MOOD.scare+.45);MOOD.a=Math.min(1,MOOD.a+.3);MOOD.c=Math.max(-1,MOOD.c-.1);MOOD.cowerUntil=Math.max(MOOD.cowerUntil,t+.5);
+     if(MOOD.taps.length>=3){let ux=globalC.xc-f.ax,uy=globalC.yc-f.ay,ul=Math.hypot(ux,uy);if(ul<R*.1){const a=Math.random()*2*Math.PI;ux=Math.cos(a);uy=Math.sin(a)}else{ux/=ul;uy/=ul}
+@@ -2130,7 +2136,7 @@
+ function slideLen(){let S=mat.slide*R;if(IV2('impC3'))S*=Math.max(.5,1+.8*IMP.w-.4*IMP.tr);return S}
+ function dragTarget(){if(!(mat.slide>0)){const [dx,dy,n]=dragAvg(),k=dragFollow();return[dx*k,dy*k,n]}
+   let sx=0,sy=0,n=0;for(const f of fingers.values())if(f.mode==='grab'){if(!f.tug){sx+=f.x-f.ax;sy+=f.y-f.ay}n++}if(!n)return[0,0,0];   // v2.51 tug：捏著邊緣拉的手指不把整隻拖走，只拉出黏條
+-  const dx=sx/n,dy=sy/n,dl=Math.hypot(dx,dy);if(dl<1e-9)return[0,0,n];const S=slideLen(),st=S*Math.tanh((1-dragFollow())*dl/S);return[dx-dx/dl*st,dy-dy/dl*st,n]}
++  let dx=sx/n,dy=sy/n,dl=Math.hypot(dx,dy);if(dl<1e-9)return[0,0,n];let cx0=0,cy0=0;if(F1X.iw&&n===1){const f=[...fingers.values()].find(q=>q.mode==='grab');if(f&&f.r0x!=null){const rl=Math.hypot(f.r0x,f.r0y);if(rl>R*.1){const ux=f.r0x/rl,uy=f.r0y/rl,p=-(dx*ux+dy*uy);if(p>0){const wt=smooth01((rl/R-.15)/.35),c=Math.min(p,rl*(F1X.iwK||1.6))*wt;cx0=-ux*c;cy0=-uy*c;dx-=cx0;dy-=cy0;dl=Math.hypot(dx,dy)||1e-9}}}}const S=slideLen(),st=S*Math.tanh((1-dragFollow())*dl/S);return[cx0+dx-dx/dl*st,cy0+dy-dy/dl*st,n]}
+ // 手指換了（多一根、少一根）：偏移先併進家，再把基準對到現在，目標從 0 接著走
+ function dragRebase(){HOMEX+=DRAG.ox;HOMEY+=DRAG.oy;DRAG.ox=0;DRAG.oy=0;const [tx,ty,n]=dragTarget();DRAG.bx=n?-tx:0;DRAG.by=n?-ty:0;DRAG.slipT=0}
+ // 放手：還有別根在抓就重對基準；最後一根放開就併進家（停在被拖到的地方），甩著放手照偏移的速度再滑（最多約 0.4R，0.25 秒時間常數）
