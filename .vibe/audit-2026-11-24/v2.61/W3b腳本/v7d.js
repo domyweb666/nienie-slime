@@ -1,0 +1,4 @@
+const R1={};const set=(o)=>{for(const k in PRESETS)Object.assign(PRESETS[k],o);Object.assign(mat,o)};const up=q=>Math.abs(Math.atan2(Math.sin(q.a),Math.cos(q.a)));
+for(const bs of [0,1]){set({bumpSoft:bs});const dir=1,s=4,tr=[];open(s*13+1,{tr:.3});steps(300);const q=PROPS.filter(p=>p.deco)[1];const p=scr(globalC.xc,globalC.yc);ev('pointerdown',1,p[0],p[1]);steps(6);for(let k=1;k<=14;k++){ev('pointermove',1,p[0]+dir*k*9,p[1]-k*3);steps(1)}ev('pointerup',1,p[0]+dir*126,p[1]-42);const t0=t;let px=globalC.xc;
+ steps(150,i=>{if(i%6===0)tr.push([+(t-t0).toFixed(2),Math.round((globalC.xc-px)*10),Math.round(q.x-q.hx),+up(q).toFixed(2),SILL.air?1:0,SILL.hop?1:0,GAIT.on?1:0,SILL.route?1:0,LIFE.st,+(t-lastTouch).toFixed(2),ESC.on?1:0,+(t-(q.softT||-99)).toFixed(2),Math.round(globalC.xc-q.x)].join(' '));if(i%6===0)px=globalC.xc});R1['b'+bs]=tr}
+return R1;

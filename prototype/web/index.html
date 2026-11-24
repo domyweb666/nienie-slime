@@ -1791,11 +1791,11 @@ function drCat(){const p=drCatPick();if(!p){LIFE.until=t+restDur();return}const 
 function drStep(dt){const U=DR.push;if(!U)return;const p=U.p;if(!DRon()||SILL.route!==U.route||p.gone||p.held||p.fell){DR.push=null;return}
   const s=LIFE.sns.length?LIFE.sns[LIFE.sns.length-1]:null;if(!s||s.cut>0||sniffEnv(s)<.6)return;
   p.vx=U.side*R*.2;p.lastHit=t;p.catT=t;p.selfT=t}
-const BRAIN={m:.15,mS:.15,pre:null,ev:{h:-9,j:-9,w:0,sc:0},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:0,seed:20261114,hudAt:0,naps:0,selfWake:0,zAt:.5,jA:1,jS:1,slp:false};   // v2.61 C7（brJit）：zAt 睏到多少才想睡、jA 這一輪醒著睏得多快、jS 這一覺睡多快醒，每一輪重抽
+const BRAIN={m:.15,mS:.15,pre:null,ev:{h:-9,j:-9,w:0,sc:0},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:0,seed:20261114,hudAt:0,naps:0,selfWake:0,zAt:.5,jA:1,jS:1,slp:false,ojT:-9};   // v2.61 C7（brJit）：zAt 睏到多少才想睡、jA 這一輪醒著睏得多快、jS 這一覺睡多快醒，每一輪重抽
 const BRon=()=>mat.life2>=.5&&mat.brain>=.5;
 const MDon=()=>BRon()&&mat.mood>=.5,BRM=()=>MDon()?BRAIN.m:0,BRMS=()=>MDon()?BRAIN.mS:0;   // v2.42 心情（關著時一律當 0）
 function brnd(){BRAIN.seed=(Math.imul(BRAIN.seed,1664525)+1013904223)>>>0;return BRAIN.seed/4294967296}
-function brainReset(){drReset();Object.assign(BRAIN,{m:.15,mS:.15,pre:null,ev:{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:t,zAt:.5,jA:1,jS:1,slp:false})}   // 每次打開、換一隻都從同一個起點：跟你離開多久無關
+function brainReset(){drReset();Object.assign(BRAIN,{m:.15,mS:.15,pre:null,ev:{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare},z:.3,q:.3,s:0,f:0,e:.4,want:'',act:'休息',why:'',ex0:0,homeAt:t,zAt:.5,jA:1,jS:1,slp:false,ojT:-9})}   // 每次打開、換一隻都從同一個起點：跟你離開多久無關
 // v2.43 記性（大腦第 3 片）。記地方：窗台從左到右五格（原本六格，家剛好落在第 3、4 格的交界，在家被嚇會記到隔壁那格；五格時家在正中間那格的中央），每格 -1（被嚇過）到 1（被摸得舒服）。記你：side -1（你常摸左邊）到 1（右邊）。
 // 喜歡的跨天留著，討厭的三天退完（存在瀏覽器 nienie.brain，跟熟一樣每 3 秒有變才寫）。擺飾的記性等擺飾變成真的物體（第 4 片）。
 const BMEM={cell:[0,0,0,0,0],side:0,ev:{h:-9,w:0,sc:0},dirty:false,at:-9,leans:0,ts:0};
@@ -1862,12 +1862,12 @@ function brainStep(dt,engaged){const B=BRAIN;if(!BRon()){if(B.hudOn)brainHud(fal
   if(brainAtHome())B.homeAt=t;
   B.act=DR.push?'推東西':SLP.on?'睡覺':B.pre&&B.pre.k==='sleep'?'想睡了':(B.pre&&B.pre.k==='greet')||B.want==='greet'?'看著你':ESC.on?'逃跑':engaged?'被你碰著':E4.on?'來找你':LURE.on?'注意你的手指':ECHO.st!=='idle'?'回你的節奏':LIFE.st==='look'?'張望':(LIFE.st==='go'||LIFE.st==='arrive'||GAIT.on||(SILL.on&&SILL.route))?'走':'休息';
   brainHud(mat.brainHud>=.5)}
-const BRJ={a0:.3,a1:2.6,s0:.45,s1:2.4,z0:.4,z1:.75,e0:.15,q:.9,lie:9};   // v2.61 C7：a 醒著睏得多快的倍數（越大越快睏）、s 睡著多快睡飽的倍數、z 睏到多少才睡、e 醒來想動至少留幾成、q 醒來好奇最多多少、lie 醒來最多賴幾秒
+const BRJ={a0:.3,a1:2.6,s0:.45,s1:2.4,z0:.4,z1:.75,e0:.5,q:.6,lie:9};   // v2.61 C7：a 醒著睏得多快的倍數（越大越快睏）、s 睡著多快睡飽的倍數、z 睏到多少才睡、e 醒來想動至少留幾成、q 醒來好奇最多多少、lie 醒來最多賴幾秒
 const BR_Q=30,BR_E=90,BR_GO=.5,BR_REST=.35,BR_NAMES={rest:'休息',look:'張望',go:'走',sleep:'睡覺',greet:'來找你',offer:'把你常摸的那邊靠過來',cat:'去推東西'};
 function sleepOK(){return IV3('sleep')&&!SLP.on&&LIFE.st==='rest'&&!fingers.size&&!E4.on&&ECHO.st==='idle'&&!SWIM.on&&!(SNW.cloud>.03)&&!SNW.loose.length}
 function e4OK(){return IV3('e4')&&!E4.on&&IMP.tr>.5&&E4.count<3+Math.round(2*exLevel())&&t-E4.lastT>40&&!fingers.size&&t-lastTouch>6}
 // 休息到時間：五個需求各算一個分數（怕會壓住睡、來找你、走，推高張望），最高的贏；都不到 0.35 就繼續休息。分數接近時加一點亂數挑
-function brainPick(canGo){const B=BRAIN,n=()=>(brnd()-.5)*.16,calm=1-B.f,idleT=idleSec(),opening=mat.wakeSoft>=.5&&t>=SLP.openT&&t-SLP.openT<(mat.sleepAfter||40);
+function brainPick(canGo){const B=BRAIN,na=mat.greetLook>=.5&&t<B.ojT?OPENJ.n:.16,n=()=>(brnd()-.5)*na,calm=1-B.f,idleT=idleSec(),opening=mat.wakeSoft>=.5&&t>=SLP.openT&&t-SLP.openT<(mat.sleepAfter||40);
   const c=[['rest',BR_REST,'都不高',0],['look',B.q+.3*B.f+n(),'好奇',B.q],['go',canGo?B.e*(1-.5*B.z)*(1-.5*B.f)*(1+.3*BRM())+n()+(MMon()&&SILL.plane==='room'&&BMEM.cell[memCellAt(globalC.xc)]<-.3?.4:0):-1,'想動',B.e],
     ['sleep',!opening&&sleepOK()&&idleT>8&&B.z>B.zAt?B.z*calm+n():-1,'睏',B.z],['greet',e4OK()?B.s*calm+n():-1,'想被摸',B.s],['offer',memCanOffer()?B.s*calm*.9+n():-1,'想被摸',B.s],['cat',drCatOK()?B.q*calm+.15+n():-1,'好奇',B.q]];   // v2.46 推東西排最後：條件不成立時不抽亂數，前面幾項抽到的數字跟 v2.45 一樣
   let b=c[0];for(const x of c)if(x[1]>b[1])b=x;B.want=b[0];B.why=b[0]==='rest'?'五個都不高，繼續休息':b[2]+' '+b[3].toFixed(2)+' 最高，'+BR_NAMES[b[0]];return b[0]}
@@ -2164,7 +2164,8 @@ function greetStep(){const G=GREET;if(G.st!=='wait')return;
   if(t<G.at)return;
   G.st='';G.until=t+GREETK.look;EYE.user=Math.max(EYE.user,G.until);EYE.blinkT=t+GREETK.blink;EYE.nextBlink=Math.max(EYE.nextBlink,t+GREETK.blink+1.2);
   if(LIFE.st==='rest'&&!SLP.on)LIFE.until=Math.max(LIFE.until,G.until+.1+.6*Math.random())}
-function brainJit(){if(!(mat.greetLook>=.5)||!BRon())return;const B=BRAIN,r=Math.random;B.seed=(r()*4294967296)>>>0;B.z=.15+.3*r();B.q=.05+.65*r();B.e=.05+.65*r();B.s=.4*r()*IMP.tr}   // 打開（換隻、離開十分鐘回來）時四個需求的起點加亂數：開頭三件事不再每次一樣
+function brainJit(){if(!(mat.greetLook>=.5)||!BRon())return;const B=BRAIN,r=Math.random;B.seed=(r()*4294967296)>>>0;B.z=.15+.3*r();B.q=.05+.65*r();B.e=.15+.7*r();B.s=.4*r()*IMP.tr;B.ojT=t+OPENJ.s}   // 打開（換隻、離開十分鐘回來）時四個需求的起點加亂數，剛打開 OPENJ.s 秒挑事情時每一項多加一點亂數（平常 0.16）：開頭三件事不再每次一樣。只加起點不夠：好奇漲得快、想動漲得慢，第二件以後照樣都是探
+const OPENJ={s:40,n:.8};
 // B2 睡著：40 秒沒人碰（點空白處也算碰）而且在休息，就慢慢睡著（1.6 秒時間常數閉眼、攤軟、呼吸慢一倍半）。碰它嚇醒（縮大 1.6 倍、睜大、「嗯？」），手指放旁邊 1.2 秒慢慢醒
 function sleepTry(){if(!IV3('sleep')||SLP.on)return false;
   if(idleSec()<(mat.sleepAfter||40)||LIFE.st!=='rest'||fingers.size||E4.on||ECHO.st!=='idle'||SWIM.on||SNW.cloud>.03||SNW.loose.length)return false;   // v2.31 亮粉在沉的時候不睡：清的那一刻要睜眼
