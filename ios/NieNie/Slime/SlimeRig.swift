@@ -388,6 +388,10 @@ final class SlimeRig {
     // B2 sleep: k eases 0...1 (1.6 s falling asleep, 0.25 s waking); lastAny = the last touch anywhere (a tap on empty space counts)
     private var slpSnoreAt = 0.0   // v2.50 next sleeping breath sound
     private var slpOn = false, slpK = 0.0, slpLastAny = -99.0, slpWakeT = -9.0, slpAskAt = -9.0, slpNearT = 0.0, flBoost = 1.0
+    // v2.61 C1 (wakeSoft; web SLP): openT = when it was opened (or another one swam in); slow = this waking is the slow one; tap = the finger that touched it asleep (still to be told light or hard,
+    // then, done, held on), since tapT0; tapN = light touches this nap; roll = the turn over (since when, which side, how far it has moved for it)
+    private var slpOpenT = -99.0, slpSlow = false, slpTapN = 0, slpTapT0 = -9.0, slpTapDone = false, slpRollT = -9.0, slpRollD = 1.0, slpRollO = 0.0
+    private var slpTap: Finger?
     // C6 echo: st 0 idle, 1 listening, 2 answering; beats = offsets from t0; prev = the rhythm it answered last (you repeating it = happy)
     private var echoTaps: [Double] = [], echoSt = 0, echoX = 0.0, echoY = 0.0, echoBeats: [Double] = [], echoI = 0, echoT0 = 0.0
     private var echoPrev: [Double]?, echoPrevT = -99.0, echoSame = false, echoJoyUntil = -9.0
@@ -402,6 +406,7 @@ final class SlimeRig {
     /// to gravity and the floor (it really hits it, so no two wobbles are alike). Distance is drawn: it starts up-right at 0.15×, each
     /// hop comes closer and bigger, the last lands at home. Reduce Motion: no travel, one small hop at home.
     func startIntro() {
+        slpOpenT = t   // v2.61 C1: opened, or another one swims in
         guard effParams.intro >= 0.5, N > 0 else { return }
         if effParams.introSwim >= 0.5 && params.life2 >= 0.5 && lv(params.lifeGait) { swimIntro(1); return }   // v2.23 開場游過來
         var y1 = -1e9
@@ -443,7 +448,7 @@ final class SlimeRig {
             }
             return
         }
-        if f.gentleT > 1 && moodC > 0.35 && fingers.isEmpty { happyT = t; wagT = t + 0.1; hop(); voice("happy") }
+        if f.gentleT > 1 && moodC > 0.35 && fingers.isEmpty && !slpOn { happyT = t; wagT = t + 0.1; hop(); voice("happy") }   // v2.61 C1: !slpOn, let go still asleep (it only turned over)
     }
     private func flee(_ dx: Double, _ dy: Double, _ dist: Double) {
         guard dist > 0 else { return }
@@ -1061,6 +1066,7 @@ final class SlimeRig {
         QDX = QX; QDY = QY; QVX = [Double](repeating: 0, count: N); QVY = QVX; QW = QVX; cvX = 0; cvY = 0; caX = 0; caY = 0; cpX = nil; cpY = nil; tickLastT = -9   // v2.25
         stkOX = 0; stkOY = 0; stkVX = 0; stkVY = 0; stkG = 0; stkLast = -9; stkSaid = false; stkPet = false; trail = []   // v2.26
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
+        slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         CAPG = 1; CAPGAP = 0   // v2.54
@@ -2116,7 +2122,8 @@ final class SlimeRig {
             if !grab && allowed && walkGiftAt(sx, sy) { onGiftTap?(); return }
         }
         if grab { escOn = false }   // v2.18: caught, it stops running
-        if grab { swimOn = false; wake(true) }   // v2.23: caught while swimming in, no hello; asleep, it startles awake
+        let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)   // v2.61 C1: made here (it was made further down): softTouch keeps hold of it
+        if grab { swimOn = false; if !(slpOn && softTouch(f)) { wake(true) } }   // v2.23: caught while swimming in, no hello; asleep, it startles awake; v2.61 C1 (wakeSoft): trusting, it waits 0.25 s to tell a light touch
         if !grab && allowed {   // v2.23: asleep, a tap beside it wakes it (that tap is no rhythm); awake, C6 listens
             if slpOn { var db = 1e9; for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }; if db < R * 2 { wake(false) }; echoTaps = [] }
             else { echoTap(x, y) }
@@ -2124,15 +2131,14 @@ final class SlimeRig {
         // v2.19: caught, the sniffing pseudopods draw in and it stops walking; A5 the dent still shows at once (below) and 0.1...0.25 s
         // later it flinches by itself; A7 a touch on empty space within 3R makes it turn and sniff that way 0.3 s later
         // v2.20 C5: wary, it flinches sooner
-        if grab && lv(params.lifeFlinch) && !(flAt > t) { flAt = t + (0.1 + Double.random(in: 0..<0.15, using: &rng)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt; flTapAt = flAt }   // flTapAt: v2.61 D2
-        if grab && params.life2 >= 0.5 { cutSniffs(); gaitOn = false; gaitK = 1; wanderMoving = false; lifeSt = .rest; lifeUntil = -1; askOn = false }
+        if grab && lv(params.lifeFlinch) && !(flAt > t) && !slpOn { flAt = t + (0.1 + Double.random(in: 0..<0.15, using: &rng)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt; flTapAt = flAt }   // flTapAt: v2.61 D2
+        if grab && params.life2 >= 0.5 { cutSniffs(); gaitOn = false; gaitK = 1; wanderMoving = false; lifeSt = slpOn ? .sleep : .rest; lifeUntil = -1; askOn = false }   // v2.61 C1: slpOn, still asleep
         let lure = !grab && allowed && (iv2(params.impC1) || iv2(params.impC2))   // v2.20: a finger on empty space goes to C1, C2 (lureStep), not just one sniff
         if !grab && allowed && !lure && lv(params.lifeAttend) {
             var db = 1e9
             for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }
             if db < R * 3 { attOn = true; attAt = t + 0.3; attX = x; attY = y }
         }
-        let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)
         f.radius = radius; f.r0 = radius
         f.sx = sx; f.sy = sy
         f.lure = lure
@@ -2532,6 +2538,7 @@ final class SlimeRig {
     func cancelAllTouches() {
         for f in fingers.values { for m in f.mem { GRAB[m.i] = false } }
         fingers.removeAll()
+        softDrop()   // v2.61 C1: the app went to the background
         dragRelease(glide: false)   // v2.20: the offset joins home, as on a normal release
         lastTouch = t
     }
@@ -5064,6 +5071,7 @@ final class SlimeRig {
         let st = bodyStretch(f)   // v2.20: dragged along a long way is not a hard pull
         if lv(params.lifeFlinch) && st > 1 { shkAt = t + 0.3; shkAmp = min(1, 0.4 + (st - 1) / 1.5) }
         if lv(params.lifeBreath) && st > 1.5 { exert = max(exert, min(1, 0.3 + (st - 1.5) * 0.35)) }
+        if slpOn { lifeSt = .sleep; return }   // v2.61 C1: it only turned over
         if lv(params.lifeAttend) && !escOn && !introOn && !clusters.isEmpty && hypot(f.fx - clusters[gi].xc, f.fy - clusters[gi].yc) > R * 0.4 {
             attOn = true; attAt = t + 0.5; attX = f.fx; attY = f.fy
         }
@@ -5128,9 +5136,11 @@ final class SlimeRig {
             if slpNearT > 1.2 { wake(false) }
             return
         }
-        if echoSt != 0 { return }   // v2.23 C6: listening to your rhythm or answering it: it stays put
+        let hear: Bool = echoSt == 1 && params.nearFast >= 0.5   // v2.61 C2 (nearFast): still listening (the finger may be there to stay): it looks at the finger beside it and comes over all the same; only answering holds it
+        if echoSt != 0 && !hear { return }   // v2.23 C6: listening to your rhythm or answering it: it stays put
         if lifeSt == .rest && sleepTry() { return }
         let lured = lureStep(dt)   // v2.20 C1 C2: a finger resting beside it takes over
+        if hear && !lured { return }   // v2.61 C2: between two taps it does not wander off by itself
         let e4 = !lured && e4Step(dt)   // v2.22 E4: trusting and left alone a while, it comes to the front to say hello
         // v2.20 C4 begging: a pseudopod toward where your finger left, edging over when that is far
         if !lured && !e4 && askOn && t >= askAt && !clusters.isEmpty {
@@ -5556,7 +5566,7 @@ final class SlimeRig {
     /// C4 begging: released after a purr (the happy hop), 0.9 s later it reaches toward where your finger left and edges over if far;
     /// touched again within 5 s, the purr comes fast (touchBegan).
     private func impAsk(_ f: Finger) {
-        guard iv2(params.impC4), !escOn, impTrust >= 0.2, f.gentleT > 1, moodC > 0.35, fingers.isEmpty else { return }
+        guard iv2(params.impC4), !escOn, !slpOn, impTrust >= 0.2, f.gentleT > 1, moodC > 0.35, fingers.isEmpty else { return }
         impAskUntil = t + 5; attOn = false; askOn = true; askAt = t + 0.9; askX = f.fx; askY = f.fy
     }
     /// Every frame: stroking, purring and a gentle drag build trust (20...25 s of stroking to very trusting); wariness halves in 3 min.
@@ -5715,7 +5725,7 @@ final class SlimeRig {
     }
     /// E2 a tap (under 0.25 s, not pulled): after the flinch it leans toward your finger and says "pu"; wary, it leans away.
     private func e2Release(_ f: Finger) {
-        guard iv3(params.e2), t - f.tDown < 0.25, f.stretch < 0.3, !clusters.isEmpty else { return }
+        guard iv3(params.e2), !slpOn, t - f.tDown < 0.25, f.stretch < 0.3, !clusters.isEmpty else { return }   // v2.61 C1: !slpOn (and in impAsk)
         leanT = t + 0.3; leanA = atan2(f.fy - clusters[gi].yc, f.fx - clusters[gi].xc); leanS = impWary > 0.4 ? -1 : 1; voice("poke", 0.7)
     }
     /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free.
@@ -5825,8 +5835,9 @@ final class SlimeRig {
         var g: Finger?, pf: Finger?
         for f in fingers.values { if f.mode == .grab { if g == nil { g = f } } else if pf == nil { pf = f } }
         var o: (Double, Double)?
-        if let g { o = tow(g.fx, g.fy) }
-        else if let pf { o = tow(pf.fx, pf.fy) }
+        // v2.61 B4 (eyeTrue): the real finger, held or beside it, not the smoothed one
+        if let g { o = params.eyeTrue >= 0.5 ? tow(g.rawX, g.rawY) : tow(g.fx, g.fy) }
+        else if let pf { o = params.eyeTrue >= 0.5 ? tow(pf.rawX, pf.rawY) : tow(pf.fx, pf.fy) }
         else if echoSt != 0 { o = tow(echoX, echoY) }
         else if t < eyeUser || slpOn { o = (0, 0) }
         else if escOn { o = tow(escDX, escDY) }
@@ -5872,7 +5883,7 @@ final class SlimeRig {
         if let g { open = min(open, t - g.tDown < 0.3 ? 0.55 : 0.8) }
         if snwK > 0.02 && g == nil { open = min(open, 1 - 0.85 * snwK * min(1, max(0, (snwCloud - 0.06) / 0.3))) }   // v2.31: eyes shut while the glitter settles, breathing with you; open again once clear
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
-        if impWary > 0.5 || moodScare > 0.3 || t - slpWakeT < 0.8 { wide = 1.18 }
+        if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
         if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
@@ -5964,21 +5975,95 @@ final class SlimeRig {
     /// B2: untouched 40 s (a tap on empty space counts) while resting, it falls asleep: eyes close, it melts a little, breathes slow and deep.
     private func sleepTry() -> Bool {
         guard iv3(params.sleep), !slpOn else { return false }
-        guard t - max(lastTouch, slpLastAny) >= (params.sleepAfter > 0 ? params.sleepAfter : 40), lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn, snwCloud <= 0.03 else { return false }   // v2.31: not while the glitter settles, it has to open its eyes at the clear moment
+        guard idleSec >= (params.sleepAfter > 0 ? params.sleepAfter : 40), lifeSt == .rest, fingers.isEmpty, !e4On, echoSt == 0, !swimOn, snwCloud <= 0.03 else { return false }   // v2.31: not while the glitter settles, it has to open its eyes at the clear moment
         slpOn = true; lifeSt = .sleep; cutSniffs()
         return true
     }
-    /// Awake again: sharp (touched) it flinches 1.6× and opens wide; gently (a finger beside it) it just opens; then "mm?".
-    private func wake(_ sharp: Bool) {
+    // MARK: v2.61 C1 (wakeSoft; .uiux/04-手感/極致優化規劃-暫定.md; web WAKEK, softTouch, tapJudge, rollStep, idleSec)
+    /// Trusting (lureStep's rule: over 0.25 and 0.1 above wary), touched asleep it does not wake yet. Within T of landing, the hand past v (R a second on the screen) or dragged past st (R) is a hard one: startled, as before.
+    /// Otherwise it wakes slowly (eyes opening with `slow`, no flinch, not wide); very trusting (deep) it only turns over (shifts `roll` × R and back in roT), until the n-th touch of the nap, held past `hold`, or dragged past st.
+    private enum WakeSet {
+        static let trust: Double = 0.25, lead: Double = 0.1, tapGap: Double = 1   // trusting enough; ahead of wary by; a third touch within this is poking
+        static let v: Double = 4, st: Double = 0.8, T: Double = 0.25
+        static let deep: Double = 0.7, roll: Double = 0.05, roT: Double = 1.4, n: Int = 3, hold: Double = 1.2, slow: Double = 0.5
+    }
+    /// How long nobody has been there. Just opened it counts from the opening (lastTouch starts at −10, so it used to fall asleep 30 s after).
+    private var idleSec: Double {
+        let opened: Double = params.wakeSoft >= 0.5 && slpOpenT <= t ? slpOpenT : -99
+        return t - max(lastTouch, slpLastAny, opened)
+    }
+    /// A finger has touched it asleep. true: wait and see (tapJudge); false: startled awake, as before.
+    private func softTouch(_ f: Finger) -> Bool {
+        guard params.wakeSoft >= 0.5, impTrust > WakeSet.trust, impTrust - impWary > WakeSet.lead else { return false }
+        if taps.filter({ t - $0 < WakeSet.tapGap }).count >= 2 { return false }   // the third within a second: poking, as before
+        if let q = slpTap, q !== f { return false }
+        slpTap = f; slpTapT0 = t; slpTapDone = false
+        return true
+    }
+    /// Every frame, at the start of sleepStep: light or hard, then what a light one does.
+    private func tapJudge() {
+        guard let f = slpTap else { return }
+        if !slpOn { slpTap = nil; return }
+        let there: Bool = fingers.values.contains(where: { $0 === f })
+        let here: Bool = there && (f.mode == .grab || t - f.hitT < 0.1)
+        let hv: Double = hypot(f.vxS, f.vyS) * camZ / R
+        let off: Double = hypot(f.rawX - f.ax, f.rawY - f.ay) / R
+        if !slpTapDone {
+            if hv >= WakeSet.v || off > WakeSet.st { slpTap = nil; wake(true); return }
+            if here && t - slpTapT0 < WakeSet.T { return }
+            slpTapDone = true; slpTapN += 1
+            if impTrust > WakeSet.deep && slpTapN < WakeSet.n && clusters.indices.contains(gi) {
+                slpRollT = t; slpRollO = 0; slpRollD = f.ax >= clusters[gi].xc ? 1 : -1
+            } else {
+                slpTap = nil; wake(false, slow: true)
+                return
+            }
+        }
+        if !here { slpTap = nil; return }
+        if f.yank { wake(true) } else if t - slpTapT0 > WakeSet.hold || off > WakeSet.st { wake(false, slow: true) }
+    }
+    /// The turn over: it shifts toward where the finger landed and back (moved with its previous positions, no velocity). No sound, no tap.
+    private func rollStep(_ dt: Double) {
+        if slpRollT < 0 { return }
+        let u: Double = (t - slpRollT) / WakeSet.roT
+        var o = 0.0
+        if u >= 0 && u < 1 {
+            let s: Double = sin(.pi * u)
+            o = R * WakeSet.roll * (reduceMotion ? 0.5 : 1) * (s * s) * slpRollD
+        }
+        let d: Double = o - slpRollO
+        slpRollO = o
+        if d != 0 { moveHome(d, 0, dt) }
+        if u >= 1 || u < 0 { slpRollT = -9 }
+    }
+    /// Switched off, or gone to the background: nothing of it is left half done (a turn over goes straight back).
+    private func softDrop() {
+        slpTap = nil; slpTapN = 0; slpTapDone = false
+        if slpRollO != 0 { let d: Double = -slpRollO; slpRollO = 0; moveHome(d, 0, 1.0 / 60) }
+        slpRollT = -9
+    }
+    /// Awake again: sharp (touched) it flinches 1.6× and opens wide; gently (a finger beside it) it just opens; then "mm?". slow (v2.61 C1): it opens slowly and not wide.
+    private func wake(_ sharp: Bool, slow: Bool = false) {
         guard slpOn else { return }
+        slpSlow = slow; slpTapN = 0; slpTap = nil   // v2.61 C1
         slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1, using: &rng); eyeBlinkT = t
         if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
         slpAskAt = t + (sharp ? 0.45 : 0.3)
     }
     private func sleepStep(_ dt: Double) {
         if !iv3(params.sleep) && slpOn { wake(false) }
-        if slpOn, fingers.values.contains(where: { t - $0.hitT < 0.05 }) { wake(true) }   // a finger pushed in from outside touched it
-        slpK += ((slpOn ? 1 : 0) - slpK) * (1 - exp(-dt / (slpOn ? 1.6 : 0.25)))
+        if params.wakeSoft < 0.5 { softDrop(); slpSlow = false }   // v2.61 C1 switched off
+        tapJudge()
+        if slpOn {
+            for f in fingers.values where t - f.hitT < 0.05 {   // a finger pushed in from outside touched it
+                if slpTap === f || softTouch(f) { continue }   // v2.61 C1: being told light or hard
+                wake(true)
+                break
+            }
+        }
+        rollStep(dt)
+        let wakeTau: Double = slpSlow ? WakeSet.slow : 0.25   // v2.61 C1
+        slpK += ((slpOn ? 1 : 0) - slpK) * (1 - exp(-dt / (slpOn ? 1.6 : wakeTau)))
         if slpK < 1e-3 && !slpOn { slpK = 0 }
         // v2.50 sleeping breaths, one every 4 to 7 s
         if slpOn && slpK > 0.8 {

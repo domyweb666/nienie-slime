@@ -22,9 +22,12 @@
 - 手機 Swift 沒有大腦（brain、mood、decoReact 都 0 次）。手機 460 是欺負門檻、414 是放手逃。
 
 ## ⏭️ 下一步從哪繼續
-1. 看多米回哪幾題、先做哪一塊。
-2. 照規劃檔「分批」第一批拆工作包。網頁先（`prototype/web/index.html`）再 Swift（`SlimeRig.swift` 是一個大檔，會撞的包排隊）。A1、A2 到 A5 從 `patches/` 開始。
-3. 先做 A7（會紅的測試）再動手感。動工前提醒多米：用 build 158 照 B7 拍十分鐘，不拍就沒有改前的毫秒。
+1. 先讀 `.vibe/第一批-結果與待確認.md`（每包數字、待確認、進行中的代理）和 `.vibe/第一批-合約.md`。多米已答「完整版，照推薦」，不用再問 7 題。
+2. 看 W3b 有沒有結果：`git status`、`git log`。它只改 `prototype/web/index.html`、`selftest.js`，驗證順序：四項紅燈（v226、mem、decoBody、v252）→ C4 開頭三件事 → C7 數字 → 整份 selftest 連 T70、T71 跑 2 次 → 開關 0 重驗。沒跑完就照那份清單重派一個代理（規格：W3b 的交辦在上一個會話；腳本 `.vibe/audit-2026-11-24/v2.61/W3腳本/`）。收完就提交並把 W3 打勾。
+3. R：一次派兩到三個只讀反駁者（網頁行為＋資料、Swift、規格與誇大），加一個全測代理（整份 selftest 3 次、混合 250 重量、T70 合併版、開關 0 逐點相同）。抓到的真錯派代理修，修完再跑一次全測。
+4. 修網頁 `desk.js` 的缺口（舊預設提示沒答時拉的三顆不存，`deskSave`、`feel-keep`，跟 S5 在手機修的同一個）。
+5. 更新 `.vibe/未做清單.md`、`.uiux/04-手感/參數表-暫定.md`、`CLAUDE.md` 加 v2.61（CLAUDE.md 是核心檔，改前先給多米看現況）。
+6. 回報多米（照 anti-ai-voice、繁中）：做了什麼、實際數字、沒驗到的、待確認；問一次：要不要推（推了 CI 才編 Swift）、湯圓餡、要不要裝 Swift 工具跑型別預檢（約 1 GB）。不推、不發 TestFlight。
 
 ## 🧩 剩下的工作
 - [x] A：稽核八份筆記齊全
@@ -40,7 +43,7 @@
 - [x] S2：Swift A2–A5｜SlimeRig｜W1、S1
 - [x] S3a：Swift D1、D2、C3（照 W2-移植說明）｜SlimeRig｜W2
 - [x] S5：修 Swift 複查抓到的（`v2.61/Swift複查.md`）＋補 tools/swift-linux-check｜UI、Controller、LabProbe、協定搬家｜S3a
-- [ ] S3b：Swift C1、C2、B4｜SlimeRig｜S3a、W3
+- [x] S3b：Swift C1、C2、B4｜SlimeRig｜S3a、W3
 - [x] S4：Swift B1 接線、B7、A7 讀數、調節台、版本｜Audio、Controller、View、UI｜S1
 - [ ] R：反駁者查網頁與 Swift、69＋項跑 3 次、混合 250 重量｜全部
 
