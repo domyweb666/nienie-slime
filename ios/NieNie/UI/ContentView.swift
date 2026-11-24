@@ -93,6 +93,7 @@ struct ContentView: View {
             .padding(.bottom, 18)
         }
         .onChange(of: controller.toastGen) { _, _ in showTimedHint(controller.toastText) }   // v2.59 窗景
+        .onChange(of: showFeel) { _, open in controller.labDesk(open: open) }   // v2.61 B7: not the desk's own onAppear and onDisappear, opened again while it fades out they can come in the wrong order
         .alert("牠想跟你出門", isPresented: $controller.walkAsk) {   // 走路: asked only when the gift stone is tapped; 先不要 keeps the stone and never asks again
             Button("先不要") { controller.walkAnswer(false) }
             Button("好") { controller.walkAnswer(true) }

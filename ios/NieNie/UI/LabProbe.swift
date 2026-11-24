@@ -107,6 +107,7 @@ final class LabProbe {
         var t = "觸控延遲（毫秒，從系統記的手指碰到那一刻 UITouch.timestamp 起算，最近 \(k.count) 下）"
         for c in Self.columns { t += "\n" + c.name + "：" + Self.spread(Self.all(k, c.key)) }
         t += "\n沒量到：手指碰到玻璃到系統記時間、合成和面板亮起來、喇叭出聲、馬達轉動。這幾段要用 240 格影片補。"
+        t += "\n「-」和「沒有」是那一步沒發生。喇叭關掉、主音量 0、灰盒、手機沒有震動馬達時，聲音或震動那兩欄不記。手機側邊的靜音開關程式讀不到，那時照記。"
         t += "\n「叫聲音播完」「叫震動完」是程式叫完的時間，那時聲音和震動還沒出來。「排定上螢幕」是系統給的時間，畫面可能再晚一格。"
         if !k.isEmpty { t += "\n最近幾下，欄位順序同上：" }
         for l in k.suffix(20) {
@@ -394,14 +395,22 @@ final class SkinReader {
         for y in 0..<h {
             for x in 0..<w {
                 var t: Float = 0
-                for i in 0..<taps { t += pa[y * w + max(0, min(w - 1, x + i - r))] * g[i] }
+                for i in 0..<taps {
+                    let col: Int = max(0, min(w - 1, x + i - r))
+                    let v: Float = pa[y * w + col]
+                    t += v * g[i]
+                }
                 pb[y * w + x] = t
             }
         }
         for y in 0..<h {
             for x in 0..<w {
                 var t: Float = 0
-                for i in 0..<taps { t += pb[max(0, min(h - 1, y + i - r)) * w + x] * g[i] }
+                for i in 0..<taps {
+                    let row: Int = max(0, min(h - 1, y + i - r))
+                    let v: Float = pb[row * w + x]
+                    t += v * g[i]
+                }
                 pa[y * w + x] = t
             }
         }

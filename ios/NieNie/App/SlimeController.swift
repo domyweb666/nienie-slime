@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreHaptics
 import CoreMotion
 import SwiftUI
 import UIKit
@@ -144,13 +145,14 @@ final class SlimeController: ObservableObject {
         let p = current
         switch e {
         case .press(let gain):
-            let probe = LabProbe.shared   // v2.61 B7: timed only while the desk is open
-            probe.soundStart()
+            let probe = LabProbe.shared   // v2.61 B7: timed only while the desk is open, and only what really sounds or taps
+            let heard: Bool = soundHeard, felt: Bool = hapticFelt
+            if heard { probe.soundStart() }
             sound.press(intensity: pressIntensity(gain, radius: rig.maxTouchRadius, weight: p.sndPressSize))
-            probe.soundEnd()
-            probe.hapStart()
+            if heard { probe.soundEnd() }
+            if felt { probe.hapStart() }
             haptics.transient(intensity: 0.25 + 0.35 * gain, sharpness: p.pressSharp)
-            probe.hapEnd()
+            if felt { probe.hapEnd() }
         case .squish(let gain):
             // 提案第 24 條: two fingers pinching closer
             sound.press(intensity: gain)
@@ -464,7 +466,9 @@ final class SlimeController: ObservableObject {
             get: { self.current[keyPath: field.key] },
             set: { v in
                 if let i = FeelBatch.index(field.key) {   // v2.61: the batch's switches are not a material's
+                    let was: [Bool] = self.batch.pullOn
                     self.batch.set(i, v >= 0.5)
+                    self.feelPullPressed(was)
                     self.pushParams()
                     self.activeSlot = nil
                     self.feelSave()
@@ -481,9 +485,12 @@ final class SlimeController: ObservableObject {
 
     func restoreDefaults() {
         params[material] = material.defaults
+        let was: [Bool] = batch.pullOn
         if pullBlind == nil { batch = FeelBatch() }   // v2.61: the panel's own button puts everything on it back
+        feelPullPressed(was)
         pushParams()
         activeSlot = nil
+        feelSave()   // or A3, A4, A5 would come back at the next launch
     }
 
     /// Apply one second-batch candidate on top of the current numbers (one at a time for blind tests).
@@ -526,6 +533,16 @@ final class SlimeController: ObservableObject {
         let keep = feelStale != nil ? feelStaleSnap : nil
         let s = FeelDeskStore(pv: feelPv, ps: feelPs, base: keep?.base ?? material.rawValue, k: keep?.k ?? feelPick().k, s: feelSlots, log: Array(feelLog.suffix(60)))
         if let d = try? JSONEncoder().encode(s) { UserDefaults.standard.set(d, forKey: Self.feelKey) }
+    }
+
+    /// v2.61: A3, A4 or A5 was just pressed (not set by a whole saved feel). While 用新預設／留著我的 is not answered, feelSave writes 多米's older numbers and not the
+    /// desk, so the ones that changed go into those: they are stored, and 留著我的 does not undo them. The ones not pressed stay as they were stored.
+    private func feelPullPressed(_ was: [Bool]) {
+        guard pullBlind == nil, let old = feelStaleSnap else { return }
+        let now: [Bool] = batch.pullOn
+        var kept: [Bool] = old.pullOn
+        for i in kept.indices where i < now.count && i < was.count && now[i] != was[i] { kept[i] = now[i] }
+        feelStaleSnap?.setPull(kept)
     }
 
     /// Lay a saved feel over the material's numbers: its material first, then the 13 numbers. Nothing else happens: no bump, no sound
@@ -704,12 +721,16 @@ final class SlimeController: ObservableObject {
 
     func batchTier(_ t: FeelBatch.Tier) {
         guard pullBlind == nil else { return }
+        let was: [Bool] = batch.pullOn
         batch = FeelBatch(t)
+        feelPullPressed(was)
         batchDone("換到「\(t.name)」。")
     }
     func batchTogglePull(_ id: String) {
         guard pullBlind == nil else { return }
+        let was: [Bool] = batch.pullOn
         batch[id] = !batch[id]
+        feelPullPressed(was)
         let v: String = batch[id] ? "開" : "關"
         batchDone("\(FeelBatch.pullName(id))：\(v)。")
     }
@@ -863,9 +884,17 @@ final class SlimeController: ObservableObject {
     }
 
     // v2.61 B7, A7: what LabProbe reads, shown on the desk (refreshed with the frame readout twice a second) and copied
-    /// The desk opened or closed: touches are timed only while it is open
-    func labDesk(open: Bool) { LabProbe.shared.on = open }
-    /// 碰著時固定 120, never saved
+    /// The desk opened or closed: touches are timed only while it is open, and 固定 120 ends with it
+    func labDesk(open: Bool) {
+        LabProbe.shared.on = open
+        if !open && lab120 { lab120 = false }
+    }
+    /// What LabProbe may time: a press that is muted, at volume 0 or on a phone without haptics returns at once and would read as fast.
+    /// The ringer switch on the side silences the app too, and no call tells.
+    private var soundHeard: Bool { !sound.muted && current.volMaster > 0 }
+    private var hapticFelt: Bool { haptics.enabled && Self.hasHaptics }
+    private static let hasHaptics: Bool = CHHapticEngine.capabilitiesForHardware().supportsHaptics
+    /// 碰著時固定 120, never saved, off again when the desk is closed
     @Published var lab120 = false { didSet { LabProbe.shared.lock120 = lab120 } }
     func labSkinStart() {
         LabProbe.shared.skinStart()
@@ -878,7 +907,8 @@ final class SlimeController: ObservableObject {
         let route = s.currentRoute.outputs.first?.portType.rawValue ?? "?"
         let ms: String = String(format: "音訊：緩衝 %.1f 毫秒、系統報的輸出延遲 %.1f、引擎報的 %.1f", s.ioBufferDuration * 1000, s.outputLatency * 1000, sound.engineLatency * 1000)
         let a: String = lab120 ? "開" : "關", b: String = latencyTest ? "開" : "關", c: String = labGrey ? "開" : "關"
-        return LabProbe.shared.lagText + "\n\(ms)（輸出 \(route)）｜固定 120 \(a)｜延遲測試 \(b)｜灰盒 \(c)"
+        let d: String = soundHeard ? "開" : "靜音（不記）", e: String = hapticFelt ? "開" : "沒有（不記）"
+        return LabProbe.shared.lagText + "\n\(ms)（輸出 \(route)）｜聲音 \(d)｜震動 \(e)｜固定 120 \(a)｜延遲測試 \(b)｜灰盒 \(c)"
     }
     /// 複製量測: plain text, with the machine, the system, low power, the version and the numbers it was measured on
     var labCopyText: String {
@@ -962,6 +992,7 @@ final class SlimeController: ObservableObject {
         pushParams()
         activeSlot = n
         rig.bump(1)
+        feelSave()   // v2.61: the slot's A3, A4, A5 are on the desk now, so they are there at the next launch too (and its 13 numbers, like 換到)
     }
 
     /// v2.61: while 甲乙 is on, the three of the pull are nowhere on the panel

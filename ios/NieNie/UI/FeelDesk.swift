@@ -129,8 +129,6 @@ struct FeelDesk: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(.white)
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
         .frame(maxWidth: 460)
-        .onAppear { controller.labDesk(open: true) }   // v2.61 B7
-        .onDisappear { controller.labDesk(open: false) }
     }
 
     // MARK: - v2.61 這一批 (the same words as the web's box)
@@ -400,7 +398,7 @@ struct FeelDesk: View {
                 chip("碰著固定 120", on: controller.lab120) { controller.lab120.toggle() }
                 Spacer(minLength: 0)
             }
-            small("觸控：面板開著時，每點一下就記。量皮：按下去 5 秒內數皮有幾塊、幾個洞、外框跳多大，用電腦照同一套圖重畫來數，會多吃一點電。碰著固定 120：手指碰著時要求螢幕一秒 120 張，低電量模式系統會關掉，耗電比較多，不存。")
+            small("觸控：面板開著時，每點一下就記，靜音時不記聲音。量皮：按下去 5 秒內數皮有幾塊、幾個洞、外框跳多大，用電腦照同一套圖重畫來數，會多吃一點電。碰著固定 120：手指碰著時要求螢幕一秒 120 張，低電量模式系統會關掉，耗電比較多，收起面板就停，不存。")
             Text("圖層：關掉一層，看上面「整格」少幾毫秒").font(.rounded(11.5, .medium)).foregroundStyle(Palette.inkSoft)
             ForEach(0..<3, id: \.self) { row in
                 HStack(spacing: 5) {

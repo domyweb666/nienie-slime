@@ -2,19 +2,6 @@ import Metal
 import QuartzCore
 import UIKit
 
-/// v2.61 A1 網格聯集的皮: what the mesh skin reads from the rig besides its particles (`labParticles`) and its ring (`bnd`). SlimeRig keeps these private;
-/// the conformance goes into SlimeRig.swift (S2, the lines are in .vibe/audit-2026-11-24/v2.61/S1-對照.md). Until it is there skinU 1 draws the outline path, as 0 does.
-protocol SkinMeshSource: AnyObject {
-    /// The body's triangles, three particle indices each (SlimeRig.TRI)
-    var skinTri: [Int] { get }
-    /// Their edges, two particle indices each, every edge once (SlimeRig.EDG)
-    var skinEdg: [Int] { get }
-    /// The rest shape the triangles were cut from (SlimeRig.Q0X, Q0Y)
-    var skinRest: (x: [Double], y: [Double]) { get }
-    /// Left, right and bottom wall in world points, infinite = none (SlimeRig.worldWalls)
-    var skinWalls: (l: Double, r: Double, b: Double) { get }
-}
-
 /// v2.61 A1: one frame of the mesh skin on the CPU. Port of the web's `jelMeshMask` and `jelThick` (JELX.mode 9), same thresholds:
 /// the display points (inside particles as they are, the ring's smoothed ¼ ½ ¼ like the outline), and where the body is thin a line of 0.12R along its edges,
 /// so nothing is thinner than what the blurred mask can show. Every scratch buffer only grows; nothing is allocated a frame once it has.

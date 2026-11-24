@@ -6303,6 +6303,19 @@ extension SlimeRig {
     }
 }
 
+/// v2.61 A1 網格聯集的皮: what the mesh skin (JellySkin.swift) reads from the rig besides its particles (`labParticles`) and its ring (`bnd`). Here, not there,
+/// so that this file needs Foundation only.
+protocol SkinMeshSource: AnyObject {
+    /// The body's triangles, three particle indices each (SlimeRig.TRI)
+    var skinTri: [Int] { get }
+    /// Their edges, two particle indices each, every edge once (SlimeRig.EDG)
+    var skinEdg: [Int] { get }
+    /// The rest shape the triangles were cut from (SlimeRig.Q0X, Q0Y)
+    var skinRest: (x: [Double], y: [Double]) { get }
+    /// Left, right and bottom wall in world points, infinite = none (SlimeRig.worldWalls)
+    var skinWalls: (l: Double, r: Double, b: Double) { get }
+}
+
 /// v2.61 A1: what the mesh skin reads (JellySkin.swift, SkinMeshSource). Read only. TRI and EDG are replaced whole, never changed in place: the skin
 /// tells a new mesh by the arrays having changed.
 extension SlimeRig: SkinMeshSource {

@@ -15,6 +15,11 @@ public final class CGContext {
     public func scaleBy(x: CGFloat, y: CGFloat) {}
     public func rotate(by: CGFloat) {}
     public func setFillColor(gray: CGFloat, alpha: CGFloat) {}
+    public func setStrokeColor(gray: CGFloat, alpha: CGFloat) {}
+    public func setLineCap(_ c: CGLineCap) {}
+    public func move(to: CGPoint) {}
+    public func addLine(to: CGPoint) {}
+    public func clear(_ r: CGRect) {}
     public func setFillColor(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) {}
     public func fill(_ r: CGRect) {}
     public func addPath(_ p: CGPath) {}
@@ -101,6 +106,7 @@ open class CALayer {
     public var name: String?
     public func addSublayer(_ l: CALayer) {}
     public func insertSublayer(_ l: CALayer, at: UInt32) {}
+    public func insertSublayer(_ l: CALayer, above sibling: CALayer?) {}
     public func removeFromSuperlayer() {}
     public func setAffineTransform(_ t: CGAffineTransform) {}
     public func affineTransform() -> CGAffineTransform { .identity }

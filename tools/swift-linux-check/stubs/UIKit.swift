@@ -25,6 +25,10 @@ public final class UIScreen {
     public var maximumFramesPerSecond: Int { 120 }
     public var scale: CGFloat { 3 }
 }
+public final class UIDevice {
+    public static let current = UIDevice()
+    public var systemVersion: String { "" }
+}
 public final class UIPasteboard {
     public static let general = UIPasteboard()
     public var string: String?

@@ -3,7 +3,9 @@
 @_exported import UIKit
 
 // MARK: data flow
+public final class ObservableObjectPublisher { public init() {}; public func send() {} }
 public protocol ObservableObject: AnyObject {}
+extension ObservableObject { public var objectWillChange: ObservableObjectPublisher { ObservableObjectPublisher() } }
 @propertyWrapper public struct Published<Value> {
     public var wrappedValue: Value
     public init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
@@ -90,6 +92,11 @@ public struct Alignment { public static let leading = Alignment(), center = Alig
 public struct VStack<C: View>: View { public init(alignment: HorizontalAlignment = .center, spacing: CGFloat? = nil, @ViewBuilder content: () -> C) {}; public var body: Never { fatalError() } }
 public struct HStack<C: View>: View { public init(alignment: VerticalAlignment = .center, spacing: CGFloat? = nil, @ViewBuilder content: () -> C) {}; public var body: Never { fatalError() } }
 public struct ZStack<C: View>: View { public init(alignment: Alignment = .center, @ViewBuilder content: () -> C) {}; public var body: Never { fatalError() } }
+public struct GridItem {
+    public enum Size { case fixed(CGFloat), flexible(minimum: CGFloat = 10, maximum: CGFloat = .infinity) }
+    public init(_ size: Size = .flexible(), spacing: CGFloat? = nil, alignment: Alignment? = nil) {}
+}
+public struct LazyVGrid<C: View>: View { public init(columns: [GridItem], alignment: HorizontalAlignment = .center, spacing: CGFloat? = nil, @ViewBuilder content: () -> C) {}; public var body: Never { fatalError() } }
 public struct Group<C: View>: View { public init(@ViewBuilder content: () -> C) {}; public var body: Never { fatalError() } }
 public struct Axis { public struct Set: OptionSet { public let rawValue: Int; public init(rawValue: Int) { self.rawValue = rawValue }; public static let horizontal = Set(rawValue: 1), vertical = Set(rawValue: 2) } }
 public struct ScrollView<C: View>: View { public init(_ axes: Axis.Set = .vertical, showsIndicators: Bool = true, @ViewBuilder content: () -> C) {}; public var body: Never { fatalError() } }
@@ -173,6 +180,7 @@ extension View {
     public func alert<A: View, M: View>(_ title: String, isPresented: Binding<Bool>, @ViewBuilder actions: () -> A, @ViewBuilder message: () -> M) -> some View { self }
     public func task(_ action: @escaping @Sendable () async -> Void) -> some View { self }
     public func contextMenu<M: View>(@ViewBuilder menuItems: () -> M) -> some View { self }
+    public func onChange<V: Equatable>(of value: V, initial: Bool = false, _ action: @escaping (V, V) -> Void) -> some View { self }
     public func tag<V: Hashable>(_ t: V) -> some View { self }
     public func focused(_ b: FocusState<Bool>.Binding) -> some View { self }
     public func submitLabel(_ l: SubmitLabel) -> some View { self }
