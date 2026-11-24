@@ -93,6 +93,7 @@ final class SlimeRig {
     private var HRX: [Double] = [], HRY: [Double] = [], HRC: [Double] = [0], HB: [Double] = [], HQX: [Double] = [], HQY: [Double] = [], HBND: [Int] = []
     private var HOX = 0.0, HOY = 0.0, remCrossQ = false
     private var remN = 0, remN0 = 0, remLast = -9.0, remChk = 0.0, remCalm = -9.0
+    private var remKnot = 0.0, remKnotChk = 0.0   // v2.58 (11-24) memUntie: how long the remembered outline has been crossed with nothing held, and the 0.1 s check
     // v2.57 the six new slimes' signatures (web fxStep, drawFx): set by the controller with the chosen slime
     var fx = SlimeFx() { didSet { fxReset() } }
     private var fxStains: [(i: Int, k: Double, r: Double, hot: Bool)] = []   // 蝶豆: rubbed spots turning purple (particle, how purple, how wide ×R, rubbed this frame)
@@ -1170,7 +1171,6 @@ final class SlimeRig {
         remChk = 0
         let home = mat.remeshHome >= 0.5
         if home && !fingers.values.contains(where: { $0.mode != .none }) {   // v2.58: let go, back to the mesh it was built with
-            remCrossQ = ringCrossedQ()
             if remN > 0, HB.count == bnd.count, remesh(back: true) { remN = 0; remCalm = t + max(0, mat.remeshCalm); remLast = t }
             return
         }
@@ -1239,7 +1239,7 @@ final class SlimeRig {
         HRX = bnd.map { Q0X[$0] }; HRY = bnd.map { Q0Y[$0] }
         HRC = [0]
         for k in 0..<n { let j = (k + 1) % n; HRC.append(HRC[k] + hypot(HRX[j] - HRX[k], HRY[j] - HRY[k])) }
-        HB = Array(HRC[0..<n]); HOX = 0; HOY = 0; HQX = Q0X; HQY = Q0Y; HBND = bnd; remCrossQ = false
+        HB = Array(HRC[0..<n]); HOX = 0; HOY = 0; HQX = Q0X; HQY = Q0Y; HBND = bnd; remCrossQ = false; remKnot = 0; remKnotChk = 0
     }
     private func homeAt(_ s0: Double) -> (Double, Double) {
         let n = HRX.count, per = HRC[n]
@@ -1458,7 +1458,7 @@ final class SlimeRig {
         for (f, w, ox, oy, ux, uy) in fm {
             var mem: [(i: Int, ox: Double, oy: Double, w: Double, dx: Double, dy: Double)] = []
             for i in 0..<N where w[i] > 0.02 { mem.append((i, ox[i], oy[i], w[i], ux[i], uy[i])); GRAB[i] = true }
-            f.mem = mem
+            f.mem = mem; f.reachN = nil   // v2.58: reachN counted the old list
         }
         remT[2] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
         buildClusters()
@@ -1511,6 +1511,19 @@ final class SlimeRig {
         var m = 0.0
         for f in fingers.values where f.mode == .grab && f.far { let x = max(0, min(1, (f.stretch - 0.6) / 1.2)); m = max(m, x * x * (3 - 2 * x)) }
         return m
+    }
+    /// v2.58 (11-24) pullGive: how much of an outward pull this finger is (0.6R from where it took hold, fully at 1.8R; at least 1R from the body's
+    /// centre and heading away from it); how far it may give way shrinks by this from 2R to pullGive × R. Web `giveK`.
+    private func giveK(_ f: Finger, _ mat: FeelParams) -> Double {
+        guard mat.endless >= 0.5, mat.pullGive > 0, f.mode == .grab, !clusters.isEmpty else { return 0 }
+        let mx: Double = f.rawX - f.ax, my: Double = f.rawY - f.ay
+        let d: Double = hypot(mx, my) / R
+        if d < 0.6 { return 0 }
+        let ox: Double = f.rawX - clusters[gi].xc, oy: Double = f.rawY - clusters[gi].yc
+        let ol: Double = hypot(ox, oy), out: Double = mx * ox + my * oy
+        if ol < R || out <= 0 { return 0 }
+        let u: Double = min(1, (d - 0.6) / 1.2)
+        return u * u * (3 - 2 * u)
     }
     private func capG(_ mat: FeelParams) -> Double { mat.endless >= 0.5 ? CAPG : 1 }
     /// Widened, the remembered shape's limit is nine tenths of the live body's (2.4 of 3 before), or it shrinks back to the memory limit on release.
@@ -3262,10 +3275,20 @@ final class SlimeRig {
                     }
                     let gx: Double = sx / sw * mat.capSlip, gy: Double = sy / sw * mat.capSlip
                     if abs(sx) + abs(sy) > sw * 0.02 { grdGive = true }   // v2.52 A5
-                    f.slx += gx; f.sly += gy
-                    let l: Double = hypot(f.slx, f.sly), top: Double = R * 2
+                    // v2.58 (11-24) pullGive: pulled outward, the give may not pile up to 2R (the held patch trailed a slanted 5.5R pull by 1.6R); it
+                    // shrinks to pullGive × R, never below what it already was at once, and the effective position moves only by what is left after the limit
+                    let s0x: Double = f.slx, s0y: Double = f.sly, gk: Double = giveK(f, mat)
+                    var top: Double = R * 2
+                    if gk > 0 {
+                        let kept: Double = min(R * 2, hypot(s0x, s0y))
+                        let lim: Double = R * (2 + (mat.pullGive - 2) * gk)
+                        top = max(lim, kept)
+                    }
+                    f.slx = s0x + gx; f.sly = s0y + gy
+                    let l: Double = hypot(f.slx, f.sly)
                     if l > top { f.slx *= top / l; f.sly *= top / l }
-                    f.fx += gx; f.fy += gy
+                    if gk > 0 { f.fx += f.slx - s0x; f.fy += f.sly - s0y }
+                    else { f.fx += gx; f.fy += gy }
                 }
             }
         }
@@ -3463,6 +3486,8 @@ final class SlimeRig {
             }
         }
         let touched = fingers.values.contains { $0.mode == .grab && !tentGrip($0) }   // v2.27: holding only a tentacle, the body does not remember (tentRest keeps its length); clay's crossings and shaking came from here
+        var untie = false   // v2.58 (11-24) memUntie: the remembered shape is being untied this frame
+        if touched || t < relaxUntil { remKnotChk = 0.1 }   // the last check is from before the touch: check again as soon as it is let go
         if t < relaxUntil {
             // 揉回原形: the remembered shape eases back to the original over half a second; positions follow
             // through shape matching, so nothing jumps (手感精修提案 第 28 條)
@@ -3509,8 +3534,25 @@ final class SlimeRig {
         } else {
             // crossed: relax at the v2.13 rate (0.3). With recover slowed to 0.05 the knot a 9R pull leaves in the tail stayed for
             // 12 s after release; relaxing shortens the strand and the knot comes undone
-            let crossQ = mat.remeshHome >= 0.5 && mat.endless >= 0.5 && mat.recover < 0.6 && remCrossQ   // v2.58: the remembered outline crosses itself, undo it faster
-            let kr = min(1, (crossQ ? 0.6 : mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && mat.endless < 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.54 無限拉: a few flipped triangles in a long remembered shape no longer make all of it retreat fast (it lost half in 2 s); the no-flip guard opens them, a crossed ring still retreats fast   // v2.38: a flipped remembered shape too
+            // v2.58: the remembered outline crosses itself, undo it faster (0.6). Checked here every 0.1 s, also with no re-sample, while clinging, with tentacles
+            let knotOn: Bool = mat.remeshHome >= 0.5 && mat.endless >= 0.5
+            if knotOn {
+                remKnotChk += dt
+                let untying: Bool = mat.memUntie > 0 && remKnot > mat.memUntie   // while untying, every frame: stop as soon as it is undone
+                if remKnotChk >= 0.1 || untying { remKnotChk = 0; remCrossQ = ringCrossedQ() }
+            }
+            let cq: Bool = knotOn && remCrossQ
+            // v2.58 (11-24) memUntie: crossed longer than this, retreat fast and leave out the memory's own limits below until it is undone (they held the knot in place and it kept shaking)
+            remKnot = cq ? remKnot + dt : 0
+            untie = cq && mat.memUntie > 0 && remKnot > mat.memUntie
+            var back: Double = mat.recover
+            if untie { back = 4 }
+            else if cq && mat.recover < 0.6 { back = 0.6 }
+            else if mat.recover < 0.3 {
+                if mat.ringGuard > 0 && ringCrossed() { back = 0.3 }
+                else if mat.flipMem >= 0.5 && mat.endless < 0.5 && flipCount(QX, QY) > 0 { back = 0.3 }
+            }
+            let kr: Double = min(1, back * dt)   // v2.54 無限拉: a few flipped triangles in a long remembered shape no longer make all of it retreat fast (it lost half in 2 s); the no-flip guard opens them, a crossed ring still retreats fast   // v2.38: a flipped remembered shape too
             if kr > 0 {
                 for i in 0..<N { QX[i] += (H0X[i] - QX[i]) * kr; QY[i] += (H0Y[i] - QY[i]) * kr }
             }
@@ -3528,8 +3570,8 @@ final class SlimeRig {
         }
         if mat.tentMem > 0 { restFix(mat) }
         tentRest(dt, mat)
-        if mat.memSmooth > 0 { memSmoothStep(dt, mat.memSmooth) }   // v2.47
-        if mat.memCap > 0 && !EDG.isEmpty {   // v2.48: the remembered shape keeps to its own limits
+        if !untie && mat.memSmooth > 0 { memSmoothStep(dt, mat.memSmooth) }   // v2.47
+        if !untie && mat.memCap > 0 && !EDG.isEmpty {   // v2.48: the remembered shape keeps to its own limits
             for _ in 0..<3 { if !strainStep(&QX, &QY, mat.capLo, memCapNow(mat), false, mat) { break } }
         }
         if EDL.count * 2 == EDG.count {   // the remembered shape's longest edge, times rest (the pseudopods fade by it)
@@ -3542,7 +3584,7 @@ final class SlimeRig {
             }
             QSTR = mq.squareRoot()
         }
-        if mat.noFlip > 0 { meshGuard(&QX, &QY, max(mat.noFlip, 0.3), nil) }   // v2.29: the remembered shape may not flip either (measured: 102 triangles flipped after rough pulling, and it never came undone)
+        if !untie && mat.noFlip > 0 { meshGuard(&QX, &QY, max(mat.noFlip, 0.3), nil) }   // v2.29: the remembered shape may not flip either (measured: 102 triangles flipped after rough pulling, and it never came undone)
         var mx = 0.0, my = 0.0
         for i in 0..<N { mx += QX[i]; my += QY[i] }
         mx /= Double(N); my /= Double(N)
@@ -4049,6 +4091,13 @@ final class SlimeRig {
 
     private var clingOn = false, clingSide = "", clingT0 = 0.0, clingAX: [Double] = [], clingAY: [Double] = []
     private var clingN0 = 0, clingN = 0, clingAcc = 0.0, clingSaid = false
+    /// v2.58 (11-24): some particle is moving (over 0.003R in one substep; at rest it is far below that)
+    private func clingShaking() -> Bool {
+        let v: Double = R * 0.003
+        for i in 0..<N where abs(X[i] - PX[i]) > v || abs(Y[i] - PY[i]) > v { return true }
+        return false
+    }
+    private var clingKnot = 0.0, clingChk = 0.0   // v2.58 (11-24): how long the body on a screen edge has been knotted, and the 0.1 s check
     private var sillStickT = -1.0, sillStickDur = 0.0
     private func clingWallD(_ side: String, _ x: Double, _ y: Double) -> Double {
         guard let g = sillG else { return 1e9 }
@@ -4086,7 +4135,7 @@ final class SlimeRig {
     private func clingP0() -> Double { R * (params.imp >= 0.5 ? max(1, min(1.5, 1.25 - 0.25 * impTrust + 0.25 * impWary)) : 1.2) }
     private func clingStart(_ side: String) {
         guard params.cling >= 0.5 else { return }
-        clingOn = true; clingSide = side; clingT0 = t; clingN0 = 0; clingN = 0; clingAcc = 0; clingSaid = false
+        clingOn = true; clingSide = side; clingT0 = t; clingN0 = 0; clingN = 0; clingAcc = 0; clingSaid = false; clingKnot = 0; clingChk = 0
         clingAX = Array(repeating: .nan, count: N); clingAY = clingAX
         eyeUser = t + 1.5
         onEvent?(.fx(kind: "cling", gain: 0.6, delay: 0))   // v2.50 it splats onto the frame
@@ -4118,6 +4167,16 @@ final class SlimeRig {
                         clingAX[i] = pa.x; clingAY[i] = pa.y
                         clingN += 1; clingN0 = max(clingN0, clingN)
                     }
+                }
+            }
+            let mat = effParams
+            if isEdge(sd) && mat.memUntie > 0 && mat.endless >= 0.5 && fingers.isEmpty {   // v2.58 (11-24): knotted on a screen edge it cannot come undone (it kept shaking): it lets go early and drops, by the same rule as having stuck long enough
+                clingChk += dt
+                if clingChk >= 0.1 {
+                    clingChk = 0
+                    let knotted: Bool = clingShaking() && (ringCrossed() || flipCount(X, Y) > 0)
+                    clingKnot = knotted ? clingKnot + 0.1 : 0
+                    if clingKnot > 0.6 { clingKnot = 0; sillStickT = max(0, t - 1); sillStickDur = 0.01 }
                 }
             }
             if t - clingT0 >= 0.6 && clingN <= 0 { clingEnd() }   // nothing reached the wall: only gravity holds it there, as in v2.30
