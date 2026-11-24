@@ -37,6 +37,13 @@ struct FeelDesk: View {
                 if let stale = controller.feelStale { stalePrompt(stale) }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        // v2.58 (QC-0007 #48): all ten, here where one looks for them (the bottom row stays behind 十隻都顯示)
+                        Text("選史萊姆").font(.rounded(13, .heavy))
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), alignment: .leading, spacing: 6) {
+                            ForEach(SlimeKind.allCases) { k in
+                                chip(k.name, on: controller.slime == k) { controller.pickSlime(k) }
+                            }
+                        }
                         HStack(spacing: 6) {
                             Text("從哪個材質開始").font(.rounded(12)).foregroundStyle(Palette.inkSoft)
                             ForEach([SlimeMaterial.clay, .mochi, .jelly]) { m in

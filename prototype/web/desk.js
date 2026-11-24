@@ -106,6 +106,7 @@ function deskRow(host,row,more){const [key,name,hint,min,max,step]=row,lab=docum
 function deskSync(){const B=DESK.blind,F2=DESK.fsl;
   for(const k in F2){F2[k].inp.value=mat[k];const u=deskUnit(k,mat[k]);F2[k].out.textContent=dfmt(mat[k])+(u?'｜'+u:'');F2[k].em.textContent=effNote(k)||''}
   const root=$('feel');if(!root||!root.firstChild)return;
+  for(const b of root.querySelectorAll('[data-sl]'))b.setAttribute('aria-pressed',String(+b.getAttribute('data-sl')===SLIME));
   for(const b of root.querySelectorAll('[data-m]'))b.setAttribute('aria-pressed',String(b.getAttribute('data-m')===curMat));
   for(const b of root.querySelectorAll('[data-go]'))b.disabled=!DESK.slots[+b.getAttribute('data-go')];
   for(const b of root.querySelectorAll('[data-blind]')){const [x,y]=b.getAttribute('data-blind').split(',').map(Number);b.disabled=!(DESK.slots[x]&&DESK.slots[y])}
@@ -121,6 +122,7 @@ function deskBuild(){const root=$('feel');if(!root)return;
   root.innerHTML=`<div class="feel-head"><b>手感調節台</b><span class="feel-ver">預設 ${FEELVER}</span><button id="feel-close">收起</button></div>
   <div class="feel-row" id="feel-prompt" hidden><span id="feel-prompt-t"></span><button id="feel-usenew">用新預設</button><button id="feel-keep">留著我的</button></div>
   <div id="feel-main" class="feel-box">
+    <div class="feel-row"><span>選史萊姆</span>${SLIMES.map((q,i)=>`<button data-sl="${i}">${q.name}</button>`).join("")}</div>
     <div class="feel-row"><span>從哪個材質開始</span><button data-m="clay">黏土</button><button data-m="mochi">麻糬</button><button data-m="jelly">果凍</button></div>
     <details id="feel-styles" open><summary>手感風格（10 選 1，v2.54）</summary><div class="feel-row feel-styles">${STYLES.map(s=>`<button data-style="${s[0]}" title="${s[2]}">${s[1]}</button>`).join('')}</div><p class="feel-note">按一個就套到黏土上（只動幾個旋鈕，下面看得到）。每一種的數學在按下去後的說明裡。</p></details>
     <div id="feel-sliders"></div>
@@ -149,6 +151,7 @@ function deskBuild(){const root=$('feel');if(!root)return;
   $('b-feel').addEventListener('click',()=>open(root.classList.contains('hidden')));$('feel-close').addEventListener('click',()=>open(false));
   root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const a=n=>b.getAttribute(n);
     if(a('data-style')){styleApply(a('data-style'))}
+    else if(a('data-sl')){chooseSlime(+a('data-sl'));DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('換成'+SLIMES[SLIME].name+'。')}
     else if(a('data-m')){setMat(a('data-m'));DESK.stale=null;DESK.pv=FEELVER;DESK.ps=deskStamp();DESK.base0=deskSnap();deskSync();deskSave();deskNote('換成'+MATN[curMat]+'的預設值。')}
     else if(a('data-save')!==null){const i=+a('data-save');DESK.slots[i]=deskSnap();deskSync();deskSave();deskNote('現在的手感存成 '+(i+1)+'。')}
     else if(a('data-go')!==null){const i=+a('data-go');deskApply(DESK.slots[i]);deskNote('換到 '+(i+1)+'（'+MATN[curMat]+'起點）。馬上捏，幾秒內再換另一個。')}

@@ -88,6 +88,10 @@ final class SlimeRig {
     /// v2.54 補點: what the remembered shape returns to. The same as Q0 until the body is re-sampled; then Q0 becomes the remembered
     /// shape of that moment (mesh, clusters and rest lengths are measured from it) and H0, carried over by interpolation, is the original lump.
     private var H0X: [Double] = [], H0Y: [Double] = []
+    // v2.58 (web homeRing): the body as built: its outline (points, running length), all its points, its outline's indices; each outline point's
+    // place along that outline now (HB), and how far H0 has been shifted by re-centring
+    private var HRX: [Double] = [], HRY: [Double] = [], HRC: [Double] = [0], HB: [Double] = [], HQX: [Double] = [], HQY: [Double] = [], HBND: [Int] = []
+    private var HOX = 0.0, HOY = 0.0, remCrossQ = false
     private var remN = 0, remN0 = 0, remLast = -9.0, remChk = 0.0, remCalm = -9.0
     // v2.57 the six new slimes' signatures (web fxStep, drawFx): set by the controller with the chosen slime
     var fx = SlimeFx() { didSet { fxReset() } }
@@ -889,7 +893,7 @@ final class SlimeRig {
             QX[i] = Q0X[i]; QY[i] = Q0Y[i]
             X[i] = cx + Q0X[i]; Y[i] = cy + Q0Y[i]; PX[i] = X[i]; PY[i] = Y[i]
         }
-        H0X = Q0X; H0Y = Q0Y; remN = 0; remN0 = N; remLast = -9; remCalm = -9   // v2.54 補點
+        H0X = Q0X; H0Y = Q0Y; remN = 0; remN0 = N; remLast = -9; remCalm = -9; homeRing()   // v2.54 補點
         for k in tent.indices {   // v2.27 tentSlip, tentBump, tentRest
             tent[k].all = (0..<N).filter { TID[$0] == k }
             tent[k].root = tent[k].all.filter { TUB[$0] < 0.08 }
@@ -1164,18 +1168,24 @@ final class SlimeRig {
         remChk += dt
         guard remChk >= 0.1, t - remLast >= 0.2 else { return }
         remChk = 0
+        let home = mat.remeshHome >= 0.5
+        if home && !fingers.values.contains(where: { $0.mode != .none }) {   // v2.58: let go, back to the mesh it was built with
+            remCrossQ = ringCrossedQ()
+            if remN > 0, HB.count == bnd.count, remesh(back: true) { remN = 0; remCalm = t + max(0, mat.remeshCalm); remLast = t }
+            return
+        }
         let nb = bnd.count
         var bmax = 0.0, bmin = 1e9
         for k in 0..<nb { let i = bnd[k], j = bnd[(k + 1) % nb], d: Double = hypot(QX[j] - QX[i], QY[j] - QY[i]); bmax = max(bmax, d); bmin = min(bmin, d) }
         var smax = 0.0, smin = 1e9, e = 0, k = 0
         while e + 1 < EDG.count { let i = EDG[e], j = EDG[e + 1], l: Double = hypot(QX[i] - QX[j], QY[i] - QY[j]) / EDL[k]; smax = max(smax, l); smin = min(smin, l); e += 2; k += 1 }
         let grow = bmax > (mat.remeshHi > 0 ? mat.remeshHi : 2.6) * h || smax > (mat.remeshStr > 0 ? mat.remeshStr : 2.8)
-        let shrink = remN > 0 && Double(N) > Double(remN0) * 1.05 && (bmin < (mat.remeshLo > 0 ? mat.remeshLo : 0.55) * h || smin < 0.45)
+        let shrink = !home && remN > 0 && Double(N) > Double(remN0) * 1.05 && (bmin < (mat.remeshLo > 0 ? mat.remeshLo : 0.55) * h || smin < 0.45)
         guard grow || shrink else { return }
         // only at a clean moment: no flipped triangle, no crossing in the live body; going back, only while untouched (re-sampled during
         // rough play too, the fuzz jumped twice as much and left twice as many corners)
         if shrink && !grow && fingers.values.contains(where: { $0.mode != .none }) { return }
-        guard !ringCrossedQ(), !ringCrossed(), flipCount(X, Y) == 0 else { return }
+        guard !ringCrossedQ(), !ringCrossed(), flipCount(X, Y) == 0, !home || flipCount(QX, QY) == 0 else { return }
         let t0 = Date()
         if remesh() { remN += 1; remeshCount += 1; remCalm = t + max(0, mat.remeshCalm) }
         remLast = t; remeshMs = Date().timeIntervalSince(t0) * 1000
@@ -1220,20 +1230,95 @@ final class SlimeRig {
     }
 
     var remT = [0.0, 0, 0, 0, 0, 0]; private var remT0 = Date()
-    private func remesh() -> Bool {
+    /// v2.58 補點後回原形的目標不能摺 (QC-0007 #46: pull, let go, and it twitched on and on; web `homeRing`...). Each new point's return place (H0)
+    /// was interpolated over the old mesh; after a few long pulls the new triangles spanned several badly skewed old ones and H0 itself had 20 to 40
+    /// flipped triangles and edges pressed to 2%. Let go, the remembered shape kept heading for a folded target it could not reach. Now the outline
+    /// keeps its place along the built outline, crowded places pushed apart, and the inside is eased by neighbour averages until nothing is flipped.
+    private func homeRing() {
+        let n = bnd.count
+        HRX = bnd.map { Q0X[$0] }; HRY = bnd.map { Q0Y[$0] }
+        HRC = [0]
+        for k in 0..<n { let j = (k + 1) % n; HRC.append(HRC[k] + hypot(HRX[j] - HRX[k], HRY[j] - HRY[k])) }
+        HB = Array(HRC[0..<n]); HOX = 0; HOY = 0; HQX = Q0X; HQY = Q0Y; HBND = bnd; remCrossQ = false
+    }
+    private func homeAt(_ s0: Double) -> (Double, Double) {
+        let n = HRX.count, per = HRC[n]
+        var s = s0.truncatingRemainder(dividingBy: per)
+        if s < 0 { s += per }
+        var lo = 0, hi = n
+        while hi - lo > 1 { let m = (lo + hi) / 2; if HRC[m] <= s { lo = m } else { hi = m } }
+        let span = HRC[lo + 1] - HRC[lo], f: Double = span > 0 ? (s - HRC[lo]) / span : 0, j = (lo + 1) % n
+        return (HRX[lo] + (HRX[j] - HRX[lo]) * f, HRY[lo] + (HRY[j] - HRY[lo]) * f)
+    }
+    private func homeSpread(_ S: inout [Double]) {
+        let M = S.count, per = HRC[HRX.count], least = 0.35 * per / Double(M)
+        for q in 0..<600 {
+            var bad = false
+            for m in 0..<M { let nx: Double = m + 1 < M ? S[m + 1] : S[0] + per; if nx - S[m] < least { bad = true; break } }
+            if !bad && q >= 8 { break }
+            let o = S
+            for m in 0..<M {
+                let a: Double = m > 0 ? o[m - 1] : o[M - 1] - per, b: Double = m + 1 < M ? o[m + 1] : o[0] + per
+                S[m] = o[m] + 0.5 * ((a + b) / 2 - o[m])
+            }
+        }
+    }
+    private func homeUnfold() {
+        guard EDEG.count == N, TRA.count * 3 == TRI.count else { return }
+        var onB = [Bool](repeating: false, count: N)
+        for i in bnd { onB[i] = true }
+        let need = 0.12 * TRA.reduce(0, +) / Double(max(1, TRA.count))
+        for _ in 0..<400 {
+            var bad = false, k = 0
+            while k < TRI.count {
+                let a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]
+                let ar: Double = 0.5 * ((H0X[b] - H0X[a]) * (H0Y[c] - H0Y[a]) - (H0Y[b] - H0Y[a]) * (H0X[c] - H0X[a]))
+                if ar < need && !(onB[a] && onB[b] && onB[c]) { bad = true; break }
+                k += 3
+            }
+            if !bad { return }
+            var sx = [Double](repeating: 0, count: N), sy = sx, e = 0
+            while e + 1 < EDG.count {
+                let i = EDG[e], j = EDG[e + 1]
+                sx[i] += H0X[j]; sy[i] += H0Y[j]; sx[j] += H0X[i]; sy[j] += H0Y[i]
+                e += 2
+            }
+            for i in 0..<N where !onB[i] && EDEG[i] > 0 { H0X[i] += 0.7 * (sx[i] / EDEG[i] - H0X[i]); H0Y[i] += 0.7 * (sy[i] / EDEG[i] - H0Y[i]) }
+        }
+    }
+    private func homeCenter() {
+        var hx = 0.0, hy = 0.0
+        for i in 0..<N { hx += H0X[i]; hy += H0Y[i] }
+        hx /= Double(N); hy /= Double(N)
+        for i in 0..<N { H0X[i] -= hx; H0Y[i] -= hy }
+        HOX += hx; HOY += hy
+    }
+
+    /// back (v2.58): instead of sampling anew, the points the body was built with, found in the return target (H0)
+    private func remesh(back: Bool = false) -> Bool {
         remT0 = Date()
         let nb = bnd.count
-        let P: [(Double, Double)] = bnd.map { (QX[$0], QY[$0]) }
+        let LX = back ? H0X : QX, LY = back ? H0Y : QY, HP = HRC[HRX.count]
+        let P: [(Double, Double)] = bnd.map { (LX[$0], LY[$0]) }
         var cum = [0.0]
         for k in 1...nb { let a = P[k - 1], b = P[k % nb]; cum.append(cum[k - 1] + hypot(b.0 - a.0, b.1 - a.1)) }
         let per = cum[nb], M = max(24, Int((per / (h * 1.05)).rounded()))
-        var pts: [(Double, Double)] = [], nbnd: [Int] = []
+        var pts: [(Double, Double)] = [], nbnd: [Int] = [], NS: [Double] = []
         var j = 0
-        for m in 0..<M {
+        if back {
+            for i in HQX.indices { pts.append((HQX[i] - HOX, HQY[i] - HOY)) }
+            nbnd = HBND
+        }
+        for m in 0..<(back ? 0 : M) {
             let tg = Double(m) / Double(M) * per
             while j + 1 < cum.count - 1 && cum[j + 1] < tg { j += 1 }
             let span = cum[j + 1] - cum[j], f: Double = span > 0 ? (tg - cum[j]) / span : 0, a = P[j], b = P[(j + 1) % nb]
             nbnd.append(pts.count); pts.append((a.0 + (b.0 - a.0) * f, a.1 + (b.1 - a.1) * f))
+            if HB.count == nb {
+                var d: Double = (HB[(j + 1) % nb] - HB[j]).truncatingRemainder(dividingBy: HP)
+                if d < 0 { d += HP }
+                NS.append(HB[j] + f * d)
+            }
         }
         func inP(_ x: Double, _ y: Double) -> Bool {
             var c = false, jj = nb - 1
@@ -1250,9 +1335,9 @@ final class SlimeRig {
         let cw = h, ncx = max(1, Int((x1 - x0) / cw) + 3), ncy = max(1, Int((y1 - y0) / cw) + 3)
         func cell(_ x: Double, _ y: Double) -> (Int, Int) { (min(ncx - 1, max(0, Int((x - x0) / cw) + 1)), min(ncy - 1, max(0, Int((y - y0) / cw) + 1))) }
         var bb = [[Int]](repeating: [], count: ncx * ncy)
-        for b in 0..<M { let c = cell(pts[b].0, pts[b].1); bb[c.1 * ncx + c.0].append(b) }
+        for b in 0..<(back ? 0 : M) { let c = cell(pts[b].0, pts[b].1); bb[c.1 * ncx + c.0].append(b) }
         var gy = y0, row = 0
-        while gy <= y1 {
+        while !back && gy <= y1 {
             var gx = x0 + (row % 2 == 1 ? h / 2 : 0)
             while gx <= x1 {
                 if inP(gx, gy) {
@@ -1274,7 +1359,7 @@ final class SlimeRig {
         var tb = [[Int]](repeating: [], count: ncx * ncy)
         for k in 0..<nt {
             let a = T[3 * k], b = T[3 * k + 1], c = T[3 * k + 2]
-            let lo = cell(min(QX[a], QX[b], QX[c]), min(QY[a], QY[b], QY[c])), hi = cell(max(QX[a], QX[b], QX[c]), max(QY[a], QY[b], QY[c]))
+            let lo = cell(min(LX[a], LX[b], LX[c]), min(LY[a], LY[b], LY[c])), hi = cell(max(LX[a], LX[b], LX[c]), max(LY[a], LY[b], LY[c]))
             for yy in lo.1...hi.1 { for xx in lo.0...hi.0 { tb[yy * ncx + xx].append(k) } }
         }
         var SA = [Int](repeating: 0, count: n2 * 3), SW = [Double](repeating: 0, count: n2 * 3)
@@ -1284,8 +1369,8 @@ final class SlimeRig {
             let pc = cell(x, y), cand = tb[pc.1 * ncx + pc.0]
             for pass in 0..<2 where best < 0 || (pass == 1 && bs < -0.05) {
             for k in (pass == 0 ? cand : Array(0..<nt)) {
-                let a = T[3 * k], b = T[3 * k + 1], c = T[3 * k + 2], ax = QX[a], ay = QY[a]
-                let v0x = QX[b] - ax, v0y = QY[b] - ay, v1x = QX[c] - ax, v1y = QY[c] - ay, v2x = x - ax, v2y = y - ay
+                let a = T[3 * k], b = T[3 * k + 1], c = T[3 * k + 2], ax = LX[a], ay = LY[a]
+                let v0x = LX[b] - ax, v0y = LY[b] - ay, v1x = LX[c] - ax, v1y = LY[c] - ay, v2x = x - ax, v2y = y - ay
                 let den: Double = v0x * v1y - v1x * v0y
                 if abs(den) < 1e-9 { continue }
                 let v: Double = (v2x * v1y - v1x * v2y) / den, w: Double = (v0x * v2y - v2x * v0y) / den, u = 1 - v - w, mn = min(u, v, w)
@@ -1296,6 +1381,21 @@ final class SlimeRig {
             let u = max(0, bw.0), v = max(0, bw.1), w = max(0, bw.2), sm = u + v + w > 0 ? u + v + w : 1
             SA[3 * p] = T[3 * best]; SA[3 * p + 1] = T[3 * best + 1]; SA[3 * p + 2] = T[3 * best + 2]
             SW[3 * p] = u / sm; SW[3 * p + 1] = v / sm; SW[3 * p + 2] = w / sm
+        }
+        if back {
+            let rk = (0..<nb).sorted { HB[$0] < HB[$1] }
+            for (k, p) in HBND.enumerated() {
+                let v = HRC[k]
+                var lo = -1
+                for q in 0..<nb where HB[rk[q]] <= v { lo = q }
+                let a = rk[lo < 0 ? nb - 1 : lo], b = rk[lo < 0 ? 0 : (lo + 1) % nb]
+                var g: Double = HB[b] - HB[a], d: Double = v - HB[a]
+                if g <= 0 { g += HP }
+                if d < 0 { d += HP }
+                let fr: Double = max(0, min(1, d / g))
+                SA[3 * p] = bnd[a]; SA[3 * p + 1] = bnd[b]; SA[3 * p + 2] = bnd[b]
+                SW[3 * p] = 1 - fr; SW[3 * p + 1] = fr; SW[3 * p + 2] = 0
+            }
         }
         remT[1] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
         func ip(_ A: [Double]) -> [Double] {
@@ -1317,6 +1417,7 @@ final class SlimeRig {
             for i in a { x += QX[i]; y += QY[i] }
             return (x / Double(a.count), y / Double(a.count))
         }
+        let nQX: [Double] = back ? ip(QX) : [], nQY: [Double] = back ? ip(QY) : []
         let eL = qAt(eyeL), eR = qAt(eyeR), hq = (hiIdx < N ? QX[hiIdx] : 0, hiIdx < N ? QY[hiIdx] : 0)
         let nX = ip(X), nY = ip(Y), nPX = ip(PX), nPY = ip(PY), nH0X = ip(H0X), nH0Y = ip(H0Y), nEX = ip(EX), nEY = ip(EY)
         let nQDX: [Double]? = QDX.count == N ? ip(QDX) : nil, nQDY: [Double]? = QDY.count == N ? ip(QDY) : nil
@@ -1325,13 +1426,27 @@ final class SlimeRig {
         N = n2; bnd = nbnd
         X = nX; Y = nY; PX = nPX; PY = nPY; H0X = nH0X; H0Y = nH0Y; EX = nEX; EY = nEY
         var mx = 0.0, my = 0.0
-        for p in pts { mx += p.0; my += p.1 }
-        mx /= Double(N); my /= Double(N)
-        Q0X = pts.map { $0.0 - mx }; Q0Y = pts.map { $0.1 - my }; QX = Q0X; QY = Q0Y
-        var hx = 0.0, hy = 0.0
-        for i in 0..<N { hx += H0X[i]; hy += H0Y[i] }
-        hx /= Double(N); hy /= Double(N)
-        for i in 0..<N { H0X[i] -= hx; H0Y[i] -= hy }
+        if back {
+            for i in 0..<N { mx += nQX[i]; my += nQY[i] }
+            mx /= Double(N); my /= Double(N)
+            Q0X = HQX; Q0Y = HQY; QX = nQX.map { $0 - mx }; QY = nQY.map { $0 - my }
+        } else {
+            for p in pts { mx += p.0; my += p.1 }
+            mx /= Double(N); my /= Double(N)
+            Q0X = pts.map { $0.0 - mx }; Q0Y = pts.map { $0.1 - my }; QX = Q0X; QY = Q0Y
+        }
+        let hOn = !back && effParams.remeshHome >= 0.5 && NS.count == M
+        if hOn {
+            for m in 1..<M { while NS[m] < NS[m - 1] { NS[m] += HP } }
+            homeSpread(&NS)
+            for m in 0..<M { let q = homeAt(NS[m]); H0X[m] = q.0 - HOX; H0Y[m] = q.1 - HOY }
+            HB = NS.map { (v: Double) -> Double in let r = v.truncatingRemainder(dividingBy: HP); return r < 0 ? r + HP : r }
+        } else if back {
+            H0X = HQX; H0Y = HQY; HB = Array(HRC[0..<HRX.count]); HOX = 0; HOY = 0
+        } else {
+            HB = []
+            homeCenter()
+        }
         if let a = nQDX, let b = nQDY { QDX = a.map { $0 - mx }; QDY = b.map { $0 - my } } else { QDX = QX; QDY = QY }
         let zero = [Double](repeating: 0, count: N)
         QVX = nQVX ?? zero; QVY = nQVY ?? zero; QW = zero
@@ -1354,7 +1469,8 @@ final class SlimeRig {
         BIDX = [Int](repeating: -1, count: N)
         for k in 0..<bnd.count { BIDX[bnd[k]] = k }
         buildRungs()
-        buildMesh(fast: true)
+        buildMesh(fast: !back)
+        if hOn { homeUnfold(); homeCenter() }
         remT[4] += Date().timeIntervalSince(remT0) * 1000; remT0 = Date()
         func near(_ x: Double, _ y: Double, _ k: Int) -> [Int] {
             var o: [(Double, Int)] = []
@@ -1375,6 +1491,14 @@ final class SlimeRig {
         if let e = eR { eyeR = near(e.0, e.1, 4) }
         dentList.removeAll()
         CAPG = 1
+        if back {   // the shape is still long on the built mesh: the limits widen to just what it needs, so letting go does not shrink it at once
+            let mat = effParams
+            var m = 1.0, e = 0, k = 0
+            while e + 1 < EDG.count && k < EDL.count { let i = EDG[e], jj = EDG[e + 1], l: Double = hypot(QX[i] - QX[jj], QY[i] - QY[jj]) / EDL[k]; m = max(m, l); e += 2; k += 1 }
+            QSTR = m
+            let top: Double = mat.growMax > 0 ? mat.growMax : 12, base: Double = max(mat.memCap, 0.9 * mat.stretchCap)
+            if mat.memCap > 0 { CAPG = max(1, min(top, m / base)) }
+        }
         remT[5] += Date().timeIntervalSince(remT0) * 1000
         return true
     }
@@ -3385,7 +3509,8 @@ final class SlimeRig {
         } else {
             // crossed: relax at the v2.13 rate (0.3). With recover slowed to 0.05 the knot a 9R pull leaves in the tail stayed for
             // 12 s after release; relaxing shortens the strand and the knot comes undone
-            let kr = min(1, (mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && mat.endless < 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.54 無限拉: a few flipped triangles in a long remembered shape no longer make all of it retreat fast (it lost half in 2 s); the no-flip guard opens them, a crossed ring still retreats fast   // v2.38: a flipped remembered shape too
+            let crossQ = mat.remeshHome >= 0.5 && mat.endless >= 0.5 && mat.recover < 0.6 && remCrossQ   // v2.58: the remembered outline crosses itself, undo it faster
+            let kr = min(1, (crossQ ? 0.6 : mat.recover < 0.3 && ((mat.ringGuard > 0 && ringCrossed()) || (mat.flipMem >= 0.5 && mat.endless < 0.5 && flipCount(QX, QY) > 0)) ? 0.3 : mat.recover) * dt)   // v2.54 無限拉: a few flipped triangles in a long remembered shape no longer make all of it retreat fast (it lost half in 2 s); the no-flip guard opens them, a crossed ring still retreats fast   // v2.38: a flipped remembered shape too
             if kr > 0 {
                 for i in 0..<N { QX[i] += (H0X[i] - QX[i]) * kr; QY[i] += (H0Y[i] - QY[i]) * kr }
             }
@@ -4479,7 +4604,7 @@ final class SlimeRig {
         if sl < 0 {
             let idx = walkItems.firstIndex(where: { !$0.gift }) ?? 0
             let o = walkItems.remove(at: idx)
-            walkLeave.append(WalkLeave(k: o.k, big: o.big, x: walkSlotX(o.s), y: walkY(o.big), a: o.a, al: 1))
+            if params.walkShow >= 0.5 { walkLeave.append(WalkLeave(k: o.k, big: o.big, x: walkSlotX(o.s), y: walkY(o.big), a: o.a, al: 1)) }
             sl = o.s
         }
         let i = q.i < N ? q.i : 0, x0 = X[i], y0 = Y[i], sx = walkSlotX(sl), ty = walkY(q.big), G = R * sillGrav * 0.6
@@ -4489,7 +4614,10 @@ final class SlimeRig {
         walkFall.append(WalkFall(k: q.k, big: q.big, s: sl, x: x0, y: y0, vx: (sx - x0) / max(0.05, T), vy: vy, a: q.a, va: va, ty: ty, G: G, b: 0, na: Double.random(in: -0.25..<0.25, using: &rng)))
         onEvent?(.land(gain: 0.22))
     }
-    private func walkLand(_ f: WalkFall) { walkItems.append(WalkItem(k: f.k, big: f.big, s: f.s, a: f.na, gift: false)); walkSave() }
+    private func walkLand(_ f: WalkFall) {
+        if params.walkShow < 0.5 { walkLeave.append(WalkLeave(k: f.k, big: f.big, x: walkSlotX(f.s), y: walkY(f.big), a: f.na, al: 1)) }   // v2.58: not kept on the sill, it fades
+        walkItems.append(WalkItem(k: f.k, big: f.big, s: f.s, a: f.na, gift: false)); walkSave()
+    }
     private func walkStep(_ dt: Double) {
         // v2.32 興奮: home, nobody touching, one or two little hops
         if walkHopN > 0 && sillRoute == nil && !sillAir && (sillInBowl || (noBowl && sillPlane == .room)) && !introOn && fingers.isEmpty && t >= walkHopAt { walkHopN -= 1; walkHopAt = t + 0.9; hop() }
@@ -4533,14 +4661,14 @@ final class SlimeRig {
     func walkOpen() {
         walkLoadOnce()
         walkOpens += 1
-        if walkOpens >= 2 && walkPerm.isEmpty && !walkItems.contains(where: { $0.gift }) {
+        if params.walkShow >= 0.5 && walkOpens >= 2 && walkPerm.isEmpty && !walkItems.contains(where: { $0.gift }) {
             let fs = walkFreeSlot()
             walkItems.append(WalkItem(k: "stone", big: false, s: fs < 0 ? 2 : fs, a: 0.1, gift: true))
         }
         walkSave()
     }
     private func walkGiftAt(_ sx: Double, _ sy: Double) -> Bool {
-        guard sillG != nil, let q = walkItems.first(where: { $0.gift }) else { return false }
+        guard params.walkShow >= 0.5, sillG != nil, let q = walkItems.first(where: { $0.gift }) else { return false }
         return hypot(sx - walkSlotX(q.s), sy - walkY(q.big)) < 26
     }
     /// 先不要 keeps the stone and never asks again; 好 and the controller starts reading steps.
@@ -4560,7 +4688,7 @@ final class SlimeRig {
     /// The things on the sill and the ones fading away (screen points)
     var walkBackSprites: [WalkSprite] {
         guard sillG != nil else { return [] }
-        return walkItems.map { WalkSprite(kind: $0.k, big: $0.big, x: walkSlotX($0.s), y: walkY($0.big), a: $0.a, alpha: 1) }
+        return (params.walkShow >= 0.5 ? walkItems : []).map { WalkSprite(kind: $0.k, big: $0.big, x: walkSlotX($0.s), y: walkY($0.big), a: $0.a, alpha: 1) }
             + walkLeave.map { WalkSprite(kind: $0.k, big: $0.big, x: $0.x, y: $0.y, a: $0.a, alpha: max(0, $0.al)) }
     }
     /// The one stuck to it (a little inside the outline, turning with the body) and the ones falling (world points)

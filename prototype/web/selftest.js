@@ -1129,7 +1129,7 @@
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   // T47 走路（多米 11-06：現實裡走路跟牠掛勾）。門檻與上限、從窗外爬回來、捏一下掉、20 秒自己掉、放滿擠掉最舊的、送的石頭與權限那段、存得起來。網頁拿不到真步數，用 bank 假裝
-  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, walkShow: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
     const clear = () => { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; WALK.bank = 0; WALK.dayN = 0; WALK.day = ''; WALK.opens = 0; WALK.perm = ''; };
     const fresh = sd => { Math.random = seeded(sd || 4701); clear(); mat = { ...SP }; setup(); ESC.on = false; E2.tk.length = 0; E2.tkT = 0; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; };
@@ -1695,6 +1695,22 @@
     LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
     const sum = a => a.reduce((s, o) => s + o.mean, 0);
     res.PASS.remeshCalm = r.on.every((o, k) => o.mean <= 5 && o.nan === 0 && o.selfX === 0 && o.rel >= .9 * r.off[k].rel) && sum(r.on) < .85 * sum(r.off) && r.on.some(o => o.remesh > 0);
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T68 v2.58 放手後要靜下來（remeshHome，QC-0007 #46）。真正的預設值，六個種子各隨機連拉六次（抓外框附近、拉到窗戶裡隨機一點、按住、放手），最後一次放手後第 6 到 8 秒量 T61 的跳動：
+  // 開著沒有 NaN、回原形的目標沒有翻面；同一套 remeshHome 0 當對照，平均是開著的兩倍以上（證明量得到）
+  { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
+    const SP = { ...PRE54.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 };
+    const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(61); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 61 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const rough = (over, sd) => { fresh(over); const rr = seeded(sd * 7919), P = Array.from({ length: 6 }, () => [rr(), rr(), rr(), rr(), 10 + Math.floor(rr() * 20), 20 + Math.floor(rr() * 70)]); let rm = 0;
+      for (const [a1, a2, a3, a4, nm, hh] of P) { const bi = bnd[Math.floor(a1 * bnd.length) % bnd.length], c = globalC, k = .15 + .3 * a2, [sx, sy] = scr(X[bi] + (c.xc - X[bi]) * k, Y[bi] + (c.yc - Y[bi]) * k), ex = 10 + a3 * (innerWidth - 20), ey = 60 + a4 * innerHeight * .5; ev('pointerdown', 1, sx, sy); steps(4); for (let s = 1; s <= nm; s++) { ev('pointermove', 1, sx + (ex - sx) * s / nm, sy + (ey - sy) * s / nm); steps(1); } steps(hh); rm = Math.max(rm, REM.n); ev('pointerup', 1, ex, ey); steps(25); }
+      steps(360); let vx = null, vy = null, js = 0, nj = 0; for (let k = 0; k < 120; k++) { const n0 = N, x0 = Float64Array.from(X), y0 = Float64Array.from(Y); steps(1); if (N !== n0) { vx = null; continue; } let ax = 0, ay = 0; for (let i = 0; i < N; i++) { ax += X[i] - x0[i]; ay += Y[i] - y0[i]; } ax /= N; ay /= N; const nx = new Float64Array(N), ny = new Float64Array(N); let j = 0; for (let i = 0; i < N; i++) { nx[i] = X[i] - x0[i] - ax; ny[i] = Y[i] - y0[i] - ay; if (vx) j = Math.max(j, Math.hypot(nx[i] - vx[i], ny[i] - vy[i])); } if (vx) { js += j; nj++; } vx = nx; vy = ny; }
+      let nan = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) nan++; return { mean: +(js / Math.max(1, nj)).toFixed(2), rm, nan, h0: flipCount(H0X, H0Y) }; };
+    const sds = [4, 8, 20, 34, 38, 12]; r.on = sds.map(d => rough({}, d)); r.off = sds.map(d => rough({ remeshHome: 0 }, d));
+    const avg = a => a.reduce((q, o) => q + o.mean, 0) / a.length; r.avg = [+avg(r.on).toFixed(2), +avg(r.off).toFixed(2)];
+    res.T68_settle = r; log.splice(0); restoreClock(clock); VIEW.bg = bg0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
+    res.PASS.settle = r.avg[1] >= 2 * r.avg[0] && r.on.every(o => o.nan === 0 && o.h0 === 0) && r.on.some(o => o.rm > 0);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();

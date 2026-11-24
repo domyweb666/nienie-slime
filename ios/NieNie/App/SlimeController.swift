@@ -51,7 +51,7 @@ final class SlimeController: ObservableObject {
         for m in SlimeMaterial.allCases { p[m] = m.defaults }
         params = p
         // v2.33 一隻為主: always 芋圓 while 一隻為主 is on (the default); off, the slime chosen last time
-        let saved = SlimeMaterial.clay.defaults.one >= 0.5 && !UserDefaults.standard.bool(forKey: "nienie.showAll") ? SlimeKind.taro : (SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey)   // v2.57: 十隻都顯示 on, the last one chosen
+        let saved = SlimeMaterial.clay.defaults.one >= 0.5 && !UserDefaults.standard.bool(forKey: "nienie.showAll") && !UserDefaults.standard.bool(forKey: "nienie.picked") ? SlimeKind.taro : (SlimeKind(rawValue: UserDefaults.standard.string(forKey: "slime") ?? "") ?? .honey)   // v2.57: 十隻都顯示 on, the last one chosen
         slime = saved; material = saved.material
         var start = saved.material.defaults
         saved.apply(&start)
@@ -373,6 +373,12 @@ final class SlimeController: ObservableObject {
         else { rig.resetImpression() }
         rig.startIntro()
         sound.press(intensity: 0.5)
+    }
+
+    /// v2.58 (QC-0007 #48: the six new ones were added but nowhere in the settings): picked in the feel desk, kept for the next launch even with 一隻為主 on
+    func pickSlime(_ k: SlimeKind) {
+        UserDefaults.standard.set(true, forKey: "nienie.picked")
+        select(k)
     }
 
     /// Panel only: the same slime on another material (blind tests).
