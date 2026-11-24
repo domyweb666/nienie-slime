@@ -15,10 +15,10 @@ final class SlimeController: ObservableObject {
     @Published private(set) var slime: SlimeKind = .honey
     private var impressions: [SlimeKind: (trust: Double, wary: Double)] = [:]   // each slime's impression, this run only
     @Published private(set) var params: [SlimeMaterial: FeelParams]
-    /// v2.57 (多米 11-23: the six new slimes on the phone, both looks, a switch to compare): the panel's two chips, kept in UserDefaults.
-    /// showAll: all ten in the bottom row (一隻為主 off for every material); oldLook6: the six in the v2.51 look (opaque, no highlights)
+    /// The panel's two chips, kept in UserDefaults. showAll (v2.57): all ten in the bottom row (一隻為主 off for every material).
+    /// glossyClear (v2.60, 多米 11-24: back to the opaque body): all ten glossy and see-through as in v2.53b to v2.59. Its own key: the one v2.57 kept meant the opposite, for six of them
     @Published var showAll = UserDefaults.standard.bool(forKey: "nienie.showAll") { didSet { UserDefaults.standard.set(showAll, forKey: "nienie.showAll"); pushParams() } }
-    @Published var oldLook6 = UserDefaults.standard.bool(forKey: "nienie.look6") { didSet { UserDefaults.standard.set(oldLook6, forKey: "nienie.look6"); pushParams() } }
+    @Published var glossyClear = UserDefaults.standard.bool(forKey: "nienie.clear") { didSet { UserDefaults.standard.set(glossyClear, forKey: "nienie.clear"); pushParams() } }
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2 || labGrey; syncAudio() } }
     /// v2.40 環境音: "rain", "fire", "noise" (pink noise, 11-22) or "lofi", kept in UserDefaults (long press the speaker button to choose)
@@ -61,7 +61,7 @@ final class SlimeController: ObservableObject {
         var start = saved.material.defaults
         saved.apply(&start)
         if UserDefaults.standard.bool(forKey: "nienie.showAll") { start.one = 0 }
-        if UserDefaults.standard.bool(forKey: "nienie.look6") { start.look6 = 1 }
+        if UserDefaults.standard.bool(forKey: "nienie.clear") { start.clear = 1 }
         rig = SlimeRig(params: start)
         rig.fx = saved.fx   // v2.57 its signature
         rig.reduceMotion = reduceMotion
@@ -127,7 +127,7 @@ final class SlimeController: ObservableObject {
         var p = params[material] ?? material.defaults
         slime.apply(&p)
         if showAll { p.one = 0 }   // v2.57
-        p.look6 = oldLook6 ? 1 : 0
+        p.clear = glossyClear ? 1 : 0   // v2.60
         return p
     }
 
@@ -747,8 +747,8 @@ final class SlimeController: ObservableObject {
         let p = current
         switch id {
         case "round": return !(p.round > 0)
-        case "hi": return !(p.shine > 0)
-        case "wet": return !(p.shine > 0 && p.wet >= 0.5)
+        case "hi": return !(p.lookShine > 0)
+        case "wet": return !(p.lookShine > 0 && p.wet >= 0.5)
         case "refr": return !(p.water > 0)
         case "caustic": return !(p.caustic > 0)
         case "bubbles": return !(p.bubbles > 0)
@@ -817,7 +817,11 @@ final class SlimeController: ObservableObject {
 
     func loadSlot(_ n: Int) {
         guard let data = UserDefaults.standard.data(forKey: Self.slotKey(n)),
-              let p = decodeSlot(data) else { return }
+              var p = decodeSlot(data) else { return }
+        // v2.60: a slot carries the feel, never the look. Slots saved on build 158 or older hold shine 1, opaque 0 (the glossy body): going to one would bring that back,
+        // and two slots that look different are no blind test (how soft it feels follows how it looks)
+        let now = current
+        p.shine = now.shine; p.opaque = now.opaque; p.clear = now.clear
         params[material] = p
         pushParams()
         activeSlot = n

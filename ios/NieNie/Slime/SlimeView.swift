@@ -740,7 +740,6 @@ final class SlimeView: UIView {
             if let v = o.kCore { skin.kCore = Float(v) }
             if let v = o.glow { skin.glow = Float(v) }
         }
-        let old6 = kind.isNew && p.look6 >= 0.5   // v2.57 新六隻外觀 1: the v2.51 look they were designed in
         if off.contains("shade") { skin.amb = 1; skin.dif = 0 }
         // C3 (決定 8): what moves behind it shows through it too
         let t0 = CACurrentMediaTime()
@@ -764,7 +763,8 @@ final class SlimeView: UIView {
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
                  skin: skin, round: round,
                  water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
-                 shine: old6 ? 0 : p.shine, opaque: old6 ? 0.9 : p.opaque, extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"))
+                 shine: p.lookShine, opaque: p.lookOpaque,   // v2.60 (多米 11-24): opaque, no highlights, all ten; the panel's 外觀 chip (clear) makes them glossy and see-through
+                 extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"))
         drawWater(body: body, z: z)
         drawFx(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)

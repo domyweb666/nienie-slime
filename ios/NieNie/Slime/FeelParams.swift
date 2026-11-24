@@ -250,7 +250,7 @@ struct FeelParams: Equatable, Codable {
     var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
     // v2.57 (the six new slimes, web v2.52): seconds alone before it falls asleep (湯圓 25), how fast wariness fades (× 260 s; 布丁 0.12, scared easily but forgets fast)
     var sleepAfter: Double = 40, wFade: Double = 1
-    var look6: Double = 0             // v2.57 (多米 11-23: make both looks, a switch in the app): 1 gives the six new slimes the v2.51 look they were designed in (body 0.9 opaque, no highlights); 0 they look like the others (glossy and clear, v2.53b). Set from the panel's chip, for every material
+    var clear: Double = 0             // v2.60 (多米 11-24: back to the opaque body; v2.57's switch for the six new ones now covers all ten): 1 = all ten glossy and see-through as in v2.53b to v2.59 (shine 1, opaque 0); 0 = shine and opaque below. Set from the panel's chip, for every material
     // v2.47 (多米 11-16, phone video of build 127: pulled about, some places turn sharp; pulled too long it twitches; take the powder out; it should look full of water)
     var pressPull: Double = 1         // 1: the press spread fades once the finger has pulled away from where it landed (0.15R to 0.6R). Measured: pulled 3R and held still, the patch under the finger was still spread 0.3R (the grab radius), tearing it: 18 flipped triangles, the guard pushing 5 pt back every frame. 0 = v2.46
     var dragCalm: Double = 1          // 1: the spring the whole body follows the finger on is damped more from 1R of travel, no overshoot from 3R (pulled 3.5R it ran 60 pt past and came back, jumping for a second with the hand still). 0 = v2.46
@@ -276,8 +276,8 @@ struct FeelParams: Equatable, Codable {
     var absorb: Double = 0.68         // 0 the whole of it like clear water; 1 a strong colour in the middle
     var caustic: Double = 0           // v2.51: 0 (the ring under it read as a base). sitting, a patch of gathered light under it and a faint ring of shade; 0 off
     // v2.51 (多米 11-22). Web: the same keys in PRESETS
-    var shine: Double = 1             // 0: no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50
-    var opaque: Double = 0          // how much the thick part of the body hides what is behind it. 0 = v2.50 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
+    var shine: Double = 0             // 0 (v2.60, 多米 11-24: back to the look of v2.51 to v2.53): no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50, and v2.53b to v2.59
+    var opaque: Double = 0.9          // how much the thick part of the body hides what is behind it. 0.9 (v2.60): only the thin edge lets it through. 0 = v2.50, and v2.53b to v2.59 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
     var lump: Double = 1              // irregular outline (web shape.js): heavy below, a bump leaning to one side on top, a smaller one low on the other side; 0 = the near-round blob of v2.50. Rebuilds the body
     var strand: Double = 0            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
     var tugEdge: Double = 0        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
@@ -328,6 +328,10 @@ struct FeelParams: Equatable, Codable {
     var volMusic: Double = 0.25       // v2.21 background lofi volume (the speaker button's first state); ducks to 0.6 while held
     var sndSettle: Double = 1         // after-release tail: bubbles after a pull, a small hiss after a long press; 0 = off
     var sndPressSize: Double = 0.5    // how much contact size (majorRadius) changes the press sound; 0 = off
+
+    /// v2.60 what the skin really draws with: `clear` makes all ten glossy and see-through, otherwise the two numbers as they are. Web: lookShine, lookOpaque
+    var lookShine: Double { clear >= 0.5 ? 1 : shine }
+    var lookOpaque: Double { clear >= 0.5 ? 0 : opaque }
 }
 
 /// v2.57 a new slime's signature (web `fx`): purple where it is rubbed (蝶豆), fog when shaken (汽水), a sesame core (湯圓), a caramel cap (布丁), pearls (珍奶). RGB 0...255.
@@ -443,7 +447,7 @@ enum SlimeKind: String, CaseIterable, Identifiable {
     var desc: String { ["黏土，慢吞吞，最愛睡", "果凍，好動，愛到處跑", "黏土，怕生，熟了很黏人", "黏土，愛撒嬌，常來找你",
                         "果凍偏硬，酷，慢熟", "麻糬，愛睡，肚子裡有芝麻餡", "果凍，怕生，揉過的地方會變紫", "最軟，停不下來，搖了會變霧", "最 Q，膽小，頭上有焦糖", "黏土，貪吃，肚子裡有珍珠"][index] }
     var material: SlimeMaterial { [.clay, .jelly, .clay, .clay, .jelly, .mochi, .jelly, .jelly, .jelly, .clay][index] }
-    /// v2.57 one of the six new ones (the panel's 新六隻外觀 switch only touches these)
+    /// v2.57 one of the six new ones (v2.60: the look no longer tells them apart; nothing reads this now, kept as the mark)
     var isNew: Bool { index >= 4 }
     /// v2.57 each new one's signature, drawn on the body (web `fx`, `drawFx`)
     var fx: SlimeFx {
@@ -758,8 +762,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.refr, name: "水把後面的東西彎多少 v2.49", hint: "透過身體看到的背景偏移多少（×半徑），邊緣彎最多", range: 0...0.6, step: 0.02),
         TuneField(key: \.absorb, name: "厚的地方多有顏色 v2.49", hint: "0 整隻像清水；1 中間很濃", range: 0...1, step: 0.05),
         TuneField(key: \.caustic, name: "底下的聚光 v2.49", hint: "坐著時底下一塊聚起來的亮光和一圈淡影；0 關", range: 0...1.5, step: 0.1),
-        TuneField(key: \.shine, name: "身體上的亮點 v2.51", hint: "（多米 11-22：身體內不要有反光）0 沒有：主亮點、小亮點、左上白弧、柔光全關；1 回 v2.50", range: 0...1, step: 0.1),
-        TuneField(key: \.opaque, name: "身體多不透明 v2.51", hint: "（多米 11-22：下方有一條線或底座）厚的地方蓋掉多少後面的東西。0 回 v2.50：窗台邊和布墊透過身體看得到；0.9 只剩邊緣薄的地方透", range: 0...1, step: 0.05),
+        TuneField(key: \.shine, name: "身體上的亮點 v2.51", hint: "（多米 11-22：身體內不要有反光）0 沒有：主亮點、小亮點、左上白弧、柔光全關；1 回 v2.50。v2.60 預設回到不透明（多米 11-24）：這條回到 0。外觀切到亮面透明時這條不作用", range: 0...1, step: 0.1),
+        TuneField(key: \.opaque, name: "身體多不透明 v2.51", hint: "（多米 11-22：下方有一條線或底座）厚的地方蓋掉多少後面的東西。0 回 v2.50：窗台邊和布墊透過身體看得到；0.9 只剩邊緣薄的地方透。v2.60 預設回到不透明（多米 11-24）：這條回到 0.9。外觀切到亮面透明時這條不作用", range: 0...1, step: 0.05),
         TuneField(key: \.lump, name: "不規則外形 v2.51", hint: "（多米 11-22：預設形狀要不規則）1：下盤重、上面一個歪向一邊的鼓包；0 回 v2.50 接近圓的團塊", range: 0...1, step: 0.1),
         TuneField(key: \.strand, name: "黏條 v2.51", hint: "（多米 11-22：不能破皮；手指拉到哪就延長到哪）1：身體只拉到穩定的長度，再遠用一條黏條接到手指，不會斷；0 回 v2.50", range: 0...1, step: 1),
         TuneField(key: \.tugEdge, name: "捏邊緣算拉、捏中間算拿 v2.51", hint: "手指按下的地方離外框這麼近（×半徑）以內，就只把那塊拉出去；更靠中間照舊整隻被拖著走。0 一律整隻拖走", range: 0...1, step: 0.02),

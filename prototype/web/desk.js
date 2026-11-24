@@ -116,7 +116,7 @@ function deskSync(){const B=DESK.blind,F2=DESK.fsl;
   if(B)for(const b of root.querySelectorAll('[data-bs]'))b.setAttribute('aria-pressed',String(+b.getAttribute('data-bs')===B.cur));
   $('feel-prompt').hidden=!DESK.stale;if(DESK.stale)$('feel-prompt-t').textContent='預設已更新到 '+FEELVER+'，現在用的是新預設。你之前存的數字是在「'+DESK.stale+'」上調的，要用回去就按「留著我的」。';
   const g=$('lab-grey'),c=$('lab-circle');if(g)g.setAttribute('aria-pressed',String(LAB.grey));if(c)c.setAttribute('aria-pressed',String(LAB.circle));
-  for(const b of root.querySelectorAll('[data-layer]')){const k=b.getAttribute('data-layer'),dead=(k==='hi'&&!(mat.shine>0))||(k==='wet'&&!(mat.shine>0&&mat.wet>=.5))||(k==='caustic'&&!(mat.caustic>0))||(k==='bubbles'&&!(mat.bubbles>0))||(k==='refr'&&!(mat.water>0))||(k==='dent'&&!(mat.dent>=.5))||(k==='mood'&&!(mat.moodColor>0))||(k==='round'&&!(mat.round>0));
+  for(const b of root.querySelectorAll('[data-layer]')){const k=b.getAttribute('data-layer'),dead=(k==='hi'&&!(lookShine()>0))||(k==='wet'&&!(lookShine()>0&&mat.wet>=.5))||(k==='caustic'&&!(mat.caustic>0))||(k==='bubbles'&&!(mat.bubbles>0))||(k==='refr'&&!(mat.water>0))||(k==='dent'&&!(mat.dent>=.5))||(k==='mood'&&!(mat.moodColor>0))||(k==='round'&&!(mat.round>0));
     b.setAttribute('aria-pressed',String(!LAB.off[k]&&!dead));b.disabled=dead;b.title=dead?'這一層現在的參數是 0，本來就沒畫':''}}
 function deskBuild(){const root=$('feel');if(!root)return;
   root.innerHTML=`<div class="feel-head"><b>手感調節台</b><span class="feel-ver">預設 ${FEELVER}</span><button id="feel-close">收起</button></div>
