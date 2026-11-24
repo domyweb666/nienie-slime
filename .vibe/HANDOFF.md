@@ -39,6 +39,7 @@
 - [ ] W3：網頁 C1、C2、C4、C7、B4、雨 0.3｜規劃檔各條驗法｜index.html、selftest.js｜W2、B1
 - [x] S2：Swift A2–A5｜SlimeRig｜W1、S1
 - [x] S3a：Swift D1、D2、C3（照 W2-移植說明）｜SlimeRig｜W2
+- [ ] S5：修 Swift 複查抓到的（`v2.61/Swift複查.md`）＋補 tools/swift-linux-check｜UI、Controller、LabProbe、協定搬家｜S3a
 - [ ] S3b：Swift C1、C2、B4｜SlimeRig｜S3a、W3
 - [x] S4：Swift B1 接線、B7、A7 讀數、調節台、版本｜Audio、Controller、View、UI｜S1
 - [ ] R：反駁者查網頁與 Swift、69＋項跑 3 次、混合 250 重量｜全部
