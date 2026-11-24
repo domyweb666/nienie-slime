@@ -1,6 +1,6 @@
 # Handoff: 窗景 12 扇搬進 Swift，寫完還沒編譯（2026-11-24，v2.59，先看這段）
 
-> 工作樹 `E:/捏捏史萊姆/_wt-窗景`，分支 `window-scenes-v1`，從 `feel-3x-panel-v1` 的 `d2a010b` 接著做。**沒推、沒合回、沒發 TestFlight、沒編譯過。**
+> 多米 11-24 說合回並推：已快轉進 `feel-3x-panel-v1`（工作樹 `prototype/web/_wt`），推到 `a32088a`，CI 結果看 PR #1。沒發 TestFlight。
 
 ## 做了什麼
 - 資料：`tools/export-windows-ios.py` 開網頁把 `windows.js` 拆好的每層輸出成圖（1.5 倍、無損 webp 205 張）和時間表 `windows.json`，放 `ios/NieNie/Resources/win/`，共 2.5 MB。SVG 改了就重跑（約 4 分鐘）。`windows.js` 只加了資料欄位（`raw`、`tk`、`ty`、`pd`），畫面逐點沒變。
@@ -21,14 +21,14 @@
 - App Store 版的調節台從隱藏面板還開得到，窗景等於免費。上架前要換。
 
 ## 下一步從哪繼續
-1. 多米說合、推 → `prototype/web/_wt` 裡 `git merge --ff-only window-scenes-v1`，`git push origin feel-3x-panel-v1`，看 PR #1 的 CI。
+1. 看 PR #1 在 `a32088a` 之後的 CI。編不過先修 `WindowScene.swift`，再推。
 2. 編過、多米說發 → `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`。
 3. 真機看：12 扇白天夜晚、身體裡的折射、牠爬到窗外時的前後、每幀時間。
 
 ## 工作包
 - [x] I1：輸出圖層與時間表
 - [x] I2：Swift 繪製、折射、選窗
-- [ ] I3：CI 編譯｜BUILD SUCCEEDED｜ios/｜要多米說推
+- [ ] I3：CI 編譯｜BUILD SUCCEEDED｜ios/｜已推，看結果
 - [ ] H：TestFlight｜要多米說發
 
 ---
