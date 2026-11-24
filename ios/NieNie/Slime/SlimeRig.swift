@@ -411,6 +411,10 @@ final class SlimeRig {
     /// comfortable → happy (stand tall, wag, hop); a quick one (under 0.25 s, not pulled) → a poke: flinch, the third within 1 s darts aside.
     private func moodRelease(_ f: Finger) {
         guard params.emo >= 0.5 else { return }
+        if params.pullSoft >= 0.5 && moodStrainMax > 0.15 && memLen() > PullSet.noFlee * HRC[HRX.count] {   // v2.61 A5 (fl): still pulled long, it does not run yet (only the scare)
+            moodStrainMax = 0; moodScare = min(1, moodScare + 0.5)
+            return
+        }
         if moodStrainMax > 0.15 {
             flee(-pullDX, -pullDY, W * (0.45 + 0.35 * moodStrainMax) * params.flee); moodStrainMax = 0; return
         }
@@ -635,6 +639,7 @@ final class SlimeRig {
 
     final class Finger {
         var tug: Bool? = nil      // v2.51: grabbed near the outline: it pulls a strand out, the body is not carried (nil = not judged yet)
+        var r0x: Double? = nil, r0y = 0.0   // v2.61 A4: where it took hold, from the body's centre (r0x, r0y on the web; not the contact radius r0)
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
         enum Mode { case grab, push, none, stroke }   // v2.26 F6 stroke: sliding over it, nothing pinned
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
@@ -962,6 +967,7 @@ final class SlimeRig {
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         CAPG = 1; CAPGAP = 0   // v2.54
+        pullStillT = 0   // v2.61
         sillInit()   // v2.28 窗台: last, it moves the body over the bowl and lets it drop
         shkReset()   // v2.31 搖晃沉澱: clear, the glitter in a pile
     }
@@ -1176,7 +1182,8 @@ final class SlimeRig {
         remChk = 0
         let home = mat.remeshHome >= 0.5
         if home && !fingers.values.contains(where: { $0.mode != .none }) {   // v2.58: let go, back to the mesh it was built with
-            if remN > 0, HB.count == bnd.count, remesh(back: true) { remN = 0; remCalm = t + max(0, mat.remeshCalm); remLast = t }
+            let shortEnough: Bool = !(mat.pullSoft >= 0.5) || memLen() < PullSet.homeLen * HRC[HRX.count]   // v2.61 A2 (bl): not until what it remembers is back under 1.35× the built outline
+            if remN > 0, HB.count == bnd.count, shortEnough, remesh(back: true) { remN = 0; remCalm = t + max(0, mat.remeshCalm); remLast = t }
             return
         }
         let nb = bnd.count
@@ -1530,6 +1537,40 @@ final class SlimeRig {
         let u: Double = min(1, (d - 0.6) / 1.2)
         return u * u * (3 - 2 * u)
     }
+    // MARK: - v2.61 拉的三顆開關 (多米 11-25; .uiux/04-手感/極致優化規劃-暫定.md A2...A5; web PULLHOLD, PULLWHOLE, PULLSOFT)
+
+    /// The numbers of pullHold (A3), pullWhole (A4) and pullSoft (A5 + A2), one for one with the web's.
+    private enum PullSet {
+        static let still: Double = 0.3, wait: Double = 0.25            // a finger slower than this (radii a second) is still; that long (s) and the pull has stopped
+        static let holdFade: Double = 0.25, holdMin: Double = 0.02     // A3 (cr): stopped, remembering falls to holdMin over holdFade s
+        static let wholeK: Double = 1.6, wholeR0: Double = 0.15, wholeRamp: Double = 0.35   // A4 (iw): at most wholeK × (how far from the centre it took hold) moves the whole body; taken hold within wholeR0 R of the centre none, wholeRamp R further out all of it
+        static let noFlee: Double = 1.35, homeLen: Double = 1.35       // A5 (fl): the remembered outline over this × the built one, let go, it does not flee yet. A2 (bl): under this it goes back to the built mesh
+        static let upright: Double = 3                                 // A5 (up): turning upright, the farthest tip moves at most this (R a second)
+        static let relV: Double = 6, relT: Double = 0.8                // A5 (vc): for relT s after letting go no particle is faster than relV (R a second)
+        static let drift: Double = 0.3                                 // A2 (gv): stopped, the finger's effective position drifts at most this far (R)
+    }
+    /// How long every grabbing finger has been still (web `PULLT`); 0 with nothing held, after a rebuild, and while both switches that read it are off.
+    private var pullStillT = 0.0
+    private func pullMoving() -> Bool {
+        fingers.values.contains { $0.mode == .grab && hypot($0.vxS, $0.vyS) > R * PullSet.still }
+    }
+    /// Once a frame, right before the memory (web `pullStillStep`).
+    private func pullStillStep(_ dt: Double) {
+        guard params.pullHold >= 0.5 || params.pullSoft >= 0.5, fingers.values.contains(where: { $0.mode == .grab }) else { pullStillT = 0; return }
+        pullStillT = pullMoving() ? 0 : pullStillT + dt
+    }
+    /// A3: how much of the remembering is left (pulled open 0.6R on, fully at 1.8R: pullK). Web `pullHoldK`.
+    private func pullHoldK(_ mat: FeelParams) -> Double {
+        let g0: Double = pullStillT < PullSet.wait ? 1 : max(PullSet.holdMin, 1 - (pullStillT - PullSet.wait) / PullSet.holdFade)
+        return 1 - pullK(mat) * (1 - g0)
+    }
+    /// How long the remembered shape's outline is (web `memLen`).
+    private func memLen() -> Double {
+        var s = 0.0
+        let n = bnd.count
+        for k in 0..<n { let i = bnd[k], j = bnd[(k + 1) % n]; s += hypot(QX[j] - QX[i], QY[j] - QY[i]) }
+        return s
+    }
     private func capG(_ mat: FeelParams) -> Double { mat.endless >= 0.5 ? CAPG : 1 }
     /// Widened, the remembered shape's limit is nine tenths of the live body's (2.4 of 3 before), or it shrinks back to the memory limit on release.
     private func memCapNow(_ mat: FeelParams) -> Double { mat.endless >= 0.5 && CAPG > 1 ? max(mat.memCap, 0.9 * mat.stretchCap) * CAPG : mat.memCap }
@@ -1547,7 +1588,8 @@ final class SlimeRig {
         }
         CAPGAP = gap
         if held {
-            if gap > 0.12 && mat.stretchCap > 0 {
+            let grows: Bool = !(mat.pullSoft >= 0.5) || pullMoving()   // v2.61 A2 (cg): the limit widens only while a finger moves
+            if gap > 0.12 && mat.stretchCap > 0 && grows {
                 var mx = 0.0, e = 0, k = 0
                 while e + 1 < EDG.count {
                     let i = EDG[e], j = EDG[e + 1], l: Double = hypot(X[i] - X[j], Y[i] - Y[j]) / EDL[k]
@@ -2000,6 +2042,7 @@ final class SlimeRig {
         // C4: touched again while it begs, the purr comes in 0.3 s (a stroke normally takes 1 s)
         if grab && iv2(params.impC4) && t < impAskUntil { f.gentleT = 0.7; moodC = max(moodC, 0.5); impTrust = min(1, impTrust + 0.05); impAskUntil = -9 }
         if grab {
+            if clusters.indices.contains(gi) { f.r0x = x - clusters[gi].xc; f.r0y = y - clusters[gi].yc }   // v2.61 A4
             fingerGrab(f, id: id, x: x, y: y)
             onEvent?(.press(gain: 0.7))
             // press flat (多米 2026-11-01: wanted to see it): a press counts only if it lands on the upper half; remember the
@@ -2223,6 +2266,7 @@ final class SlimeRig {
         f.ax = f.rawX; f.ay = f.rawY; f.x = f.rawX; f.y = f.rawY; f.fx = f.rawX; f.fy = f.rawY
         f.stretch = 0; f.ex = 0; f.ey = 0; f.sb = 0; f.step = 0; f.hold = 0; f.press = 0; f.pressOn = false; f.peak = 0; f.on = false; f.far = false
         f.tGrab = t; f.grainI = 0; f.grR = 0
+        if clusters.indices.contains(gi) { f.r0x = f.rawX - clusters[gi].xc; f.r0y = f.rawY - clusters[gi].yc }   // v2.61 A4
         fingerGrab(f, id: id, x: f.rawX, y: f.rawY)
         onEvent?(.press(gain: 0.35))
         dragRebase()
@@ -2909,6 +2953,7 @@ final class SlimeRig {
         shkStep(dt)   // v2.31 搖晃沉澱
         tentBump()
         if clingOn { for i in 0..<N { clingPin(i) } }   // v2.36: again after the tentacle bumps (else they push it ~2.6 pt off the wall)
+        pullStillStep(dt)   // v2.61
         plasticity(dt)
         twitch(L)
         eyeStep(dt)   // v2.23
@@ -2933,10 +2978,22 @@ final class SlimeRig {
         let G: Double = sillOn ? (introOn ? R * introG : R * sillGrav * sillGVY) * dt * dt : (introOn ? R * introG * dt * dt : 0)   // v2.17 intro: gravity only while hopping in; v2.28 窗台: always; v2.30 it can turn (0 while it lifts itself)
         let Gh: Double = sillOn && !introOn ? R * sillGrav * sillGVX * dt * dt : 0
         // 1 Verlet
-        for i in 0..<N {
-            let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
-            PX[i] = X[i]; PY[i] = Y[i]
-            X[i] += vx + Gh; Y[i] += vy + G
+        let relCap: Bool = mat.pullSoft >= 0.5 && fingers.isEmpty && t - lastTouch < PullSet.relT && !introOn && sillHop == nil
+        if relCap {   // v2.61 A5 (vc): just let go, no particle faster than 6R a second (before gravity is added)
+            let lim: Double = PullSet.relV * R * dt
+            for i in 0..<N {
+                var vx: Double = (X[i] - PX[i]) * damp, vy: Double = (Y[i] - PY[i]) * damp
+                let sp: Double = hypot(vx, vy)
+                if sp > lim { vx *= lim / sp; vy *= lim / sp }
+                PX[i] = X[i]; PY[i] = Y[i]
+                X[i] += vx + Gh; Y[i] += vy + G
+            }
+        } else {
+            for i in 0..<N {
+                let vx = (X[i] - PX[i]) * damp, vy = (Y[i] - PY[i]) * damp
+                PX[i] = X[i]; PY[i] = Y[i]
+                X[i] += vx + Gh; Y[i] += vy + G
+            }
         }
         // 2 fingers (GWT: how much each particle is held this substep, for grabHold in shape matching)
         for i in 0..<N { GWT[i] = 0 }
@@ -3166,7 +3223,16 @@ final class SlimeRig {
         // upright: turn back head-up. Kinematic (position and previous position together), so no overshoot.
         let gAng = atan2(clusters[gi].sn, clusters[gi].cs)
         let grabbing = !fingers.isEmpty
-        let rotK = -gAng * min(0.2, grabbing ? min(mat.upright * mat.anchor * mat.gripRot, mat.gripUp >= 0 ? mat.gripUp : 1) : mat.upright)   // v2.29 gripUp: grabbed, the body has to be able to turn, else a pulled strand can only wrap around it
+        var rotK: Double = -gAng * min(0.2, grabbing ? min(mat.upright * mat.anchor * mat.gripRot, mat.gripUp >= 0 ? mat.gripUp : 1) : mat.upright)   // v2.29 gripUp: grabbed, the body has to be able to turn, else a pulled strand can only wrap around it
+        if mat.pullSoft >= 0.5 && !grabbing {   // v2.61 A5 (up): long, it turns back without flinging its tip
+            var rm = 0.0
+            for i in bnd {
+                let ux: Double = X[i] - gcx, uy: Double = Y[i] - gcy, q: Double = ux * ux + uy * uy
+                if q > rm { rm = q }
+            }
+            let lim: Double = PullSet.upright * R * dt / max(R * 0.5, sqrt(rm))
+            rotK = max(-lim, min(lim, rotK))
+        }
         if rotK != 0 { rotateFree(by: rotK, around: gcx, gcy) }
         // idle sway: pure performance displacement, no velocity left behind
         let sway = L * mat.life * 0.0009 * sin(t * 2 * .pi / 5.3)
@@ -3273,7 +3339,12 @@ final class SlimeRig {
             for f in fingers.values where f.mode == .grab && !f.mem.isEmpty {
                 var sx = 0.0, sy = 0.0, sw = 0.0
                 for m in f.mem { sx += SLX[m.i] * m.w; sy += SLY[m.i] * m.w; sw += m.w }
-                if sw > 0 {
+                var heldBack = false   // v2.61 A2 (gv): stopped, a finger that has already given way 0.3R gives no further the same way
+                if mat.pullSoft >= 0.5 && pullStillT > PullSet.wait {
+                    let along: Double = f.slx * sx + f.sly * sy
+                    heldBack = hypot(sx, sy) > 0 && along > 0 && hypot(f.slx, f.sly) > R * PullSet.drift
+                }
+                if sw > 0 && !heldBack {
                     if mat.endless >= 0.5, !clusters.isEmpty {   // v2.54 無限拉: the finger gives way outward and sideways, never back toward the body's centre (that was the pull that would not stretch)
                         let rx: Double = f.fx - clusters[gi].xc, ry: Double = f.fy - clusters[gi].yc, rl: Double = hypot(rx, ry)
                         if rl > 1e-6 { let d: Double = (sx * rx + sy * ry) / rl; if d < 0 { sx -= d * rx / rl; sy -= d * ry / rl } }
@@ -3507,7 +3578,8 @@ final class SlimeRig {
                 let x = max(0, min(1, (t - f.tDown - lo) / (hi - lo)))
                 g = max(g, x * x * (3 - 2 * x))
             }
-            let yl = mat.yield * R, kc: Double = min(1, (mat.creep + max(0, mat.pullCreep - mat.creep) * pullK(mat)) * rateKC * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
+            let yl = mat.yield * R, kc0: Double = min(1, (mat.creep + max(0, mat.pullCreep - mat.creep) * pullK(mat)) * rateKC * dt * g) * (mat.rubSpeed > 0 && tickOn ? 0.0 : 1.0)   // v2.24: a tickle is not sculpting
+            let kc: Double = mat.pullHold >= 0.5 ? kc0 * pullHoldK(mat) : kc0   // v2.61 A3 (cr): pulled long and stopped, it all but stops remembering
             // v2.24 pressLocal: while the finger has not moved off (0.15R) only the part near it remembers. With the whole body remembering, holding still wrote the
             // small shape-matching errors into the far edge, a 48° corner in 4 s (in Q itself); once it moves the whole body remembers as before, pulls keep their shape
             let plGrabs = fingers.values.filter { $0.mode == .grab }
@@ -5026,10 +5098,28 @@ final class SlimeRig {
             n += 1
         }
         if n == 0 { return (0, 0, 0) }
-        let dx = sx / Double(n), dy = sy / Double(n), dl = hypot(dx, dy)
+        var dx: Double = sx / Double(n), dy: Double = sy / Double(n), dl: Double = hypot(dx, dy)
         if dl < 1e-9 { return (0, 0, n) }
+        // v2.61 A4 (iw): one finger pulling towards the body's middle: that part of the travel moves the whole body first (at most 1.6 × how far
+        // from the middle it took hold), only the rest stretches it
+        var wx = 0.0, wy = 0.0
+        if params.pullWhole >= 0.5, n == 1, let f = fingers.values.first(where: { $0.mode == .grab }), let r0x = f.r0x {
+            let rl: Double = hypot(r0x, f.r0y)
+            if rl > R * 0.1 {
+                let ux: Double = r0x / rl, uy: Double = f.r0y / rl
+                let p: Double = -(dx * ux + dy * uy)
+                if p > 0 {
+                    let wt: Double = smooth01((rl / R - PullSet.wholeR0) / PullSet.wholeRamp)
+                    let c: Double = min(p, rl * PullSet.wholeK) * wt
+                    wx = -ux * c; wy = -uy * c
+                    dx -= wx; dy -= wy
+                    dl = hypot(dx, dy)
+                    if !(dl > 0) { dl = 1e-9 }
+                }
+            }
+        }
         let S = slideLen(), st: Double = S * tanh((1 - dragFollow()) * dl / S)
-        return (dx - dx / dl * st, dy - dy / dl * st, n)
+        return (wx + dx - dx / dl * st, wy + dy - dy / dl * st, n)
     }
     /// A finger joined or left: fold the offset into home, then rebase so the target carries on from 0.
     private func dragRebase() {
@@ -5041,6 +5131,7 @@ final class SlimeRig {
     /// on at the offset's speed (at most about 0.4R, 0.25 s time constant).
     private func dragRelease(glide: Bool) {
         if fingers.values.contains(where: { $0.mode == .grab }) { dragRebase(); return }
+        pullStillT = 0   // v2.61: the last one let go
         var vx = dragVX, vy = dragVY
         let vl = hypot(vx, vy), vm = R * (params.slide > 0 ? 6 : 1.6)   // v2.21: a fling glides on up to about 1.5R (v2.20 0.4R)
         if vl > vm { vx *= vm / vl; vy *= vm / vl }
@@ -6077,4 +6168,13 @@ extension SlimeRig {
                       pearls: fxPearls.map { (x: $0.x, y: $0.y) },
                       capFlow: fxCapFlow)
     }
+}
+
+/// v2.61 A1: what the mesh skin reads (JellySkin.swift, SkinMeshSource). Read only. TRI and EDG are replaced whole, never changed in place: the skin
+/// tells a new mesh by the arrays having changed.
+extension SlimeRig: SkinMeshSource {
+    var skinTri: [Int] { TRI }
+    var skinEdg: [Int] { EDG }
+    var skinRest: (x: [Double], y: [Double]) { (Q0X, Q0Y) }
+    var skinWalls: (l: Double, r: Double, b: Double) { let w = worldWalls; return (w.l, w.r, w.b) }
 }

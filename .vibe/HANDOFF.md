@@ -37,7 +37,7 @@
 - [ ] T：T70 破皮測試（A7 網頁）｜對 v2.60 會紅、兩套門檻｜selftest.js｜W1
 - [ ] W2：網頁 D1、D2、C3｜規劃檔各條驗法｜index.html、selftest.js｜W1、T
 - [ ] W3：網頁 C1、C2、C4、C7、B4、雨 0.3｜規劃檔各條驗法｜index.html、selftest.js｜W2、B1
-- [ ] S2：Swift A2–A5｜SlimeRig｜W1、S1
+- [x] S2：Swift A2–A5｜SlimeRig｜W1、S1
 - [ ] S3：Swift D1、D2、C1、C2、C3、B4｜SlimeRig｜S2、W3
 - [ ] S4：Swift B1 接線、B7、A7 讀數、調節台、版本｜Audio、Controller、View、UI｜S1
 - [ ] R：反駁者查網頁與 Swift、69＋項跑 3 次、混合 250 重量｜全部
