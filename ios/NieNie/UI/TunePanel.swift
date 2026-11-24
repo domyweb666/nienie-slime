@@ -34,10 +34,10 @@ struct TunePanel: View {
 
             // blind test: save the current numbers as 1 or 2, then switch by number only
             HStack(spacing: 6) {
-                chip("存 1") { controller.saveSlot(1) }
-                chip("存 2") { controller.saveSlot(2) }
-                chip("切 1", on: controller.activeSlot == 1, enabled: controller.slotSaved[1] == true) { controller.loadSlot(1) }
-                chip("切 2", on: controller.activeSlot == 2, enabled: controller.slotSaved[2] == true) { controller.loadSlot(2) }
+                chip("存 1", enabled: controller.pullBlind == nil) { controller.saveSlot(1) }
+                chip("存 2", enabled: controller.pullBlind == nil) { controller.saveSlot(2) }
+                chip("切 1", on: controller.activeSlot == 1, enabled: controller.slotSaved[1] == true && controller.pullBlind == nil) { controller.loadSlot(1) }
+                chip("切 2", on: controller.activeSlot == 2, enabled: controller.slotSaved[2] == true && controller.pullBlind == nil) { controller.loadSlot(2) }
                 Spacer(minLength: 0)
                 Text(controller.activeSlot.map { "\($0) 號" } ?? "未存")
                     .font(.rounded(13))
@@ -106,7 +106,7 @@ struct TunePanel: View {
                             .font(.rounded(12, .heavy))
                             .foregroundStyle(Palette.inkSoft)
                             .padding(.top, 4)
-                        ForEach(TuneField.all.filter { $0.section == section }) { f in
+                        ForEach(TuneField.all.filter { $0.section == section && !controller.hiddenNow($0) }) { f in   // v2.61 甲乙: not shown which side is on
                             let value = controller.binding(for: f)
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack {

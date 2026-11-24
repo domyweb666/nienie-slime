@@ -19,6 +19,12 @@ final class SlimeController: ObservableObject {
     /// glossyClear (v2.60, 多米 11-24: back to the opaque body): all ten glossy and see-through as in v2.53b to v2.59. Its own key: the one v2.57 kept meant the opposite, for six of them
     @Published var showAll = UserDefaults.standard.bool(forKey: "nienie.showAll") { didSet { UserDefaults.standard.set(showAll, forKey: "nienie.showAll"); pushParams() } }
     @Published var glossyClear = UserDefaults.standard.bool(forKey: "nienie.clear") { didSet { UserDefaults.standard.set(glossyClear, forKey: "nienie.clear"); pushParams() } }
+    /// v2.61 第一批: the fourteen switches, laid over every material and slime (changing either leaves them as they are). Not kept for the next launch,
+    /// except the three of the pull, which come back with the desk's numbers
+    @Published private(set) var batch = FeelBatch()
+    /// v2.61 甲乙 in progress
+    @Published private(set) var pullBlind: PullBlind?
+    @Published var pullWhat: PullBlind.What = .all
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2 || labGrey; syncAudio() } }
     /// v2.40 環境音: "rain", "fire", "noise" (pink noise, 11-22) or "lofi", kept in UserDefaults (long press the speaker button to choose)
@@ -128,6 +134,7 @@ final class SlimeController: ObservableObject {
         slime.apply(&p)
         if showAll { p.one = 0 }   // v2.57
         p.clear = glossyClear ? 1 : 0   // v2.60
+        batch.apply(to: &p)   // v2.61
         return p
     }
 
@@ -137,8 +144,13 @@ final class SlimeController: ObservableObject {
         let p = current
         switch e {
         case .press(let gain):
+            let probe = LabProbe.shared   // v2.61 B7: timed only while the desk is open
+            probe.soundStart()
             sound.press(intensity: pressIntensity(gain, radius: rig.maxTouchRadius, weight: p.sndPressSize))
+            probe.soundEnd()
+            probe.hapStart()
             haptics.transient(intensity: 0.25 + 0.35 * gain, sharpness: p.pressSharp)
+            probe.hapEnd()
         case .squish(let gain):
             // 提案第 24 條: two fingers pinching closer
             sound.press(intensity: gain)
@@ -192,6 +204,7 @@ final class SlimeController: ObservableObject {
 
     /// Called by the slime view once per display frame, after the rig stepped.
     func frame(dt: Double) {
+        if pullBlind?.pending != nil && !rig.isTouched { pullBlindApply() }   // v2.61 甲乙: the hand is off the body
         let p = current
         // v2 layered sound: the strand loop, strands, rub loop and the after-release tail all follow the physics here
         sound.frame(dt: dt, rub: rig.rubLevel() * p.rubMax, stretch: rig.pullStretch, grabbing: rig.isGrabbing)
@@ -300,6 +313,7 @@ final class SlimeController: ObservableObject {
         sound.pitchJitter = current.pitchJitter
         sound.pullMax = current.sndPullMax
         sound.rubMax = current.rubMax
+        sound.snd61 = current.snd61 >= 0.5   // v2.61 B1
         sound.settleAmt = current.sndSettle
         sound.music = soundMode == 0 && !labGrey ? current.volMusic : 0
     }
@@ -449,6 +463,13 @@ final class SlimeController: ObservableObject {
         Binding(
             get: { self.current[keyPath: field.key] },
             set: { v in
+                if let i = FeelBatch.index(field.key) {   // v2.61: the batch's switches are not a material's
+                    self.batch.set(i, v >= 0.5)
+                    self.pushParams()
+                    self.activeSlot = nil
+                    self.feelSave()
+                    return
+                }
                 var p = self.current
                 p[keyPath: field.key] = v
                 self.params[self.material] = p
@@ -460,6 +481,7 @@ final class SlimeController: ObservableObject {
 
     func restoreDefaults() {
         params[material] = material.defaults
+        if pullBlind == nil { batch = FeelBatch() }   // v2.61: the panel's own button puts everything on it back
         pushParams()
         activeSlot = nil
     }
@@ -494,7 +516,11 @@ final class SlimeController: ObservableObject {
     private var feelStaleSnap: FeelSnap?
     private var feelBase0: FeelSnap?   // the desk as the app opened (or the material was last chosen): 「這次動過」 counts from here
 
-    private func feelPick() -> FeelSnap { FeelSnap.pick(current, base: material.rawValue) }
+    private func feelPick() -> FeelSnap {
+        var s = FeelSnap.pick(current, base: material.rawValue)
+        if let b = pullBlind { s.setPull(b.keep) }   // v2.61 甲乙: what is being compared is not the desk's own
+        return s
+    }
 
     private func feelSave() {
         let keep = feelStale != nil ? feelStaleSnap : nil
@@ -509,6 +535,7 @@ final class SlimeController: ObservableObject {
         var p = current
         s.apply(to: &p)
         params[material] = p
+        if pullBlind == nil { batch.setPull(s.pullOn) }   // v2.61
         pushParams()
         activeSlot = nil
         feelSave()
@@ -570,7 +597,9 @@ final class SlimeController: ObservableObject {
     /// v2.54 手感風格: lay one of the ten over clay's defaults, like going to a saved feel (no bump).
     func feelStyle(_ st: FeelStyle) {
         guard feelBlind == nil else { return }
-        feelApply(st.snap)
+        var sn = st.snap
+        sn.setPull(batch.pullOn)   // v2.61: a style moves the knobs only
+        feelApply(sn)
         feelNote = "套上「\(st.name)」：\(st.math)。\(st.feel)。不喜歡就按「回到預設」，喜歡的話存成一格，可以拿去跟別的盲比。"
     }
     /// The style the desk's numbers are exactly, if any.
@@ -648,6 +677,7 @@ final class SlimeController: ObservableObject {
         feelBlind = nil
         material = slime.material
         for m in SlimeMaterial.allCases { params[m] = m.defaults }
+        batch.setPull([false, false, false])   // v2.61: what is saved goes back, the other switches stay
         feelSlots = [nil, nil, nil]
         feelStale = nil; feelStaleSnap = nil; feelPv = FeelKnob.version; feelPs = FeelKnob.stamp
         pushParams()
@@ -667,7 +697,73 @@ final class SlimeController: ObservableObject {
         for id in FeelKnob.keys where FeelKnob.fmt(b.k[id] ?? 0) != FeelKnob.fmt(now.k[id] ?? 0) {
             o.append("\(FeelKnob.name(id)) \(FeelKnob.fmt(b.k[id] ?? 0))→\(FeelKnob.fmt(now.k[id] ?? 0))")
         }
-        return o
+        return o + FeelSnap.pullDiff(b, now, "→")
+    }
+
+    // MARK: - v2.61 這一批
+
+    func batchTier(_ t: FeelBatch.Tier) {
+        guard pullBlind == nil else { return }
+        batch = FeelBatch(t)
+        batchDone("換到「\(t.name)」。")
+    }
+    func batchTogglePull(_ id: String) {
+        guard pullBlind == nil else { return }
+        batch[id] = !batch[id]
+        let v: String = batch[id] ? "開" : "關"
+        batchDone("\(FeelBatch.pullName(id))：\(v)。")
+    }
+    func batchToggleGroup(_ g: FeelBatch.Group) {
+        let v = !batch.all(g.ids)
+        for id in g.ids { batch[id] = v }
+        let w: String = v ? "開" : "關"
+        batchDone("\(g.name)：\(w)。")
+    }
+    private func batchDone(_ note: String) {
+        pushParams()
+        activeSlot = nil
+        feelSave()
+        feelNote = note
+    }
+
+    /// 甲 or 乙 (0 or 1). The first press starts a comparison and tosses the coin.
+    func pullBlindPick(_ side: Int) {
+        guard feelBlind == nil, side == 0 || side == 1 else { return }
+        var b = pullBlind ?? PullBlind(pullWhat, keep: batch.pullOn, now: ProcessInfo.processInfo.systemUptime)
+        b.pending = side
+        pullBlind = b
+        if !rig.isTouched { pullBlindApply() }
+    }
+    func pullBlindReveal() {
+        guard var b = pullBlind, !b.revealed else { return }
+        b.revealed = true
+        pullBlind = b
+        feelLog.append(b.line(now: ProcessInfo.processInfo.systemUptime))
+        if feelLog.count > 60 { feelLog.removeFirst(feelLog.count - 60) }
+        feelSave()
+    }
+    func pullBlindStop() {
+        guard var b = pullBlind else { return }
+        b.pending = 2
+        pullBlind = b
+        if !rig.isTouched { pullBlindApply() }
+    }
+    private func pullBlindApply() {
+        guard var b = pullBlind, let n = b.pending else { return }
+        b.pending = nil
+        if n == 2 {
+            pullBlind = nil
+            batch.setPull(b.keep)
+            pushParams()
+            feelSave()
+            feelNote = "甲乙比完，拉的三顆回到原本的。"
+            return
+        }
+        if let s = b.shown, s != n { b.switches += 1 }
+        b.shown = n
+        pullBlind = b
+        batch.setPull(b.sides[n])
+        pushParams()
     }
 
     /// v2.52 A2: what the sliders say against what the physics really uses (a scene or a mode can override a slider)
@@ -697,6 +793,8 @@ final class SlimeController: ObservableObject {
         }
         extra.append("讀數：" + labText.replacingOccurrences(of: "\n", with: "｜"))
         if let f = fuzzSummary { extra.append(f.text) }
+        if LabProbe.shared.lagAny { extra.append(lagCopy) }   // v2.61 B7
+        extra.append(batch.line)   // v2.61
         return FeelExport.text(header: feelHeader, slimeName: slime.name, current: feelPick(),
                                effectivePull: eff.used.maxPull != eff.set.maxPull ? eff.used.maxPull : nil,
                                slots: feelSlots, changed: feelChanged, log: feelLog, extra: extra)
@@ -705,7 +803,7 @@ final class SlimeController: ObservableObject {
     /// 貼上匯入
     @discardableResult
     func feelImport(_ text: String) -> Bool {
-        guard feelBlind == nil else { return false }
+        guard feelBlind == nil, pullBlind == nil else { return false }
         guard let r = FeelExport.parse(text) else {
             feelNote = "剪貼簿裡找不到 #nienie-feel 那一行。先拷貝「複製數值給 Agent」複製出來的整段字，再按一次「貼上匯入」。"
             return false
@@ -757,7 +855,42 @@ final class SlimeController: ObservableObject {
         default: return false
         }
     }
-    func labResetReadouts() { rig.guardReset() }
+    func labResetReadouts() {
+        rig.guardReset()
+        LabProbe.shared.lagReset()
+        LabProbe.shared.skinReset()
+        objectWillChange.send()
+    }
+
+    // v2.61 B7, A7: what LabProbe reads, shown on the desk (refreshed with the frame readout twice a second) and copied
+    /// The desk opened or closed: touches are timed only while it is open
+    func labDesk(open: Bool) { LabProbe.shared.on = open }
+    /// 碰著時固定 120, never saved
+    @Published var lab120 = false { didSet { LabProbe.shared.lock120 = lab120 } }
+    func labSkinStart() {
+        LabProbe.shared.skinStart()
+        objectWillChange.send()
+    }
+    var labSkinOn: Bool { LabProbe.shared.skinOn }
+    var labProbeText: String { LabProbe.shared.lagShort + "\n" + LabProbe.shared.skinText }
+    private var lagCopy: String {
+        let s = AVAudioSession.sharedInstance()
+        let route = s.currentRoute.outputs.first?.portType.rawValue ?? "?"
+        let ms: String = String(format: "音訊：緩衝 %.1f 毫秒、系統報的輸出延遲 %.1f、引擎報的 %.1f", s.ioBufferDuration * 1000, s.outputLatency * 1000, sound.engineLatency * 1000)
+        let a: String = lab120 ? "開" : "關", b: String = latencyTest ? "開" : "關", c: String = labGrey ? "開" : "關"
+        return LabProbe.shared.lagText + "\n\(ms)（輸出 \(route)）｜固定 120 \(a)｜延遲測試 \(b)｜灰盒 \(c)"
+    }
+    /// 複製量測: plain text, with the machine, the system, low power, the version and the numbers it was measured on
+    var labCopyText: String {
+        let knobs: [String] = FeelKnob.main.map { $0.name + " " + FeelKnob.fmt(current[keyPath: $0.key]) }
+        var t: [String] = [feelHeader + "｜系統 " + UIDevice.current.systemVersion]
+        t.append("參數：" + material.name + "（" + slime.name + "）｜" + knobs.joined(separator: "、"))
+        t.append(batch.line)
+        t.append("讀數：" + labText.replacingOccurrences(of: "\n", with: "｜"))
+        t.append(lagCopy)
+        t.append(LabProbe.shared.skinText)
+        return t.joined(separator: "\n")
+    }
 
     /// The 量測 readout (B6): refresh rate, longest frame, the physics alone, how often each guard acted (since 讀數歸零)
     var labText: String {
@@ -797,7 +930,7 @@ final class SlimeController: ObservableObject {
     private static func slotKey(_ n: Int) -> String { "feelSlot\(n)" }
 
     func saveSlot(_ n: Int) {
-        guard let data = try? JSONEncoder().encode(current) else { return }
+        guard pullBlind == nil, let data = try? JSONEncoder().encode(current) else { return }
         UserDefaults.standard.set(data, forKey: Self.slotKey(n))
         slotSaved[n] = true
         activeSlot = n
@@ -816,8 +949,11 @@ final class SlimeController: ObservableObject {
     }
 
     func loadSlot(_ n: Int) {
-        guard let data = UserDefaults.standard.data(forKey: Self.slotKey(n)),
+        guard pullBlind == nil, let data = UserDefaults.standard.data(forKey: Self.slotKey(n)),
               var p = decodeSlot(data) else { return }
+        // v2.61: the slot's own A3, A4, A5 (a slot from before has none: off); the batch's other switches stay as they are
+        let raw = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]) ?? [:]
+        batch.setPull(FeelBatch.pull.map { ((raw[$0] as? NSNumber)?.doubleValue ?? 0) >= 0.5 })
         // v2.60: a slot carries the feel, never the look. Slots saved on build 158 or older hold shine 1, opaque 0 (the glossy body): going to one would bring that back,
         // and two slots that look different are no blind test (how soft it feels follows how it looks)
         let now = current
@@ -828,10 +964,16 @@ final class SlimeController: ObservableObject {
         rig.bump(1)
     }
 
+    /// v2.61: while 甲乙 is on, the three of the pull are nowhere on the panel
+    func hiddenNow(_ f: TuneField) -> Bool {
+        guard pullBlind != nil, let i = FeelBatch.index(f.key) else { return false }
+        return FeelBatch.pull.contains(FeelBatch.keys[i].id)
+    }
+
     /// Same JSON shape as the prototype's 複製數值.
     var exportText: String {
         let p = current
-        let pairs = TuneField.all.map { f in "\"\(f.name)\":\(Self.fmt(p[keyPath: f.key]))" }
+        let pairs = TuneField.all.filter { !hiddenNow($0) }.map { f in "\"\(f.name)\":\(Self.fmt(p[keyPath: f.key]))" }
         return "{\"史萊姆\":\"\(slime.name)\",\"手感\":\"\(material.name)\"," + pairs.joined(separator: ",") + "}"
     }
 

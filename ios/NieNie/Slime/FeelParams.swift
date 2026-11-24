@@ -617,7 +617,7 @@ struct TuneField: Identifiable {
     var section = "手感"
     var id: String { name }
 
-    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形"]
+    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61"]
 
     static let all: [TuneField] = [
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
@@ -882,6 +882,19 @@ struct TuneField: Identifiable {
         TuneField(key: \.moodColor, name: "心情變色", hint: "舒服偏粉橘、被扯偏紅、害怕或戒備偏藍灰、睡著偏深藍；數字是最多染幾成；0 不變色", range: 0...1, step: 0.05, section: "外形"),
         TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
         TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),
+
+        // v2.61 第一批 (the same words as the web). greetLook, brJit, bumpSoft are not here: the phone does not read them yet
+        TuneField(key: \.skinU, name: "皮：不會斷的畫法 v2.61", hint: "1：先畫滿身體裡每一個小三角形，細的地方補一條保底線，拉遠、打結時皮比較不會斷開。0 回 v2.60（照外框畫）。只在果凍皮有作用", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.pullHold, name: "拉的 A3：拉長停住就定住 v2.61", hint: "1：拉開 0.6R 以上，手指停下來 0.25 秒，身體就不再自己變長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.pullWhole, name: "拉的 A4：往裡拉，整隻先走 v2.61", hint: "1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.pullSoft, name: "拉的 A5：拉很長放手，收回去 v2.61", hint: "1：身體拉得很長時放手，先不逃、轉正有限速、放手後 0.8 秒內每一點有限速；按住不動時上限不會自己變大。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.rough, name: "只有快扯算欺負 v2.61", hint: "1：慢慢拉很長不算欺負；快扯不會變熟，也不會變得怕你。0 回 v2.60（拉開 1.5R 撐半秒就算）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.tapSoft, name: "慢慢點不算攻擊 v2.61", hint: "1：慢慢點牠不會嚇到。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.petSlow, name: "慢慢摸也算摸 v2.61", hint: "1：摸得很慢也會呼嚕、變熟。0 回 v2.60（太慢會被當成抓）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.wakeSoft, name: "輕碰慢慢醒 v2.61", hint: "1：睡著時輕輕碰，慢慢醒；剛打開 40 秒才會睡。0 回 v2.60（一碰就嚇醒、30 秒就睡）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.nearFast, name: "聽節奏時也會靠過來 v2.61", hint: "1：在聽你打節奏時，手指放旁邊照樣靠過來。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.eyeTrue, name: "眼睛看真的手指 v2.61", hint: "1：眼睛跟著手指現在的位置。0 回 v2.60（慢四分之一秒）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.snd61, name: "新的揉聲 v2.61", hint: "1：揉的聲音換新的循環，抓著時雨聲變小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
     ]
 }
 

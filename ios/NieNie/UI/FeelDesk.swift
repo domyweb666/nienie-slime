@@ -34,6 +34,8 @@ struct FeelDesk: View {
             if let blind = controller.feelBlind {
                 // 3-4 鏈四: while the two are being compared no number is on screen
                 blindBox(blind)
+            } else if let pb = controller.pullBlind {
+                pullBlindBox(pb)   // v2.61
             } else {
                 if let stale = controller.feelStale { stalePrompt(stale) }
                 ScrollView {
@@ -53,6 +55,7 @@ struct FeelDesk: View {
                             }
                             Spacer(minLength: 0)
                         }
+                        batchBox   // v2.61
                         DisclosureGroup(isExpanded: $showStyles) {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(Array(stride(from: 0, to: FeelStyle.all.count, by: 2)), id: \.self) { r in
@@ -111,7 +114,7 @@ struct FeelDesk: View {
                 .foregroundStyle(Palette.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if !copiedText.isEmpty && controller.feelBlind == nil {
+            if !copiedText.isEmpty && controller.feelBlind == nil && controller.pullBlind == nil {
                 Text(copiedText)
                     .font(.system(size: 11, design: .monospaced))
                     .textSelection(.enabled)
@@ -126,6 +129,86 @@ struct FeelDesk: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(.white)
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
         .frame(maxWidth: 460)
+        .onAppear { controller.labDesk(open: true) }   // v2.61 B7
+        .onDisappear { controller.labDesk(open: false) }
+    }
+
+    // MARK: - v2.61 這一批 (the same words as the web's box)
+
+    private var batchBox: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("這一批（v2.61）").font(.rounded(13, .heavy))
+            HStack(spacing: 5) {
+                ForEach(FeelBatch.Tier.allCases) { t in
+                    chip(t.name, on: controller.batch.tier == t) { controller.batchTier(t) }
+                        .accessibilityAddTraits(controller.batch.tier == t ? .isSelected : [])
+                }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 5) {
+                Text("拉").font(.rounded(12)).foregroundStyle(Palette.inkSoft)
+                ForEach(FeelBatch.pull, id: \.self) { id in
+                    chip(FeelBatch.pullName(id), on: controller.batch[id]) { controller.batchTogglePull(id) }
+                        .accessibilityAddTraits(controller.batch[id] ? .isSelected : [])
+                }
+                Spacer(minLength: 0)
+            }
+            small("停住：拉長停下來，就定在那裡。整隻先走：往身體裡拉，整隻先跟著走再拉長。收回去：拉很長放手，會收回來。這三顆會跟著存檔。")
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), alignment: .leading, spacing: 6) {
+                ForEach(FeelBatch.groups) { g in
+                    chip(g.name, on: controller.batch.all(g.ids)) { controller.batchToggleGroup(g) }
+                        .accessibilityAddTraits(controller.batch.all(g.ids) ? .isSelected : [])
+                }
+            }
+            small("按一下關，再按開。關掉的那組就跟 build 158 一樣。不跟著存檔，重開 app 會回到開。震動那組第二批才有。")
+            Text("甲乙比拉").font(.rounded(13, .heavy)).padding(.top, 2)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), alignment: .leading, spacing: 6) {
+                ForEach(PullBlind.What.allCases) { w in
+                    chip(w.name, on: controller.pullWhat == w) { controller.pullWhat = w }
+                }
+            }
+            HStack(spacing: 8) {
+                bigButton("甲", note: "", on: false) { controller.pullBlindPick(0) }
+                bigButton("乙", note: "", on: false) { controller.pullBlindPick(1) }
+            }
+            small("按甲或乙開始。哪邊是哪一種每次開始都重抽，按「揭曉」才會寫。手放開才會換。")
+        }
+    }
+
+    /// 甲乙 in progress: nothing here says which side is which until 揭曉
+    private func pullBlindBox(_ b: PullBlind) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("甲乙：" + b.what.name).font(.rounded(13, .heavy))
+            HStack(spacing: 8) {
+                ForEach(0..<2, id: \.self) { i in
+                    bigButton(PullBlind.name(i), note: b.pending == i ? "放開手就換" : (b.shown == i ? "現在是這個" : ""), on: b.shown == i) { controller.pullBlindPick(i) }
+                }
+            }
+            if b.revealed { Text(b.answer).font(.rounded(13)).fixedSize(horizontal: false, vertical: true) }
+            HStack(spacing: 6) {
+                chip("揭曉", enabled: !b.revealed) { controller.pullBlindReveal() }
+                chip("結束") { controller.pullBlindStop() }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func bigButton(_ title: String, note: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text(title).font(.rounded(22, .heavy))
+                if !note.isEmpty { Text(note).font(.rounded(11, .medium)) }
+            }
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .foregroundStyle(on ? .white : Palette.ink)
+            .background(RoundedRectangle(cornerRadius: 16).fill(on ? Palette.ink : .white).overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.ink, lineWidth: 2.5)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(note.isEmpty ? title : title + "，" + note)
+    }
+
+    private func small(_ s: String) -> some View {
+        Text(s).font(.rounded(11.5, .medium)).foregroundStyle(Palette.inkSoft).fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - v2.59 窗景
@@ -301,6 +384,23 @@ struct FeelDesk: View {
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(Palette.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
+            // v2.61 B7, A7
+            Text(controller.labProbeText)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 5) {
+                chip("複製量測") {
+                    let text = controller.labCopyText
+                    UIPasteboard.general.string = text
+                    copiedText = text
+                    controller.feelNote = "量測複製好了。同一段字也在下面的框裡。"
+                }
+                chip(controller.labSkinOn ? "量皮中……" : "量皮 5 秒", enabled: !controller.labSkinOn) { controller.labSkinStart() }
+                chip("碰著固定 120", on: controller.lab120) { controller.lab120.toggle() }
+                Spacer(minLength: 0)
+            }
+            small("觸控：面板開著時，每點一下就記。量皮：按下去 5 秒內數皮有幾塊、幾個洞、外框跳多大，用電腦照同一套圖重畫來數，會多吃一點電。碰著固定 120：手指碰著時要求螢幕一秒 120 張，低電量模式系統會關掉，耗電比較多，不存。")
             Text("圖層：關掉一層，看上面「整格」少幾毫秒").font(.rounded(11.5, .medium)).foregroundStyle(Palette.inkSoft)
             ForEach(0..<3, id: \.self) { row in
                 HStack(spacing: 5) {

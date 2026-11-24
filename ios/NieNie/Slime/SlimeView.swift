@@ -64,6 +64,7 @@ final class SlimeView: UIView {
     private var touchesDown = 0
     private var lastTouchEnd: CFTimeInterval = -10
     private var frameRate: Float = 0
+    private var rateLocked = false   // v2.61 B7 碰著時固定 120: what the link was last asked for
     private var bandMode = false   // 候選 34: outline drawn as a filled band of varying width
     private var lastTimestamp: CFTimeInterval = 0
     private var laidOutSize: CGSize = .zero
@@ -287,6 +288,7 @@ final class SlimeView: UIView {
             let l = CADisplayLink(target: self, selector: #selector(tick(_:)))
             l.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
             frameRate = 120
+            rateLocked = false
             l.add(to: .main, forMode: .common)
             link = l
             lastTimestamp = 0
@@ -339,6 +341,7 @@ final class SlimeView: UIView {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if LabProbe.shared.on, let t = touches.first { LabProbe.shared.begin(touch: t.timestamp) }   // v2.61 B7
         touchesDown += touches.count
         setFrameRate(120)
         if latencyTest {
@@ -399,10 +402,14 @@ final class SlimeView: UIView {
     /// 提案第 35 條. The latency test keeps 120Hz so the slow-motion count measures the 120Hz pipeline; from idle the
     /// first frame after a touch can be one 60Hz frame (up to 8 ms) later, which the panel's Hz readout also shows.
     private func setFrameRate(_ hz: Float) {
-        guard hz != frameRate, let l = link else { return }
+        // v2.61 B7, off unless the desk's 固定 120 is on: the three the same while a finger is down (Apple: for measuring; low power mode takes 120 away anyway)
+        let lock: Bool = hz >= 120 && touchesDown > 0 && LabProbe.shared.lock120 && (window?.screen.maximumFramesPerSecond ?? 60) >= 120
+        guard hz != frameRate || lock != rateLocked, let l = link else { return }
         frameRate = hz
+        rateLocked = lock
+        let low: Float = lock ? 120 : 60
         l.preferredFrameRateRange = hz >= 120
-            ? CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+            ? CAFrameRateRange(minimum: low, maximum: 120, preferred: 120)
             : CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
     }
 
@@ -433,6 +440,10 @@ final class SlimeView: UIView {
         onFrame?(dt)
         redraw()
         let work = CACurrentMediaTime() - t0
+        if LabProbe.shared.on {   // v2.61 B7, A7
+            LabProbe.shared.frame(start: t0, end: t0 + work, target: link.targetTimestamp)
+            LabProbe.shared.skinTick()
+        }
         // frame readout over a one-second window
         frameLog.append((time: now, dt: dt, work: work, phys: phys, deco: decoCost, dropped: dt > nominal * 1.5))
         while let first = frameLog.first, now - first.time > 1 { frameLog.removeFirst() }
@@ -773,6 +784,10 @@ final class SlimeView: UIView {
                  water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
                  shine: p.lookShine, opaque: p.lookOpaque,   // v2.60 (多米 11-24): opaque, no highlights, all ten; the panel's 外觀 chip (clear) makes them glossy and see-through
                  extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"), mesh: mesh)
+        if LabProbe.shared.skinOn {   // v2.61 A7
+            let fill: [CGPath] = mesh == nil ? [body] + extra : []
+            LabProbe.shared.skinFrame(mesh: mesh, paths: fill, outline: outline, size: bounds.size, R: R, round: round)
+        }
         drawWater(body: body, z: z)
         drawFx(body: body, z: z)
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)

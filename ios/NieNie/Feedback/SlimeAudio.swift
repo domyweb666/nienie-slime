@@ -10,6 +10,10 @@ protocol SlimeSoundSource: AnyObject {
     var pitchJitter: Double { get set }
     var pullMax: Double { get set }      // loudest the stretching-strand loop gets
     var rubMax: Double { get set }       // loudest the rub loop gets (the rub level passed to frame is already scaled by it)
+    /// v2.61 B1 (FeelParams.snd61): the new rub loop, and the rain at 0.3 instead of 0.6 while held. false = v2.60
+    var snd61: Bool { get set }
+    /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
+    var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
     var music: Double { get set }        // v2.21 background volume (lofi; v2.40 rain and fire too), 0 = off
     /// v2.40 環境音: "rain", "fire", "noise" or "lofi" (web `SFX.setAmb`). Scenes come from `amb.json`; "noise" is a bed with no events.
@@ -44,6 +48,8 @@ final class SlimeAudio: SlimeSoundSource {
     var pitchJitter = 0.08
     var pullMax = 0.6
     var rubMax = 0.7
+    var snd61 = true   // v2.61 B1
+    var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
     /// v2.21 background lofi (多米 build 77: put lofi behind it), `bgm-lofi.caf` (ALAC: AAC pads silence, and AVAudioPlayer loops the whole file, so an m4a has a gap) from `prototype/sfx-design/design_lofi.py`: a 126 s loop.
@@ -392,7 +398,9 @@ final class SlimeAudio: SlimeSoundSource {
         // rub loop, giving way to the strand loop once pulled far
         let level = muted ? 0 : Self.clamp(rub, 0, 1) * rubDuck(stretch)
         let n = rubMax > 0 ? Self.clamp(level / rubMax, 0, 1) : 0
-        driveLoop(rubVoice, key: "rub.loop", target: level, dt: dt, attack: 0.06, decay: 0.06,
+        // v2.61 B1: the new loop; without its files the old one. A loop already sounding keeps its file, the next rub picks again
+        let rubKey = snd61 && !(bank["rub.loop61"] ?? []).isEmpty ? "rub.loop61" : "rub.loop"
+        driveLoop(rubVoice, key: rubKey, target: level, dt: dt, attack: 0.06, decay: 0.06,
                   rate: 0.94 + 0.12 * n, lowpass: 1400 + 2600 * n)
     }
 
@@ -482,7 +490,8 @@ final class SlimeAudio: SlimeSoundSource {
 
     private func ambFrame(dt: Double, grabbing: Bool) {
         let scene = ambName != "lofi" && ambFile != nil
-        let target = scene && !muted ? music * ambRatio * (grabbing ? 0.6 : 1) : 0
+        let duck: Double = snd61 && ambName == "rain" ? 0.3 : 0.6   // v2.61 B1: the rain only; fire and noise stay at 0.6
+        let target = scene && !muted ? music * ambRatio * (grabbing ? duck : 1) : 0
         ambLevel += (target - ambLevel) * (1 - exp(-dt / (target < ambLevel ? 0.4 : 1.2)))
         ambMix.outputVolume = Float(ambLevel)
         guard scene, target > 0, ambBed.isPlaying, let evs = ambScene?["events"] as? [String: Any] else { return }

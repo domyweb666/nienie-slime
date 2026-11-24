@@ -15,7 +15,7 @@ struct FeelKnob: Identifiable {
     let section: String
 
     /// The name of this set of defaults. Change it when a knob's default changes for any material; the stamp below catches it if you forget.
-    static let version = "v2.54"
+    static let version = "v2.61"
 
     static let main: [FeelKnob] = [
         FeelKnob(id: "alpha", key: \.alpha, name: "軟", hint: "按三秒，看周圍跟著塌多少。越右越硬", range: 0.05...0.8, step: 0.01, section: "捏下去"),
@@ -80,7 +80,155 @@ struct FeelKnob: Identifiable {
     }()
 }
 
-/// One saved feel: the material it started from, the defaults it was tuned on, the 13 numbers.
+/// v2.61 第一批 (.vibe/第一批-合約.md): the fourteen switches, the same names and words as the web's desk (KEYS61, TIER61, GRP61, PULL3 in index.html).
+/// They belong to the desk, not to a material: the controller lays them over whatever material and slime is on screen, so neither changes them.
+/// Only the three of the pull go into a saved feel and the copied text's last line; the stamp of the defaults does not know them, so older saved feels stay valid.
+struct FeelBatch: Equatable {
+    struct Key {
+        let id: String
+        let key: WritableKeyPath<FeelParams, Double>
+    }
+    static let keys: [Key] = [
+        Key(id: "skinU", key: \FeelParams.skinU),
+        Key(id: "pullHold", key: \FeelParams.pullHold),
+        Key(id: "pullWhole", key: \FeelParams.pullWhole),
+        Key(id: "pullSoft", key: \FeelParams.pullSoft),
+        Key(id: "rough", key: \FeelParams.rough),
+        Key(id: "tapSoft", key: \FeelParams.tapSoft),
+        Key(id: "petSlow", key: \FeelParams.petSlow),
+        Key(id: "wakeSoft", key: \FeelParams.wakeSoft),
+        Key(id: "nearFast", key: \FeelParams.nearFast),
+        Key(id: "greetLook", key: \FeelParams.greetLook),
+        Key(id: "brJit", key: \FeelParams.brJit),
+        Key(id: "bumpSoft", key: \FeelParams.bumpSoft),
+        Key(id: "eyeTrue", key: \FeelParams.eyeTrue),
+        Key(id: "snd61", key: \FeelParams.snd61),
+    ]
+    static let pull: [String] = ["pullHold", "pullWhole", "pullSoft"]
+    static func pullName(_ id: String) -> String {
+        switch id {
+        case "pullHold": return "A3 停住"
+        case "pullWhole": return "A4 整隻先走"
+        case "pullSoft": return "A5 收回去"
+        default: return id
+        }
+    }
+    struct Group: Identifiable {
+        let name: String
+        let ids: [String]
+        var id: String { name }
+    }
+    static let groups: [Group] = [
+        Group(name: "皮", ids: ["skinU"]),
+        Group(name: "牠怎麼記你", ids: ["rough", "tapSoft", "petSlow"]),
+        Group(name: "聲音", ids: ["snd61"]),
+        Group(name: "眼睛和旁邊", ids: ["eyeTrue", "nearFast", "greetLook"]),
+        Group(name: "睡醒", ids: ["wakeSoft"]),
+    ]
+    enum Tier: String, CaseIterable, Identifiable {
+        case b158, fix, pull
+        var id: String { rawValue }
+        var name: String {
+            switch self {
+            case .b158: return "build 158"
+            case .fix: return "只修錯"
+            case .pull: return "修錯加拉的三條"
+            }
+        }
+    }
+
+    private(set) var on: [Bool]   // one for each of `keys`, in that order
+
+    /// 只修錯: this build's defaults
+    init() {
+        let d = SlimeMaterial.clay.defaults
+        on = Self.keys.map { d[keyPath: $0.key] >= 0.5 }
+    }
+    init(_ t: Tier) {
+        self.init()
+        switch t {
+        case .b158: on = Self.keys.map { _ in false }
+        case .fix: break
+        case .pull: for id in Self.pull { self[id] = true }
+        }
+    }
+    static func index(_ id: String) -> Int? { keys.firstIndex { $0.id == id } }
+    static func index(_ key: KeyPath<FeelParams, Double>) -> Int? { keys.firstIndex { $0.key == key } }
+    subscript(id: String) -> Bool {
+        get { Self.index(id).map { on[$0] } ?? false }
+        set { if let i = Self.index(id) { on[i] = newValue } }
+    }
+    mutating func set(_ i: Int, _ v: Bool) { if on.indices.contains(i) { on[i] = v } }
+    func all(_ ids: [String]) -> Bool { ids.allSatisfy { self[$0] } }
+    var pullOn: [Bool] { Self.pull.map { self[$0] } }
+    mutating func setPull(_ v: [Bool]) { for (id, x) in zip(Self.pull, v) { self[id] = x } }
+    func apply(to p: inout FeelParams) {
+        for i in 0..<on.count { p[keyPath: Self.keys[i].key] = on[i] ? 1 : 0 }
+    }
+    var tier: Tier? { Tier.allCases.first { FeelBatch($0) == self } }
+    /// The same line as the web's copied text
+    var line: String {
+        let off: [String] = Self.keys.indices.filter { !on[$0] }.map { Self.keys[$0].id }
+        let name: String = tier?.name ?? "自己切的", list: String = off.isEmpty ? "沒有" : off.joined(separator: "、")
+        return "這一批（v2.61）：\(name)；關著的：\(list)"
+    }
+}
+
+/// v2.61 甲乙: two ways of pulling behind 甲 and 乙, which is which by a coin each time it is started and not shown until 揭曉. The change waits until no finger is on the body.
+struct PullBlind {
+    enum What: String, CaseIterable, Identifiable {
+        case all, hold, whole, soft
+        var id: String { rawValue }
+        var name: String {
+            switch self {
+            case .all: return "全關對全開"
+            case .hold: return "全開對只關 A3"
+            case .whole: return "全開對只關 A4"
+            case .soft: return "全開對只關 A5"
+            }
+        }
+        /// The two sets, A3, A4, A5
+        var sets: (first: [Bool], second: [Bool]) {
+            switch self {
+            case .all: return ([false, false, false], [true, true, true])
+            case .hold: return ([true, true, true], [false, true, true])
+            case .whole: return ([true, true, true], [true, false, true])
+            case .soft: return ([true, true, true], [true, true, false])
+            }
+        }
+    }
+    let what: What
+    let sides: [[Bool]]       // 甲, 乙
+    let keep: [Bool]          // the three as they were, to go back to
+    let startedAt: Double
+    var shown: Int?           // on the body now: 0 甲, 1 乙, nil = not changed yet
+    var pending: Int?         // waiting for the hand to let go: 0, 1, or 2 = stop comparing
+    var switches = 0
+    var revealed = false
+
+    init(_ what: What, keep: [Bool], now: Double, coin: Bool = Bool.random()) {
+        self.what = what
+        let s = what.sets
+        sides = coin ? [s.second, s.first] : [s.first, s.second]
+        self.keep = keep
+        startedAt = now
+    }
+    static func name(_ i: Int) -> String { i == 0 ? "甲" : "乙" }
+    static func label(_ f: [Bool]) -> String {
+        if !f.contains(true) { return "三顆全關（跟 build 158 一樣）" }
+        if !f.contains(false) { return "三顆全開" }
+        let off: [String] = zip(FeelBatch.pull, f).filter { !$0.1 }.map { FeelBatch.pullName($0.0) }
+        return "只關" + off.joined(separator: "、")
+    }
+    var answer: String { "甲是\(Self.label(sides[0]))，乙是\(Self.label(sides[1]))。" }
+    func line(now: Double, date: Date = Date()) -> String {
+        let c = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: date)
+        func p2(_ x: Int?) -> String { let v = x ?? 0; return v < 10 ? "0\(v)" : "\(v)" }
+        return "甲乙 \(p2(c.month))-\(p2(c.day)) \(p2(c.hour)):\(p2(c.minute))｜\(what.name)｜\(answer)｜換了 \(switches) 次、\(Int((now - startedAt).rounded())) 秒"
+    }
+}
+
+/// One saved feel: the material it started from, the defaults it was tuned on, the 13 numbers and, since v2.61, the three switches of the pull.
 /// v2.54 手感風格 10 選 1 (多米 11-22: name the feels that are optimal in some mathematical or programming sense, and let me pick).
 /// Each is clay's defaults with a few knobs laid over, applied like a saved feel (no bump), so it can be saved to a slot and compared blind.
 /// Same ids, names, words and numbers as the web's `STYLES` in desk.js (change one, change the other). 韌 (maxPull) is not touched: with
@@ -130,7 +278,15 @@ struct FeelSnap: Codable, Equatable {
     static func pick(_ p: FeelParams, base: String) -> FeelSnap {
         var k: [String: Double] = [:]
         for id in FeelKnob.keys { k[id] = Double(FeelKnob.fmt(FeelKnob.get(p, id))) ?? FeelKnob.get(p, id) }
+        for id in FeelBatch.pull {
+            if let i = FeelBatch.index(id) { k[id] = p[keyPath: FeelBatch.keys[i].key] >= 0.5 ? 1 : 0 }
+        }
         return FeelSnap(base: base, pv: FeelKnob.version, ps: FeelKnob.stamp, k: k)
+    }
+    /// v2.61: A3, A4, A5 (a feel saved before has none of them: off)
+    var pullOn: [Bool] { FeelBatch.pull.map { (k[$0] ?? 0) >= 0.5 } }
+    mutating func setPull(_ v: [Bool]) {
+        for (id, x) in zip(FeelBatch.pull, v) { k[id] = x ? 1 : 0 }
     }
     func apply(to p: inout FeelParams) { for id in FeelKnob.keys { if let v = k[id] { FeelKnob.set(&p, id, v) } } }
     /// Every key present (a missing one takes the material's default), so an older or a pasted feel is whole.
@@ -139,6 +295,7 @@ struct FeelSnap: Codable, Equatable {
         let d = m.defaults
         var o = self
         for id in FeelKnob.keys where !(o.k[id]?.isFinite ?? false) { o.k[id] = FeelKnob.get(d, id) }
+        o.setPull(pullOn)   // v2.61
         return o
     }
     /// What differs between two saved feels, as "名字 a／b".
@@ -147,6 +304,16 @@ struct FeelSnap: Codable, Equatable {
         if a.base != b.base { o.append("材料 \(FeelKnob.materialName(a.base))／\(FeelKnob.materialName(b.base))") }
         for id in FeelKnob.keys where FeelKnob.fmt(a.k[id] ?? 0) != FeelKnob.fmt(b.k[id] ?? 0) {
             o.append("\(FeelKnob.name(id)) \(FeelKnob.fmt(a.k[id] ?? 0))／\(FeelKnob.fmt(b.k[id] ?? 0))")
+        }
+        return o + pullDiff(a, b, "／")
+    }
+    /// v2.61: the switches of the pull that differ, "A3 停住 開／關"
+    static func pullDiff(_ a: FeelSnap, _ b: FeelSnap, _ mark: String) -> [String] {
+        var o: [String] = []
+        let pa = a.pullOn, pb = b.pullOn
+        for (i, id) in FeelBatch.pull.enumerated() where pa[i] != pb[i] {
+            let x: String = pa[i] ? "開" : "關", y: String = pb[i] ? "開" : "關"
+            o.append("\(FeelBatch.pullName(id)) \(x)\(mark)\(y)")
         }
         return o
     }
@@ -184,7 +351,8 @@ struct FeelDeskStore: Codable {
 enum FeelExport {
     /// The numbers in a fixed key order, so the same feel gives the same line on the phone and on the web.
     static func json(current: FeelSnap, slots: [FeelSnap?]) -> String {
-        func kj(_ k: [String: Double]) -> String { "{" + FeelKnob.keys.map { "\"\($0)\":\(FeelKnob.fmt(k[$0] ?? 0))" }.joined(separator: ",") + "}" }
+        let ids: [String] = FeelKnob.keys + FeelBatch.pull   // v2.61: the web adds the three at the end too
+        func kj(_ k: [String: Double]) -> String { "{" + ids.map { "\"\($0)\":\(FeelKnob.fmt(k[$0] ?? 0))" }.joined(separator: ",") + "}" }
         func sj(_ s: FeelSnap?) -> String {
             guard let s else { return "null" }
             return "{\"base\":\"\(s.base)\",\"pv\":\"\(s.pv ?? "")\",\"ps\":\"\(s.ps ?? "")\",\"k\":\(kj(s.k))}"
@@ -210,7 +378,8 @@ enum FeelExport {
         for (i, s) in slots.enumerated() {
             guard let s, let m = SlimeMaterial(rawValue: s.base) else { continue }
             let d = m.defaults
-            let diff = FeelKnob.keys.filter { FeelKnob.fmt(s.k[$0] ?? 0) != FeelKnob.fmt(FeelKnob.get(d, $0)) }.map { "\(FeelKnob.name($0)) \(FeelKnob.fmt(s.k[$0] ?? 0))" }
+            var diff = FeelKnob.keys.filter { FeelKnob.fmt(s.k[$0] ?? 0) != FeelKnob.fmt(FeelKnob.get(d, $0)) }.map { "\(FeelKnob.name($0)) \(FeelKnob.fmt(s.k[$0] ?? 0))" }
+            for (n, id) in FeelBatch.pull.enumerated() where s.pullOn[n] { diff.append(FeelBatch.pullName(id) + " 開") }   // v2.61
             t += "\n存檔 \(i + 1)（\(m.name)，預設 \((s.pv ?? "").isEmpty ? "?" : (s.pv ?? "?"))）：" + (diff.isEmpty ? "跟預設一樣" : "跟\(m.name)預設不同的：" + diff.joined(separator: "、"))
         }
         t += "\n這次動過：" + (changed.isEmpty ? "沒有" : changed.joined(separator: "、"))
