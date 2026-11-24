@@ -1,6 +1,6 @@
-# Handoff: 窗景 12 扇搬進 Swift，寫完還沒編譯（2026-11-24，v2.59，先看這段）
+# Handoff: 窗景 12 扇搬進 Swift，CI 編過，沒上過手機（2026-11-24，v2.59，先看這段）
 
-> 多米 11-24 說合回並推：已快轉進 `feel-3x-panel-v1`（工作樹 `prototype/web/_wt`），推到 `a32088a`，CI 結果看 PR #1。沒發 TestFlight。
+> 多米 11-24 說合回並推：已快轉進 `feel-3x-panel-v1`（工作樹 `prototype/web/_wt`），推到 `a32088a`，PR #1 的 CI `BUILD SUCCEEDED`（run 45327524238）。沒發 TestFlight。
 
 ## 做了什麼
 - 資料：`tools/export-windows-ios.py` 開網頁把 `windows.js` 拆好的每層輸出成圖（1.5 倍、無損 webp 205 張）和時間表 `windows.json`，放 `ios/NieNie/Resources/win/`，共 2.5 MB。SVG 改了就重跑（約 4 分鐘）。`windows.js` 只加了資料欄位（`raw`、`tk`、`ty`、`pd`），畫面逐點沒變。
@@ -15,20 +15,19 @@
 - 網頁整份 selftest 一次，69 項全過。最終的圖用 iPhone 的倍率（1.37）再比一次（T=7.7），22 種平均差最大 0.50。
 
 ## 沒驗、要注意
-- **Swift 沒編譯過**，要推上去跑 CI。編不過先看 `WindowScene.swift`。
+- CI 只編譯，沒跑過：Metal 管線、圖有沒有進 bundle，要裝到手機才知道。
 - iPhone 沒看過：幀時間、發熱、記憶體（雪地夜晚約 45 MB，兩張一起最多約 80 MB）、換窗那幾幀牆比窗外早變夜晚。
 - 網頁「夜晚睏得快 1.5 倍」用的 `brAwakeT` Swift 沒有，沒加。
 - App Store 版的調節台從隱藏面板還開得到，窗景等於免費。上架前要換。
 
 ## 下一步從哪繼續
-1. 看 PR #1 在 `a32088a` 之後的 CI。編不過先修 `WindowScene.swift`，再推。
-2. 編過、多米說發 → `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`。
-3. 真機看：12 扇白天夜晚、身體裡的折射、牠爬到窗外時的前後、每幀時間。
+1. 多米說發 → `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`。
+2. 真機看：12 扇白天夜晚、身體裡的折射、牠爬到窗外時的前後、每幀時間。
 
 ## 工作包
 - [x] I1：輸出圖層與時間表
 - [x] I2：Swift 繪製、折射、選窗
-- [ ] I3：CI 編譯｜BUILD SUCCEEDED｜ios/｜已推，看結果
+- [x] I3：CI 編譯（a32088a，BUILD SUCCEEDED）
 - [ ] H：TestFlight｜要多米說發
 
 ---
