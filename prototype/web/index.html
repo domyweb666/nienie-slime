@@ -640,7 +640,8 @@ const LIFE={st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0
 // GAIT：一縮一衝（A3）。ph<0 是出發前蓄力；每一下 P 秒，前 c 秒收縮往前衝、之後放鬆滑停；k 沿前進方向拉長幾倍；off 蓄力時往後縮的位移
 const GAIT={on:false,tx:0,ty:0,dash:false,ph:-1,prep:0,v:0,vp:0,h:0,k:1,str:1,last:false,off:0};
 // FLN：晚一拍才縮（A5）。at 排好幾秒縮、t0 開始縮、amp 這一下多大、H 習慣（每縮一次乘 0.55，放著 7 秒時間常數回 1）、s 現在的縮放、last 上一下的幅度
-const FLN={at:-9,t0:-9,amp:0,H:1,s:1,last:0};
+const FLN={at:-9,t0:-9,amp:0,H:1,s:1,last:0,tc:1,tcq:false,tpAt:-9};   // v2.61 D2（tapSoft）：tc 你碰牠那一縮最多縮多少（每輕點一下變成那次的 TAPK.k，照 TAPK.T 秒慢慢放寬，最少 TAPK.lo×flinchAmp；1 等於沒有限制）；tcq 輕點的那一縮還沒到，到了再記；tpAt 這次排的縮是手指碰出來的
+const TAPK={k:.93,T:90,lo:.3};
 // SHK：大力拉完放手甩一甩（整團快速左右轉幾下、越來越小，外加輪廓發抖）；th 目前轉了多少
 const SHK={at:-9,t0:-9,amp:0,th:0};
 // BRX：呼吸像生理（A6）。exert 喘 0..1（4 秒時間常數退，8 到 10 秒回平常）；sighNext 下一次大口呼吸（-1＝下一幀再挑）；sighCyc 那一口是第幾個週期；pauseUntil 吐完停一下
@@ -658,6 +659,12 @@ const IMP={tr:0,w:0,lx:0,ly:0,has:false,askUntil:-9,hiddenAt:-1};
 const LURE={on:false,id:-1,t0:0,stillT:0,pounced:false,touched:false,startle:-9,sn:null,rub:0,backed:false};
 const IV2=k=>mat.imp>=.5&&mat.life2>=.5&&mat[k]>=.5;
 const SB=f=>f.sb!=null?f.sb:(f.stretch||0);
+// v2.61 D1（rough）：什麼算快扯。v 手在螢幕上的速度（30 毫秒平滑，每秒幾個半徑），st 那時候那塊已經被拉開多少（×半徑）。整抓記兩個：f.vMax 最大手速（不衰減）、f.yank 這一抓扯過沒有（往外、夠快、拉開了）
+const ROUGH={v:6,st:.8},roughOn=()=>mat.rough>=.5;
+// v2.61 C3（petSlow）：被摸了多少。cm 一個半徑算幾公分；每秒 lo 到 hi 公分算摸（lo 以下到 lo0、hi 到 hi0 之間漸弱）；rate 每秒加多少；cap 同一個方向一趟最多加多少（所以一趟不會呼嚕，要有第二趟）；
+// rin 離落下那一刻的身體中心這麼近才加，rout 以外（抓著的）當成在拉，這一次加的全部退掉；gap 停手多久還算在摸；out 停手之後每秒退多少
+const PETK={cm:1.8,lo0:.5,lo:1,hi:10,hi0:14,rate:2.5,cap:.8,rin:1.1,rout:1.25,c0:.35,gap:.6,out:.6,max:3},PET={g:0,last:-9,on:false,said:false};
+const petReset=()=>Object.assign(PET,{g:0,last:-9,on:false,said:false});
 // v2.22（多米 build 77：還是沒有互動的感覺；繼續做黏液；.uiux/04-手感/拉力互動聲音黏液提案-暫定.md 第二、四節）：E1 出聲、E2 動作都有它的回應、E3 看得出印象、E4 來找你、黏液
 const IV3=k=>mat.life2>=.5&&mat[k]>=.5;
 // E2：lean* 朝手指傾一下（S −1 是戒的往反方向）；nuz* 蹭；tk 搔癢時手指方向反過來的時刻；nudgeT 往你的手指推一下（Swift 輕頂一下）
@@ -951,10 +958,10 @@ function setup(){
   // 亮光粒子：團塊左上
   let bd=1e9;for(let i=0;i<N;i++){if(TID[i]>=0)continue;const d=Math.hypot(Q0X[i]+R*.28,Q0Y[i]+R*.32);if(d<bd){bd=d;hiIdx=i}}
   {const nb=[],rr=R*.3;for(let i=0;i<N;i++){const ox=Q0X[i]-Q0X[hiIdx],oy=Q0Y[i]-Q0Y[hiIdx];if(i!==hiIdx&&ox*ox+oy*oy<rr*rr)nb.push([i,ox,oy])}HIF.i=hiIdx;HIF.nb=nb}   // v2.26 F7
-  Object.assign(STK,{ox:0,oy:0,vx:0,vy:0,g:0,last:-9,said:false,pet:false});TRAIL.length=0;
+  Object.assign(STK,{ox:0,oy:0,vx:0,vy:0,g:0,last:-9,said:false,pet:false});petReset();TRAIL.length=0;
   fingers.clear();GRAB.fill(0);lastShape={seed:mat.seed,floppy:mat.floppy,limbs:mat.limbs,bodySize:mat.bodySize,dens:mat.dens};
   BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;BR.jw=0;BR.lift=0;POD.list=[];POD.clock=0;POD.next=.5;POD.E=[];POD.shift=0;FLAT.on=false;{const v=viewV();CAM.z=1;CAM.x=v.x;CAM.y=v.y;FOL.x=v.x;FOL.y=v.y;FOL.vx=0;FOL.vy=0;FOL.chase=false}INTRO.on=false;INTRO.sq=0;IV.s=1;IV.ox=0;IV.oy=0;Object.assign(MOOD,{c:0,a:0,strain:0,strainMax:0,scare:0,cowerUntil:-9,happyT:-9,wagT:-9,taps:[],tugX:0,tugY:0});ESC.on=false;PURR=0;PINCH.a=-1;PINCH.b=-1;DENTS.length=0;shkReset();
-  brainReset();Object.assign(LIFE,{st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0,arrT:-9,arrOff:0});Object.assign(GAIT,{on:false,k:1,off:0,v:0});Object.assign(FLN,{at:-9,t0:-9,amp:0,H:1,s:1,last:0});Object.assign(SHK,{at:-9,t0:-9,amp:0,th:0});Object.assign(BRX,{exert:0,sighNext:-1,sighCyc:-1,pauseUntil:-9,ampX:1});STR.k=1;PSM[0]=1;PSM[1]=0;PSM[2]=0;PSM[3]=1;LB=1;   // v2.19
+  brainReset();Object.assign(LIFE,{st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0,arrT:-9,arrOff:0});Object.assign(GAIT,{on:false,k:1,off:0,v:0});Object.assign(FLN,{at:-9,t0:-9,amp:0,H:1,s:1,last:0,tc:1,tcq:false,tpAt:-9});Object.assign(SHK,{at:-9,t0:-9,amp:0,th:0});Object.assign(BRX,{exert:0,sighNext:-1,sighCyc:-1,pauseUntil:-9,ampX:1});STR.k=1;PSM[0]=1;PSM[1]=0;PSM[2]=0;PSM[3]=1;LB=1;   // v2.19
   Object.assign(DRAG,{ox:0,oy:0,vx:0,vy:0,bx:0,by:0,gx:0,gy:0,slipT:0});LURE.on=false;LURE.sn=null;LIFE.ask=null;E4.on=false;E4.wait=-1;Object.assign(E2,{leanT:-9,nuzT0:-1,nuzO:0,nuzSaid:false,tkT:0,gigNext:0,nudgeT:-9});E2.tk.length=0;   // v2.22（E2、E4 的計時也歸零：時鐘倒回去時，留著的 gigNext 會讓它一直等不到下一次咯咯笑）：INTRO.sq 也要歸零：開心小跳跳到一半被 setup 打斷，壓扁量會一直留著，參考形狀永遠被撐開（量過 −0.053，T28 放手 2 秒剩 0.76，原本 0.89）   // v2.20：重建時手指直接清掉、不經過放手，偏移不歸零的話家會一直歪（量過：舊測試跟著歪，T31 按住 3 秒移 61 點，原本 30）
   CAMR.st=0;CAMR.until=-9;E2.leanO=0;eyeSetup();EYE.pose=null;EYE.cx=0;EYE.cy=0;EYE.ck=1;Object.assign(SLP,{on:false,k:0,askAt:-9,nearT:0});Object.assign(ECHO,{st:'idle',i:0,joyUntil:-9});ECHO.taps.length=0;SWIM.on=false;   // v2.23
   {let A=0;const n=bnd.length;for(let i=0;i<n;i++){const a=bnd[i],b=bnd[(i+1)%n];A+=X[a]*Y[b]-X[b]*Y[a]}A0=Math.abs(A)/2}
@@ -1120,7 +1127,7 @@ function down(e){
   if(grab){SWIM.on=false;wake(true)}   // v2.23：游過來途中被抓就不打招呼；睡著被碰嚇醒
   if(!grab){if(SLP.on){let db=1e9;for(const i of bnd)db=Math.min(db,Math.hypot(X[i]-p.x,Y[i]-p.y));if(db<R*2)wake(false);ECHO.taps.length=0}else echoTap(p.x,p.y)}   // v2.23：睡著時點旁邊叫醒它（這下不算節奏）；醒著時點空白處給 C6 聽   // v2.18：抓住就停下逃跑
   // v2.19：抓到就收回正在探的偽足、停下來；A5 凹痕照上面馬上出現，0.1 到 0.25 秒後它自己縮一下；A7 碰它旁邊的空白處（3R 內），0.3 秒後轉過去探
-  if(grab&&LV('lifeFlinch')&&!(FLN.at>t)){FLN.at=t+(.1+.15*Math.random())*(IV2('impC5')?1-.5*IMP.w:1);FLN.pre=LIFE.st}   // pre：被碰之前在做什麼（休息時縮得大）；v2.20 C5 戒高時縮得早
+  if(grab&&LV('lifeFlinch')&&!(FLN.at>t)){FLN.at=t+(.1+.15*Math.random())*(IV2('impC5')?1-.5*IMP.w:1);FLN.pre=LIFE.st;FLN.tpAt=FLN.at}   // pre：被碰之前在做什麼（休息時縮得大）；v2.20 C5 戒高時縮得早
   if(grab&&mat.life2>=.5){cutSniffs();GAIT.on=false;GAIT.k=1;WANDER.moving=false;LIFE.st='rest';LIFE.until=-1;LIFE.ask=null}
   const lure=!grab&&(IV2('impC1')||IV2('impC2'));if(lure)f.lure=true;   // v2.20：按在空白處的手指交給 C1、C2（lureStep），不再只探一下
   if(!grab&&!lure&&LV('lifeAttend')){let db=1e9;for(const i of bnd)db=Math.min(db,Math.hypot(X[i]-p.x,Y[i]-p.y));if(db<R*3)LIFE.att={at:t+.3,x:p.x,y:p.y,blank:true}}
@@ -1180,7 +1187,7 @@ function tentSlip(f){if(!(mat.tentSlip>0))return false;const k=gripTent(f);if(k<
   const gx=globalC.xc,gy=globalC.yc,ox=rx-gx,oy=ry-gy,ol=Math.hypot(ox,oy)||1,fx=f.x-rx,fy=f.y-ry,fl=Math.hypot(fx,fy)||1,back=(ox*fx+oy*fy)/(ol*fl)<.2;   // 繞到身體後面也滑開：觸手會橫跨身體，一樣會抖
   if(!back&&fl>=mat.tentSlip*rest)return false;letGo(f);return true}
 // 摸到一半停住（或 Swift 的接觸面變大）：手指底下那塊被抓住，從這裡接著拉
-function strokeGrab(f){f.mode='grab';f.ax=f.x;f.ay=f.y;f.fx=f.x;f.fy=f.y;f.stretch=0;f.ex=0;f.ey=0;f.sb=0;f.step=0;f.hold=0;f.press=0;f.pressOn=false;f.peak=0;f.on=false;f.r0x=f.x-globalC.xc;f.r0y=f.y-globalC.yc;fingerGrab(f,{x:f.x,y:f.y});sfxPlay('press',.35);dragRebase()}
+function strokeGrab(f){f.mode='grab';f.ax=f.x;f.ay=f.y;f.fx=f.x;f.fy=f.y;f.stretch=0;f.ex=0;f.ey=0;f.sb=0;f.step=0;f.hold=0;f.press=0;f.pressOn=false;f.peak=0;f.vMax=0;f.yank=false;f.on=false;f.r0x=f.x-globalC.xc;f.r0y=f.y-globalC.yc;fingerGrab(f,{x:f.x,y:f.y});sfxPlay('press',.35);dragRebase()}
 function trailAdd(f){const g=globalC,cs=g.cs==null?1:g.cs,sn=g.sn||0,px=f.x-g.xc,py=f.y-g.yc;TRAIL.push({x:cs*px+sn*py,y:-sn*px+cs*py,t0:t,n:f.tDown});if(TRAIL.length>64)TRAIL.shift()}
 // 每幀：判斷、摸與抓互換、痕跡、整團被帶走的偏移（連上一幀一起平移，不留速度，家也跟著走）
 function strokeStep(dt){if(!(mat.strokeV>0&&mat.inertiaHz>0)){for(const f of [...fingers.values()])if(f.mode==='stroke')strokeGrab(f)}
@@ -1672,7 +1679,9 @@ function introStep(dt,h){const I=INTRO;I.pt+=dt;let y1=-1e9;for(const i of bnd)y
 function moodRelease(f){if(!(mat.emo>=.5))return;
   if(mat.pullSoft>=.5&&MOOD.strainMax>.15&&memLen()>PULLSOFT.noFlee*HRC[HRX.length]){MOOD.strainMax=0;MOOD.scare=Math.min(1,MOOD.scare+.5);return}   // v2.61 A5：還拉得很長就先不逃
   if(MOOD.strainMax>.15){flee(-MOOD.px,-MOOD.py,W*(.45+.35*MOOD.strainMax)*mat.flee);MOOD.strainMax=0;return}
-  if(t-f.tDown<.25&&(f.stretch||0)<.3){MOOD.taps=MOOD.taps.filter(x=>t-x<1);MOOD.taps.push(t);MOOD.scare=Math.min(1,MOOD.scare+.45);MOOD.a=Math.min(1,MOOD.a+.3);MOOD.c=Math.max(-1,MOOD.c-.1);MOOD.cowerUntil=Math.max(MOOD.cowerUntil,t+.5);
+  if(t-f.tDown<.25&&(f.stretch||0)<.3){MOOD.taps=MOOD.taps.filter(x=>t-x<1);MOOD.taps.push(t);MOOD.a=Math.min(1,MOOD.a+.3);
+    if(mat.tapSoft>=.5&&MOOD.taps.length<3){if(FLN.at>0&&FLN.at===FLN.tpAt)FLN.tcq=true;else if(FLN.t0>f.tDown)tapCap(FLN.amp)}
+    else{FLN.tc=1;FLN.tcq=false;MOOD.scare=Math.min(1,MOOD.scare+.45);MOOD.c=Math.max(-1,MOOD.c-.1);MOOD.cowerUntil=Math.max(MOOD.cowerUntil,t+.5)}   // v2.61 D2（tapSoft）：一秒內不滿三下只是碰一下，不嚇、不扣舒服、不縮著（嚇沒漲，心情和這格的記性就不會扣）
     if(MOOD.taps.length>=3){let ux=globalC.xc-f.ax,uy=globalC.yc-f.ay,ul=Math.hypot(ux,uy);if(ul<R*.1){const a=Math.random()*2*Math.PI;ux=Math.cos(a);uy=Math.sin(a)}else{ux/=ul;uy/=ul}
       flee(ux,uy,W*.28*mat.flee);MOOD.taps=[];MOOD.c=Math.max(-1,MOOD.c-.3);MOOD.a=1}return}
   if((f.gentleT||0)>1&&MOOD.c>.35&&!fingers.size){MOOD.happyT=t;MOOD.wagT=t+.1;hop();voice('happy',.8)}}
@@ -1681,23 +1690,42 @@ function flee(ux,uy,dist){if(!(dist>0))return;const l=Math.hypot(ux,uy)||1;ux/=l
 // 開心小跳：開場的跳只跳一下、不走遠（mini：碰它照常抓）
 function hop(){if(INTRO.on||(SILL.on&&(SILL.route||SILL.tanV||SILL.air)))return;let y1=-1e9;for(const i of bnd)y1=Math.max(y1,Y[i]);
   Object.assign(INTRO,{on:true,mini:true,ph:'crouch',k:0,n:1,pt:0,sq:0,floor:y1,u:1,s0:1,ox0:0,oy0:0,px:HOMEX,py:y1})}
+// v2.61 C3（petSlow，多米：慢慢摸被當成抓）：抓和摸的判斷不動，另外數一個「被摸了多少」PET.g，只餵呼嚕（moodStep）和熟（impStep），不動舒服、戒、身體。抓著、摸著都數。
+// 每一趟（同一個方向）看出發點：從中心 c0 內出發、或往外（跟由中心往外的方向差 60 度內）不算，跟 strokeJudge 同一條規則；折返就是新的一趟
+function petStep(dt){PET.on=false;if(!(mat.petSlow>=.5)){if(PET.g)petReset();return}
+  let f=null,n=0;for(const q of fingers.values()){n++;if(q.mode==='grab'||q.mode==='stroke'&&q.on)f=q}
+  let pull=false;
+  if(f&&n===1){const K=PETK;let P=f.pt;if(!P)P=f.pt={cx:globalC.xc,cy:globalC.yc,sx:f.x,sy:f.y,px:f.x,py:f.y,ml:0,run:0,sum:0,x:false};
+    const dl=Math.hypot(f.x-P.sx,f.y-P.sy);
+    if(dl>=P.ml){P.ml=dl;P.px=f.x;P.py=f.y}
+    else if(Math.hypot(f.x-P.px,f.y-P.py)>R*.15&&(f.x-P.px)*(P.px-P.sx)+(f.y-P.py)*(P.py-P.sy)<0){P.sx=P.px;P.sy=P.py;P.ml=Math.hypot(f.x-P.sx,f.y-P.sy);P.px=f.x;P.py=f.y;P.run=0}
+    const d=Math.hypot(f.x-P.cx,f.y-P.cy)/R,rx=P.sx-P.cx,ry=P.sy-P.cy,rl=Math.hypot(rx,ry),mx=f.x-P.sx,my=f.y-P.sy,ml=Math.hypot(mx,my),away=rl<R*K.c0||ml>1e-6&&(rx*mx+ry*my)/(rl*ml)>.5,v=Math.hypot(f.vxS,f.vyS)*CAM.z/R*K.cm;
+    if(f.mode==='grab'&&d>K.rout&&!P.x){P.x=true;PET.g=Math.max(0,PET.g-P.sum);P.sum=0}
+    pull=P.x||away&&ml>R*.3||f.yank;
+    if(v>K.hi0)PET.g=Math.max(0,PET.g-3*dt);
+    else if(!pull&&!away&&d<K.rin&&v>K.lo0&&!tickOn()&&MOOD.strain<.05&&!ESC.on){const a=Math.max(0,Math.min(K.cap-P.run,K.max-PET.g,K.rate*dt*Math.min(1,(v-K.lo0)/(K.lo-K.lo0),(K.hi0-v)/(K.hi0-K.hi))));PET.g+=a;P.run+=a;P.sum+=a;PET.last=t}}
+  if(t-PET.last>PETK.gap||PET.last>t)PET.g=Math.max(0,PET.g-PETK.out*dt);
+  PET.on=PET.g>1&&!pull&&n<2&&t>=PET.last&&t-PET.last<PETK.gap&&!tickOn();
+  if(PET.g<.5)PET.said=false}
 // 每幀：心情跟著手上的動作走（只看抓得最長的那根）；呼嚕；逃跑中的家
 function moodStep(dt){
-  if(!(mat.emo>=.5)){MOOD.strain=0;MOOD.tugX=0;MOOD.tugY=0;PURR=0;ESC.on=false;return}
+  if(!(mat.emo>=.5)){MOOD.strain=0;MOOD.tugS=0;MOOD.tugX=0;MOOD.tugY=0;PURR=0;ESC.on=false;return}
+  petStep(dt);
   let g=null;for(const f of fingers.values())if(f.mode==='grab'&&(!g||SB(f)>SB(g)))g=f;
   if(g){const st=SB(g),sp=Math.hypot(g.vxS,g.vyS)/R;
     const v24=mat.rubSpeed>0,spPt=sp*R,rubbing=v24&&spPt>R*.3;g.gentleT=st<.6&&(v24?spPt<mat.rubSpeed*60&&!tickOn():sp<2)?(g.gentleT||0)+dt*(rubbing?2:1):Math.max(0,(g.gentleT||0)-2*dt);   // v2.24 rubSpeed：門檻改實際速度（每秒 60 點約 1 公分）；真的在揉時舒服來得比按著快一倍
     if(g.gentleT>1){MOOD.c=Math.min(1,MOOD.c+(rubbing?.6:.35)*dt);MOOD.a+=(.15-MOOD.a)*(1-Math.exp(-dt/1.5))}
-    g.strainT=st>1.5?(g.strainT||0)+dt:Math.max(0,(g.strainT||0)-dt);
+    g.strainT=st>1.5&&(!roughOn()||g.yank)?(g.strainT||0)+dt:Math.max(0,(g.strainT||0)-dt);
     const sv=Math.max(0,Math.min(1,(g.strainT-.5)/1));MOOD.strain+=(sv-MOOD.strain)*(1-Math.exp(-dt/.15));MOOD.strainMax=Math.max(MOOD.strainMax,MOOD.strain);
+    if(roughOn()){g.tugT=st>1.5?(g.tugT||0)+dt:Math.max(0,(g.tugT||0)-dt);MOOD.tugS=(MOOD.tugS||0)+(Math.max(0,Math.min(1,g.tugT-.5))-(MOOD.tugS||0))*(1-Math.exp(-dt/.15))}   // v2.61 D1：往回拔照舊看拉開多少、撐多久（跟快慢無關），拉長的形狀才不變；量過慢拉不拔，芋圓往上拉 4R 停住矮一成二
     if(MOOD.strain>0){MOOD.c=Math.max(-1,MOOD.c-.6*dt*MOOD.strain);MOOD.a=Math.min(1,MOOD.a+.8*dt*MOOD.strain)}
     const px=g.fx-globalC.xc,py=g.fy-globalC.yc,pl=Math.hypot(px,py);if(pl>R*.2){MOOD.px=px/pl;MOOD.py=py/pl}}
-  else{MOOD.strain*=Math.exp(-dt/.2);const k=1-Math.exp(-dt/6);
+  else{MOOD.strain*=Math.exp(-dt/.2);if(MOOD.tugS)MOOD.tugS*=Math.exp(-dt/.2);const k=1-Math.exp(-dt/6);
     if(STK.g>1&&t-STK.last<.05){MOOD.c=Math.min(1,MOOD.c+1.2*dt);MOOD.a+=(.15-MOOD.a)*(1-Math.exp(-dt/1.5))}   // v2.26 F6：摸算進舒服；手指只有一半的時間在身上，所以漲得比揉快一倍
     else{MOOD.c-=MOOD.c*k;MOOD.a-=MOOD.a*k}}
   MOOD.scare*=Math.exp(-dt/.8);
-  {const tg=MOOD.strain*R*.35;MOOD.tugX=-MOOD.px*tg;MOOD.tugY=-MOOD.py*tg}   // 拔河：家往拉的反方向挪，身體往回扯（你還是拉得動）
-  const pt=(g&&(g.gentleT||0)>1||!g&&STK.g>1&&t-STK.last<.6)&&MOOD.c>.2?Math.min(1,(MOOD.c-.2)/.5):0;PURR+=(pt-PURR)*(1-Math.exp(-dt*(1+.4*exLevel())/.3));
+  {const tg=(roughOn()?MOOD.tugS||0:MOOD.strain)*R*.35;MOOD.tugX=-MOOD.px*tg;MOOD.tugY=-MOOD.py*tg}   // 拔河：家往拉的反方向挪，身體往回扯（你還是拉得動）
+  const pt=(g&&(g.gentleT||0)>1||!g&&STK.g>1&&t-STK.last<.6)&&MOOD.c>.2?Math.min(1,(MOOD.c-.2)/.5):0,pt2=PET.on?Math.max(pt,Math.min(1,(PET.g-1)/.5)):pt;PURR+=(pt2-PURR)*(1-Math.exp(-dt*(1+.4*exLevel())/.3));
   if(ESC.on){const p=Math.min(1,(t-ESC.t0)/ESC.T),e=1-(1-p)**3,nx=ESC.sx+(ESC.dx-ESC.sx)*e,ny=ESC.sy+(ESC.dy-ESC.sy)*e;
     WANDER.vx=(nx-HOMEX)/dt;WANDER.vy=(ny-HOMEY)/dt;HOMEX=nx;HOMEY=ny;
     if(LV('lifeGait')){STR.k=1+.15*(1-p)**2*(REDUCED?.5:1);STR.h=Math.atan2(ESC.dy-ESC.sy,ESC.dx-ESC.sx)}   // v2.19：衝出去時沿方向拉長
@@ -1913,11 +1941,14 @@ function lifeRelease(f){const st=SB(f);   // v2.20：拖著走時用身體真的
   if(LV('lifeBreath')&&st>1.5)BRX.exert=Math.max(BRX.exert,Math.min(1,.3+(st-1.5)*.35));
   if(LV('lifeAttend')&&!ESC.on&&!INTRO.on&&Math.hypot(f.fx-globalC.xc,f.fy-globalC.yc)>R*.4)LIFE.att={at:t+.5,x:f.fx,y:f.fy,blank:false};
   LIFE.st='rest';LIFE.until=t+1.5+2*Math.random()}
+function tapCap(a){FLN.tc=Math.max(TAPK.lo*mat.flinchAmp,Math.min(FLN.tc,a*TAPK.k))}
 function lifeStep(dt,idle,engaged){
   swimGreet();   // v2.23 游到家了：打招呼
   // A5 受驚：排好的時間到了就縮（被碰前在休息 1.2 倍、在走 0.8 倍；舒服時減半；連續碰每次乘 0.55，放著 7 秒時間常數恢復）
   FLN.H+=(1-FLN.H)*(1-Math.exp(-dt/7));
-  if(FLN.at>0&&t>=FLN.at){FLN.at=-9;if(LV('lifeFlinch')){const pre=(FLN.pre==='rest'?1.2:FLN.pre==='go'?.8:1)*(FLN.boost||1),a=mat.flinchAmp*pre*(MOOD.c>.3?.5:1)*FLN.H*(REDUCED?.5:1)*(IV2('impC5')?1+1.2*IMP.w:1)*brainFlinch();
+  FLN.tc=mat.tapSoft>=.5?Math.min(1,FLN.tc*Math.exp(dt/TAPK.T)):1;
+  if(FLN.at>0&&t>=FLN.at){const byTap=mat.tapSoft>=.5&&FLN.at===FLN.tpAt;FLN.at=-9;if(LV('lifeFlinch')){let a;{const pre=(FLN.pre==='rest'?1.2:FLN.pre==='go'?.8:1)*(FLN.boost||1);a=mat.flinchAmp*pre*(MOOD.c>.3?.5:1)*FLN.H*(REDUCED?.5:1)*(IV2('impC5')?1+1.2*IMP.w:1)*brainFlinch()}
+    if(byTap){a=Math.min(a,FLN.tc);if(FLN.tcq)tapCap(a)}FLN.tcq=false;   // v2.61 D2：輕點越點縮越小
     FLN.amp=a;FLN.t0=t;FLN.last=a;FLN.H*=.55;FLN.boost=1;cutSniffs();if(LV('lifeBreath'))BRX.exert=Math.max(BRX.exert,.1+2*a)}}   // 縮的時候快吸一口氣：喘一點點
   {const u=t-FLN.t0,e=u<0?0:u<.06?Math.sin(Math.PI/2*u/.06):u<.11?1:Math.exp(-(u-.11)/.18);FLN.s=1-FLN.amp*e}   // 60 毫秒縮到底、停 50 毫秒、半秒放鬆
   // 甩一甩：整團快速左右轉幾下（每秒 6 下、0.16 秒時間常數變小），位置與上一幀一起轉（不留速度），形狀照黏土規矩留著
@@ -1967,9 +1998,9 @@ function lifeStep(dt,idle,engaged){
 }
 /* ---------- v2.22 出聲（E1）、動作都有它的回應（E2）、看得出印象（E3）、來找你（E4）、黏液 ---------- */
 // E1：被扯到想逃那一下「嗯嗯」、呼嚕起來「嗯～」（每一抓各一次）
-function e1Step(){if(!IV3('e1'))return;let g=null;for(const f of fingers.values())if(f.mode==='grab'){g=f;break}if(!g){if(PURR>.3&&STK.g>1&&!STK.said&&t-STK.last<.6){STK.said=true;voice('mmm',.6)}return}
+function e1Step(){if(!IV3('e1'))return;let g=null;for(const f of fingers.values())if(f.mode==='grab'){g=f;break}if(!g){if(PURR>.3&&STK.g>1&&!STK.said&&t-STK.last<.6){STK.said=true;if(!(PET.on&&PET.said))voice('mmm',.6);if(PET.on)PET.said=true}return}
   if(MOOD.strain>.5&&!g.saidProt){g.saidProt=true;voice('protest',.8)}
-  if(PURR>.3&&!g.saidPurr){g.saidPurr=true;if(!E2.nuzSaid)voice('mmm',.6)}}   // 已經在蹭、哼過了就不再哼
+  if(PURR>.3&&!g.saidPurr){g.saidPurr=true;if(!E2.nuzSaid&&!(PET.on&&PET.said))voice('mmm',.6);if(PET.on)PET.said=true}}   // 已經在蹭、哼過了就不再哼
 // E2 點一下（0.25 秒內、沒拉開）：被戳那一縮之後，它朝你的手指傾一下、「噗」一聲；戒的往反方向傾
 function e2Release(f){if(!IV3('e2'))return;if(!(t-f.tDown<.25&&(f.stretch||0)<.3))return;
   E2.leanT=t+.3;E2.leanA=Math.atan2(f.fy-globalC.yc,f.fx-globalC.xc);E2.leanS=IMP.w>.4||BRM()<-.35?-1:1;if(BRM()>.35)MOOD.wagT=t+.35;voice('poke',.7)}
@@ -2009,7 +2040,7 @@ function e4Step(dt){if(!IV3('e4')){E4.on=false;return false}
 const MC={c:0,s:0,w:0,z:0},MCOL={c:[255,154,139],s:[240,68,79],w:[141,166,217],z:[108,120,184]};
 function moodColorStep(dt){const q=1-Math.exp(-dt/.4),cl=v=>Math.max(0,Math.min(1,v));if(!(mat.moodColor>0)){MC.c=MC.s=MC.w=MC.z=0;return}
   const happy=t-MOOD.happyT<2?1:0,tk=fingers.size&&tickOn()?.7:0;
-  MC.c+=(Math.max(cl((MOOD.c-.1)/.45),happy,tk)-MC.c)*q;let st=0,yk=0;for(const f of fingers.values())if(f.mode==='grab'){st=Math.max(st,SB(f));yk=Math.max(yk,Math.hypot(f.vxS,f.vyS)/R)}{const tg=Math.max(MOOD.strain,ESC.on?1:0,cl((st-.6)/.5),tk?0:cl((yk-5)/3));MC.s+=(tg-MC.s)*(tg>MC.s?1-Math.exp(-dt/.12):q)}   /* 身體會跟著手指走（拉力），很難撐到想逃，紅色看拉伸量和猛扯的速度 */MC.w+=(Math.max(cl(MOOD.scare),cl(IMPD.w/.6))-MC.w)*q;MC.z+=(SLP.k-MC.z)*q}
+  MC.c+=(Math.max(cl((MOOD.c-.1)/.45),happy,tk)-MC.c)*q;let st=0,yk=0;for(const f of fingers.values())if(f.mode==='grab'&&(!roughOn()||f.yank)){st=Math.max(st,SB(f));yk=Math.max(yk,Math.hypot(f.vxS,f.vyS)/R)}{const tg=Math.max(MOOD.strain,ESC.on?1:0,cl((st-.6)/.5),tk?0:cl((yk-5)/3));MC.s+=(tg-MC.s)*(tg>MC.s?1-Math.exp(-dt/.12):q)}   /* 身體會跟著手指走（拉力），很難撐到想逃，紅色看拉伸量和猛扯的速度 */MC.w+=(Math.max(cl(MOOD.scare),cl(IMPD.w/.6))-MC.w)*q;MC.z+=(SLP.k-MC.z)*q}
 function tint(c,shade){if(LAB.off.mood||c[0]!=='#'||c.length<7)return c;const A=mat.moodColor||0,sum=MC.c+MC.s+MC.w+MC.z;if(!IV3('e3')&&!(A>0&&sum>.002))return c;const n=parseInt(c.slice(1,7),16);let r=n>>16,g=n>>8&255,b=n&255;
   if(IV3('e3')){const tr=IMPD.tr,w=IMPD.w,pp=FX().purple;if(pp){const k=.62*tr,q=shade?.8:1;r+=(pp[0]*q-r)*k;g+=(pp[1]*q-g)*k;b+=(pp[2]*q-b)*k}   /* v2.52 蝶豆：熟了往紫偏，不走暖色 */else{r=Math.min(255,r+22*tr);g=Math.min(255,g+4*tr);b=Math.max(0,b-18*tr)}r+=(255-r)*.22*w;g+=(255-g)*.22*w;b+=(255-b)*.22*w}
   if(A>0&&sum>.002){const nm=Math.max(1,sum),k=A*sum/nm,sh=shade?.82:1,cc=FX().purple||MCOL.c,mx=i=>(MC.c*cc[i]+MC.s*MCOL.s[i]+MC.w*MCOL.w[i]+MC.z*MCOL.z[i])/sum*sh;r+=(mx(0)-r)*k;g+=(mx(1)-g)*k;b+=(mx(2)-b)*k}
@@ -2048,7 +2079,7 @@ function eyeStep(dt){if(!(mat.eyes>=.5)||!EYE.L.length)return;
   // 表情
   const happy=(BRM()>.45&&t<EYE.user&&!g)||PURR>.3||(t>=MOOD.happyT&&t-MOOD.happyT<1.6)||(E4.on&&E4.ph==='wave')||t<ECHO.joyUntil||t-SNW.last<1.2,
     squeeze=MOOD.strain>.4||tickOn()||(ESC.on&&t-ESC.t0<.5)||t<EYE.sqU;
-  if(g&&g.peak/R>5&&SB(g)>.8)EYE.sqU=t+.45;   // 猛扯那一下也擠成 > <（單指拉會被拖著走，很少撐到想逃）
+  if(g&&g.peak/R>5&&SB(g)>.8&&(!roughOn()||g.yank))EYE.sqU=t+.45;   // 猛扯那一下也擠成 > <（單指拉會被拖著走，很少撐到想逃）
   const mode=SLP.k>.65?'sleep':squeeze?'squeeze':happy?'happy':'open';
   if(mode!==EYE.mode){EYE.mode=mode;if(mode==='open')EYE.blinkT=t-.08}   // 換回睜眼從閉著那一刻開始睜
   let open=1,wide=1;
@@ -2226,11 +2257,11 @@ function dentRate(dn){if(!(mat.dentFade<9.95))return 0;return 4/(mat.dentFade*(1
 function impReset(){Object.assign(IMP,{tr:0,w:0,has:false,askUntil:-9})}
 // 放手時看這一抓是哪一種，記進印象：扯到想逃、連戳、大力甩是戒；溫柔的一抓讓戒退兩成（C5 慢慢放心）。要在 moodRelease 前（它會把 strainMax 歸零）
 function impRelease(f){memTouch(f);if(!(mat.imp>=.5))return;const w0=IMP.w;IMP.lx=f.fx;IMP.ly=f.fy;IMP.has=true;
-  const quick=t-f.tDown<.25&&(f.stretch||0)<.3,taps=MOOD.taps.filter(x=>t-x<1).length+1,fling=f.peak/R>6;
-  if(MOOD.strainMax>.15){IMP.w+=.15+.25*MOOD.strainMax;IMP.tr-=.15}
-  else if(quick){IMP.w+=taps>=3?.2:.04;if(taps>=3)IMP.tr-=.1}
+  const quick=t-f.tDown<.25&&(f.stretch||0)<.3,taps=MOOD.taps.filter(x=>t-x<1).length+1,rough=roughOn(),hard=rough&&(f.vMax||0)>=ROUGH.v,fling=!rough&&f.peak/R>6;   // v2.61 D1：hard 這一抓手快過；甩不再另外加戒
+  if(MOOD.strainMax>.15){if(!rough){IMP.w+=.15+.25*MOOD.strainMax;IMP.tr-=.15}}   // v2.61 D1：快扯照樣逃（moodRelease），但不加戒、熟不動
+  else if(quick){IMP.w+=taps>=3?.2:mat.tapSoft>=.5?0:.04;if(taps>=3)IMP.tr-=.1}
   else if(fling){IMP.w+=.1;IMP.tr-=.05}
-  else{IMP.w*=.8;if(IV3('e3')&&(f.dragMax||0)>R*.5)IMP.tr+=.12}   // v2.22 E3：乖乖被拖著走，熟一點
+  else{if(!(rough&&f.yank))IMP.w*=.8;if(IV3('e3')&&(f.dragMax||0)>R*.5&&!hard)IMP.tr+=.12}   // v2.22 E3：乖乖被拖著走，熟一點
   if(IMP.w>w0)IMP.w=w0+(IMP.w-w0)*(mat.wRate||1);   // v2.23 個性：戒得快慢
   IMP.tr=Math.max(0,Math.min(1,IMP.tr));IMP.w=Math.max(0,Math.min(1,IMP.w))}
 // C4 討摸：揉到呼嚕放手（開心小跳那一下），0.9 秒後往你手指離開的地方伸偽足、離得遠就挪過去；5 秒內再碰，呼嚕來得快（down）
@@ -2242,8 +2273,9 @@ function impStep(dt){if(!(mat.imp>=.5))return;
   if(g){const st=SB(g),sp=Math.hypot(g.vxS,g.vyS)/R;
     const e3=(IV3('e3')?3:1)*(mat.trRate||1);   // v2.23 個性：熟得快慢   // v2.22 E3：熟得快三倍（揉 5 秒就看得出來）
     if((g.gentleT||0)>1){IMP.tr+=(.04+.04*PURR)*dt*e3;IMP.w-=.05*dt*e3}   // 輕揉 20 到 25 秒到很熟（E3 開著 7 秒左右）
-    else if(st<1.2&&sp>.3&&sp<3&&MOOD.strain<.05&&Math.hypot(DRAG.ox,DRAG.oy)>R*.3)IMP.tr+=.02*dt*e3}
+    else if(st<1.2&&sp>.3&&sp<3&&MOOD.strain<.05&&Math.hypot(DRAG.ox,DRAG.oy)>R*.3&&!(roughOn()&&(g.vMax||0)>=ROUGH.v))IMP.tr+=.02*dt*e3}
   else if(STK.g>1&&t-STK.last<.05){const e3=(IV3('e3')?3:1)*(mat.trRate||1);IMP.tr+=(.04+.04*PURR)*dt*e3;IMP.w-=.05*dt*e3}   // v2.26 F6：摸也會熟
+  if(PET.on&&t-PET.last<.05&&!(g&&(g.gentleT||0)>1)&&!(!g&&STK.g>1&&t-STK.last<.05))IMP.tr+=(.04+.04*PURR)*dt*(IV3('e3')?3:1)*(mat.trRate||1);   // v2.61 C3：慢慢摸也會熟（揉、摸已經算過的那幾幀不重複）
   IMP.w*=Math.exp(-dt/(260*(mat.wFade||1)));   // v2.52 wFade：每隻戒退的快慢（布丁膽小但忘得快）
   IMP.tr=Math.max(0,Math.min(1,IMP.tr));IMP.w=Math.max(0,Math.min(1,IMP.w));
   {const k=1-Math.exp(-dt/1);IMPD.tr+=(IMP.tr-IMPD.tr)*k;IMPD.w+=(IMP.w-IMPD.w)*k}}
@@ -2326,7 +2358,9 @@ function update(dt){
     if(f.slx||f.sly){const l=Math.hypot(f.slx,f.sly);if(l<.01){f.slx=0;f.sly=0}else{const ux=f.slx/l,uy=f.sly/l,back=Math.max(0,(f.x-f.lx)*ux+(f.y-f.ly)*uy),nl=Math.max(0,l-back)*Math.exp(-dt/2);f.slx=ux*nl;f.sly=uy*nl}}   // 手指往退讓的方向移回來多少，退讓量就收回多少；另外 2 秒慢慢退掉
     f.vx=(f.x-f.lx)/dt;f.vy=(f.y-f.ly)/dt;f.lx=f.x;f.ly=f.y;
     {const kv=1-Math.exp(-dt/.03);f.vxS+=(f.vx-f.vxS)*kv;f.vyS+=(f.vy-f.vyS)*kv;f.peak=Math.max(Math.hypot(f.vx,f.vy),f.peak*Math.exp(-dt/.08))}
-    if(f.mode==='grab'){const st=Math.hypot(ex,ey)/R;f.ex=ex;f.ey=ey;const step=Math.floor(st*2.5);f.stretch=st;if(step>f.step&&st>.35)sfxPlay('pull',Math.min(1,.4+st/2),1-.08*Math.min(1,st/1.5));f.step=Math.max(f.step,step);
+    if(f.mode==='grab'){const st=Math.hypot(ex,ey)/R;f.ex=ex;f.ey=ey;const step=Math.floor(st*2.5);f.stretch=st;
+      if(roughOn()){const hv=Math.hypot(f.vxS,f.vyS)*CAM.z/R;if(hv>(f.vMax||0))f.vMax=hv;if(!f.yank&&hv>=ROUGH.v&&st>ROUGH.st&&ex*f.vxS+ey*f.vyS>0)f.yank=true}   // v2.61 D1
+      if(step>f.step&&st>.35)sfxPlay('pull',Math.min(1,.4+st/2),1-.08*Math.min(1,st/1.5));f.step=Math.max(f.step,step);
       // 按壓（接觸點先凹）：按下那幀先到目標的 pressFirst，之後用 pressRise 補完；按住不動（慢於每秒一個半徑）再慢慢攤深
       const still=Math.hypot(f.vxS,f.vyS)<R;f.hold=Math.max(0,Math.min(1,f.hold+(still?dt/Math.max(.05,mat.pressHoldTime):-dt/.3)));
       // v2.47 拉開了就不再攤（多米 11-16 錄影：拉一拉變尖、拉太長會抽動）：攤開是給「按」用的。量到拉 3R 按著不動時，手指底下那塊還被往外攤 0.3R（跟抓取半徑一樣大），

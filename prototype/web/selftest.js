@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.61（11-25）：加 T70（破皮，真的畫出來讀畫面），多跑約 8 到 9 分鐘；window.T70LONG = 1 跑長版
    v2.59（11-24）：加 T69（窗景）；跑的時候窗戶一律原本那扇，跑完還原
    v2.56（11-23）：加 T67（補點後站穩）；T65、T66 照慣例把它關掉。
    v2.52（11-22）：加 T63；舊項目釘住 v2.51 關掉、窗台拉伸上限回 3.2（見下面 PRE47 那段的說明）。
@@ -464,15 +465,20 @@
     r32.foldFrames = xf; r32.end = snap();
     res.T32_introFollow = r32; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; }
 
-  // T33 情緒（v2.18，多米：被拉扯想逃、舒服時呼嚕）：抓右緣往右拉 2.2R 撐 1.5 秒，想逃要滿（strain > 0.8）、舒服掉到負的；放手要開始逃、
+  // T33 情緒（v2.18，多米：被拉扯想逃、舒服時呼嚕；v2.61 D1 改成快扯會逃、慢拉不會）：抓右緣用 0.15 秒往右扯 2.2R（每秒約 15R）撐到 2 秒，想逃要滿（strain > 0.8）、舒服掉到負的；放手要開始逃、
   //     2.5 秒後家往左（拉的反方向）移超過 0.4 個畫面寬。中間輕揉 2.5 秒（半徑 0.25R 的小圈），舒服 > 0.3、呼嚕 > 0.3，放手要開心小跳。
   //     1 秒內戳 3 下要閃開（2 秒後移超過 0.15 個畫面寬）。全程零對折、逃完面積回來
   { const clock = saveClock(); Math.random = seeded(20261120); const r33 = {}; let xf = 0; const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
     resetAligned(1e9, { emo: 1 }); nextTwitch = 1e9; let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const sx = X[b] - R * 0.15, sy = Y[b], h0 = HOMEX;
     let q = sc(sx, sy), sMax = 0; ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);   // 手指用累加位移（鏡頭拉的時候會動，世界換螢幕會讓手指退回來）
-    for (let k = 1; k <= 120; k++) { const tx = sx + 2.2 * R * Math.min(1, k / 30); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; sMax = Math.max(sMax, MOOD.strain); }
+    for (let k = 1; k <= 120; k++) { const tx = sx + 2.2 * R * Math.min(1, k / 9); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; sMax = Math.max(sMax, MOOD.strain); }
     r33.strainHeld = +sMax.toFixed(2); r33.moodPulled = +MOOD.c.toFixed(2); ev('pointerup', 1, q[0], q[1]); r33.fleeStarted = ESC.on;
     for (let k = 0; k < 150; k++) { steps(1); if (classify()[0]) xf++; } r33.fledW = +((h0 - HOMEX) / W).toFixed(2); steps(120); r33.afterFlee = snap();
+    // v2.61 D1（rough）：同一個拉法慢慢拉（2 秒拉 2.2R、停 1 秒）：不想逃、不紅、不加戒、沒脫手；rough 0 照舊會逃（證明量得到）。快扯停 0.1 秒、扯著就放：熟、戒都不動
+    const drag33 = (o, frames, hold) => { resetAligned(1e9, { emo: 1, imp: 1, e3: 1, moodColor: .8, ...o }); impReset(); nextTwitch = 1e9; MOOD.strainMax = 0; MC.s = 0; let bi = -1; for (const i of bnd) if (bi < 0 || X[i] > X[bi]) bi = i; const ax = X[bi] - R * 0.15, ay = Y[bi]; let p = sc(ax, ay), sm = 0, red = 0; ev('pointerdown', 1, p[0], p[1]); const f = fingers.get(1);
+      for (let k = 1; k <= frames + hold; k++) { const tx = ax + 2.2 * R * Math.min(1, k / frames); p = [p[0] + (tx - f.x) * CAM.z, p[1] + (ay - f.y) * CAM.z]; ev('pointermove', 1, p[0], p[1]); steps(1); if (classify()[0]) xf++; sm = Math.max(sm, MOOD.strain); red = Math.max(red, MC.s); }
+      const held = fingers.get(1) === f && f.mode === 'grab', vm = f.vMax || 0; ev('pointerup', 1, p[0], p[1]); const o33 = { strain: +sm.toFixed(2), red: +red.toFixed(2), flee: ESC.on, held, w: +IMP.w.toFixed(3), tr: +IMP.tr.toFixed(3), vMax: +vm.toFixed(1) }; ESC.on = false; steps(30); return o33; };
+    r33.slow = drag33({}, 120, 60); r33.slowOld = drag33({ rough: 0 }, 120, 60); r33.yankStop = drag33({}, 9, 6); r33.yankGo = drag33({}, 9, 0);
     resetAligned(1e9, { emo: 1 }); nextTwitch = 1e9; { const cx = globalC.xc, cy = globalC.yc; let pMax = 0, cMax = 0; q = sc(cx, cy); ev('pointerdown', 1, q[0], q[1]);
       for (let k = 1; k <= 150; k++) { const a = 2 * Math.PI * 0.5 * k / 60; q = sc(cx + R * 0.25 * Math.sin(a), cy + R * 0.25 * (1 - Math.cos(a))); ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; pMax = Math.max(pMax, PURR); cMax = Math.max(cMax, MOOD.c); }
       ev('pointerup', 1, q[0], q[1]); r33.purrMax = +pMax.toFixed(2); r33.comfortMax = +cMax.toFixed(2); r33.happyHop = INTRO.on && !!INTRO.mini; for (let k = 0; k < 90; k++) { steps(1); if (classify()[0]) xf++; } }
@@ -553,7 +559,7 @@
     { const tap = dent({}, 7, 36), hold = dent({}, 60, 90), tapOld = dent({ dentFade: 10 }, 7, 36);
       r35.dent = { tapAt06: tap.d, holdAt15: hold.d, tapOldAt06: tapOld.d, qdevDiffPt: +Math.abs(tap.qdev - tapOld.qdev).toFixed(2) }; }
     // c 印象怎麼漲、怎麼退
-    { L3({ emo: 1 }); rub(3, 360); const trRub = IMP.tr; L3({ emo: 1 }); const b = rightPt(), sx = X[b] - R * 0.15, sy = Y[b]; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);
+    { L3({ emo: 1 }); rub(3, 360); const trRub = IMP.tr; L3({ emo: 1, rough: 0 }); /* v2.61 D1：慢拉、快扯都不加戒了，這裡量的是戒怎麼退，用舊規則加 */ const b = rightPt(), sx = X[b] - R * 0.15, sy = Y[b]; let q = sc(sx, sy); ev('pointerdown', 1, q[0], q[1]); const f1 = fingers.get(1);
       for (let k = 1; k <= 150; k++) { const tx = sx + 3 * R * Math.min(1, k / 20); q = [q[0] + (tx - f1.x) * CAM.z, q[1] + (sy - f1.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); if (classify()[0]) xf++; }
       ev('pointerup', 1, q[0], q[1]); steps(30); const wPull = IMP.w; impStep(180); r35.imp = { trAfterRub6s: +trRub.toFixed(2), wAfterStrain: +wPull.toFixed(2), wAfter3minRatio: +(IMP.w / wPull).toFixed(2) }; impReset(); }
     // d C1 手指停在旁邊
@@ -940,7 +946,7 @@
     // 開場：落地 4 次、落地壓扁到 0.9 以下、3.2 秒內、碰一下直接到家；鏡頭跟隨：會跑出畫面、4 秒後追到中心附近、抓著時鏡頭不動；全程零對折
     introFollow: res.T32_introFollow.introLands === 4 && res.T32_introFollow.landAspect < 0.9 && res.T32_introFollow.introSec < 3.2 && okArea(res.T32_introFollow.afterIntro) && res.T32_introFollow.skipOff && Math.abs(res.T32_introFollow.skipScale - 1) < 0.01 && res.T32_introFollow.skipFingers === 0 && res.T32_introFollow.followOutPt > 0 && res.T32_introFollow.followEndOff < PRESETS.clay.followStop + 0.1 && res.T32_introFollow.grabCamMovePt < 1 && res.T32_introFollow.foldFrames === 0,
     // 情緒：拉扯想逃（strain > 0.8、舒服變負、放手往反方向逃 0.4 畫面寬以上）、輕揉呼嚕（舒服、呼嚕 > 0.3、放手開心小跳）、連戳 3 下閃開；零對折、面積回來
-    moodWorks: res.T33_mood.strainHeld > 0.8 && res.T33_mood.moodPulled < 0 && res.T33_mood.fleeStarted && res.T33_mood.fledW > 0.4 && okArea(res.T33_mood.afterFlee) && res.T33_mood.purrMax > 0.3 && res.T33_mood.comfortMax > 0.3 && res.T33_mood.happyHop && res.T33_mood.dartStarted && res.T33_mood.dartW > 0.15 && res.T33_mood.foldFrames === 0,
+    moodWorks: (s => !s.slow.flee && s.slow.strain === 0 && s.slow.red <= .2 && s.slow.held && s.slow.w === 0 && s.slowOld.flee && s.yankStop.w === 0 && s.yankStop.tr === 0 && s.yankGo.w === 0 && s.yankGo.tr === 0 && s.yankGo.vMax >= 6)(res.T33_mood) && res.T33_mood.strainHeld > 0.8 && res.T33_mood.moodPulled < 0 && res.T33_mood.fleeStarted && res.T33_mood.fledW > 0.4 && okArea(res.T33_mood.afterFlee) && res.T33_mood.purrMax > 0.3 && res.T33_mood.comfortMax > 0.3 && res.T33_mood.happyHop && res.T33_mood.dartStarted && res.T33_mood.dartW > 0.15 && res.T33_mood.foldFrames === 0,
     // v2.19 活物感：休息 0.35 到 0.65、有探有走；碰著呼吸還在、沒被記進形狀；晚一拍才縮、會習慣；一縮一衝的速度高峰在收縮那段、路線彎、走得到；
     // 碰旁邊空白處會探、不凍住；拉完甩一甩、探手指離開的地方；全程零對折
     // v2.20：拖著走（跟過去 0.55R 到 0.85R、被抓那端照樣跟手、放手不退、零自交、面積回來）；凹痕 0.6 秒、1.5 秒退完，形狀照舊；印象漲退；
@@ -1731,6 +1737,65 @@
     } catch (e) { r.err = String(e); }
     VIEW.bg = bg0; VIEW.win = w0; WIN.fixed = f0; res.T69_windows = r;
     res.PASS.windows = r.err === '' && r.n === 22 && !r.still.length && !r.stop.length && !r.clear.length && r.only === 'night' && r.back === 'day' && r.blue === 'blue' && r.draw.length === 3 && r.draw.every(Boolean);
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T70 v2.61 破皮（A7）。前面 69 項把皮釘成平塗、不讀畫面，看不到破皮。這項換成預設的清透皮、窗台、芋圓，真的畫出來，每 2 格讀 JEL.h2（畫面一半大、模糊過的遮罩，門檻 0.46 跟著色器同一個）：
+  // 裂：0.004R² 以上的皮有兩塊以上（碰到螢幕邊的最多算一塊）；洞：0.002R² 以上、四面都是皮；突變：外框上一點離上一次的皮超過「這兩格外框最多走的」加 4 點加 0.12R。一組手勢只要有一格就算那組中。
+  // 手勢：最糟四種各 10 次（抓中間往右、往左快扯到螢幕邊；抓中間往右下快扯 3R；兩指水平快拉到螢幕邊；種子固定），隨手拉（身上任一點、任一方向、0.5R 到螢幕邊、每秒 3 到 25R、按住 0.3 到 3 秒）。
+  // 門檻：預設（皮 1、拉的三顆 0）只擋裂，最糟 40 組最多 2 組，洞和突變只記錄（換皮不會少，補量 27／40）；三顆全開最糟 40 組破（裂、洞、突變任一）0 組，隨手拉破的不超過 1%（無條件進位）。
+  // 對照：同一批的前 20 組改皮 0（v2.60 的外框畫法）要裂 2 組以上，證明量得到（20 組量到 7，40 組 12 到 15）。回家力道：網頁自己的值用來擋，手機的值（KPIOS）只記錄。
+  // 數字每次差幾組（物理裡有不吃種子的計時）。預設跑短版，約 8 到 9 分鐘；先設 window.T70LONG = 1 跑長版，約 40 分鐘（估）：對照和手機力道也跑滿 40 組，隨手拉 300 次，手機力道隨手拉 100 次。短版隨手拉的次數可用 window.T70N 改。
+  { const clock = saveClock(), view0 = { ...VIEW }, sl0 = SLIME, kp0 = window.KPIOS, long = !!window.T70LONG, r = { long, sec: {}, err: '' }, T0 = performance.now();
+    Object.assign(VIEW, { skin: 'A', body: 'round', face: 1, bg: 'day', win: '' });
+    const si = SLIMES.findIndex(q => q.id === 'taro'), s = SLIMES[si], OLD = { skinU: 0, pullHold: 0, pullWhole: 0, pullSoft: 0 }, DEF = { ...OLD, skinU: 1 }, ALL = { skinU: 1, pullHold: 1, pullWhole: 1, pullSoft: 1 };
+    const SP = { ...PRE54[s.mat], seed: s.seed, ...s.p, shakeMode: 0, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0 };
+    const fresh = (over, seed, x0) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(seed); SLIME = si; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed }); brainReset(); MOOD.strain = 0; MOOD.scare = 0;
+      if (x0 != null) { const dx = x0 - CX; for (let i = 0; i < N; i++) { X[i] += dx; PX[i] += dx; } HOMEX += dx; }
+      steps(120); log.splice(0); };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const DIR = { R: [1, 0], L: [-1, 0], DR: [.7071, .7071] }, toEdge = (x, y, ux, uy) => { let k = 1e9; if (ux > 1e-6) k = Math.min(k, (W - 4 - x) / ux); if (ux < -1e-6) k = Math.min(k, (4 - x) / ux); if (uy > 1e-6) k = Math.min(k, (H - 4 - y) / uy); if (uy < -1e-6) k = Math.min(k, (4 - y) / uy); return k; };
+    // 讀畫面：遮罩、皮幾塊、洞幾個、離皮多遠。只算身體那一框（外擴 1 格）
+    let mw = 0, mh = 0, buf = null, cur = null, prev = null, lab = null, stk = null, box = null, pbox = null, disp = 0, lastMax = 0, o = null, fr = 0;
+    const read = () => { draw(); const gl = JEL.gl; if (!gl || gl.isContextLost() || !JEL.float) throw new Error('T70：WebGL 沒開，畫不出果凍皮'); if (mw !== JEL.h2.w || mh !== JEL.h2.h) { mw = JEL.h2.w; mh = JEL.h2.h; buf = new Float32Array(mw * mh * 4); lab = new Int8Array(mw * mh); stk = new Int32Array(mw * mh); prev = null; }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, JEL.h2.f); gl.readPixels(0, 0, mw, mh, gl.RGBA, gl.FLOAT, buf); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      cur = new Uint8Array(mw * mh); let x0 = mw, x1 = -1, y0 = mh, y1 = -1; for (let y = 0; y < mh; y++) for (let x = 0, p = (mh - 1 - y) * mw * 4, q = y * mw; x < mw; x++, p += 4, q++) if (buf[p] > .46) { cur[q] = 1; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      box = x1 < 0 ? null : [Math.max(0, x0 - 1), Math.max(0, y0 - 1), Math.min(mw - 1, x1 + 1), Math.min(mh - 1, y1 + 1)]; };
+    const comps = v => { const [bx0, by0, bx1, by1] = box, out = [], px2 = (W / mw) * (H / mh) / (R * R); for (let y = by0; y <= by1; y++) lab.fill(0, y * mw + bx0, y * mw + bx1 + 1);   // v 1：皮（八連通）；0：皮以外（四連通），碰到框邊的不是洞
+      for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) { const st = y * mw + x; if (cur[st] !== v || lab[st]) continue; let n = 0, top = 0, be = 0, se = 0; stk[top++] = st; lab[st] = 1;
+        while (top) { const p = stk[--top], px = p % mw, py = (p / mw) | 0; n++; if (px === bx0 || px === bx1 || py === by0 || py === by1) be = 1; if (px === 0 || py === 0 || px === mw - 1 || py === mh - 1) se = 1;
+          for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) { if ((!ox && !oy) || (!v && ox && oy)) continue; const ax = px + ox, ay = py + oy; if (ax < bx0 || ay < by0 || ax > bx1 || ay > by1) continue; const q = ay * mw + ax; if (cur[q] === v && !lab[q]) { lab[q] = 1; stk[top++] = q; } } }
+        if (v || !be) out.push([n * px2, se]); } return out; };
+    const dist = (m, b) => { const [bx0, by0, bx1, by1] = b, w = bx1 - bx0 + 1, hh = by1 - by0 + 1, d = new Float32Array(w * hh), D = 1.4142; for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) { const i = y * w + x; let v = m[(y + by0) * mw + x + bx0] ? 0 : 1e6; if (v) { if (x > 0) v = Math.min(v, d[i - 1] + 1); if (y > 0) { v = Math.min(v, d[i - w] + 1); if (x > 0) v = Math.min(v, d[i - w - 1] + D); if (x < w - 1) v = Math.min(v, d[i - w + 1] + D); } } d[i] = v; }
+      for (let y = hh - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) { const i = y * w + x; let v = d[i]; if (!v) continue; if (x < w - 1) v = Math.min(v, d[i + 1] + 1); if (y < hh - 1) { v = Math.min(v, d[i + w] + 1); if (x < w - 1) v = Math.min(v, d[i + w + 1] + D); if (x > 0) v = Math.min(v, d[i + w - 1] + D); } d[i] = v; } return d; };
+    const look = () => { read(); if (!o.n++ && (!box || comps(1).every(c => c[0] < 1))) o.blank = 1;   // 第一次讀就沒有身體：畫不出來，不算過
+      if (box) { let big = 0, eb = 0; for (const [a, e] of comps(1)) if (a >= .004) { if (!e) big++; else if (!eb) { eb = 1; big++; } } if (big > 1) o.split++; if (comps(0).some(c => c[0] >= .002)) o.hole++; }
+      if (prev && box && pbox) { const b = [Math.min(box[0], pbox[0]), Math.min(box[1], pbox[1]), Math.max(box[2], pbox[2]), Math.max(box[3], pbox[3])], dc = dist(cur, b), dp = dist(prev, b), w = b[2] - b[0] + 1; let far = 0; for (let y = b[1]; y <= b[3]; y++) for (let x = b[0]; x <= b[2]; x++) { const q = y * mw + x; if (cur[q] === prev[q]) continue; const d = (cur[q] ? dp : dc)[(y - b[1]) * w + x - b[0]]; if (d > far) far = d; } const pop = (far * 2 - disp - 4) / R; if (pop > o.popMax) o.popMax = pop; if (pop > .12) o.pop++; }
+      prev = cur; pbox = box; disp = 0; };
+    const step = n => { for (let k = 0; k < n; k++) { const n0 = N, r0 = REM.n, l0 = REM.last, x0 = Float64Array.from(X), y0 = Float64Array.from(Y); steps(1); fr++; if (N !== n0 || REM.n !== r0 || REM.last !== l0) disp += lastMax; else { let d = 0; for (const i of bnd) d = Math.max(d, Math.hypot(X[i] - x0[i], Y[i] - y0[i])); lastMax = d * CAM.z; disp += lastMax; }
+      if (fr % 2 === 0) look(); } };
+    const mv = (id, x, y) => ev('pointermove', id, Math.max(4, Math.min(W - 4, x)), Math.max(4, Math.min(H - 4, y)));
+    const pull = (sx, sy, ux, uy, d, sp, hold, rel) => { ev('pointerdown', 1, sx, sy); step(4); const n = Math.max(2, Math.ceil(d / R / sp * 60)); for (let k = 1; k <= n; k++) { mv(1, sx + ux * d * k / n, sy + uy * d * k / n); step(1); } step(hold); ev('pointerup', 1, sx + ux * d, sy + uy * d); step(rel); };
+    const go = { pull(c, over) { const [ux, uy] = DIR[c.dir], rr = seeded(c.seed * 7919 + 13), g = SILL.g, jt = () => (rr() - .5) * R * .16; fresh(over, c.seed, ux < 0 ? g.r - R * 1.05 : g.l + R * 1.05); let [x, y] = scr(globalC.xc, globalC.yc); x += jt(); y += jt(); pull(x, y, ux, uy, Math.min(c.d * R, toEdge(x, y, ux, uy)), 25, 180, 240); },
+      opp(c, over) { fresh(over, c.seed); const [cx, cy] = scr(globalC.xc, globalC.yc), a = cx + R * .35, b = cx - R * .35, d1 = W - 4 - a, d2 = b - 4; ev('pointerdown', 1, a, cy); ev('pointerdown', 2, b, cy); step(4); const n = Math.max(2, Math.ceil(Math.max(d1, d2) / R / 20 * 60)); for (let k = 1; k <= n; k++) { mv(1, a + d1 * k / n, cy); mv(2, b - d2 * k / n, cy); step(1); } step(180); ev('pointerup', 1, a + d1, cy); step(6); ev('pointerup', 2, b - d2, cy); step(234); },
+      rnd(c, over) { const rr = seeded(c.seed * 104729 + 17), g = SILL.g; fresh(over, c.seed, g.l + R * 1.05 + rr() * (g.r - g.l - R * 2.1)); let x = 0, y = 0; for (let k = 0; k < 60; k++) { const a = rr() * 6.2832, q = Math.sqrt(rr()) * R, wx = globalC.xc + Math.cos(a) * q, wy = globalC.yc + Math.sin(a) * q; if (insideBody(wx, wy)) { [x, y] = scr(wx, wy); break; } }
+        const a = rr() * 6.2832, ux = Math.cos(a), uy = Math.sin(a), te = toEdge(x, y, ux, uy), d = Math.min(te, R * .5 + rr() * Math.max(0, te - R * .5)), sp = 3 * Math.pow(25 / 3, rr()), hd = Math.round(18 + rr() * 162); pull(x, y, ux, uy, d, sp, hd, 180); } };
+    const worst = []; for (let k = 0; k < 10; k++) worst.push({ id: 'R' + k, k: 'pull', dir: 'R', d: 99, seed: 31175 + k * 1000 }, { id: 'DR' + k, k: 'pull', dir: 'DR', d: 3, seed: 31175 + k * 1000 }, { id: 'O' + k, k: 'opp', seed: 31201 + k * 1000 }, { id: 'L' + k, k: 'pull', dir: 'L', d: 99, seed: 31101 + k * 1000 });
+    const casual = n => Array.from({ length: n }, (_, k) => ({ id: 'N' + k, k: 'rnd', seed: 45000 + k }));
+    const batch = async (nm, cells, over, kp) => { const b0 = performance.now(), q = { n: 0, brk: 0, split: 0, hole: 0, pop: 0, blank: 0, nan: 0, popMax: 0, skin: null, who: '' }; if (kp) window.KPIOS = 1; else delete window.KPIOS;
+      for (const c of cells) { o = { n: 0, split: 0, hole: 0, pop: 0, blank: 0, popMax: 0 }; prev = pbox = null; disp = lastMax = fr = 0; go[c.k](c, over); for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); let bad = 0; for (let i = 0; i < N; i++) if (!isFinite(X[i]) || !isFinite(Y[i])) bad++;
+        q.n++; if (o.split || o.hole || o.pop) { q.brk++; q.who += ' ' + c.id + (o.split ? '裂' : '') + (o.hole ? '洞' : '') + (o.pop ? '突' : ''); } if (o.split) q.split++; if (o.hole) q.hole++; if (o.pop) q.pop++; q.blank += o.blank; if (bad) q.nan++; q.popMax = Math.max(q.popMax, o.popMax); await new Promise(a => setTimeout(a, 0)); }
+      q.popMax = +q.popMax.toFixed(2); if (typeof SKIN !== 'undefined') q.skin = SKIN.used; r[nm] = q; r.sec[nm] = Math.round((performance.now() - b0) / 1000); };
+    try { WALK.items.length = 0; WALK.fall.length = 0; WALK.leave.length = 0; WALK.stuck = null; fresh(DEF, 70); draw(); const nr = long ? 300 : window.T70N || 20, few = long ? worst : worst.slice(0, 20);
+      await batch('old', few, OLD, 0); await batch('def', worst, DEF, 0); await batch('all', worst, ALL, 0);
+      await batch('defR', casual(nr), DEF, 0); await batch('allR', casual(nr), ALL, 0);
+      await batch('defP', long ? worst : worst.slice(0, 12), DEF, 1); await batch('allP', long ? worst : worst.slice(0, 12), ALL, 1);
+      if (long) { await batch('defRP', casual(100), DEF, 1); await batch('allRP', casual(100), ALL, 1); }
+    } catch (e) { r.err = String(e); }
+    if (kp0 === undefined) delete window.KPIOS; else window.KPIOS = kp0;
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); SLIME = sl0; Object.assign(VIEW, view0); r.sec.total = Math.round((performance.now() - T0) / 1000);
+    res.T70_skin = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; if (typeof drReset === 'function') drReset();
+    const ran = ['old', 'def', 'all', 'defR', 'allR', 'defP', 'allP'].every(k => r[k] && r[k].blank === 0 && r[k].nan === 0);
+    res.PASS.skinWhole = r.err === '' && ran && r.old.split >= (long ? 6 : 2) && r.def.split <= 2 && r.all.brk === 0 && r.allR.brk <= Math.ceil(r.allR.n * .01);
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
