@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.61（11-25）：加 T73（慢拉往裡穿過去時跟手照舊變少，最後跑，約 30 秒）
    v2.61（11-25）：加 T72（補守預設開著、原本沒人守的開關，最後跑，約 30 秒）；T71 的換隻記憶原本恆真，改成真的開著大腦再看
    v2.61（11-25）：加 T71（W3：睡醒、手指放旁邊、打開先看你、眼睛、換隻記憶）
    v2.61（11-25）：加 T70（破皮，真的畫出來讀畫面），多跑約 8 到 9 分鐘；window.T70LONG = 1 跑長版
@@ -1871,6 +1872,29 @@
       snd: !!r.snd && r.snd.on === .3 && r.snd.off === .6, push: ['v3', 'v35'].every(q => r.push[q].on0 && r.push[q].slow && !r.push[q].startle) && r.push.fast.startle && r.push.off.startle, sleepHold: r.sleepHold.n > 60 && !r.sleepHold.lean && r.sleepHold.nuz === 0 && !r.sleepHold.mmm, tug: r.tug.before > .3 && r.tug.after === 0,
       pull: !r.err && lock(r.pull.zero, '000') && lock(r.pull.one, '111') && F.mat === '100' && /停住/.test(F.diff) && F.save === '110,001,100' && F.live && F.imp === '110,001,100' && F.bare === '000,000,000' };
     res.PASS.guard61 = Object.values(r.ok).every(Boolean); res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T73 v2.61 慢拉往裡穿過去時跟手照舊變少（11-25：rough 讓慢拉的 strain 一直是 0，跟手（dragFollow）讀 strain，按住時不放鬆，家停在手指上面，抓對側邊往右下慢拉的洞變久一倍）。窗台、芋圓、真正的預設，真的畫出來，每 2 格讀一次 JEL.h2 的洞（0.002R² 以上、四面都是皮，跟 T70 同一個門檻）。
+  // 手勢：從窗台左邊抓對側邊往右下慢拉 3R（每秒 4R），按住 3 秒，放手 1.5 秒；4 顆種子，同一批跑三種：預設、rough 0、預設但跟手改回讀 strain（修之前）。
+  // 擋：按住末的跟手跟 rough 0 一樣、家被帶走的距離每顆種子差 0.1R 內；修之前那種四顆合計至少多 1R（量到每顆 0.84 對 0.46，證明量得到）；放手後洞 0；洞讀數合計不超過 rough 0 的 1.6 倍加 8；慢拉照樣 strain 0、不逃。身長只記錄。
+  { const clock = saveClock(), view0 = { ...VIEW }, sl0 = SLIME, I0 = { tr: IMP.tr, w: IMP.w }, df0 = dragFollow, r = { err: '' }, T0 = performance.now();
+    Object.assign(VIEW, { skin: 'A', body: 'round', face: 1, bg: 'day', win: '' });
+    const si = SLIMES.findIndex(q => q.id === 'taro'), s = SLIMES[si], SP = { ...PRE54[s.mat], seed: s.seed, ...s.p, shakeMode: 0, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0 };
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const holes = () => { draw(); const gl = JEL.gl; if (!gl || gl.isContextLost() || !JEL.float) throw new Error('T73：WebGL 沒開，畫不出果凍皮'); const w = JEL.h2.w, hh = JEL.h2.h, b = new Float32Array(w * hh * 4), m = new Uint8Array(w * hh), st = [], a1 = (W / w) * (H / hh) / (R * R); gl.bindFramebuffer(gl.FRAMEBUFFER, JEL.h2.f); gl.readPixels(0, 0, w, hh, gl.RGBA, gl.FLOAT, b); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      let skin = 0, n = 0; for (let i = 0; i < w * hh; i++) if (b[i * 4] > .46) { m[i] = 1; skin++; } if (skin * a1 < 1) throw new Error('T73：畫不出身體');
+      for (let i = 0; i < w * hh; i++) { if (m[i]) continue; let c = 0, edge = false; st.push(i); m[i] = 2; while (st.length) { const p = st.pop(), x = p % w, y = (p / w) | 0; c++; if (!x || !y || x === w - 1 || y === hh - 1) edge = true; if (x && !m[p - 1]) { m[p - 1] = 2; st.push(p - 1); } if (x < w - 1 && !m[p + 1]) { m[p + 1] = 2; st.push(p + 1); } if (y && !m[p - w]) { m[p - w] = 2; st.push(p - w); } if (y < hh - 1 && !m[p + w]) { m[p + w] = 2; st.push(p + w); } } if (!edge && c * a1 >= .002) n++; }
+      return n; };
+    const one = (over, seed) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(seed); SLIME = si; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; GREET.st = ''; GREET.until = -9; EYE.user = -9;
+      { const dx = SILL.g.l + R * 1.05 - CX; for (let i = 0; i < N; i++) { X[i] += dx; PX[i] += dx; } HOMEX += dx; } steps(120);
+      const u = .7071, rr = seeded(seed * 7919 + 13); let bi = bnd[0], bd = -1e9; for (const i of bnd) { const p = -(X[i] + Y[i]); if (p > bd) { bd = p; bi = i; } } let [x, y] = scr(X[bi] + u * R * .15, Y[bi] + u * R * .15); x -= u * (rr() - .5) * R * .16; y += u * (rr() - .5) * R * .16;
+      const o = { hold: 0, rel: 0, strain: 0, esc: false }, d = 3 * R, n = 45; ev('pointerdown', 1, x, y); steps(4); for (let k = 1; k <= n; k++) { ev('pointermove', 1, Math.min(W - 4, x + u * d * k / n), Math.min(H - 4, y + u * d * k / n)); steps(1); }
+      for (let k = 1; k <= 180; k++) { steps(1); o.strain = Math.max(o.strain, MOOD.strain); if (k % 2 === 0 && holes()) o.hold++; } const f = fingers.get(1); o.held = !!f && f.mode === 'grab'; o.follow = +dragFollow().toFixed(3); o.home = +(Math.hypot(DRAG.ox - DRAG.bx, DRAG.oy - DRAG.by) / R).toFixed(2); let a = 1e9, b = -1e9, c = 1e9, e = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); c = Math.min(c, Y[i]); e = Math.max(e, Y[i]); } o.len = +(Math.hypot(b - a, e - c) / R).toFixed(2);
+      ev('pointerup', 1, x + u * d, y + u * d); for (let k = 1; k <= 90; k++) { steps(1); o.esc = o.esc || ESC.on; if (k % 2 === 0 && holes()) o.rel++; } return o; };
+    const all = async (nm, over, old) => { if (old) dragFollow = () => { const q = MOOD.tugS; MOOD.tugS = MOOD.strain; try { return df0(); } finally { MOOD.tugS = q; } }; const L = []; try { for (const sd of [52138, 57138, 62138, 67138]) { L.push(one(over, sd)); await new Promise(a => setTimeout(a, 0)); } } finally { dragFollow = df0; } const sum = k => L.reduce((p, q) => p + q[k], 0); r[nm] = { hold: sum('hold'), rel: sum('rel'), strain: Math.max(...L.map(q => q.strain)), esc: L.some(q => q.esc), held: L.every(q => q.held), follow: L.map(q => q.follow), home: L.map(q => q.home), len: L.map(q => q.len) }; };
+    try { await all('on', {}, 0); await all('off', { rough: 0 }, 0); await all('old', {}, 1); } catch (e) { r.err = String(e); }
+    dragFollow = df0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); SLIME = sl0; Object.assign(VIEW, view0); IMP.tr = I0.tr; IMP.w = I0.w; r.sec = Math.round((performance.now() - T0) / 1000);
+    res.T73_slowPull = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    res.PASS.slowPull = r.err === '' && r.on.held && r.on.strain === 0 && !r.on.esc && r.off.strain > .5 && r.on.home.every((v, i) => Math.abs(v - r.off.home[i]) <= .1) && r.on.follow.every((v, i) => Math.abs(v - r.off.follow[i]) <= .03) && r.old.home.reduce((p, q, i) => p + q - r.on.home[i], 0) >= 1 && r.on.rel === 0 && r.on.hold <= r.off.hold * 1.6 + 8;
+    res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); Object.assign(PRESETS, PRE54); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去

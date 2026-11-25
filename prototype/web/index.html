@@ -659,8 +659,8 @@ const IMP={tr:0,w:0,lx:0,ly:0,has:false,askUntil:-9,hiddenAt:-1};
 const LURE={on:false,id:-1,t0:0,stillT:0,pounced:false,touched:false,startle:-9,sn:null,rub:0,backed:false};
 const IV2=k=>mat.imp>=.5&&mat.life2>=.5&&mat[k]>=.5;
 const SB=f=>f.sb!=null?f.sb:(f.stretch||0);
-// v2.61 D1（rough）：什麼算快扯。v 手在螢幕上的速度（30 毫秒平滑，每秒幾個半徑），st 那時候那塊已經被拉開多少（×半徑）。整抓記兩個：f.vMax 最大手速（不衰減）、f.yank 這一抓扯過沒有（往外、夠快、拉開了）
-const ROUGH={v:6,st:.8},roughOn=()=>mat.rough>=.5;
+// v2.61 D1（rough）：什麼算快扯。v 手在螢幕上的速度（30 毫秒平滑，每秒幾個半徑），st 那時候那塊已經被拉開多少（×半徑）。整抓記兩個：f.vMax 最大手速（不衰減）、f.yank 這一抓扯過沒有（往外、夠快、拉開了）。inR、inC：tugIn 用，抓的地方離中心多遠（R）起算、往中心拉的角度（餘弦）多少起算
+const ROUGH={v:6,st:.8,inR:.35,inC:.5},roughOn=()=>mat.rough>=.5;
 // v2.61 C3（petSlow）：被摸了多少。cm 一個半徑算幾公分；每秒 lo 到 hi 公分算摸（lo 以下到 lo0、hi 到 hi0 之間漸弱）；rate 每秒加多少；cap 同一個方向一趟最多加多少（所以一趟不會呼嚕，要有第二趟）；
 // rin 離落下那一刻的身體中心這麼近才加，rout 以外（抓著的）當成在拉，這一次加的全部退掉；gap 停手多久還算在摸；out 停手之後每秒退多少
 const PETK={cm:1.8,lo0:.5,lo:1,hi:10,hi0:14,rate:2.5,cap:.8,rin:1.1,rout:1.25,c0:.35,gap:.6,out:.6,max:3},PET={g:0,last:-9,on:false,said:false};
@@ -2237,7 +2237,11 @@ impLoad();memLoad();
 // 跟手幾成：D1 的 drag；C3 熟的跟得多、戒的跟得少；扯到想逃時跟得少（輕輕拖會跟、用力扯會抵抗）
 function dragFollow(){if(!(mat.drag>0))return 0;let k=mat.drag;
   if(IV2('impC3'))k*=Math.max(.3,1+.43*IMP.tr-.57*IMP.w);
-  if(mat.emo>=.5)k*=1-.7*MOOD.strain;return k}
+  if(mat.emo>=.5)k*=1-.7*(roughOn()?Math.max(MOOD.strain,(MOOD.tugS||0)*tugIn()):MOOD.strain);return k}
+// v2.61 D1 補：慢拉的 strain 一直是 0，跟手（dragFollow）讀 strain 就不放鬆。抓對側邊慢拉、從身體裡穿過去時，家停在偏 .84R（放鬆是退到 .46R、手指從身體另一邊穿出去），拉過去那段跟身體圍出的洞合不起來（20 顆種子洞讀數 387 對 193）。
+// 所以穿過身體的那一種拉，放鬆讀 tugS（跟往回拔同一個，只看拉開多少、撐多久）；往外拉的照舊讀 strain，全部都讀的話身體更長、放手沒有逃，混合 250 多破 6 到 13 組。只有一根手指時算，0 到 1
+function tugIn(){let f=null,n=0;for(const q of fingers.values())if(q.mode==='grab'){f=q;n++}if(n!==1||f.r0x==null||f.tug)return 0;const rl=Math.hypot(f.r0x,f.r0y),dx=f.x-f.ax,dy=f.y-f.ay,dl=Math.hypot(dx,dy);if(rl<R*.1||dl<R*.1)return 0;
+  return smooth01((rl/R-ROUGH.inR)/.25)*smooth01((-(dx*f.r0x+dy*f.r0y)/(rl*dl)-ROUGH.inC)/.2)}
 function dragAvg(){let sx=0,sy=0,n=0;for(const f of fingers.values())if(f.mode==='grab'){sx+=f.fx-f.ax;sy+=f.fy-f.ay;n++}return n?[sx/n,sy/n,n]:[0,0,0]}
 // v2.21 D1' 拉力（多米 build 77 錄影：往右下拉，史萊姆也要一併往右下靠；量過果凍拉 2.5R 整團只跟 0.56R）：先被拉長，拉到 slide 附近再拉就整團被拖著走，
 // 被拉長的量 = slide·tanh((1−跟手)·位移/slide)，剩下的全是整團移動。用手指真的位移（不是拉伸上限後的），多指取平均：兩指往兩邊拉平均接近 0，不會被拖走，照樣拉很長
