@@ -45,7 +45,8 @@
 - [x] S5：修 Swift 複查抓到的（`v2.61/Swift複查.md`）＋補 tools/swift-linux-check｜UI、Controller、LabProbe、協定搬家｜S3a
 - [x] S3b：Swift C1、C2、B4｜SlimeRig｜S3a、W3
 - [x] S4：Swift B1 接線、B7、A7 讀數、調節台、版本｜Audio、Controller、View、UI｜S1
-- [ ] R：反駁者查網頁與 Swift、69＋項跑 3 次、混合 250 重量｜全部
+- [x] K：網頁 `desk.js` 存檔缺口（舊預設提示沒答時按的三顆會存；改在 `index.html` 的包裝層，跟手機 `feelPullPressed` 同一套；實測修前紅修後綠）
+- [ ] R（11-25 派出四個代理，進行中）：反駁者查網頁與 Swift、69＋項跑 3 次、混合 250 重量｜全部
 
 ## 🗑️ 雜訊
 - 稽核過程的舊門檻（4.5R、裂 0、身長短 5 到 12%）都作廢，以規劃檔為準。

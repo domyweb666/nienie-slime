@@ -3463,9 +3463,11 @@ const GRP61=[['皮',['skinU']],['牠怎麼記你',['rough','tapSoft','petSlow']]
     for(const b of box.querySelectorAll('[data-61p]'))set(b,on(mat[b.getAttribute('data-61p')])===1);
     for(const b of box.querySelectorAll('[data-61g]'))set(b,GRP61[+b.getAttribute('data-61g')][1].every(k=>on(mat[k])))};
   const done=t=>{syncSliders();deskSync();deskSave();if(t)deskNote(t)};
+  // 「用新預設／留著我的」還沒答時，deskSave 寫的是舊存檔那份：剛按的那幾顆寫進那份裡，才存得住，按「留著我的」也不會被蓋回去。沒按的照舊存檔（跟手機 feelPullPressed 同一套）
+  const pullNow=()=>PULL3.map(k=>on(mat[k])),pressed=was=>{const o=DESK.stale&&DESK.staleSnap;if(o&&o.k&&!PULLQ)PULL3.forEach((k,i)=>{if(on(mat[k])!==was[i])o.k[k]=on(mat[k])})};
   box.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const a=n=>b.getAttribute(n);
-    if(a('data-61t')){const q=TIER61[a('data-61t')];for(const k of KEYS61)mat[k]=q[1](k);done('換到「'+q[0]+'」。')}
-    else if(a('data-61p')){const k=a('data-61p');mat[k]=on(mat[k])?0:1;done(PULLN[k]+'：'+word(mat[k])+'。')}
+    if(a('data-61t')){const q=TIER61[a('data-61t')],was=pullNow();for(const k of KEYS61)mat[k]=q[1](k);pressed(was);done('換到「'+q[0]+'」。')}
+    else if(a('data-61p')){const k=a('data-61p'),was=pullNow();mat[k]=on(mat[k])?0:1;pressed(was);done(PULLN[k]+'：'+word(mat[k])+'。')}
     else if(a('data-61g')!==null){const [n,ks]=GRP61[+a('data-61g')],v=ks.every(k=>on(mat[k]))?0:1;for(const k of ks)mat[k]=v;done(n+'：'+word(v)+'。')}});
   document.getElementById('feel').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.id==='feel-def'&&!PULLQ){for(const k of PULL3)mat[k]=0;DESK.base0=deskSnap();done()}});   // 回到預設：存檔裡有的都回預設，拉的三顆也算
   {const v=document.querySelector('#feel .feel-ver');if(v)v.textContent='v2.61'}DESK.build='網頁 v2.61';
