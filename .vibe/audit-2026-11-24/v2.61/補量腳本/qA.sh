@@ -1,0 +1,21 @@
+. "$(dirname "$0")/lib.sh"; PORT=8995
+run c_mix.json m_def1 '{}' "$N" 4
+run c_mix.json m_w1_1 '{}' "$W1" 4
+run c_mix.json m_def2 '{}' "$N" 4
+run c_mix.json m_w1_2 '{}' "$W1" 4
+run c_mix.json m_def3 '{}' "$N" 4
+run c_mix.json m_A5 "$A5" "$N" 4
+run c_mix.json m_v260 '{}' "$O" 4
+run c_mix.json m_all "$ALL" "$N" 4
+run c_mix.json m_A3 "$A3" "$N" 4
+run c_mix.json m_A4 "$A4" "$N" 4
+run c_mix.json m_A5r0 '{"pullSoft":1,"rough":0}' "$N" 4
+run c_mix1000.json ms1_def '{}' "$N" 4
+run c_mix1000.json ms1_w1 '{}' "$W1" 4
+run c_mix2000.json ms2_def '{}' "$N" 4
+run c_mix2000.json ms2_w1 '{}' "$W1" 4
+run c_rnd.json rd_all_2 "$ALL" "$N" 4
+run c_rnd.json rd_A5_2 "$A5" "$N" 4
+run c_rnd.json rd_v260_2 "{}" "$O" 4
+bash qE.sh
+echo QA >> out/q.log
