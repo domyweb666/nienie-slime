@@ -391,6 +391,7 @@ final class SlimeRig {
     // v2.61 C1 (wakeSoft; web SLP): openT = when it was opened (or another one swam in); slow = this waking is the slow one; tap = the finger that touched it asleep (still to be told light or hard,
     // then, done, held on), since tapT0; tapN = light touches this nap; roll = the turn over (since when, which side, how far it has moved for it)
     private var slpOpenT = -99.0, slpSlow = false, slpTapN = 0, slpTapT0 = -9.0, slpTapDone = false, slpRollT = -9.0, slpRollD = 1.0, slpRollO = 0.0
+    private var slpTapX = 0.0, slpTapY = 0.0, slpTapOut = false   // where it met the body, and whether it came in from outside
     private var slpTap: Finger?
     // C6 echo: st 0 idle, 1 listening, 2 answering; beats = offsets from t0; prev = the rhythm it answered last (you repeating it = happy)
     private var echoTaps: [Double] = [], echoSt = 0, echoX = 0.0, echoY = 0.0, echoBeats: [Double] = [], echoI = 0, echoT0 = 0.0
@@ -648,6 +649,7 @@ final class SlimeRig {
                     let p = toWorld(f.sx, f.sy), dx = p.x - f.x, dy = p.y - f.y
                     f.x = p.x; f.y = p.y; f.ax += dx; f.ay += dy; f.fx += dx; f.fy += dy
                     f.rawX += dx; f.rawY += dy; f.lastRawX += dx; f.lastRawY += dy
+                    if slpTap === f { slpTapX += dx; slpTapY += dy }
                 }
             } else {
                 camZ = sillZoom; camX = sillZPX - (sillZPX - q.x) / sillZoom; camY = sillZPY - (sillZPY - q.y) / sillZoom
@@ -5732,7 +5734,7 @@ final class SlimeRig {
     /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free.
     private func e2Step(_ dt: Double) {
         guard iv3(params.e2), !clusters.isEmpty else { nuzT0 = -1; return }
-        guard let g = firstGrab() else { nuzT0 = -1; nuzSaid = false; tkTimes.removeAll(); tkT = 0; return }
+        guard let g = firstGrab(), !slpOn else { nuzT0 = -1; nuzSaid = false; tkTimes.removeAll(); tkT = 0; return }   // v2.61 C1: asleep it does not push, nuzzle or say anything
         let sp = hypot(g.vxS, g.vyS) / R, dx = g.fx - clusters[gi].xc, dy = g.fy - clusters[gi].yc, l = max(1e-6, hypot(dx, dy))
         if !g.pushed2 && t - g.tDown > 0.35 && sp < 0.5 && g.stretch < 0.3 && impWary < 0.4 {
             g.pushed2 = true
@@ -5999,6 +6001,7 @@ final class SlimeRig {
         if taps.filter({ t - $0 < WakeSet.tapGap }).count >= 2 { return false }   // the third within a second: poking, as before
         if let q = slpTap, q !== f { return false }
         slpTap = f; slpTapT0 = t; slpTapDone = false
+        slpTapX = f.rawX; slpTapY = f.rawY; slpTapOut = f.mode != .grab   // pressed on it: where it came down; pushed in from outside: where it met the body, the way there is no drag
         return true
     }
     /// Every frame, at the start of sleepStep: light or hard, then what a light one does.
@@ -6008,9 +6011,11 @@ final class SlimeRig {
         let there: Bool = fingers.values.contains(where: { $0 === f })
         let here: Bool = there && (f.mode == .grab || t - f.hitT < 0.1)
         let hv: Double = hypot(f.vxS, f.vyS) * camZ / R
-        let off: Double = hypot(f.rawX - f.ax, f.rawY - f.ay) / R
+        let off: Double = hypot(f.rawX - slpTapX, f.rawY - slpTapY) / R
         if !slpTapDone {
-            if hv >= WakeSet.v || off > WakeSet.st { slpTap = nil; wake(true); return }
+            if hv >= WakeSet.v || (!slpTapOut && off > WakeSet.st) {   // from outside only how fast counts while it is judged: st in T is 3.2R a second, stricter than v
+                slpTap = nil; wake(true); return
+            }
             if here && t - slpTapT0 < WakeSet.T { return }
             slpTapDone = true; slpTapN += 1
             if impTrust > WakeSet.deep && slpTapN < WakeSet.n && clusters.indices.contains(gi) {

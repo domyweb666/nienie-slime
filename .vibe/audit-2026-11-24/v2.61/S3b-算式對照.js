@@ -1,6 +1,6 @@
 // S3b 對照（C1 wakeSoft、C2 nearFast、B4 eyeTrue）：SlimeRig.swift 的原文機械轉成 JS，跟 index.html 的原文吃同一串假手，每一格比狀態。
 // 動工前的 SlimeRig.swift（df8a573，S3a 完成那版）也轉一份，三個參數都 0 時跟現在的比（狀態、亂數取用次數、出聲），要逐位元相同。
-// 重跑：在工作樹根目錄 node .vibe/audit-2026-11-24/v2.61/S3b-算式對照.js（加 --live 改讀工作樹的網頁；DBG=1 印第一個不同的地方）
+// 重跑：在工作樹根目錄 node .vibe/audit-2026-11-24/v2.61/S3b-算式對照.js（加 --live 改讀工作樹的網頁；DBG=1 印第一個不同的地方）。不加 --live 對的是 a2a3b57，那版網頁的 tapJudge 還沒改（v2.61 R），會有 2 項不同，是預期的
 // 身體是照公式動的、走路是假的（gaitTo 之後等速走過去），不是物理。只證明算式一樣，不證明 Swift 編得過。
 const fs=require('fs'),cp=require('child_process'),path=require('path');
 const ROOT=path.resolve(__dirname,'../../..')+'/';

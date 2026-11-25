@@ -373,10 +373,10 @@ const F=[
   ['pullWhole','拉的 A4：往裡拉，整隻先走 v2.61','1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60',0,1,1],
   ['pullSoft','拉的 A5：拉很長放手，收回去 v2.61','1：身體拉得很長時放手，先不逃、轉正有限速、放手後 0.8 秒內每一點有限速；按住不動時上限不會自己變大。0 回 v2.60',0,1,1],
   ['rough','只有快扯算欺負 v2.61','1：慢慢拉很長不算欺負；快扯不會變熟，也不會變得怕你。0 回 v2.60（拉開 1.5R 撐半秒就算）',0,1,1],
-  ['tapSoft','慢慢點不算攻擊 v2.61','1：慢慢點牠不會嚇到。0 回 v2.60',0,1,1],
+  ['tapSoft','慢慢點不算攻擊 v2.61','1：慢慢點牠不會嚇到，還是會縮一下，越點縮越小。0 回 v2.60',0,1,1],
   ['petSlow','慢慢摸也算摸 v2.61','1：摸得很慢也會呼嚕、變熟。0 回 v2.60（太慢會被當成抓）',0,1,1],
   ['wakeSoft','輕碰慢慢醒 v2.61','1：睡著時輕輕碰，慢慢醒；剛打開 40 秒才會睡。0 回 v2.60（一碰就嚇醒、30 秒就睡）',0,1,1],
-  ['nearFast','聽節奏時也會靠過來 v2.61','1：在聽聲音打節奏時，手指放旁邊照樣靠過來。0 回 v2.60',0,1,1],
+  ['nearFast','聽節奏時也會靠過來 v2.61','1：在聽你打節奏時，手指放旁邊照樣靠過來。0 回 v2.60',0,1,1],
   ['greetLook','打開先看你 v2.61','1：打開、切回來，先看你一眼。0 回 v2.60',0,1,1],
   ['brJit','作息每次不一樣 v2.61','1：醒多久、睡多久每次有點不同。0 回 v2.60',0,1,1],
   ['bumpSoft','自己撞到擺飾只晃不倒 v2.61','1：牠自己走路撞到的擺飾晃一下，不會倒。0 回 v2.60',0,1,1],
@@ -578,7 +578,7 @@ function worldWalls(){if(SILL.on&&SILL.g){if(SILL.plane!=='room')return{l:-1e5,r
 function updateCam(dt){if(SILL.on){const S=SILL,q=viewV();   // v2.30 窗外：鏡頭縮小，樞紐放在窗外台階的高度，地板的螢幕位置不動
     if(S.zoom!==S.ztg){S.zoom+=(S.ztg-S.zoom)*(1-Math.exp(-dt/(S.grab?.1:.4)));if(Math.abs(S.zoom-S.ztg)<.002)S.zoom=S.ztg;
       CAM.z=S.zoom;CAM.x=S.zpx-(S.zpx-q.x)/S.zoom;CAM.y=S.zpy-(S.zpy-q.y)/S.zoom;
-      for(const f of fingers.values()){if(f.mode!=='grab')continue;const p=toWorld(f.sx,f.sy),dx=p.x-f.x,dy=p.y-f.y;f.x=p.x;f.y=p.y;f.ax+=dx;f.ay+=dy;f.fx+=dx;f.fy+=dy;f.lx+=dx;f.ly+=dy}}   // 舉起來的那 0.2 秒，手指底下那塊跟著手指
+      for(const f of fingers.values()){if(f.mode!=='grab')continue;const p=toWorld(f.sx,f.sy),dx=p.x-f.x,dy=p.y-f.y;f.x=p.x;f.y=p.y;f.ax+=dx;f.ay+=dy;f.fx+=dx;f.fy+=dy;f.lx+=dx;f.ly+=dy;if(SLP.tap&&SLP.tap.f===f){SLP.tap.x+=dx;SLP.tap.y+=dy}}}   // 舉起來的那 0.2 秒，手指底下那塊跟著手指
     else{CAM.z=S.zoom;CAM.x=S.zpx-(S.zpx-q.x)/S.zoom;CAM.y=S.zpy-(S.zpy-q.y)/S.zoom}
     return}const v=viewV(),pad=R*(mat.camPad||.35);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(const i of bnd){x0=Math.min(x0,X[i]);x1=Math.max(x1,X[i]);y0=Math.min(y0,Y[i]);y1=Math.max(y1,Y[i])}
@@ -960,7 +960,7 @@ function setup(){
   {const nb=[],rr=R*.3;for(let i=0;i<N;i++){const ox=Q0X[i]-Q0X[hiIdx],oy=Q0Y[i]-Q0Y[hiIdx];if(i!==hiIdx&&ox*ox+oy*oy<rr*rr)nb.push([i,ox,oy])}HIF.i=hiIdx;HIF.nb=nb}   // v2.26 F7
   Object.assign(STK,{ox:0,oy:0,vx:0,vy:0,g:0,last:-9,said:false,pet:false});petReset();TRAIL.length=0;
   fingers.clear();GRAB.fill(0);lastShape={seed:mat.seed,floppy:mat.floppy,limbs:mat.limbs,bodySize:mat.bodySize,dens:mat.dens};
-  BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;BR.jw=0;BR.lift=0;POD.list=[];POD.clock=0;POD.next=.5;POD.E=[];POD.shift=0;FLAT.on=false;{const v=viewV();CAM.z=1;CAM.x=v.x;CAM.y=v.y;FOL.x=v.x;FOL.y=v.y;FOL.vx=0;FOL.vy=0;FOL.chase=false}INTRO.on=false;INTRO.sq=0;IV.s=1;IV.ox=0;IV.oy=0;Object.assign(MOOD,{c:0,a:0,strain:0,strainMax:0,scare:0,cowerUntil:-9,happyT:-9,wagT:-9,taps:[],tugX:0,tugY:0});ESC.on=false;PURR=0;PINCH.a=-1;PINCH.b=-1;DENTS.length=0;shkReset();
+  BR.phase=0;BR.tlPrev=mat.idleFreeze>=.5?tLife:t;BR.amp=1;BR.wave=0;BR.deepAt=-99;BR.grabStart=-1;BR.jw=0;BR.lift=0;POD.list=[];POD.clock=0;POD.next=.5;POD.E=[];POD.shift=0;FLAT.on=false;{const v=viewV();CAM.z=1;CAM.x=v.x;CAM.y=v.y;FOL.x=v.x;FOL.y=v.y;FOL.vx=0;FOL.vy=0;FOL.chase=false}INTRO.on=false;INTRO.sq=0;IV.s=1;IV.ox=0;IV.oy=0;Object.assign(MOOD,{c:0,a:0,strain:0,strainMax:0,scare:0,cowerUntil:-9,happyT:-9,wagT:-9,taps:[],tugS:0,tugX:0,tugY:0});ESC.on=false;PURR=0;PINCH.a=-1;PINCH.b=-1;DENTS.length=0;shkReset();
   brainReset();Object.assign(LIFE,{st:'rest',until:-1,looks:0,noGo:false,sns:[],att:null,wrg:1,goFade:0,arrT:-9,arrOff:0});Object.assign(GAIT,{on:false,k:1,off:0,v:0});Object.assign(FLN,{at:-9,t0:-9,amp:0,H:1,s:1,last:0,tc:1,tcq:false,tpAt:-9});Object.assign(SHK,{at:-9,t0:-9,amp:0,th:0});Object.assign(BRX,{exert:0,sighNext:-1,sighCyc:-1,pauseUntil:-9,ampX:1});STR.k=1;PSM[0]=1;PSM[1]=0;PSM[2]=0;PSM[3]=1;LB=1;   // v2.19
   Object.assign(DRAG,{ox:0,oy:0,vx:0,vy:0,bx:0,by:0,gx:0,gy:0,slipT:0});LURE.on=false;LURE.sn=null;LIFE.ask=null;E4.on=false;E4.wait=-1;Object.assign(E2,{leanT:-9,nuzT0:-1,nuzO:0,nuzSaid:false,tkT:0,gigNext:0,nudgeT:-9});E2.tk.length=0;   // v2.22（E2、E4 的計時也歸零：時鐘倒回去時，留著的 gigNext 會讓它一直等不到下一次咯咯笑）：INTRO.sq 也要歸零：開心小跳跳到一半被 setup 打斷，壓扁量會一直留著，參考形狀永遠被撐開（量過 −0.053，T28 放手 2 秒剩 0.76，原本 0.89）   // v2.20：重建時手指直接清掉、不經過放手，偏移不歸零的話家會一直歪（量過：舊測試跟著歪，T31 按住 3 秒移 61 點，原本 30）
   CAMR.st=0;CAMR.until=-9;E2.leanO=0;eyeSetup();EYE.pose=null;EYE.cx=0;EYE.cy=0;EYE.ck=1;Object.assign(SLP,{on:false,k:0,askAt:-9,nearT:0,slow:false,tap:null,n:0,rollT:-9,rollO:0});Object.assign(ECHO,{st:'idle',i:0,joyUntil:-9});ECHO.taps.length=0;SWIM.on=false;   // v2.23
@@ -2021,7 +2021,7 @@ function e2Release(f){if(!IV3('e2')||SLP.on)return;if(!(t-f.tDown<.25&&(f.stretc
 // E2 每幀：按著不動 0.35 秒往手指推一下；手指放著不動 0.8 秒開始蹭；搔癢扭來扭去，撥超過 3 秒掙脫躲開
 function e2Step(dt){if(!IV3('e2')){E2.nuzT0=-1;return}
   let g=null;for(const f of fingers.values())if(f.mode==='grab'){g=f;break}
-  if(!g){E2.nuzT0=-1;E2.nuzSaid=false;E2.tk.length=0;E2.tkT=0;return}
+  if(!g||SLP.on){E2.nuzT0=-1;E2.nuzSaid=false;E2.tk.length=0;E2.tkT=0;return}   // 睡著不做（v2.61 C1：很熟的睡著被按著只翻一下，不往手指推、不蹭、不出聲）；wakeSoft 0 時抓到就醒，走不到
   const sp=Math.hypot(g.vxS,g.vyS)/R,dx=g.fx-globalC.xc,dy=g.fy-globalC.yc,l=Math.hypot(dx,dy)||1;
   if(!g.pushed2&&t-g.tDown>.35&&sp<.5&&(g.stretch||0)<.3&&IMP.w<.4){g.pushed2=true;if(Math.random()<.3){E2.leanT=t;E2.leanA=Math.atan2(dy,dx);E2.leanS=1;E2.nudgeT=t}}
   // 搔癢：手指每秒 1.5R 以上、方向一下子反過來 120 度以上，1 秒內 4 次
@@ -2070,10 +2070,10 @@ const SLP={on:false,k:0,lastAny:-99,wakeT:-9,askAt:-9,nearT:0,openT:-99,slow:fal
 // 不然慢慢醒（閉著的眼睛用 slow 秒的時間常數睜開、不縮、不睜大）。很熟（deep）只翻一下（重心挪 roll 個半徑再回來，roT 秒）不醒，一覺第 n 次、按住 hold 秒、或之後拖開超過 st 才慢慢醒。不熟的照舊
 const WAKEK={v:4,st:.8,T:.25,deep:.7,roll:.05,roT:1.4,n:3,hold:1.2,slow:.5};
 function softTouch(f){if(!(mat.wakeSoft>=.5&&IMP.tr>.25&&IMP.tr-IMP.w>.1)||MOOD.taps.filter(x=>t-x<1).length>=2)return false;   // 一秒內第三下是連戳，照舊
-  if(SLP.tap&&SLP.tap.f!==f)return false;SLP.tap={f,t0:t,done:false};return true}
+  if(SLP.tap&&SLP.tap.f!==f)return false;SLP.tap={f,t0:t,done:false,x:f.x,y:f.y,out:f.mode!=='grab'};return true}   // x、y：碰到身體的那一點（抓下去的就是落指點；從外面推進來的是碰到那一刻，前面那段路不算拖開）。out：從外面推進來、劃進來的
 function tapJudge(){const q=SLP.tap;if(!q)return;const f=q.f;if(!SLP.on){SLP.tap=null;return}
-  const here=fingers.get(f.id)===f&&(f.mode==='grab'||t-f.hitT<.1),hv=Math.hypot(f.vxS,f.vyS)*CAM.z/R,off=Math.hypot(f.x-f.ax,f.y-f.ay)/R;
-  if(!q.done){if(hv>=WAKEK.v||off>WAKEK.st){SLP.tap=null;wake(true);return}
+  const here=fingers.get(f.id)===f&&(f.mode==='grab'||t-f.hitT<.1),hv=Math.hypot(f.vxS,f.vyS)*CAM.z/R,off=Math.hypot(f.x-q.x,f.y-q.y)/R;
+  if(!q.done){if(hv>=WAKEK.v||!q.out&&off>WAKEK.st){SLP.tap=null;wake(true);return}   // 從外面推進來的這 T 秒只看手速：st 對 T 等於每秒 3.2R，比 v 還嚴
     if(here&&t-q.t0<WAKEK.T)return;
     q.done=true;SLP.n++;
     if(IMP.tr>WAKEK.deep&&SLP.n<WAKEK.n){SLP.rollT=t;SLP.rollO=0;SLP.rollD=f.ax>=globalC.xc?1:-1}else{SLP.tap=null;wake(false,false,true);return}}
@@ -2154,7 +2154,7 @@ function drawEyes(col){if(!(mat.eyes>=.5)||!EYE.L.length)return;
     ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,Math.PI*2);ctx.fill();
     if(h>w*.7){ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(x-w*.32,y-h*.4,w*.34,0,Math.PI*2);ctx.fill()}}}
 // v2.61 C4（greetLook，多米：打開、切回來都先看你）：打開、換隻等落地（窗台），切回來等 0.35 秒，轉過來看你、眨一下，看完再做別的。跟離開多久無關。睡著就慢慢醒（不出聲）。碰牠就不看了。不出聲、不動身體，只有眼睛
-const GREET={st:'',open:false,at:-9,t0:-9,until:-9,blurT:-9,air:false},GREETK={land:.2,back:.35,look:1.4,blink:.25,max:8};
+const GREET={st:'',open:false,at:-9,t0:-9,until:-9,blurT:-9,air:false},GREETK={land:.15,back:.35,look:1.4,blink:.25,max:8};
 function greetArm(open){if(!(mat.greetLook>=.5&&mat.life2>=.5&&mat.eyes>=.5)||fingers.size||GREET.st==='wait')return;Object.assign(GREET,{st:'wait',open,t0:t,until:-9,air:false,at:open?-9:t+GREETK.back});
   if(!open&&SLP.on)wake(false,true,true)}
 function greetStep(){const G=GREET;if(G.st!=='wait')return;
@@ -2809,10 +2809,10 @@ function hangStep(dt){for(const n in HANG){const q=HANG[n];if(!q.on)continue;con
 // v2.45 擺飾變真第 2 片：牠推東西，東西不推牠。每一幀看牠的點有哪些落在東西裡，用這些點「真的移動了多少」（跟上一幀比，走路那種整團平移也算；Verlet 的 X-PX 看不到表演位移）
 // 去帶東西：東西的速度往牠那一塊的速度靠，靠多快看蓋住多少、東西多重。慢的帶不動（輸給窗台的摩擦），快的撞飛。牠的點一個都不改
 // v2.61 C7（bumpSoft）：牠自己走路、探、睡著攤開碰到的（沒有手指在身上、最後一次碰牠 1.5 秒以前、不在空中、不是牠在推東西），只晃一下：角度最多 lean、位置最多挪 move 個半徑，碰完 hold 秒內都夾著。你抓著牠撞、甩過去、手指推的，照舊會倒
-const SOFTB={lean:.16,move:.08,hold:1.6,k:.12,w:1.6};
+const SOFTB={lean:.16,move:.08,hold:1.6,k:.12,w:1.6,back:2};   // back：已經歪過 lean 的（你甩牠撞歪的）每秒最多收回幾弧度，不一步扶正；比 w 快，牠自己才推不倒
 function selfMove(){if(!(mat.bumpSoft>=.5)||SILL.air||SILL.hop||SILL.grab||t>=lastTouch&&t-lastTouch<1.5)return false;for(const f of fingers.values())if(f.mode==='grab'||f.mode==='stroke'||f.mode==='push'&&t-f.hitT<.5&&!f.lure)return false;return true}
-function softHold(p){if(!drRecent(p.softT,SOFTB.hold)||p.held||p.tip||drRecent(p.fingT,1.2)||drRecent(p.catT,2))return;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a)),m=R*SOFTB.move;
-  if(Math.abs(w)>SOFTB.lean){p.a-=w-Math.sign(w)*SOFTB.lean;if(p.va*w>0)p.va=0}
+function softHold(p,dt){if(!drRecent(p.softT,SOFTB.hold)||p.held||p.tip||drRecent(p.fingT,1.2)||drRecent(p.catT,2))return;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a)),m=R*SOFTB.move;
+  if(Math.abs(w)>SOFTB.lean){p.a-=Math.sign(w)*Math.min(Math.abs(w)-SOFTB.lean,SOFTB.back*dt);if(p.va*w>0)p.va=0}
   if(p.x>p.softX+m){p.x=p.softX+m;if(p.vx>0)p.vx=0}else if(p.x<p.softX-m){p.x=p.softX-m;if(p.vx<0)p.vx=0}}
 const DB={x:null,y:null,n:0,ok:false,stat:{n:0,v:0}};
 function decoBody(dt){if(!DREAL()||!(mat.decoBody>=.5)){DB.ok=false;return}
@@ -2860,7 +2860,7 @@ function propsStep(dt){const S=SILL,g=S.g,G0=R*SILLG,bwr=g.bx+g.bw*.48,bwy=g.by+
       if(wy>g.fl&&wy<g.fl+R*.5&&wx>g.sl&&wx<g.sr){p.y-=(wy-g.fl)*.7;touch++;const vn=p.vy+p.va*rx;if(vn>0){const e=vn>R*1.5?.15:0,j=-(1+e)*vn/(1/p.m+rx*rx/p.I);p.vy+=j/p.m;p.va+=j*rx/p.I;
           const vt=p.vx-p.va*ry,lim=PROP_MU*Math.abs(j),jt=Math.max(-lim,Math.min(lim,-vt/(1/p.m+ry*ry/p.I)));p.vx+=jt/p.m;p.va-=ry*jt/p.I;if(vn>R*1.2)propKnock(p,vn/(R*9))}}
       if(!p.deco&&wx<bwr&&wy>bwy&&wy<g.fl+1){p.x+=(bwr-wx)*.7;const vn=p.vx-p.va*ry;if(vn<0){const j=-1.1*vn/(1/p.m+ry*ry/p.I);p.vx+=j/p.m;p.va-=ry*j/p.I;if(-vn>R*1.2)propKnock(p,-vn/(R*9))}}}
-    softHold(p);p.tc=touch;if(p.deco&&!p.held&&touch>=2){const f=PROP_MU*G0*dt;p.vx=Math.abs(p.vx)<=f?0:p.vx-Math.sign(p.vx)*f}   // v2.45 平放著滑會被窗台磨停（原本只有落地那一下有摩擦，一推就滑出窗台）
+    softHold(p,dt);p.tc=touch;if(p.deco&&!p.held&&touch>=2){const f=PROP_MU*G0*dt;p.vx=Math.abs(p.vx)<=f?0:p.vx-Math.sign(p.vx)*f}   // v2.45 平放著滑會被窗台磨停（原本只有落地那一下有摩擦，一推就滑出窗台）
     if(touch){p.vx*=.9985;p.va*=.994;if(!p.held&&touch>=2&&Math.abs(p.vx)+Math.abs(p.vy)<7&&Math.abs(p.va)<.22){p.vx=0;p.vy=0;p.va=0;const w=Math.atan2(Math.sin(p.a),Math.cos(p.a));if(Math.abs(w)<.08)p.a-=w*.2}}   // 兩個點著地才算停；只差一點點就慢慢躺平，不留歪的
     if(p.deco&&Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)))>.6)p.upT=t;   // 蠟燭倒了火就熄，扶正 3 秒後再亮
     if(p.deco&&!p.held){const w=Math.abs(Math.atan2(Math.sin(p.a),Math.cos(p.a)));if(w>.6&&!p.tip){p.tip=true;drCrash(p,.35);sfxPlay('fx.topple',.7)}else if(w<.3)p.tip=false}   // v2.46 倒下那一下（歪過 0.6 算倒，回到 0.3 以內才算站回來，在邊緣晃不會算兩次）
@@ -3434,29 +3434,28 @@ requestAnimationFrame(frame);
 <script>
 /* v2.61 調節台「這一批」（多米 11-25）。寫在這裡、不動 desk.js：三檔、拉的三顆、五組切換，規格在 .vibe/第一批-合約.md。
    拉的三顆跟著存 1、存 2、存 3 和匯出走（包住 desk.js 的 deskPick、deskApply…），其他開關不進。沒有這三顆的舊存檔當成全關；手感風格只動旋鈕，不動這三顆。
-   網址有 ?pull= 時三顆鎖住，這一塊收起來，匯出也不寫，畫面上看不到是哪一邊。 */
+   網址有 ?pull= 時三顆鎖住，這一塊收起來，匯出不寫台上那三顆，盲比的「差在」也不寫，畫面上看不到是哪一邊；三格存檔照原本的留著，匯入的字沒帶三顆就保留那一格原本的。 */
 'use strict';
 const TIER61={b158:['build 158',k=>0],fix:['只修錯',k=>PRESETS.clay[k]],pull:['修錯加拉的三條',k=>PULL3.includes(k)?1:PRESETS.clay[k]]};
 const PULLN={pullHold:'A3 停住',pullWhole:'A4 整隻先走',pullSoft:'A5 收回去'};
 const GRP61=[['皮',['skinU']],['牠怎麼記你',['rough','tapSoft','petSlow']],['聲音',['snd61']],['眼睛和旁邊',['eyeTrue','nearFast','greetLook']],['睡醒',['wakeSoft']]];
 (()=>{
-  let saving=false;const d0={pick:deskPick,apply:deskApply,save:deskSave,diff:deskDiff,changed:deskChanged,json:deskJSON,imp:deskImport,text:deskText,sync:deskSync,style:styleSnap};
+  const d0={pick:deskPick,apply:deskApply,diff:deskDiff,changed:deskChanged,json:deskJSON,imp:deskImport,text:deskText,sync:deskSync,style:styleSnap};
   const on=v=>+v>=.5?1:0,saved=FEEL61&&FEEL61.v===2&&FEEL61.k?FEEL61.k:{},word=v=>on(v)?'開':'關';
-  deskPick=()=>{const o=d0.pick();for(const k of PULL3)o[k]=saving&&PULLQ?on(saved[k]):on(mat[k]);return o};
-  deskSave=()=>{saving=true;try{d0.save()}finally{saving=false}};   // 網址鎖住時，台上記的是原本存的，不被網址蓋掉
+  deskPick=()=>{const o=d0.pick();for(const k of PULL3)o[k]=PULLQ?on(saved[k]):on(mat[k]);return o};   // 網址鎖住時，台上記的、存 1 到存 3 寫的都是原本存的，不是網址的值
   deskApply=sn=>{if(sn&&sn.k&&!PULLQ)for(const k of PULL3)mat[k]=on(sn.k[k]);d0.apply(sn)};
   styleSnap=id=>{const s=d0.style(id);if(s)for(const k of PULL3)s.k[k]=on(mat[k]);return s};
-  deskDiff=(a,b)=>{const o=d0.diff(a,b);for(const k of PULL3)if(on(a.k[k])!==on(b.k[k]))o.push(PULLN[k]+' '+word(a.k[k])+'／'+word(b.k[k]));return o};
+  deskDiff=(a,b)=>{const o=d0.diff(a,b);if(!PULLQ)for(const k of PULL3)if(on(a.k[k])!==on(b.k[k]))o.push(PULLN[k]+' '+word(a.k[k])+'／'+word(b.k[k]));return o};
   deskChanged=()=>{const o=d0.changed(),b=DESK.base0;if(b&&!PULLQ)for(const k of PULL3)if(on(b.k[k])!==on(mat[k]))o.push(PULLN[k]+' '+word(b.k[k])+'→'+word(mat[k]));return o};
-  deskJSON=()=>{const t=d0.json();if(PULLQ)return t;const o=JSON.parse(t);for(const k of PULL3)o.k[k]=on(mat[k]);o.s.forEach((s,i)=>{if(s)for(const k of PULL3)s.k[k]=on(DESK.slots[i].k[k])});return JSON.stringify(o)};
-  deskImport=txt=>{const r=d0.imp(txt),m=/#nienie-feel\s+(\{.*\})\s*$/m.exec(txt||'');if(!m||!r.startsWith('匯入了'))return r;try{const o=JSON.parse(m[1]);[0,1,2].forEach(i=>{const s=(o.s||[])[i];if(s&&s.k&&DESK.slots[i])for(const k of PULL3)DESK.slots[i].k[k]=on(s.k[k])});if(!PULLQ)for(const k of PULL3)mat[k]=on(o.k[k]);deskSync();deskSave()}catch(_){}return r};
+  deskJSON=()=>{const o=JSON.parse(d0.json());if(!PULLQ)for(const k of PULL3)o.k[k]=on(mat[k]);o.s.forEach((s,i)=>{if(s)for(const k of PULL3)s.k[k]=on(DESK.slots[i].k[k])});return JSON.stringify(o)};
+  deskImport=txt=>{const was=DESK.slots.slice(),keep=(k,i,v)=>PULLQ&&typeof v!=='number'&&was[i]&&was[i].k?was[i].k[k]:v,r=d0.imp(txt),m=/#nienie-feel\s+(\{.*\})\s*$/m.exec(txt||'');if(!m||!r.startsWith('匯入了'))return r;try{const o=JSON.parse(m[1]);[0,1,2].forEach(i=>{const s=(o.s||[])[i];if(s&&s.k&&DESK.slots[i])for(const k of PULL3)DESK.slots[i].k[k]=on(keep(k,i,s.k[k]))});if(!PULLQ)for(const k of PULL3)mat[k]=on(o.k[k]);deskSync();deskSave()}catch(_){}return r};
   const tierNow=()=>{for(const id in TIER61)if(KEYS61.every(k=>on(mat[k])===on(TIER61[id][1](k))))return id;return null};
   deskText=()=>{const t=d0.text(),id=tierNow(),w='\n這一批（v2.61）：'+(PULLQ?'拉的三條由網址決定':(id?TIER61[id][0]:'自己切的'))+'；關著的：'+(KEYS61.filter(k=>!on(mat[k])&&!(PULLQ&&PULL3.includes(k))).join('、')||'沒有');return t.replace('\n#nienie-feel',w+'\n#nienie-feel')};
   const main=document.getElementById('feel-main'),box=document.createElement('div');box.className='feel-box';box.id='feel-61';
   box.innerHTML='<h4>這一批（v2.61）</h4>'+(PULLQ?'<p class="feel-note">拉的三條由網址決定，這裡先不顯示是哪一邊。</p>':
     '<div class="feel-row"><span>三檔</span>'+Object.keys(TIER61).map(id=>`<button data-61t="${id}">${TIER61[id][0]}</button>`).join('')+'</div>'+
     '<div class="feel-row"><span>拉</span>'+PULL3.map(k=>`<button data-61p="${k}">${PULLN[k]}</button>`).join('')+'<small>停住：拉長停下來，就定在那裡。整隻先走：往身體裡拉，整隻先跟著走再拉長。收回去：拉很長放手，會收回來。這三顆會跟著存檔。</small></div>')+
-    '<div class="feel-row"><span>單獨切</span>'+GRP61.map(([n],i)=>`<button data-61g="${i}">${n}</button>`).join('')+'<small>按一下關，再按開。關掉的那組就跟 build 158 一樣。不跟著存檔。</small></div>';
+    '<div class="feel-row"><span>單獨切</span>'+GRP61.map(([n],i)=>`<button data-61g="${i}">${n}</button>`).join('')+'<small>按一下關，再按開。關掉的那組，牠的行為就跟 build 158 一樣（外觀不變）。不跟著存檔。</small></div>';
   main.insertBefore(box,document.getElementById('feel-styles'));
   deskSync=()=>{d0.sync();const id=tierNow(),set=(b,v)=>b.setAttribute('aria-pressed',String(v));
     for(const b of box.querySelectorAll('[data-61t]'))set(b,b.getAttribute('data-61t')===id);
