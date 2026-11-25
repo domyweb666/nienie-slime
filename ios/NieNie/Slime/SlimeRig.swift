@@ -472,7 +472,8 @@ final class SlimeRig {
     private static let grainTimes: [Double] = [0.06, 0.13, 0.21, 0.30], grainGains: [Double] = [0.8, 0.6, 0.42, 0.28]   // v2.25 F5
     // MARK: v2.61 D1 D2 C3 (.uiux/04-手感/極致優化規劃-暫定.md; web ROUGH, TAPK, PETK)
     /// D1 (rough), a yank: the hand at v (R a second on the screen, 30 ms smoothed) or more, heading outward, the patch pulled open past st (R).
-    private enum RoughSet { static let v: Double = 6, st: Double = 0.8 }
+    /// inR, inC are tugIn's: it counts from this far from the body's middle (R), and from this angle (cosine) towards the middle.
+    private enum RoughSet { static let v: Double = 6, st: Double = 0.8, inR: Double = 0.35, inC: Double = 0.5 }
     private var roughOn: Bool { params.rough >= 0.5 }
     /// D2 (tapSoft): each light tap caps the next flinch at k of this one, eased off over T s, never below lo × flinchAmp.
     private enum TapSet { static let k: Double = 0.93, T: Double = 90, lo: Double = 0.3 }
@@ -5198,8 +5199,28 @@ final class SlimeRig {
         guard params.drag > 0 else { return 0 }
         var k = params.drag
         if iv2(params.impC3) { k *= max(0.3, 1 + 0.43 * impTrust - 0.57 * impWary) }
-        if params.emo >= 0.5 { k *= 1 - 0.7 * moodStrain }
+        if params.emo >= 0.5 {
+            let ease: Double = roughOn ? max(moodStrain, moodTugS * tugIn()) : moodStrain   // v2.61 D1
+            k *= 1 - 0.7 * ease
+        }
         return k
+    }
+    /// v2.61 D1 (rough), web tugIn: a slow pull keeps moodStrain at 0, so reading it dragFollow never let go of following the finger: pulled slowly from one
+    /// side through the body, home stopped 0.84R off (following less it settles 0.46R off and the finger comes out on the other side) and the ring the strand made
+    /// with the body never closed (web, hole readings over 20 seeds, 387 against 193). So a pull through the body lets go by moodTugS (how far and how long,
+    /// the tug back's own); one heading outward still reads moodStrain (all of them reading it, the body gets longer and the mixed 250 break 6 to 13 sets more).
+    /// How much of the pull is that kind, 0...1; one finger only.
+    private func tugIn() -> Double {
+        var g: Finger?
+        var n = 0
+        for q in fingers.values where q.mode == .grab { g = q; n += 1 }
+        guard n == 1, let f = g, let r0x = f.r0x, f.tug != true else { return 0 }
+        let rl: Double = hypot(r0x, f.r0y), dx: Double = f.x - f.ax, dy: Double = f.y - f.ay, dl: Double = hypot(dx, dy)
+        if rl < R * 0.1 || dl < R * 0.1 { return 0 }
+        let dot: Double = dx * r0x + dy * f.r0y
+        let inward: Double = -dot / (rl * dl)
+        let wt: Double = smooth01((rl / R - RoughSet.inR) / 0.25)
+        return wt * smooth01((inward - RoughSet.inC) / 0.2)
     }
     private func dragAvg() -> (x: Double, y: Double, n: Int) {
         var sx = 0.0, sy = 0.0, n = 0
