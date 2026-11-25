@@ -1,6 +1,6 @@
 # 修洞：網頁 0844ceb ↔ Swift 對照
 
-2026-11-25。只改 `ios/NieNie/Slime/SlimeRig.swift`（+23 −2）。FeelParams.swift 不用改。沒有編譯過（這台沒有 swiftc），沒上真機。
+2026-11-25。只改 `ios/NieNie/Slime/SlimeRig.swift`（+23 −2）。FeelParams.swift 不用改。這台沒有 swiftc，11-25 推上去後 CI 編過（`2a215f2`，run 45647079938），沒上真機。
 「算式」指 `修洞-算式對照.js`：Swift 原文機械轉成 JS，跟 index.html 原文吃同一組輸入。
 
 ## 1. 這次加的
