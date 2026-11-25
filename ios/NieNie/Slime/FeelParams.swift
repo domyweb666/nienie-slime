@@ -889,7 +889,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.pullWhole, name: "拉的 A4：往裡拉，整隻先走 v2.61", hint: "1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.pullSoft, name: "拉的 A5：拉很長放手，收回去 v2.61", hint: "1：身體拉得很長時放手，先不逃、轉正有限速、放手後 0.8 秒內每一點有限速；按住不動時上限不會自己變大。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.rough, name: "只有快扯算欺負 v2.61", hint: "1：慢慢拉很長不算欺負；快扯不會變熟，也不會變得怕你。0 回 v2.60（拉開 1.5R 撐半秒就算）", range: 0...1, step: 1, section: "這一批 v2.61"),
-        TuneField(key: \.tapSoft, name: "慢慢點不算攻擊 v2.61", hint: "1：慢慢點牠不會嚇到。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.tapSoft, name: "慢慢點不算攻擊 v2.61", hint: "1：慢慢點牠不會嚇到，還是會縮一下，越點縮越小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.petSlow, name: "慢慢摸也算摸 v2.61", hint: "1：摸得很慢也會呼嚕、變熟。0 回 v2.60（太慢會被當成抓）", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.wakeSoft, name: "輕碰慢慢醒 v2.61", hint: "1：睡著時輕輕碰，慢慢醒；剛打開 40 秒才會睡。0 回 v2.60（一碰就嚇醒、30 秒就睡）", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.nearFast, name: "聽節奏時也會靠過來 v2.61", hint: "1：在聽你打節奏時，手指放旁邊照樣靠過來。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),

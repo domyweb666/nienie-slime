@@ -215,7 +215,7 @@ struct PullBlind {
     }
     static func name(_ i: Int) -> String { i == 0 ? "甲" : "乙" }
     static func label(_ f: [Bool]) -> String {
-        if !f.contains(true) { return "三顆全關（跟 build 158 一樣）" }
+        if !f.contains(true) { return "三顆全關" }
         if !f.contains(false) { return "三顆全開" }
         let off: [String] = zip(FeelBatch.pull, f).filter { !$0.1 }.map { FeelBatch.pullName($0.0) }
         return "只關" + off.joined(separator: "、")

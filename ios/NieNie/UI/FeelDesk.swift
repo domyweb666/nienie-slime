@@ -158,7 +158,7 @@ struct FeelDesk: View {
                         .accessibilityAddTraits(controller.batch.all(g.ids) ? .isSelected : [])
                 }
             }
-            small("按一下關，再按開。關掉的那組就跟 build 158 一樣。不跟著存檔，重開 app 會回到開。震動那組第二批才有。")
+            small("按一下關，再按開。關掉的那組，牠的行為就跟 build 158 一樣（外觀不變）。不跟著存檔，重開 app 會回到開。震動那組第二批才有。")
             Text("甲乙比拉").font(.rounded(13, .heavy)).padding(.top, 2)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), alignment: .leading, spacing: 6) {
                 ForEach(PullBlind.What.allCases) { w in
