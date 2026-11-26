@@ -67,3 +67,4 @@
 - 12:29 第 6 項做完（`e4ceb60`）：手機 `napCum/napOn/napX/napY/napN`、`napReady`、`napStep`（每幀 sleepStep→napStep→echoStep），lifeStep 加 `!napOn`，呼嚕來源用 `purr > 0.3`（同網頁 PURR）。`nap napPurr napWait` 進調節台 v2.63，build 158 那檔一起關。nap 0 讀程式確認同 `036bea1`。可疑：SlimeRig 6688–6691 napReady 四個 Bool、6696 `for … where` 加 `||`。推上去跑 CI，開始第 7 項。
 - 12:33 CI run 45755528219（`c1e71da`，含第 6 項）BUILD SUCCEEDED，沒有新警告。
 - 13:26 第 7 項做完（`abedb67`）：`holdScared`、`holdTickle` 預設 1（網頁 dragStep C3、releaseFinger、e2Step；手機 Finger.scared、C3、release、e2Step）。T77 6 次全過：戒 0.65 連拉 10 次脫手 0、抗議 10、走開 10；撥 20 秒不掙脫、扭 28 次；兩指 705 點照舊撕開；開關 0 照舊滑走 10／10、6.72 秒掙脫。舊搔癢項 T37 L5、T38 L6、T39 L7 釘 `holdTickle: 0`，門檻沒動。整份 77／77 一次。標準清單 41 加註記。可疑：SlimeRig 6127 `if let g, …, … else if let g`、2530 flee。推上去跑 CI，開始第 8 項。
+- 13:30 第 7 項推上去跑 CI（run 45761695432，`00a54f4`）。第 8、9 項交給同一個子代理依序做（各自 commit）。第 19 項（查條款，只寫一份文件、不 commit）同時開跑，跟程式不撞檔，主對話之後提交。
