@@ -97,6 +97,7 @@ final class SlimeController: ObservableObject {
         rig.walkOpen()   // 走路: the second open leaves the gift stone
         walkReadSteps()
         startMotion()   // v2.31 搖晃沉澱
+        stepsWas = stepsWanted   // v2.63 (未做 82): from here on a parameter change starts and stops the sensors
 
         NotificationCenter.default.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification,
                                                object: nil, queue: .main) { [weak self] _ in
@@ -360,6 +361,7 @@ final class SlimeController: ObservableObject {
         if labGrey { p.greyBox() }   // v2.52 灰盒 (3-2): only the physics is left; the sliders keep their own numbers
         rig.params = p
         syncAudio()
+        syncSensors()   // v2.63 (未做 82)
         haptics.setAudioThroughHaptics(current.popViaHaptics >= 0.5, url: sound.releaseSampleURL)
     }
 
@@ -397,12 +399,14 @@ final class SlimeController: ObservableObject {
     func walkFake(_ n: Int) { rig.walkBankSteps(n) }
     func walkClear() { rig.walkClear(); UserDefaults.standard.removeObject(forKey: "nienie.walk.lastRead") }
     private func walkReadSteps() {
-        guard rig.walkPerm == "ok", CMPedometer.isStepCountingAvailable() else { return }
+        guard stepsWanted, !stepsReading, rig.walkPerm == "ok", CMPedometer.isStepCountingAvailable() else { return }   // v2.63 (未做 82): walkShow 0, nothing is asked
         let now = Date()
         let from = (UserDefaults.standard.object(forKey: "nienie.walk.lastRead") as? Date) ?? Calendar.current.startOfDay(for: now)
         guard now.timeIntervalSince(from) > 1 else { return }
+        stepsReading = true
         pedometer.queryPedometerData(from: from, to: now) { [weak self] data, error in
             DispatchQueue.main.async {
+                self?.stepsReading = false
                 guard let self, error == nil, let n = data?.numberOfSteps.intValue else { return }
                 UserDefaults.standard.set(now, forKey: "nienie.walk.lastRead")
                 if n > 0 { self.rig.walkBankSteps(n) }
@@ -412,9 +416,26 @@ final class SlimeController: ObservableObject {
 
     // MARK: - v2.31 搖晃沉澱: the phone's shakes, and the panel's pretend ones
 
+    // v2.63 (未做 82, 關掉的玩法還在耗電): the sensors run only while what they feed is on. 搖晃沉澱 (shake) or 珍奶's pearls
+    // (they sink after a real shake whatever shake says): the 60 Hz device motion; 走路 (walkShow): the step reads. A parameter
+    // turned on starts them, turned off stops them. Both off, nothing calls startDeviceMotionUpdates or CMPedometer (the panel's
+    // 讀步數 probe is its own button). With shake 0 the wind bell no longer swings on a real shake; the panel's pretend shakes still do
+    private var motionWanted: Bool { rig.params.shake >= 0.5 || rig.fx.pearls > 0 }
+    private var stepsWanted: Bool { rig.params.walkShow >= 0.5 }
+    private var stepsWas: Bool?   // nil until init has made its own first read
+    private var stepsReading = false   // a query in flight: a second one would bank the same steps twice
+    private func syncSensors() {
+        guard let was = stepsWas else { return }
+        if motionWanted { if !resignedActive { startMotion() } }
+        else if motion.isDeviceMotionActive { motion.stopDeviceMotionUpdates() }
+        let s = stepsWanted
+        stepsWas = s
+        if s && !was { walkReadSteps() }
+    }
+
     /// Device motion at 60 Hz; the acceleration without gravity, in m/s², past shakeG counts as one shake. Screen direction: the phone flung right, it goes left in the bowl.
     private func startMotion() {
-        guard motion.isDeviceMotionAvailable, !motion.isDeviceMotionActive else { return }
+        guard motionWanted, motion.isDeviceMotionAvailable, !motion.isDeviceMotionActive else { return }
         motion.deviceMotionUpdateInterval = 1.0 / 60
         motion.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
             guard let self, let m else { return }
