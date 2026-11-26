@@ -448,6 +448,13 @@ final class SlimeRig {
     private var mdOn: Bool { brOn && params.mood >= 0.5 }
     private var brainM: Double { mdOn ? brain.m : 0 }
     private var brainMS: Double { mdOn ? brain.mS : 0 }
+    // v2.64 大腦第三片「記地方」(brMem; web BMEM, MMon): the five cells and your side (SlimeBrain.Mem); the body side is under MARK v2.64 記地方 below.
+    // Off (brMem 0, the brain off, no sill) and nothing reads or writes it: as v2.63
+    private var mem = SlimeBrain.Mem()
+    private var mmOn: Bool { brOn && params.brMem >= 0.5 && sillOn && sillG != nil }
+    /// v2.64: set by the controller; the rig calls it when the places changed and it is time to write them (the web's memSave: memPut, then localStorage).
+    /// The controller reads memSaved(ts:) for the slime on screen. nil (the Linux harness): nothing is written
+    var memWrite: (() -> Void)?
     /// What the brain is doing and why it chose the last thing (the web's 「牠在想什麼」 lines; no readout on the phone yet)
     var brainSay: (act: String, why: String) { (act: brain.act, why: brain.why) }
     /// v2.23 收集: switching slimes brings that one's impression back (this run only).
@@ -6309,6 +6316,7 @@ final class SlimeRig {
     /// At release, what kind of grab it was goes into the impression: pulled until it wanted to flee, poked in a row, flung hard → wary;
     /// a gentle one takes a fifth of the wariness off (C5 calming). Before moodRelease (which clears strainMax).
     private func impRelease(_ f: Finger) {
+        memTouch(f)   // v2.64 記地方 (web impRelease: memTouch(f) first, whether or not the impression is on)
         guard params.imp >= 0.5 else { return }
         impLX = f.fx; impLY = f.fy; impHas = true
         let w0 = impWary
@@ -7002,8 +7010,8 @@ final class SlimeRig {
     }
 
     // MARK: v2.63 大腦第一片「需求和自己醒」(brain; .uiux/04-手感/極致優化規劃-暫定.md C7; web brainStep, brainRest, brainGo, brainGoHome, brainAtHome,
-    // brainSillFree, sleepOK, e4OK, brainJit, line by line). The numbers are in SlimeBrain.swift. Off on the phone, as the web with MMon(), DRon() false:
-    // the remembered places (home is always the middle of the sill: memHomeX() → g.bx), the decorations (no 推東西, no candle).
+    // brainSillFree, sleepOK, e4OK, brainJit, line by line). The numbers are in SlimeBrain.swift. Off on the phone, as the web with DRon() false:
+    // the decorations (no 推東西, no candle). The remembered places (MMon) since v2.64: MARK v2.64 記地方 below.
     // brain 0: lifeStep's old dice and sleepTry's 40 s, and the sill's "back to the bowl after 25 s" (all untouched).
     // v2.63 第二片「心情」(mood): brainMood here, read by mdOn / brainM / brainMS (posture, flinch, stride, poke, eyes, wake, pick, going home); mood 0 as slice 1.
 
@@ -7011,7 +7019,8 @@ final class SlimeRig {
     private func brainStep(_ dt: Double, _ engaged: Bool) {
         guard brOn else { return }
         let idleT = idleSec
-        brain.mood(SlimeBrain.MoodIn(dt: dt, on: mdOn, purr: purr, happyT: happyT, joyUntil: echoJoyUntil, wary: impWary, scare: moodScare, half: params.moodHalf))   // v2.63 brainMood (brainMem: slice 3)
+        brain.mood(SlimeBrain.MoodIn(dt: dt, on: mdOn, purr: purr, happyT: happyT, joyUntil: echoJoyUntil, wary: impWary, scare: moodScare, half: params.moodHalf))   // v2.63 brainMood
+        brainMem(dt)   // v2.64 記地方 (web brainStep: brainMood(dt);brainMem(dt))
         let lie = brain.step(SlimeBrain.In(dt: dt, idleT: idleT, restMul: params.restMul, e4Mul: params.e4Mul, night: sceneKind == 2, exLevel: exLevel(), exert: exert,
                                            comfort: moodC, wary: impWary, scare: moodScare, trust: impTrust, awakeT: params.brAwakeT, sleepT: params.brSleepT,
                                            engaged: engaged, asleep: slpOn, resting: lifeSt == .rest, jit: params.brJit >= 0.5, hidden: false, moodOn: mdOn))
@@ -7039,17 +7048,17 @@ final class SlimeRig {
     private func e4OK() -> Bool {
         iv3(params.e4) && !e4On && impTrust > 0.5 && Double(e4Count) < 3 + (2 * exLevel()).rounded() && t - e4LastT > 40 && fingers.isEmpty && t - lastTouch > 6
     }
-    /// brainAtHome: off the sill it is always home; on it, home is the middle of the sill (the web's memHomeX() with MMon and the candle off)
+    /// brainAtHome: off the sill it is always home; on it, home is memHomeX() (v2.64: the cell it likes best; brMem 0: the middle of the sill)
     private func brainAtHome() -> Bool {
         guard sillOn, let g = sillG, !clusters.isEmpty else { return true }
-        return sillPlane == .room && abs(clusters[gi].xc - g.bx) < R * 0.3
+        return sillPlane == .room && abs(clusters[gi].xc - memHomeX(g)) < R * 0.3
     }
     private func brainSillFree() -> Bool { !sillGrab && !sillAir && sillHop == nil && sillRoute == nil && sillStickT < 0 && !escOn }
-    /// brainGoHome: back to the middle of the sill (into the bowl when there is one). true = it set off
+    /// brainGoHome: back home (memHomeX; the middle of the sill, into the bowl when there is one). true = it set off
     private func brainGoHome() -> Bool {
         guard brainSillFree(), let g = sillG else { return false }
-        let hx = g.bx   // memHomeX()
-        if sillPlane == .room && !sillInBowl && abs(hx - g.bx) > 1 { gaitTo(hx, homeY, dash: false); return gaitOn || wanderMoving }   // v2.43: a favourite cell off the middle (slice 3; never while hx is the middle)
+        let hx = memHomeX(g)
+        if sillPlane == .room && !sillInBowl && abs(hx - g.bx) > 1 { gaitTo(hx, homeY, dash: false); return gaitOn || wanderMoving }   // v2.43: the cell it likes is not the middle: it walks straight there along the sill
         guard let r = rtHome() else { return false }
         sillLastHome = t; routeStart(r)
         return true
@@ -7060,8 +7069,9 @@ final class SlimeRig {
             if brainSillFree() && !clusters.isEmpty {
                 let cx0 = clusters[gi].xc
                 var x: Double? = nil
-                for _ in 0..<6 {
-                    guard let c = floorWalkX(cx0), abs(c - cx0) >= R * 0.45 else { continue }   // v2.43 the cell it was scared in (MMon): slice 3
+                for k in 0..<6 {
+                    guard let c = floorWalkX(cx0), abs(c - cx0) >= R * 0.45 else { continue }
+                    if mmOn && mem.cell[memCellAt(c)] < -0.3 && k < 5 { continue }   // v2.43 (v2.64 on the phone): not to the cell it was scared in
                     x = c
                     if let d = dir { if (cos(d) > 0) == (c > cx0) { break } } else { break }   // sniffed one way: that way
                 }
@@ -7091,11 +7101,14 @@ final class SlimeRig {
         let opening: Bool = params.wakeSoft >= 0.5 && t >= slpOpenT && t - slpOpenT < (params.sleepAfter > 0 ? params.sleepAfter : 40)
         let canSleep: Bool = !opening && sleepOK() && idleT > 8
         let bm = brainM   // read before the call: brainM reads brain, pick mutates it
-        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK(), brm: bm)
+        var goScared = false   // v2.64 (web brainPick: MMon()&&SILL.plane==='room'&&BMEM.cell[memCellAt(globalC.xc)]<-.3)
+        if mmOn && sillPlane == .room && !clusters.isEmpty { goScared = mem.cell[memCellAt(clusters[gi].xc)] < -0.3 }
+        let offerOK = memCanOffer()
+        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK(), brm: bm, goScared: goScared, offerOK: offerOK)
         let away: Bool = sillOn && !brainAtHome(), tel: Bool = params.brPre >= 0.5
         switch w {
         case .sleep:
-            if away && brainGoHome() { brain.why += "（先走回布墊）" }
+            if away && brainGoHome() { brain.why += mmOn && mem.fav() >= 0 ? "（先走回牠喜歡的位置）" : "（先走回布墊）" }   // the web's candle (drCandleX): the decorations, 第 2 項
             else if away { lifeUntil = t + 1 }
             else if tel { brain.pre = .sleep; brain.preT0 = t; lifeUntil = t + 2; cutSniffs(); if sighCyc < 0 { sighNext = t } }   // 前兆: squint, one sigh, asleep 2 s later
             else { brain.naps += 1; slpOn = true; lifeSt = .sleep; cutSniffs() }
@@ -7105,9 +7118,11 @@ final class SlimeRig {
             lifeSt = .look; lifeLooks = 1 + (brain.q > 0.7 ? 1 : 0); lifeNoGo = false; lifeUntil = t
         case .go:
             brainGo(nil)
+        case .offer:
+            memOffer()   // v2.64
         case .rest:
             let low: Bool = brainM < -0.3   // v2.63 心情: in a bad mood it goes back after 8 s away, not 20
-            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : "五個都不高，走回布墊" }
+            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : (mem.fav() >= 0 && mmOn ? "五個都不高，走回牠喜歡的位置" : "五個都不高，走回布墊") }
             else { lifeUntil = t + restDur() }
         }
     }
@@ -7121,9 +7136,93 @@ final class SlimeRig {
     /// What the mood sees now (the web's brainReset ev, memSync)
     private func brainEv() -> SlimeBrain.Ev { SlimeBrain.Ev(h: happyT, j: echoJoyUntil, w: impWary, sc: moodScare) }
     /// The web's memSync (chooseSlime, after the impression is set): the other slime's wariness, happy moment, scare are not "just happened" (SlimeController.select)
-    func brainSync() { brain.ev = brainEv() }
+    func brainSync() { brain.ev = brainEv(); mem.ev = SlimeBrain.Mem.Ev(h: happyT, w: impWary, sc: moodScare) }   // v2.64: the places' too (web memSync: BMEM.ev)
     /// brainFlinch (v2.42): in a bad mood a touch makes it flinch bigger, in a good one smaller
     private func brainFlinch() -> Double { let m = brainM; return 1 + 0.6 * max(0, -m) - 0.3 * max(0, m) }
+
+    // MARK: v2.64 大腦第三片「記地方」(brMem; .uiux/04-手感/極致優化規劃-暫定.md C7; web BMEM, MMon, memCellAt, memCellX, memHomeX, brainMem,
+    // memTouch, memCanOffer, memOffer, memSave, memGet, v2.43 and v2.61, line by line). The sill from g.l to g.r in five cells. A purr there (+0.08 a second),
+    // the happy moment (+0.1): liked; the wariness rising (−1.5 × the rise), a scare (−0.5 × the rise): disliked. The liked cell is home (rest, sleep);
+    // a disliked one it walks round and leaves sooner (+0.4 to go). Let go after a gentle touch, it notes which side you touched (the side);
+    // trusting and wanting to be stroked, it leans that side to you, reaches a pseudopod and looks at you ('offer', the web's memOffer).
+    // Not here (the decorations, 第三批第 2 項): the night candle as home (drCandleX), a fall's scare kept out of the cells (drCrash's BMEM.ev.sc).
+    // brMem 0: mmOn false, memHomeX is the middle of the sill, nothing changes the cells, offerOK false (no random drawn): as v2.63.
+
+    /// memCellAt: which of the five cells x is in (0...4). A sill with no width (never): the first
+    private func memCellAt(_ x: Double) -> Int {
+        guard let g = sillG else { return 0 }
+        let w = g.r - g.l
+        guard w > 0 else { return 0 }
+        let v = ((x - g.l) / w * 5).rounded(.down)
+        guard v.isFinite else { return 0 }
+        return Int(max(0, min(4, v)))
+    }
+    /// memCellX: where it sits in cell k (its middle, kept 0.9R inside the sill's ends)
+    private func memCellX(_ g: SillGeo, _ k: Int) -> Double {
+        let lo = g.l + R * 0.9, hi = g.r - R * 0.9
+        return max(lo, min(hi, g.l + (g.r - g.l) * (Double(k) + 0.5) / 5))
+    }
+    /// memHomeX: where home is on the sill. The cell it likes best (past 0.3); none: the mat in the middle, unless it was scared there:
+    /// then where it is, unless it was scared there too: the nearest cell it was not scared in. brMem 0: the middle (the web's g.bx; no candle on the phone)
+    private func memHomeX(_ g: SillGeo) -> Double {
+        if !mmOn { return g.bx }
+        let k = mem.fav()
+        if k >= 0 { return memCellX(g, k) }
+        if mem.cell[memCellAt(g.bx)] >= -0.3 { return g.bx }   // nothing liked much: the mat in the middle
+        guard !clusters.isEmpty else { return g.bx }
+        let cx = clusters[gi].xc, c = memCellAt(cx)
+        if mem.cell[c] >= -0.3 { return cx }   // scared at the mat: where it is now, if not scared there
+        var b = c, bd = 9
+        for j in 0..<5 where mem.cell[j] >= -0.3 && abs(j - c) < bd { bd = abs(j - c); b = j }
+        return memCellX(g, b)
+    }
+    /// brainMem: every frame with the brain (after the mood). Off, or not on the sill's front: only what it sees now is noted, so nothing old counts later
+    private func brainMem(_ dt: Double) {
+        guard mmOn, sillPlane == .room, !clusters.isEmpty else { mem.ev = SlimeBrain.Mem.Ev(h: happyT, w: impWary, sc: moodScare); return }
+        let k = memCellAt(clusters[gi].xc)
+        if purr > 0.3 { mem.add(k, 0.08 * dt) }   // purring here: this cell liked more and more (10 s of rubbing +0.8)
+        if happyT != mem.ev.h { if happyT > mem.ev.h { mem.add(k, 0.1) }; mem.ev.h = happyT }
+        if impWary > mem.ev.w { mem.add(k, -1.5 * (impWary - mem.ev.w)) }   // yanked, poked in a row here
+        mem.ev.w = impWary
+        if moodScare > mem.ev.sc { mem.add(k, -0.5 * (moodScare - mem.ev.sc)) }
+        mem.ev.sc = moodScare
+        memSave(force: false)
+    }
+    /// memTouch (web, from impRelease, before the impression's switch): let go, which side of it you touched (a yank does not count)
+    private func memTouch(_ f: Finger) {
+        guard mmOn, moodStrainMax <= 0.15, !clusters.isEmpty else { return }
+        let sx: Double = max(-1, min(1, (f.ax - clusters[gi].xc) / R))
+        mem.side += (sx - mem.side) * 0.15; mem.dirty = true
+    }
+    /// memCanOffer: wanting to be stroked, trusting, and it knows your side: lean that side over (shares the need with coming to you; not twice in 15 s)
+    private func memCanOffer() -> Bool {
+        let at: Double = mem.offerAt != 0 ? mem.offerAt : -99   // the web's BMEM.offerAt||-99
+        return mmOn && params.imp >= 0.5 && impTrust >= 0.4 && abs(mem.side) >= 0.3 && t - at > 15 && fingers.isEmpty
+    }
+    /// memOffer: the side you touch leans to you (the E2 lean), a short pseudopod that way, a look at you
+    private func memOffer() {
+        let a: Double = mem.side > 0 ? 0 : .pi
+        leanT = t; leanA = a; leanS = 1
+        startSniff(a, 0.5, 0.5, 1, 0.6)
+        eyeUser = t + 1.6
+        mem.leans += 1; mem.offerAt = t
+        brain.s = max(0, brain.s - 0.2)
+        lifeUntil = t + 2.4
+    }
+    /// memSave: changed, and 3 s since the last write (force: leaving, a slime switch): the controller writes it (memWrite). The clock run back (at > t): write
+    func memSave(force: Bool) {
+        guard mem.dirty else { return }
+        if !force && t - mem.at < 3 && mem.at <= t { return }
+        mem.at = t; mem.dirty = false
+        memWrite?()
+    }
+    /// What the controller keeps for the slime on screen (the web's memPut). ts: ms since 1970
+    func memSaved(ts: Double) -> SlimeBrain.Mem.Saved { mem.saved(ts: ts) }
+    /// memGet's end (the controller has already faded the disliked cells): this slime's places come back, no offer pending
+    func memSet(cell: [Double], side: Double) {
+        mem.cell = cell.count == 5 ? cell : [0, 0, 0, 0, 0]
+        mem.side = side; mem.offerAt = -99; mem.leans = 0; mem.dirty = false
+    }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
     private func twitch(_ L: Double) {

@@ -90,6 +90,10 @@ final class SlimeController: ObservableObject {
             savedBond = Self.bondLoad(); bonds = savedBond   // v2.63 D6 (web impLoad: read even with bond 0, written back as it was)
             if start.bond >= 0.5 && start.imp >= 0.5 { rig.setBond(savedBond[saved] ?? 0) }
         }
+        // v2.64 記地方 (web: impLoad(); memLoad()): each slime's places come back, read whatever brMem is (written only when they change)
+        brainMems = Self.memLoad()
+        memGet()
+        rig.memWrite = { [weak self] in self?.memStore() }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
         feelLoad()   // 手感調節台: last time's numbers (v2.39; v2.52 the desk's v1 store)
         syncAudio()
@@ -112,6 +116,7 @@ final class SlimeController: ObservableObject {
             self?.sound.stopAll()
             self?.motion.stopDeviceMotionUpdates()
             self?.trustSave(force: true)   // v2.34: leaving, write the trust now
+            self?.rig.memSave(force: true)   // v2.64 記地方 (web visibilitychange hidden: memSave(true))
             self?.resignedActive = true   // v2.63 C4
         }
         // v2.20: the impression lives for this run only; 10 min or more in the background and it is a first meeting again
@@ -334,6 +339,45 @@ final class SlimeController: ObservableObject {
         savedTrust = all
         savedBond = bd; bonds = bd
     }
+    // MARK: - v2.64 記地方 (brMem; web BMEMS, memPut, memGet, memSave, memLoad): each slime's five cells and side in UserDefaults "nienie.brain",
+    // the web's localStorage shape {"id":"taro","cell":[…],"side":…,"ts":…,"all":{"taro":{"cell":[…],"side":…,"ts":…}}}; ts in ms since 1970.
+    // The liked cells stay, the disliked fade in 3 days (faded when read back, memGet). Nothing on screen shows them (the web shows them only in 「牠在想什麼」).
+
+    private var brainMems: [SlimeKind: SlimeBrain.Mem.Saved] = [:]
+    private static func memLoad() -> [SlimeKind: SlimeBrain.Mem.Saved] {
+        guard let d = UserDefaults.standard.data(forKey: "nienie.brain"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [:] }
+        var out: [SlimeKind: SlimeBrain.Mem.Saved] = [:]
+        func num(_ v: Any?) -> Double { (v as? NSNumber)?.doubleValue ?? .nan }
+        func put(_ id: String?, _ m: [String: Any]?) {
+            guard let id, let k = SlimeKind(rawValue: id), let m, let c = m["cell"] as? [Any], c.count == 5 else { return }
+            let cell: [Double] = c.map { (v: Any) -> Double in let x = num(v); return x.isFinite ? max(-1, min(1, x)) : 0 }
+            let sd = num(m["side"]), ts = num(m["ts"])
+            out[k] = SlimeBrain.Mem.Saved(cell: cell, side: sd.isFinite ? max(-1, min(1, sd)) : 0, ts: ts.isFinite ? ts : 0)
+        }
+        if let all = o["all"] as? [String: Any] { for (id, m) in all { put(id, m as? [String: Any]) } }
+        put(o["id"] as? String, o)   // the outer one (the older shape) wins, as the web's
+        return out
+    }
+    /// memPut: the slime on screen's places into the list (in memory; memStore writes the list)
+    private func memPut() { brainMems[slime] = rig.memSaved(ts: (Date().timeIntervalSince1970 * 1000).rounded()) }
+    /// memGet: the slime on screen's places back, the disliked faded by the days since; none kept: all 0
+    private func memGet() {
+        guard let m = brainMems[slime] else { rig.memSet(cell: [0, 0, 0, 0, 0], side: 0); return }
+        let days: Double = max(0, (Date().timeIntervalSince1970 * 1000 - m.ts) / 864e5)
+        rig.memSet(cell: SlimeBrain.Mem.decay(m.cell, days: days), side: m.side)
+    }
+    /// The rig's memSave said it is time (rig.memWrite): put this slime's in, write all of them
+    private func memStore() {
+        memPut()
+        guard let m = brainMems[slime] else { return }
+        var all: [String: Any] = [:]
+        for (k, v) in brainMems { all[k.rawValue] = ["cell": v.cell, "side": v.side, "ts": v.ts] as [String: Any] }
+        let obj: [String: Any] = ["id": slime.rawValue, "cell": m.cell, "side": m.side, "ts": m.ts, "all": all]
+        guard JSONSerialization.isValidJSONObject(obj), let d = try? JSONSerialization.data(withJSONObject: obj) else { return }   // a NaN would throw an exception try? cannot catch
+        UserDefaults.standard.set(d, forKey: "nienie.brain")
+    }
+
     private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0, purrPhase = 0.0
     private var backgroundAt: Date?
     private var resignedActive = false   // v2.63 C4: left active (background, lock screen, Control Center, a system alert); the next didBecomeActive is a coming back
@@ -465,6 +509,7 @@ final class SlimeController: ObservableObject {
         guard k != slime else { return }
         impressions[slime] = (rig.impTrust, rig.impWary)
         if bondOn { bonds[slime] = rig.impBond }   // v2.63 D6 (web chooseSlime: BONDS[old] = BOND.v)
+        rig.memSave(force: true); memPut()   // v2.64 記地方 (web chooseSlime: memSave(true);memPut(), still under the old slime)
         slime = k; material = k.material
         rig.fx = k.fx   // v2.57 the new six's signatures
         UserDefaults.standard.set(k.rawValue, forKey: "slime")
@@ -475,7 +520,8 @@ final class SlimeController: ObservableObject {
         else if current.trKeep >= 0.5, let tr = savedTrust[k] { rig.setImpression(trust: tr, wary: 0) }   // v2.34
         else { rig.resetImpression() }
         rig.setBond(bondOn ? (bonds[k] ?? 0) : 0)   // v2.63 D6 (web chooseSlime: impReset, then BOND.v = BONDS[new])
-        rig.brainSync()   // v2.63 心情 (web chooseSlime: …IMP set; memSync(); then startIntro)
+        memGet()   // v2.64 記地方 (web chooseSlime: memGet();memSync())
+        rig.brainSync()   // v2.63 心情 (web chooseSlime: …IMP set; memSync(); then startIntro); v2.64 the places' too
         rig.startIntro()
         sound.press(intensity: 0.5)
     }

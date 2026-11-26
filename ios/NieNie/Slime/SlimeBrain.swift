@@ -8,15 +8,19 @@ import Foundation
 /// Each waking and each sleep draws its own pace (作息亂數, brJit). Asleep, the 睏 runs out and it wakes by itself.
 /// v2.63 第二片「心情」(mood, moodHalf; the web's BRAIN.m, mS, ev, brainMood, BRM, BRMS, v2.42): m −1...1, a few minutes to change, back to 0.1 when nothing
 /// happens; mS the one the body shows (2 s behind). Only this opening: every reset starts it at 0.15, nothing is stored (not across days either).
-/// Not in these slices (the phone treats them as off, the web's MMon(), DRon() false): the remembered places (BMEM), what it does with the decorations
-/// (DR, drCat, memOffer). With those off the web's formulas lose their memory terms, written below as 0 where the web has them, so the line-by-line check stays easy.
+/// v2.64 第三片「記地方」(brMem; the web's BMEM, MMon, memCellAt, memCellX, memAdd, memFav, memDecay, brainMem, memTouch, memOffer, v2.43; BMEMS v2.61):
+/// the sill cut into five cells left to right, each −1 (scared there) to 1 (stroked well there); side −1 (you mostly touch its left) to 1 (its right).
+/// The liked cells stay across days, the disliked ones fade in three days (多米 11-14, 第 6 題 kept). The numbers are in Mem below; the body side
+/// (brainMem, memHomeX, memOffer, memTouch) is in SlimeRig.swift under MARK v2.64, the storage ("nienie.brain", each slime its own) in SlimeController.
+/// Still not on the phone (the decorations, 第三批第 2 項): the web's DRon() — 推東西 (drCat), looking at what moves (drLook), the scare of a fall (drCrash),
+/// the night candle as home (drCandleX). Their terms are written below as nothing where the web has them.
 /// What touches the body (sleep, walk, look, go home) is in SlimeRig.swift (brainStep, brainRest, brainGo, brainGoHome); this file only keeps numbers.
 /// Foundation only (the Linux check builds it with the physics files).
 struct SlimeBrain {
     /// The web's B.pre.k: what it is about to do once the 前兆 is over
     enum Pre { case sleep, greet }
-    /// The web's brainPick choices this slice can make ('offer' needs MMon, 'cat' needs DRon: both off on the phone, so they score −1 and never win)
-    enum Choice: String { case rest, look, go, sleep, greet }
+    /// The web's brainPick choices the phone can make ('offer' since v2.64 with MMon; 'cat' needs DRon: off on the phone, so it scores −1 and never wins)
+    enum Choice: String { case rest, look, go, sleep, greet, offer }
 
     // the needs (the web's BRAIN starting values; brainReset puts them back)
     var z = 0.3, q = 0.3, s = 0.0, f = 0.0, e = 0.4
@@ -60,6 +64,7 @@ struct SlimeBrain {
         case .go: return "走"
         case .sleep: return "睡覺"
         case .greet: return "來找你"
+        case .offer: return "把你常摸的那邊靠過來"
         }
     }
 
@@ -183,16 +188,20 @@ struct SlimeBrain {
     /// (look, go, sleep, greet; offer and cat draw nothing while they cannot be chosen). sleepOK here is the web's `!opening&&sleepOK()&&idleT>8`.
     /// One row of brainPick's table: the choice, its score, the need's name and value for `why`
     struct Score { let k: Choice; let v: Double; let why: String; let n: Double }
-    /// brm: the web's BRM() (the rig's brainM: the mood, 0 while it is off)
-    mutating func pick(t: Double, greetLook: Bool, canGo: Bool, sleepOK: Bool, e4OK: Bool, brm: Double) -> Choice {
+    /// brm: the web's BRM() (the rig's brainM: the mood, 0 while it is off).
+    /// v2.64 記地方: goScared = the web's `MMon()&&SILL.plane==='room'&&BMEM.cell[memCellAt(globalC.xc)]<-.3` (sitting in a cell it was scared in: +0.4 to go);
+    /// offerOK = memCanOffer() ('offer' draws its random only then, so brMem 0 draws what v2.63 drew)
+    mutating func pick(t: Double, greetLook: Bool, canGo: Bool, sleepOK: Bool, e4OK: Bool, brm: Double, goScared: Bool, offerOK: Bool) -> Choice {
         let na: Double = greetLook && t < ojT ? OpenJ.n : 0.16
         let calm = 1 - f
         var c: [Score] = [Score(k: .rest, v: K.rest, why: "都不高", n: 0)]
         do { let r = rnd(); c.append(Score(k: .look, v: q + 0.3 * f + (r - 0.5) * na, why: "好奇", n: q)) }
-        if canGo { let r = rnd(); c.append(Score(k: .go, v: e * (1 - 0.5 * z) * (1 - 0.5 * f) * (1 + 0.3 * brm) + (r - 0.5) * na + 0, why: "想動", n: e)) }   // + 0: the scared cell (MMon), slice 3
+        if canGo { let r = rnd(); c.append(Score(k: .go, v: e * (1 - 0.5 * z) * (1 - 0.5 * f) * (1 + 0.3 * brm) + (r - 0.5) * na + (goScared ? 0.4 : 0), why: "想動", n: e)) }
         else { c.append(Score(k: .go, v: -1, why: "想動", n: e)) }
         if sleepOK && z > zAt { let r = rnd(); c.append(Score(k: .sleep, v: z * calm + (r - 0.5) * na, why: "睏", n: z)) } else { c.append(Score(k: .sleep, v: -1, why: "睏", n: z)) }
         if e4OK { let r = rnd(); c.append(Score(k: .greet, v: s * calm + (r - 0.5) * na, why: "想被摸", n: s)) } else { c.append(Score(k: .greet, v: -1, why: "想被摸", n: s)) }
+        if offerOK { let r = rnd(); c.append(Score(k: .offer, v: s * calm * 0.9 + (r - 0.5) * na, why: "想被摸", n: s)) } else { c.append(Score(k: .offer, v: -1, why: "想被摸", n: s)) }   // v2.64 (web 'offer')
+        // 'cat' (去推東西, drCatOK): the decorations, 第三批第 2 項; the web draws nothing for it while it cannot be chosen
         var b = c[0]
         for x in c where x.v > b.v { b = x }
         want = b.k.rawValue
@@ -204,5 +213,42 @@ struct SlimeBrain {
     mutating func goAfterLook() -> Bool {
         let r = rnd()
         return e * (1 - 0.5 * z) * (1 - 0.5 * f) + (r - 0.5) * 0.16 > K.rest
+    }
+
+    /// v2.64 第三片「記地方」: the web's BMEM (v2.43). cell: the sill's five cells left to right, −1 (scared there) to 1 (stroked well there);
+    /// side: −1 (you mostly touch its left) to 1 (its right). ev: what the memory saw last (MOOD.happyT, IMP.w, MOOD.scare), so only a new one counts;
+    /// dirty / at: changed since the last write / when it was last written (the rig writes at most every 3 s, the web's memSave);
+    /// leans: how many times it offered you its side this slime; offerAt: when it last did (the web's BMEM.offerAt, −99 from memGet).
+    struct Mem {
+        struct Ev { var h = -9.0, w = 0.0, sc = 0.0 }
+        var cell: [Double] = [0, 0, 0, 0, 0]
+        var side = 0.0
+        var ev = Ev()
+        var dirty = false
+        var at = -9.0
+        var leans = 0
+        var offerAt = -99.0
+        /// memAdd: one cell nudged, kept in −1...1
+        mutating func add(_ k: Int, _ d: Double) {
+            guard cell.indices.contains(k) else { return }
+            cell[k] = max(-1, min(1, cell[k] + d)); dirty = true
+        }
+        /// memFav: the most liked cell, only past 0.3; −1 = none
+        func fav() -> Int {
+            var b = -1, bv = 0.3
+            for k in cell.indices { if cell[k] > bv { bv = cell[k]; b = k } }
+            return b
+        }
+        /// memDecay: the disliked cells fade in three days, the liked ones stay (多米 11-14, 第 6 題). days: since it was put away
+        static func decay(_ cell: [Double], days: Double) -> [Double] {
+            cell.map { v in v < 0 ? min(0, v + days / 3) : v }
+        }
+        /// What is kept for one slime (the web's BMEMS entry): cell and side to 3 decimals, ts = when, in ms since 1970 (the web's Date.now())
+        struct Saved { var cell: [Double]; var side: Double; var ts: Double }
+        /// memPut's rounding (the web's +v.toFixed(3))
+        func saved(ts: Double) -> Saved {
+            func r3(_ x: Double) -> Double { x.isFinite ? (x * 1000).rounded() / 1000 : 0 }   // a NaN never reaches the stored JSON
+            return Saved(cell: cell.map(r3), side: r3(side), ts: ts.isFinite ? ts : 0)
+        }
     }
 }

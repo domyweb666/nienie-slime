@@ -346,6 +346,8 @@ struct FeelParams: Equatable, Codable {
     // v2.63 大腦第二片 (web mood, moodHalf v2.42; the same keys and defaults for all three materials). SlimeBrain.mood, SlimeRig mdOn / brainM / brainMS
     var mood: Double = 1              // 心情: 1 = a mood that changes over minutes (purr, happy, its rhythm answered: better; pulled, scared, woken: worse) and leans the needs, posture, eyes, strides, the flinch, a poke; only this opening. 0 = as before. Needs brain
     var moodHalf: Double = 300        // 心情多久退一半 (s): with nothing happening the mood goes back to 0.1 (a mild liking), half the way in this many seconds
+    // v2.64 大腦第三片「記地方」(web brMem v2.43; the same key and default for all three materials). SlimeBrain.Mem, SlimeRig MARK v2.64 記地方, SlimeController brainMems ("nienie.brain")
+    var brMem: Double = 1             // 記性: 1 = it remembers on the sill where it was stroked well (goes back there to rest, to sleep) and where it was scared (walks round it), and which side you mostly touch (trusting, it offers you that side); the liked cells stay across days, the disliked fade in 3 days; 0 = as v2.63 (home always the middle of the sill, nothing written)
     // v2.63 C9 (web nap, napPurr, napWait; NAP, napStep, napReady; the same keys and defaults for all three materials). SlimeRig MARK v2.63 C9
     var nap: Double = 1               // 揉夠了在你手邊睡著: 1 = purred napPurr s in all this opening, then no finger for napWait s, it falls asleep where you last touched it (not back to the mat, no 前兆, no words); 0 = as before
     var napPurr: Double = 60          // 揉多久會睡在手邊 (s): purr over 0.3 counted this opening (a slime switch, a rebuild, a rotation start it again). The number is mine, to be tried on a phone
@@ -660,7 +662,7 @@ struct TuneField: Identifiable {
     var section = "手感"
     var id: String { name }
 
-    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61", "這一批 v2.63"]
+    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61", "這一批 v2.63", "這一批 v2.64"]
 
     static let all: [TuneField] = [
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
@@ -979,6 +981,8 @@ struct TuneField: Identifiable {
         TuneField(key: \.bond, name: "怕的要哄、熟要有得長 v2.63", hint: "1（D6）：熟拆兩層：今天的親近（原本的熟，揉 7 秒就滿）照舊，另外一個只升不降的交情（熟滿了還在揉、摸，每分鐘 +0.01，存著跨天留；快扯不扣；畫面不顯示）。交情高時，隔 2 秒以上的第一下碰不縮、朝手指靠。戒高（快扯、連點三下之後）時溫柔摸要先 3 秒，嘆一口氣才開始舒服、呼嚕。數字等多米摸。0 回改之前（存檔不寫交情）", range: 0...1, step: 1, section: "這一批 v2.63"),
         // v2.63 B6 (the web's words for sndB6)
         TuneField(key: \.sndB6, name: "拉回去再拉有絲聲 v2.63", hint: "1（B6）：同一抓拉長、縮回去、再拉，每次往外拉都有細絲一根根斷的聲音（縮回 1.5 格就退一格，一格 0.4R）；按下去只清掉上次放手的餘韻（冒小泡），不清別的聲音。0 回改之前（同一抓只有拉得比之前都長才有絲斷聲；按下去清掉所有排著的聲音）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.64 大腦第三片 (the web's words for brMem, 記性 v2.43; the phone has it from v2.64)
+        TuneField(key: \.brMem, name: "記性 v2.64", hint: "1：牠記得窗台上哪裡被摸得舒服、哪裡被嚇過，也記得你常從哪一邊摸牠。喜歡的那格牠會回去休息、睡覺；被嚇過的那格牠繞開。熟了以後，牠沒事時會把你常摸的那邊靠過來。喜歡的留到明天，討厭的三天退完。0 回 v2.63（家固定在窗台正中間，什麼都不記）。要大腦開著才有作用", range: 0...1, step: 1, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
