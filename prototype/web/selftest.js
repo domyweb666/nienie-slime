@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.64（11-27）：加 T91（B8 起步跟手：每秒 120 格，最上面往裡 0.3R 抓住往上拉，60、150、300、600 點每秒走 2 點 startFollow 1 要比 0 早一半以上、拉到最後的落後差 15% 內、0 時 lagK 每格就是原本的公式；B8 甲乙對到的組；在 T90 後面、T74 前面跑，幾秒）
    v2.64（11-27）：加 T89（C8 十隻招牌動作、喜歡的位置：十隻各放著 5 分鐘，自己的招牌 2 次以上、別隻的 0 次、喜歡那格待最久；signature 0 不做、家在布墊；你摸出來的喜歡和夜晚蠟燭優先；在 T88 後面、T74 前面跑，約 5 分鐘）。
      舊項目一律 signature 0；T72、T73、T78、T79、T82、T84、T87 也釘 0（整份比對過預設 1 和改之前，這七項的數字會變；T42、T70、T74、T81 本來每次都不同）。
    v2.64（11-27）：加 T88（D8 點一下傾完 0.4 秒頂回來、看你 1.5 秒、不碰時戒熟交情不動、1.5 秒內再碰沒有另外的獎勵；揉 30 秒有慢眨、只用睜眼和閉眼那條線；兩顆開著但沒點沒呼嚕時跟 0 逐點一樣；在 T87 後面、T74 前面跑）。
@@ -2536,6 +2537,55 @@
     const okE = !r.err && r.e.used && r.e.base.every(v => v === 0) && r.e.tr[0] > 0 && r.e.n[0] > 0 && r.e.diff[0] >= 150 && r.e.tr[1] > 0 && r.e.diff[1] > 0 && r.e.diff[1] < r.e.diff[0] && r.e.tr[2] === 0 && r.e.diff[2] === 0 && r.e.n[2] === 0 && r.e.n0.every(v => v === 0);
     r.part = { a: okA, b: okB, c: okC, d: okD, e: okE }; r.ok = okA && okB && okC && okD && okE;
     res.T90_wallTrail = r; res.PASS.wallTrail = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T91 v2.64 B8 起步跟手（startFollow；BATCH3 第 7 項，手機照這條搬）。窗台、白天、沒有窗景、芋圓、真正的預設（PRE54），牠自己會動的都關（大腦、招牌、張望有對象、頂回來、情緒、活物感、蠕動、偽足、漂、遊走：
+  //   量的是跟手，偽足剛好長在最上面那點、或自己挪開，走 2 點會量到 400 到 600 毫秒；照 F3 vis.js 一樣關掉）。
+  // 照 .vibe/audit-2026-11-24/量測工具/F3/vis.js、drag.py 的量法：每秒 120 格（手機的格數），身體最上面那點往裡 0.3R 按下去，等 12 格，手指往上每秒 v 點（畫面的點）一直拉。
+  //   「那塊」＝按下去抓到的那些粒子（f.mem 前 n0 個）照權重平均、換成畫面座標；走 2 點＝沿著拉的方向離手指開始動前那一格 2 點以上，從手指動的第一格算起幾毫秒。
+  //   a 四種速度（60、150、300、600 點每秒）startFollow 1 都比 0 早一半以上（規劃 B8「起步早一半以上」；當時試改 58／33／25／17 對 142／83／58／42，只記錄不擋）
+  //   b 尾巴不變：150、300、600 點每秒拉到最後一格，手指和那塊差幾點，1 跟 0 差在 15% 內（60 點每秒 0.9 秒只走 0.5R，還沒變回 0.22，不比）
+  //   c startFollow 0：每一格的 lagK 就是原本的 1−exp(−dt/lag)（一格都不差）；startFollow 1：手指動之前（12 格）時間常數 20 毫秒、拉到最後一格回到 lag，停 0.1 秒（超過 80 毫秒）走過的距離歸零
+  //   d B8 盲比：甲乙對到的組照 b8Map（測試裡換成固定的 0、1，不碰 localStorage）；黏土的慢一拍換成那組的、麻糬照自己的；沒在比時就是 mat 的值
+  //   另外記（不擋）：每種速度最後落後幾點、換算幾毫秒；亂捏打結比例不在這裡量（tools/web-bench/b8fz.py，40 組，規劃說判不出好壞）
+  { const clock = saveClock(), sl0 = SLIME, view0 = { ...VIEW }, cm0 = curMat, r = { a: {}, tail: {} }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, D2 = 1 / 120;
+    const base = Math.floor(seeded(91)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(91) 的種子，每一輪不同
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); const k = 2, S = SLIMES[k]; Math.random = seeded(sd + base); SLIME = k; curMat = S.mat;
+      mat = { ...PRE54[S.mat], seed: S.seed, ...S.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, brain: 0, signature: 0, lookTarget: 0, tapBack: 0, emo: 0, life: 0, life2: 0, wriggle: 0, morph: 0, pods: 0, drift: 0, wander: 0, ...over }; setup();
+      t = 0; lastTouch = -10; nextTwitch = 9e9; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99;
+      E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; FLN.say = null; PAIR.tearT = -9; PAIR.over = 0; for (let i = 0; i < 720; i++) update(D2); log.splice(0); };
+    // 拉一次：回走 2 點幾毫秒、最後落後幾點、每格的 lagK 跟舊公式差多少、時間常數
+    const pull = (over, v, sd, stop) => { fresh(over, sd); const c = globalC; let bi = bnd[0]; for (const i of bnd) if (Y[i] < Y[bi]) bi = i;
+      const [sx, sy] = sc(X[bi], Y[bi] + R * .3), wait = 12, n = wait + Math.round((v < 300 ? .9 : v === 300 ? .6 : .35) / D2);
+      ev('pointerdown', 1, sx, sy); const f = fingers.get(1), n0 = f && f.mem.length; let p0 = null, t2 = null, kd = 0, last = null; const tau = [];
+      const patch = () => { let px = 0, py = 0, w = 0; for (let q = 0; q < Math.min(n0, f.mem.length); q++) { const m = f.mem[q]; px += X[m[0]] * m[3]; py += Y[m[0]] * m[3]; w += m[3]; } return sc(px / w, py / w); };
+      for (let k = 1; k <= n; k++) { let ey = sy; if (k > wait) { ey = sy - v * D2 * (k - wait); ev('pointermove', 1, sx, ey); }
+        update(D2); if (!f || !fingers.has(1)) break; const L = mat.lag, old = L > 0 ? 1 - Math.exp(-D2 / L) : 1; kd = Math.max(kd, Math.abs(f.lagK - old)); tau.push(f.sfTau == null ? null : +f.sfTau.toFixed(4));
+        const p = patch(); if (k === wait) p0 = p; if (k > wait && t2 == null && p0 && p0[1] - p[1] >= 2) t2 = +((k - wait) * D2 * 1000).toFixed(1); last = [sy - ey, p0 ? p0[1] - p[1] : 0]; }
+      let sfD = null; if (stop && f) { for (let k = 0; k < 12; k++) update(D2); sfD = f.sfD; }
+      ev('pointerup', 1, sx, sy); for (let k = 0; k < 60; k++) update(D2);
+      return { t2, gap: last ? +(last[0] - last[1]).toFixed(1) : null, kd, tau0: tau[wait - 1], tauEnd: tau[tau.length - 1], sfD, mode: f ? f.mode : null, n0 }; };
+    try {
+      Object.assign(VIEW, { bg: 'day', win: '' });
+      // 每一次量之前先跑一次一樣的墊底（0、每秒 300 點）：fresh 清不掉上一次拉留下的一點狀態（上一次拉多快多久，會讓下一次走 2 點差一格），墊底之後 1 和 0 的起點一樣
+      const prime = () => pull({}, 300, 9101);
+      for (const v of [60, 150, 300, 600]) { prime(); const o = pull({}, v, 9101); prime(); const q = pull({ startFollow: 1 }, v, 9101, true); r.a[v] = [o.t2, q.t2]; r.tail[v] = [o.gap, q.gap, +(o.gap / v * 1000).toFixed(0), +(q.gap / v * 1000).toFixed(0)];
+        if (v === 300) r.c = { kd0: o.kd, tau0: q.tau0, tauEnd: q.tauEnd, sfD: q.sfD, mode: [o.mode, q.mode], n0: [o.n0, q.n0] }; }
+      // d 盲比那組：b8Map 換成固定的值，B8 照原樣還回去
+      { const m0 = b8Map, c0 = B8.cur, s0 = B8.set, out = []; try { for (const mp of [0, 1]) { b8Map = () => mp; for (const who of ['甲', '乙']) { B8.cur = who; B8.set = 'both'; const i = who === '甲' ? mp : 1 - mp, A = B8SETS.both.arms[i];
+              mat = { ...PRE54.clay, startFollow: 0 }; curMat = 'clay'; const okC = lagNow() === A.lag && sfOn() === (A.sf >= .5); curMat = 'mochi'; mat = { ...PRE54.mochi }; const okM = lagNow() === PRE54.mochi.lag && sfOn() === (A.sf >= .5); out.push(okC && okM); } }
+          B8.cur = null; curMat = 'clay'; mat = { ...PRE54.clay, startFollow: 1, lag: .17 }; out.push(lagNow() === .17 && sfOn() === true); mat.startFollow = 0; out.push(sfOn() === false); }
+        finally { b8Map = m0; B8.cur = c0; B8.set = s0; } r.d = out; }
+      r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); FLN.say = null; log.splice(0);
+    Object.assign(VIEW, view0); SLIME = sl0; curMat = cm0; IMP.tr = I0.tr; IMP.w = I0.w; impReset(); Object.assign(BRAIN, B0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    const V = [60, 150, 300, 600];
+    const okA = !r.err && V.every(v => r.a[v][0] != null && r.a[v][1] != null && r.a[v][1] <= r.a[v][0] * .5);
+    const okB = !r.err && [150, 300, 600].every(v => Math.abs(r.tail[v][1] - r.tail[v][0]) <= Math.abs(r.tail[v][0]) * .15);
+    const okC = !r.err && r.c.kd0 === 0 && r.c.tau0 === SFK.t0 && Math.abs(r.c.tauEnd - PRE54.clay.lag) < 1e-4 && r.c.sfD === 0 && r.c.mode.every(m => m === 'grab');
+    const okD = !r.err && r.d.length === 6 && r.d.every(Boolean);
+    r.ref = { plan0: [142, 83, 58, 42], plan1: [58, 33, 25, 17] };
+    r.part = { a: okA, b: okB, c: okC, d: okD }; r.ok = okA && okB && okC && okD;
+    res.T91_startFollow = r; res.PASS.startFollow = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
