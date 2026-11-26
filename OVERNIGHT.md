@@ -97,3 +97,4 @@
 - 19:18 第 16 項做完（`2054f3e`）：原因是晃動感測一開 app 就啟動、步數只看有沒有按過好。改成 `shake` 開或珍奶才啟動晃動、`walkShow` 開才讀步數，調節台改參數跟著開停；加「查詢沒回來不再查」。呼叫點都在 SlimeController：startDeviceMotionUpdates 只在 startMotion（:440），queryPedometerData 只在 walkReadSteps（:407）。
 - 19:18 第 17 項做完（`c0c5466`）：原因是三種材質只差 floppy，一變就整隻重建，窗台上從碗口上方 0.6R 放下來。`deskSmooth` 1：只有 floppy 變就就地改，種子／大小／密度變才重建並連上一幀整團搬回。T86 外框每格最大位移：窗台 0.74–1.20R→0.007–0.10R，藍底 0.14–2.14R→0.005–0.18R。沒釘舊項目。
 - 19:18 第 18 項做完（`5034a11`）：新增 `ios/NieNie/Resources/PrivacyInfo.xcprivacy`（追蹤 false、收集資料空、UserDefaults CA92.1、開機時間 35F9.1），project.yml 整個資料夾收、加註解；程式沒有網路請求。步數權限文字改掉「沾到什麼」。版本號現況：MARKETING_VERSION 0.2.0，build 號 CI 用 github.run_number。整份 86／86 一次（1481 秒）。可疑：SlimeController 422–434 stepsWas Optional、410 weak self 閉包；SlimeRig 2704–2733 deskRebuild 設 private(set)。推上去跑 CI（也看隱私檔有沒有進 bundle），開始第 20 項。
+- 19:19 第 21 項先開跑：最終程式快照 `5034a11`（第 20 項只改文件）整份自測 ×3，port 8980，結果寫到 scratch 的 full-5034a11.json。CI run 45809416531 在跑。第 20 項交給子代理。
