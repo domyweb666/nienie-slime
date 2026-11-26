@@ -393,6 +393,8 @@ final class WindowRenderer {
     private var lastDraw: CFTimeInterval = 0
     private var shownFrames = 0
     private let t0: CFTimeInterval = CACurrentMediaTime()
+    /// v2.64 C5 張望有對象：窗景現在在第幾秒（跟 draw 用的 T 同一個鐘；減少動態時 draw 停在 0，牠那邊這時不看窗景）
+    var clock: Double { CACurrentMediaTime() - t0 }
     private var mixed: MTLTexture?                   // 1×, the whole view: the window's picture with the room over it
 
     init?(device: MTLDevice, queue: MTLCommandQueue) {

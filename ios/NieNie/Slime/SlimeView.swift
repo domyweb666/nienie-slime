@@ -237,6 +237,43 @@ final class SlimeView: UIView {
                 self?.rig.relax(); self?.rig.onEvent?(.press(gain: 0.7)); return true
             },
         ]
+        rig.winMover = { [weak self] gx, gy, gw, gh, minV in self?.winMover(gx, gy, gw, gh, minV) }   // v2.64 C5 張望有對象
+    }
+
+    /// v2.64 C5 張望有對象（網頁 ltWin）：窗景裡這一刻正在動、在窗洞裡、每秒移動 minV 以上的那幾層，挑「速度 × 透明度」最大那層，回它的中心。
+    /// 中心 = 那層的框（還沒套動畫前）的中心，套上設計單位 → 窗洞的縮放和那層這一刻的動畫；速度取前後兩段 0.2 秒裡慢的那段（飄完從頭再來那一跳不算）。
+    /// 只看現在選的那扇（還在載入、先畫上一扇時不算）；虛線（瀑布）、不會動的、透明度不到 0.3 的不算。減少動態由牠那邊擋
+    private func winMover(_ gx: Double, _ gy: Double, _ gw: Double, _ gh: Double, _ minV: Double) -> (i: Int, x: Double, y: Double)? {
+        guard let st = winShown, st.def.id == winId, let r = windows, let lib = WindowLibrary.shared, lib.w > 0, lib.h > 0, gw > 0, gh > 0 else { return nil }
+        let T: Double = r.clock
+        let base = WindowAff(a: gw / lib.w, b: 0, c: 0, d: gh / lib.h, e: gx, f: gy)
+        func at(_ it: WindowItem, _ T: Double) -> (x: Double, y: Double) {
+            var m = base
+            for o in it.ops { m = m.times(o.at(T)) }
+            return m.apply(it.box[0] + it.box[2] / 2, it.box[1] + it.box[3] / 2)
+        }
+        var best: (i: Int, x: Double, y: Double, v: Double)? = nil
+        for (i, it) in st.items.enumerated() {
+            guard it.dash == nil, it.box.count >= 4 else { continue }
+            let moving: Bool = it.ops.contains { op in
+                if case .fixed = op { return false }
+                return true
+            }
+            guard moving else { continue }
+            var al: Double = 1
+            for a in it.alphas { al *= a.at(T) }
+            if !(al >= 0.3) { continue }
+            let p = at(it, T)
+            if !(p.x >= gx && p.x <= gx + gw && p.y >= gy && p.y <= gy + gh) { continue }
+            let p1 = at(it, T - 0.2), p2 = at(it, T - 0.4)
+            let sp: Double = min(hypot(p.x - p1.x, p.y - p1.y), hypot(p1.x - p2.x, p1.y - p2.y)) / 0.2
+            if !(sp >= minV) { continue }
+            let v: Double = sp * al
+            if let b = best, !(v > b.v) { continue }
+            best = (i: i, x: p.x, y: p.y, v: v)
+        }
+        guard let b = best else { return nil }
+        return (i: b.i, x: b.x, y: b.y)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

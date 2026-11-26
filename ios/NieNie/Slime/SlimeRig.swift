@@ -355,6 +355,12 @@ final class SlimeRig {
     private enum LifeState { case rest, look, go, arrive, sleep, route }   // v2.23 sleep (B2); v2.30 route: walking a route on the sill (the route decides, not the life)
     private struct Sniff { var a, L, t0, T1, T2, T3, ph: Double; var cut = 0.0, eCut = 0.0, id = 0 }
     private var sniffSeq = 0
+    // v2.64 C5 張望有對象（lookTarget；網頁 LT、LTK，第三批第 3 項）。程式在 MARK v2.64 C5（pickDir 旁邊）。
+    // ltCur：這次探的對象（ltPick 挑的，排進 ltReactQ 就清掉）；ltReactQ：看完的小反應（sid 是那條偽足的 id，網頁拿偽足物件本身比）；
+    // ltHabT：每個對象上次被看的時間（90 秒內份量慢慢回來）；ltS：自己那串亂數（網頁 ltRnd），rng 一個都不多抽。lookTarget 0 時都不會動
+    private struct LookTgt { let k: String; let key: String; let x: Double; let y: Double; let ta: Double }
+    private struct LookReact { let tg: LookTgt; let sid: Int; let a: Double; var at: Double }
+    private var ltCur: LookTgt? = nil, ltReactQ: LookReact? = nil, ltHabT: [String: Double] = [:], ltS: UInt32 = 1
     private var lifeSt = LifeState.rest, lifeUntil = -1.0, lifeLooks = 0, lifeNoGo = false, sniffs: [Sniff] = []
     private var attOn = false, attAt = 0.0, attX = 0.0, attY = 0.0
     private var lifeWrg = 1.0, goFade = 0.0, lastDir = 0.0
@@ -492,6 +498,9 @@ final class SlimeRig {
     /// v2.64: set by the controller; the rig calls it when the places changed and it is time to write them (the web's memSave: memPut, then localStorage).
     /// The controller reads memSaved(ts:) for the slime on screen. nil (the Linux harness): nothing is written
     var memWrite: (() -> Void)?
+    /// v2.64 C5 張望有對象（網頁 ltWin）：畫面那邊設的，問「窗景裡現在有沒有正在動的東西」。傳進去窗洞（gx、gy、gw、gh）和最慢要多快（點／秒），
+    /// 回來最快那層的編號和中心（跟牠同一套座標）。窗景存在畫面那邊（Metal），物理檔只准 Foundation，所以用這個問。nil（沒有畫面、Linux 測試）：不看窗景
+    var winMover: ((_ gx: Double, _ gy: Double, _ gw: Double, _ gh: Double, _ minV: Double) -> (i: Int, x: Double, y: Double)?)?
     /// What the brain is doing and why it chose the last thing (the web's 「牠在想什麼」 lines; no readout on the phone yet)
     var brainSay: (act: String, why: String) { (act: brain.act, why: brain.why) }
     /// v2.23 收集: switching slimes brings that one's impression back (this run only).
@@ -1211,6 +1220,7 @@ final class SlimeRig {
         e4On = false; e4Wait = -1   // v2.22
         leanT = -9; leanO = 0; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0; camRSt = 0; camRUntil = -9
         rubvBag = []; rubvLast = ""; rubvHopT = -99; rubvSpT = -9   // v2.63 C6: the clock set back, the last hop and the melting must not sit in the future
+        ltCur = nil; ltReactQ = nil; ltHabT = [:]; ltS = brain.seed ^ 0x5bd1_e995   // v2.64 C5（網頁 setup：Object.assign(LT,…)）：排好的反應、看過的對象跟著重建清掉；自己那串亂數從大腦的種子接（brainReset 不動種子，所以放在 brain.reset 前後都一樣）
         QDX = QX; QDY = QY; QVX = [Double](repeating: 0, count: N); QVY = QVX; QW = QVX; cvX = 0; cvY = 0; caX = 0; caY = 0; cpX = nil; cpY = nil; tickLastT = -9   // v2.25
         stkOX = 0; stkOY = 0; stkVX = 0; stkVY = 0; stkG = 0; stkLast = -9; stkSaid = false; stkPet = false; trail = []   // v2.26
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
@@ -5251,9 +5261,90 @@ final class SlimeRig {
     }
     /// v2.63 C5 (web pickDir, lookNoDown): on the sill a sniff pointing down (screen y grows down, sin > 0) is mirrored over the horizon;
     /// no extra draws from rng, so lookNoDown 0 is as before. MARK v2.63 C5
+    /// v2.64 C5 lookTarget：先照舊抽（rng 抽的次數不變），有對象時換成朝對象；lookNoDown 照樣套在後面
     private func pickDir() -> Double {
-        let a = pickDir0()
+        var a = pickDir0()
+        if params.lookTarget >= 0.5 { a = ltPick(a) } else { ltCur = nil }
         return params.lookNoDown >= 0.5 && sillOn && sin(a) > 0 ? -a : a
+    }
+
+    // MARK: v2.64 C5 張望有對象（lookTarget；規劃 .uiux/04-手感/極致優化規劃-暫定.md 的 C5，BATCH3 第 3 項；網頁 LT、LTK、ltRnd、ltHab、ltWin、ltCands、ltPick、ltArm、ltTap、ltReact）
+    // 原本張望的方向只是亂抽（v2.63 起不朝下）。現在每次要探之前看看旁邊有沒有東西可看（ltCands）：
+    //   touch 你碰過的地方：最後一次摸牠、放手的位置（impLX、impLY），3 分鐘內，離牠 0.9R 以上才算；記性開著時，牠最喜歡那一格也算
+    //   win   窗景裡正在動的東西（winMover，畫面那邊算：這一刻在窗洞裡、每秒移動 0.08R 以上，挑最快那層；減少動態時不算）
+    //   bell  掛著的風鈴、晴天娃娃，在晃的時候
+    //   prop  窗台上的擺飾（蠟燭、書堆、玻璃罐），左右 3R 以內
+    // 份量：碰過的地方 1 到 0.3、喜歡那格 0.6、窗景 0.8、風鈴 1.2、擺飾 0.4；同一個對象剛看過，90 秒內份量從 0 慢慢回來。份量加起來乘 0.75 是這次「有對象」的機率。
+    // 看完一個小反應（ltReact，排在偽足伸到底、停了六成的時候；被碰、走開、偽足被收掉就不做）：碰過的地方朝那邊靠一下（被嚇過、戒高往反方向縮），
+    // 會動的東西和風鈴眨一下眼、偽足再點一下，擺飾偽足再點一下。亂數用自己那串（ltRnd），rng 一個都不多抽。lookTarget 0：ltPick、ltReact 都不會跑，跟 v2.63 一樣。
+    private enum LTK {
+        static let p = 0.75, hab = 90.0, near = 3.0, touchT = 180.0, winV = 0.08, tap = 0.3
+    }
+    /// 網頁 ltRnd：(seed·1664525 + 1013904223) mod 2³²，跟大腦的 brnd 同一種
+    private func ltRnd() -> Double {
+        ltS = ltS &* 1_664_525 &+ 1_013_904_223
+        return Double(ltS) / 4_294_967_296
+    }
+    /// 剛看過的對象份量從 0 慢慢回來；時鐘倒回去（重建）時留在未來的不算
+    private func ltHab(_ k: String) -> Double {
+        guard let v = ltHabT[k], v <= t else { return 1 }
+        return min(1, (t - v) / LTK.hab)
+    }
+    private typealias LookCand = (k: String, key: String, x: Double, y: Double, w: Double)
+    private func ltCands() -> [LookCand] {
+        var o: [LookCand] = []
+        guard clusters.indices.contains(gi) else { return o }
+        let cx = clusters[gi].xc, cy = clusters[gi].yc
+        func add(_ k: String, _ key: String, _ x: Double, _ y: Double, _ w0: Double) {
+            if hypot(x - cx, y - cy) < R * 0.9 { return }
+            let w = w0 * ltHab(key)
+            if w > 0.01 { o.append((k: k, key: key, x: x, y: y, w: w)) }
+        }
+        if impHas && lastTouch <= t && t - lastTouch < LTK.touchT { add("touch", "touch", impLX, impLY, 1 - 0.7 * (t - lastTouch) / LTK.touchT) }
+        guard sillOn, let g = sillG, sillPlane == .room, !sillInBowl else { return o }
+        if mmOn { let k = mem.fav(); if k >= 0 { add("touch", "fav", memCellX(g, k), cy, 0.6) } }
+        if !reduceMotion, let m = winMover?(g.gx, g.gy, g.gw, g.gh, R * LTK.winV), m.x.isFinite, m.y.isFinite { add("win", "win\(m.i)", m.x, m.y, 0.8) }
+        if dreal {
+            for q in hangs where q.on && q.held == nil && (abs(q.va) > 0.5 || abs(q.a) > 0.08) { add("bell", q.name, q.x - sin(q.a) * q.h * 0.7, q.y + q.h * 0.7, 1.2) }
+        }
+        for p in props where !p.gone && p.fade == 0 && p.alpha >= 0.6 && p.held == nil && abs(p.x - cx) < R * LTK.near { add("prop", "p:" + p.im, p.x, min(p.y, g.fl), 0.4) }   // 手機的 props 只有擺飾（網頁的 p.deco 一定成立）
+        return o
+    }
+    /// 網頁 ltPick：有對象就朝對象（加 ±0.1 弧度），沒有就用原本抽的 a
+    private func ltPick(_ a: Double) -> Double {
+        ltCur = nil
+        let c = ltCands()
+        guard !c.isEmpty, clusters.indices.contains(gi) else { return a }
+        var w = 0.0
+        for q in c { w += q.w }
+        if ltRnd() >= LTK.p * min(1, w) { return a }
+        var r = ltRnd() * w
+        var q = c[c.count - 1]
+        for x in c { r -= x.w; if r <= 0 { q = x; break } }
+        ltHabT[q.key] = t
+        let ta = atan2(q.y - clusters[gi].yc, q.x - clusters[gi].xc)
+        ltCur = LookTgt(k: q.k, key: q.key, x: q.x, y: q.y, ta: ta)
+        return ta + (ltRnd() - 0.5) * 0.2
+    }
+    /// 網頁 ltTap：偽足再往前點一下，疊在正在探的那條上（不先收掉別的偽足）；rng 不抽
+    private func ltTap(_ a: Double) {
+        sniffSeq += 1
+        sniffs.append(Sniff(a: a, L: LTK.tap, t0: t, T1: 0.12, T2: 0.06, T3: 0.25, ph: 0, id: sniffSeq))
+    }
+    /// 網頁 ltReact：看完的小反應；晚了 0.3 秒以上、不在張望、手指在上面、睡著、在逃、那條偽足被收掉或已經不在，就不做
+    private func ltReact() {
+        guard let r = ltReactQ else { return }
+        ltReactQ = nil
+        guard t - r.at <= 0.3, lifeSt == .look, fingers.isEmpty, !slpOn, !escOn,
+              let s = sniffs.first(where: { $0.id == r.sid }), !(s.cut > 0) else { return }
+        if r.tg.k == "touch" {
+            let k = memCellAt(r.tg.x)
+            let bad = impWary > 0.4 || (mmOn && sillPlane == .room && mem.cell.indices.contains(k) && mem.cell[k] < -0.3)
+            if iv3(params.e2) { leanT = t; leanA = r.a; leanS = bad ? -1 : 1 } else { ltTap(r.a) }
+        } else {
+            ltTap(r.a)
+            if r.tg.k != "prop" { eyeBlinkT = t; eyeNextBlink = max(eyeNextBlink, t + 1.2) }
+        }
     }
     private func pickDir0() -> Double {
         if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6, using: &rng) }   // too far out: sniff back
@@ -5440,6 +5531,7 @@ final class SlimeRig {
             if d > R * 1.6 { gaitTo(askX - dx / d * R * 1.1, askY - dy / d * R * 1.1, dash: false) }
             else { lifeSt = .look; lifeLooks = 0; lifeNoGo = true; lastDir = ang; lifeUntil = t + 2.8 }
         }
+        if let q = ltReactQ, t >= q.at { if lured || e4 { ltReactQ?.at = -9 }; ltReact() }   // v2.64 C5 看完的小反應（手指在旁邊、來找你時不做）；lookTarget 0 時 ltReactQ 一直是 nil
         if !lured && !e4 && !napOn {   // v2.63 C9: the few seconds it waits to fall asleep at your hand, it does not change what it is doing (no walking, not back to the mat); nap 0: napOn is always false
             if lifeSt == .rest && t >= lifeUntil {
                 if brOn { brainRest(canGo) }   // v2.63 大腦
@@ -5453,6 +5545,7 @@ final class SlimeRig {
                     if mdOn { brain.m += 0.005 }   // v2.63 心情: a look about, a very little better (the web's; clamped in the next mood step)
                     let a = pickDir(), s = startSniff(a, params.podLen * (0.75 + 0.35 * Double.random(in: 0..<1, using: &rng)), 1.2, 0.5 + Double.random(in: 0..<1, using: &rng), 0.8)
                     lastDir = a; lifeUntil = t + s.T1 + s.T2 + s.T3 + 0.3 + Double.random(in: 0..<0.5, using: &rng)
+                    if let cur = ltCur { ltReactQ = LookReact(tg: cur, sid: s.id, a: a, at: t + s.T1 + s.T2 * 0.6); ltCur = nil }   // v2.64 C5（網頁 ltArm）：有對象就排一個看完的小反應；lookTarget 0 時 ltCur 一直是 nil
                 } else if !lifeNoGo && canGo && (brOn ? brain.goAfterLook() : Double.random(in: 0..<1, using: &rng) < 0.65) {
                     if brOn { brainGo(lastDir) } else { goStart(lastDir + Double.random(in: -0.175..<0.175, using: &rng)) }   // v2.63 大腦
                 } else {
