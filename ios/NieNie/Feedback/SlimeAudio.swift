@@ -18,6 +18,8 @@ protocol SlimeSoundSource: AnyObject {
     var sndB6: Bool { get set }
     /// v2.63 B5 (FeelParams.sndB5): startle, happy, protest and the press's wet layer play a copy of each file without its quiet lead-in (made at load). false = the files as they are
     var sndB5: Bool { get set }
+    /// v2.63 B1 pull (FeelParams.pullFx; web SFX.frame st.open): how fast a grabbing finger opens new ground (radii a second), set before each frame; 0 = off
+    var pullOpen: Double { get set }
     /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
     var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
@@ -60,6 +62,7 @@ final class SlimeAudio: SlimeSoundSource {
     var voiceBag = true   // v2.63 C6
     var sndB6 = true   // v2.63 B6
     var sndB5 = true   // v2.63 B5
+    var pullOpen = 0.0   // v2.63 B1 pull
     var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
@@ -456,11 +459,14 @@ final class SlimeAudio: SlimeSoundSource {
         }
 
         // stretching-strand loop: thinner = higher and brighter, faster = louder, held still = almost silent
-        let pulling = grabbing && stretch > pullOn && !muted
-        let pullTarget = pulling ? pullMax * Self.clamp(pullGain(stretch, stV), 0, 1) : 0
+        // v2.63 B1 pull (web: the same lines): pulled open onto new ground, a floor of pullMax × 0.3 × min(1, speed ÷ 0.5) under the old level
+        let open: Double = grabbing ? max(0, pullOpen) : 0
+        let pFloor: Double = open > 0 ? pullMax * PullFxSet.g * min(1, open / PullFxSet.v) : 0
+        let pulling = grabbing && (stretch > pullOn || pFloor > 0.005) && !muted
+        let pullTarget = pulling ? max(stretch > pullOn ? pullMax * Self.clamp(pullGain(stretch, stV), 0, 1) : 0, pFloor) : 0
         driveLoop(pullVoice, key: "pull.loop", target: pullTarget, dt: dt, attack: 0.05, decay: 0.12,
                   rate: pulling ? pullRate(stretch) : nil, lowpass: pulling ? pullLowpass(stretch) : nil)
-        if pulling, Double.random(in: 0..<1) < strandRate(stretch, stV) * dt { one("pull.strand", strandPlay(stretch)) }
+        if pulling, stretch > pullOn, Double.random(in: 0..<1) < strandRate(stretch, stV) * dt { one("pull.strand", strandPlay(stretch)) }
 
         // rub loop, giving way to the strand loop once pulled far
         let level = muted ? 0 : Self.clamp(rub, 0, 1) * rubDuck(stretch)

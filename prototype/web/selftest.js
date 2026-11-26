@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T83（B1 拉、B3 慢慢拉 0.4 秒內就有拉絲聲和手機的連續震動；快拉照舊；揉只記錄；pullFx 0 對照；震動讀 hapContStep 記的 HAP.log；在 T82 後面、T74 前面跑）
    v2.63（11-26）：加 T82（D4 牠縮那一下有一小聲和一下輕震、0.3 秒內放手的「噗」不重複、連點越點越小到不出聲不震；flinchFx 0 對照；震動讀 HAP.log；在 T81 後面、T74 前面跑）
    v2.63（11-26）：加 T81（B2 按聲跟著力道、B5 嚇到開心不要啦按的聲音跟動作同一格、音檔前奏跳過；sndB2、sndB5 0 對照；在 T80 後面、T74 前面跑）；T72 釘 sndB5 0（g 推醒一醒就查 startle，嚇到那聲排到縮的那一格後查不到）
    v2.63（11-26）：加 T80（B6 拉回去再拉有絲聲、按下去只清上次放手的餘韻；sndB6 0 對照；音效接真的引擎；在 T79 後面、T74 前面跑）
@@ -2203,6 +2204,38 @@
       && r.d.snd.length === 0 && r.d.hap.length === 0 && r.d.rel === 1 && r.bOff.snd.length === 0 && r.bOff.hap.length === 0 && r.bOff.rel === 1
       && (r.cOff || []).every(q => q.ev === 0);
     res.T82_flinchFx = r; res.PASS.flinchFx = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T83 v2.63 B1 拉、B3 慢慢拉 0.4 秒內就聽得到、摸得到（pullFx；OVERNIGHT 第 13 項，手機照這條搬）。藍底、黏土真正的預設（PRE54，大腦關），音效接真的引擎（有載到才量 loop 的真音量）。
+  // 網頁沒有震動：手機的連續震動照 hapContStep 算（拉力、呼嚕、開關遲滯，跟 SlimeController、SlimeHaptics 同一套），開了記 hapEv('pull')。拉絲聲看引擎這一格要多大（SFX.pullT），載到了也看 loop 真的音量（SFX.pullV.level）。
+  // a 身體中間抓下去，往右每秒 0.5R 拉 4 秒：從按下到第一個震動事件幾秒、拉絲聲 > 0 幾秒；pullFx 0 對照
+  // b 快拉每秒 4R 拉 1 秒：一樣量；第 0.5 秒的震動強度開關兩邊差不多（底 0.08 比原本的小，原本起來之後就是原本的）
+  // c 揉（只記錄）：抓著畫半徑 0.3R 的圈、每秒 1R、3 秒：震動開了幾次、開著幾秒、拉絲聲最大多少
+  // 擋：a 開：震動 ≤ 0.4 秒、拉絲聲 ≤ 0.4 秒（有載到時 loop 音量也是）；關：兩個都 > 0.4 秒或沒來。b 開不比關晚、0.5 秒時強度差 < 0.01（量到 0.1824 對 0.1816：底沒參與，差的是同一頁先後跑留下的狀態，跟 T66、T67 一樣）
+  { const clock = saveClock(), r = {}, P83 = { ...PRE54.clay, intro: 0, introSwim: 0, brain: 0 }, I0 = { tr: IMP.tr, w: IMP.w };
+    let loaded = false;
+    try { if (SFX && SFX.manifest) { SFX.init(); for (let i = 0; i < 120 && !loaded; i++) { loaded = ['pull.loop'].every(k => SFX.buf[k] && SFX.buf[k].length > 0); if (!loaded) await new Promise(q => setTimeout(q, 50)); } } } catch (_) {}
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P83, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; GREET.st = ''; GREET.until = -9; EYE.user = -9; steps(60); };
+    const drive = (over, path, sec, sd) => { fresh(over, sd); const [x0, y0] = sc(globalC.xc, globalC.yc), u = R * CAM.z, t0 = t, h0 = HAP.log.length; ev('pointerdown', 1, x0, y0);
+      const o = { hap: null, snd: null, loop: null, lv05: null, on: 0, onT: 0, sndMax: 0, stAt: null }; let x = x0, y = y0;
+      for (let k = 1; k <= Math.round(sec * 60); k++) { [x, y] = path(k / 60, x0, y0, u); ev('pointermove', 1, x, y); steps(1); const tt = +(t - t0).toFixed(4);
+        const hs = HAP.log.slice(h0).filter(e => e[0] === 'pull'); if (o.hap == null && hs.length) o.hap = +(hs[0][2] - t0).toFixed(4);
+        if (o.snd == null && (SFX && SFX.pullT > 0)) o.snd = tt; if (o.loop == null && SFX && SFX.pullV && SFX.pullV.level > 0) o.loop = tt;
+        if (k === 30) o.lv05 = +(HPC.lv || 0).toFixed(4); if (HPC.on) o.onT += 1 / 60; o.sndMax = Math.max(o.sndMax, SFX && SFX.pullT || 0); const f = fingers.get(1); if (o.stAt == null && f && f.stretch > .41) o.stAt = tt; }
+      o.on = HAP.log.slice(h0).filter(e => e[0] === 'pull').length; o.onT = +o.onT.toFixed(2); o.sndMax = +o.sndMax.toFixed(3);
+      ev('pointerup', 1, x, y); steps(40); return o; };
+    const line = v => (s, x0, y0, u) => [x0 + v * u * s, y0];
+    const circ = (s, x0, y0, u) => { const a = s / .3; return [x0 + .3 * u * Math.sin(a), y0 + .3 * u * (1 - Math.cos(a))]; };
+    try { HAP.log = []; r.loaded = loaded;
+      r.slow = drive({}, line(.5), 4, 83); r.slowOff = drive({ pullFx: 0 }, line(.5), 4, 83);
+      r.fast = drive({}, line(4), 1, 84); r.fastOff = drive({ pullFx: 0 }, line(4), 1, 84);
+      r.rub = drive({}, circ, 3, 85); r.rubOff = drive({ pullFx: 0 }, circ, 3, 85); r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    HAP.log = null; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0);
+    log.splice(0); IMP.tr = I0.tr; IMP.w = I0.w; impReset(); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    const late = v => v == null || v > .4;
+    r.ok = !r.err && r.slow.hap != null && r.slow.hap <= .4 && r.slow.snd != null && r.slow.snd <= .4 && (!r.loaded || (r.slow.loop != null && r.slow.loop <= .4))
+      && late(r.slowOff.hap) && late(r.slowOff.snd)
+      && r.fast.hap != null && r.fastOff.hap != null && r.fast.hap <= r.fastOff.hap && Math.abs(r.fast.lv05 - r.fastOff.lv05) < .01;
+    res.T83_pullFx = r; res.PASS.pullFx = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0

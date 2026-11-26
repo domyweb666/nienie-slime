@@ -276,8 +276,12 @@
     if (S.pending.length) { const now = c.currentTime; S.pending = S.pending.filter(e => { if (e.at <= now) { one(e.key, e.p); return false; } return true; }); }
     if (S.muted) return;
     // 拉絲 loop
-    const P = MAP.pull, pulling = grabbing && stretch > P.on;
-    const target = pulling ? S.pullMax * clamp(P.gain(stretch, S.v), 0, 1) : 0;
+    // v2.63 B1 拉（pullFx）：st.open = 手指往外拉出新距離的速度（半徑／秒，頁面算，pullFx 0 時給 0）。慢拉時身體一直跟上、拉伸過不了 0.2R，loop 要很久才起來；
+    // 有在拉開就給一個底 pullMax × PF.g × min(1, open ÷ PF.v)，跟原本的取大。Swift SlimeAudio pullOpen 同一套
+    const P = MAP.pull, PF = { g: 0.3, v: 0.5 }, open = grabbing ? Math.max(0, st.open || 0) : 0, floor = open > 0 ? S.pullMax * PF.g * Math.min(1, open / PF.v) : 0;
+    const pulling = grabbing && (stretch > P.on || floor > 0.005);
+    const target = pulling ? Math.max(stretch > P.on ? S.pullMax * clamp(P.gain(stretch, S.v), 0, 1) : 0, floor) : 0;
+    S.pullT = target;   // v2.63：這一格拉絲 loop 要多大（selftest 讀；音效沒載到也有）
     if (target > 0.005 && !S.pullV) S.pullV = loopVoice('pull.loop');
     if (S.pullV) {
       const V = S.pullV, k = 1 - Math.exp(-dt / (target > V.level ? P.attack : P.decay));
@@ -286,7 +290,7 @@
       if (pulling) { V.src.playbackRate.setTargetAtTime(P.rate(stretch), c.currentTime, 0.03); V.lp.frequency.setTargetAtTime(P.lp(stretch), c.currentTime, 0.03); }
       if (!pulling && V.level < 0.004) { stopLoop(V); S.pullV = null; }
     }
-    if (pulling) { const lam = P.strandRate(stretch, S.v); if (Math.random() < lam * dt) one('pull.strand', P.strand(stretch)); }
+    if (pulling && stretch > P.on) { const lam = P.strandRate(stretch, S.v); if (Math.random() < lam * dt) one('pull.strand', P.strand(stretch)); }
     // 揉 loop
     const R = MAP.rub, L = clamp(st.rub || 0, 0, 1) * R.duck(stretch), n = S.rubMax > 0 ? clamp(L / S.rubMax, 0, 1) : 0;
     if (L > 0.005 && !S.rubV) S.rubV = loopVoice(S.snd61 && S.buf['rub.loop61'] && S.buf['rub.loop61'].length ? 'rub.loop61' : 'rub.loop');

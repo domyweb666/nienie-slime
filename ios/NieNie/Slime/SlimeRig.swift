@@ -19,6 +19,11 @@ enum SlimeEvent {
     case flinch(gain: Double, hap: Double)   // v2.63 D4 (flinchFx): it flinched from your touch: a small sound (gain 0 = tap only) and a light tap
 }
 
+/// v2.63 B1 pull, B3 (FeelParams.pullFx; web PFX, the same numbers, Agent's picks for 多米 to hear and feel): d0 the farthest the real finger got from where it
+/// took hold must pass this (radii) before it counts as opening; tv the new-ground speed's smoothing (s); g, v the strand loop's floor (pullMax × g × min(1, speed ÷ v));
+/// v0 the new-ground speed (radii a second) that lifts the haptic floor, hap its size, ta / tr its rise / fall time constants. Used by SlimeController and SlimeAudio too
+enum PullFxSet { static let d0 = 0.05, tv = 0.06, g = 0.3, v = 0.5, v0 = 0.15, hap = 0.08, ta = 0.04, tr = 0.2 }
+
 /// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
 /// (v2.2 plus the first batch of 手感精修提案, 2026-11-01: press spread, dwell-gated plasticity,
 /// release strength by stretch, prediction fallback, animated reset; v2.4 second-batch candidates
@@ -843,6 +848,7 @@ final class SlimeRig {
         var tickAt = 0.0, tickNext = 0.0             // texture ticks: travel at the last tick, spacing to the next (提案第 13 條)
         var step = 0
         var stretch = 0.0                            // tanh-limited stretch at the last update, in radii
+        var om = 0.0, ov = 0.0                       // v2.63 B1 B3 (pullFx; web f.om, f.ov): the farthest the real finger got from where it took hold (radii), the speed it opens new ground (radii a second, 60 ms smoothed)
         let tDown: Double                            // rig time when the finger landed (dwell for plasticity)
         var press = 0.0, hold = 0.0, pressOn = false // press spread (points), hold level 0...1
         var pushed = false                           // push mode: has it displaced anything yet
@@ -2453,6 +2459,7 @@ final class SlimeRig {
         f.ax = f.rawX; f.ay = f.rawY; f.x = f.rawX; f.y = f.rawY; f.fx = f.rawX; f.fy = f.rawY
         f.stretch = 0; f.ex = 0; f.ey = 0; f.sb = 0; f.step = 0; f.hold = 0; f.press = 0; f.pressOn = false; f.peak = 0; f.on = false; f.far = false
         f.vMax = 0; f.yank = false   // v2.61 D1
+        f.om = 0; f.ov = 0   // v2.63 B1 B3 (web strokeGrab)
         f.tGrab = t; f.grainI = 0; f.grR = 0
         if clusters.indices.contains(gi) { f.r0x = f.rawX - clusters[gi].xc; f.r0y = f.rawY - clusters[gi].yc }   // v2.61 A4
         fingerGrab(f, id: id, x: f.rawX, y: f.rawY)
@@ -2782,6 +2789,11 @@ final class SlimeRig {
             if f.mode == .grab {
                 let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
                 f.stretch = st; f.ex = ex; f.ey = ey
+                do {   // v2.63 B1 B3 (pullFx; web: the same line): the farthest the real finger got from where it took hold, and how fast it opens new ground
+                    let op: Double = hypot(f.rawX - f.ax, f.rawY - f.ay) / R, d: Double = max(0, op - f.om)
+                    f.om = max(f.om, op)
+                    f.ov += (d / dt - f.ov) * (1 - exp(-dt / PullFxSet.tv))
+                }
                 if roughOn {   // v2.61 D1 (rough): the fastest this grab has been, and whether it has been yanked (fast, outward, pulled open; stays so until it lets go)
                     let hv: Double = hypot(f.vxS, f.vyS) * camZ / R, outward: Double = ex * f.vxS + ey * f.vyS
                     if hv > f.vMax { f.vMax = hv }
@@ -7157,6 +7169,13 @@ final class SlimeRig {
 
     /// Stretch (radii, tanh-limited) of the most-stretched grabbing finger: drives the strand loop's pitch, brightness and loudness.
     var pullStretch: Double { max(fingers.values.filter { $0.mode == .grab }.map(\.stretch).max() ?? 0, pairStretch * effParams.pairMax / 2) }   // v2.38: two fingers pulling apart count as a pull too (web PAIR.stR)
+
+    /// v2.63 B1 B3 (pullFx; web pullO): the fastest a grabbing finger opens new ground (radii a second), once it is past PullFxSet.d0 from where it took hold; 0 = none
+    var pullOpen: Double {
+        var m = 0.0
+        for f in fingers.values where f.mode == .grab && f.om >= PullFxSet.d0 { m = max(m, f.ov) }
+        return m
+    }
 
     /// Any finger holding the body (not pushing from outside).
     var isGrabbing: Bool { fingers.values.contains { $0.mode == .grab } }

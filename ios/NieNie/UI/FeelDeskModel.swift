@@ -112,6 +112,7 @@ struct FeelBatch: Equatable {
         Key(id: "lookNoDown", key: \FeelParams.lookNoDown),   // v2.63 C5, the same (build 158 sniffed down into the sill)
         Key(id: "rubVary", key: \FeelParams.rubVary),   // v2.63 C6, the same (build 158 hopped every time, a random sound file each time)
         Key(id: "sndB2", key: \FeelParams.sndB2),   // v2.63 B2, the same (build 158 pressed at 0.7 however hard)
+        Key(id: "pullFx", key: \FeelParams.pullFx),   // v2.63 B1 B3, the same (build 158 was silent and still for the first seconds of a slow pull)
         Key(id: "flinchFx", key: \FeelParams.flinchFx),   // v2.63 D4, the same (build 158 flinched without a sound or a tap)
         Key(id: "sndB5", key: \FeelParams.sndB5),   // v2.63 B5, the same (build 158 played the lead-ins, the startle before the flinch)
         Key(id: "sndB6", key: \FeelParams.sndB6),   // v2.63 B6, the same (build 158 snapped no strand on a second pull, and a press cleared every queued sound)
@@ -156,6 +157,7 @@ struct FeelBatch: Equatable {
         Item(id: "sndB2", name: "按聲跟著力道：輕點小聲、重壓大聲"),
         Item(id: "sndB5", name: "嚇到、開心、不要啦、按的聲音跟動作同一格"),
         Item(id: "flinchFx", name: "牠縮那一下有一小聲和一下輕震"),
+        Item(id: "pullFx", name: "慢慢拉 0.4 秒內就聽得到、摸得到"),
     ]
     enum Tier: String, CaseIterable, Identifiable {
         case b158, fix, pull

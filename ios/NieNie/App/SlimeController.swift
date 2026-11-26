@@ -59,6 +59,7 @@ final class SlimeController: ObservableObject {
 
     // continuous-haptic shaping state (提案第 12 條)
     private var lastDeformation = 0.0
+    private var pullFloor = 0.0   // v2.63 B3 (pullFx; web HPC.f): the light floor under the continuous haptic while a pull opens new ground
     private var rateSmoothed = 0.0
 
     init() {
@@ -226,6 +227,7 @@ final class SlimeController: ObservableObject {
         if pullBlind?.pending != nil && !rig.isTouched { pullBlindApply() }   // v2.61 甲乙: the hand is off the body
         let p = current
         // v2 layered sound: the strand loop, strands, rub loop and the after-release tail all follow the physics here
+        sound.pullOpen = p.pullFx >= 0.5 ? rig.pullOpen : 0   // v2.63 B1 pull (web SFX.frame st.open)
         sound.frame(dt: dt, rub: rig.rubLevel() * p.rubMax, stretch: rig.pullStretch, grabbing: rig.isGrabbing)
         // continuous haptic from the deformation and/or its rate of change (提案第 12 條); with the default
         // weights (static 1, rate 0) this is the old intensity = deformation^1.5 × hapMax
@@ -245,6 +247,16 @@ final class SlimeController: ObservableObject {
                 let lv: Double = p.hapPull * (0.18 + 0.82 * tn)
                 if lv > contLevel { contLevel = lv; contSharp = 0.15 + 0.55 * tn }
             }
+        }
+        // v2.63 B3 (pullFx; web hapContStep, the same numbers): the formulas above wait for 0.41R of stretch, which a slow pull of clay (dragged along) takes
+        // about 3 s to reach. While the real finger opens new ground at PullFxSet.v0 or faster, a light floor rises in 40 ms (0.08, under the tension's
+        // first 0.099, past the 0.03 that starts the player) and fades 0.2 s after it stops; the formulas take over once bigger. The thresholds stay
+        if p.pullFx >= 0.5 {
+            let tg: Double = rig.isGrabbing && rig.pullOpen >= PullFxSet.v0 ? PullFxSet.hap : 0
+            pullFloor += (tg - pullFloor) * (1 - exp(-dt / (tg > pullFloor ? PullFxSet.ta : PullFxSet.tr)))
+            contLevel = max(contLevel, pullFloor)
+        } else {
+            pullFloor = 0
         }
         let pk = rig.purr * p.purr
         // v2.25 F5: the purr is the one thing left on the continuous channel: a low rumble swelling 3 times a second
