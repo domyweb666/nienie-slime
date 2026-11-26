@@ -1219,6 +1219,7 @@ final class SlimeRig {
         napCum = 0; napOn = false; napN = 0   // v2.63 C9 (web setup, with SLP: Object.assign(NAP,{cum:0,on:false,n:0})): a slime switch, a rebuild, a rotation start this opening's count again
         greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
+        drReset()   // v2.64 擺飾變真 (web brainReset: drReset())
         brain.reset(t, ev: brainEv())   // v2.63 大腦 (web setup: brainReset()); startIntro draws the opening's needs (brainJit). After echoJoyUntil: the clock restarts here, an old one would hide the next 回你的節奏 from the mood
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         CAPG = 1; CAPGAP = 0   // v2.54
@@ -3302,6 +3303,7 @@ final class SlimeRig {
         fxStep(dt)   // v2.57 新六隻的招牌
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         if sillOn && sillG != nil && !props.isEmpty { decoBody(sdt * Double(n)) } else { dbOK = false }   // v2.64 擺飾變真 v2.45: once a frame (a walk's shift is added once a frame)
+        drStep(sdt * Double(n))   // v2.64 擺飾變真 v2.46: 推東西
         rateStep(dt)   // v2.54 快扯變硬
         capGrowStep(dt)   // v2.54 無限拉
         remeshCheck(dt)   // v2.54 補點
@@ -6731,6 +6733,7 @@ final class SlimeRig {
         else if let pf { o = params.eyeTrue >= 0.5 ? tow(pf.rawX, pf.rawY) : tow(pf.fx, pf.fy) }
         else if echoSt != 0 { o = tow(echoX, echoY) }
         else if greetWait && greetOpen { o = (0, 0.9) } else if t < greetUntil { o = (0, 0) }   // v2.63 C4: falling (opened), it looks down; landed, it turns to you
+        else if t < drLookT && !slpOn && drOn { o = tow(drLX, drLY) }   // v2.64 擺飾變真 (web v2.46): something moved or rang: it looks there
         else if t < eyeUser || slpOn { o = (0, 0) }
         else if escOn { o = tow(escDX, escDY) }
         else if gaitOn { o = (cos(gaitH), sin(gaitH)) }
@@ -6777,8 +6780,9 @@ final class SlimeRig {
         if snwK > 0.02 && g == nil { open = min(open, 1 - 0.85 * snwK * min(1, max(0, (snwCloud - 0.06) / 0.3))) }   // v2.31: eyes shut while the glitter settles, breathing with you; open again once clear
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
         if brain.pre == .sleep && brOn { open = min(open, 0.45) }   // v2.63 大腦 (web v2.42 前兆): about to sleep, the eyes half shut
-        let moodLow: Bool = brainM < -0.35   // v2.63 心情: in a bad mood, wide (the web's DRon() term: no decorations on the phone)
-        if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) || moodLow { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
+        let moodLow: Bool = brainM < -0.35   // v2.63 心情: in a bad mood, wide
+        let drWide: Bool = drOn && drRecent(drWideT, 0.8)   // v2.64 擺飾變真: a fall while you hold it: only the eyes go wide
+        if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) || moodLow || drWide { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
         if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
@@ -7107,8 +7111,9 @@ final class SlimeRig {
         if let lie { lifeUntil = max(lifeUntil, t + 1.5 + lie) }   // v2.61 C7: just woke, it may lie there a while first
         if slpOn && brain.z <= 0.02 && idleT > 3 { brain.selfWake += 1; wake(false, quiet: true) }   // slept enough: awake by itself (the web's wake(false,true))
         if brainAtHome() { brain.homeAt = t }
-        // what it is doing (the web's B.act; DR.push 推東西 is not on the phone)
-        if slpOn { brain.act = "睡覺" }
+        // what it is doing (the web's B.act; v2.64 DR.push 推東西 first)
+        if drPush != nil { brain.act = "推東西" }
+        else if slpOn { brain.act = "睡覺" }
         else if brain.pre == .sleep { brain.act = "想睡了" }
         else if brain.pre == .greet || brain.want == "greet" { brain.act = "看著你" }
         else if escOn { brain.act = "逃跑" }
@@ -7184,11 +7189,12 @@ final class SlimeRig {
         var goScared = false   // v2.64 (web brainPick: MMon()&&SILL.plane==='room'&&BMEM.cell[memCellAt(globalC.xc)]<-.3)
         if mmOn && sillPlane == .room && !clusters.isEmpty { goScared = mem.cell[memCellAt(clusters[gi].xc)] < -0.3 }
         let offerOK = memCanOffer()
-        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK(), brm: bm, goScared: goScared, offerOK: offerOK)
+        let catOK = drCatOK()   // v2.64 擺飾變真 (web brainPick 'cat': drCatOK())
+        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK(), brm: bm, goScared: goScared, offerOK: offerOK, catOK: catOK)
         let away: Bool = sillOn && !brainAtHome(), tel: Bool = params.brPre >= 0.5
         switch w {
         case .sleep:
-            if away && brainGoHome() { brain.why += mmOn && mem.fav() >= 0 ? "（先走回牠喜歡的位置）" : "（先走回布墊）" }   // the web's candle (drCandleX): the decorations, 第 2 項
+            if away && brainGoHome() { brain.why += mmOn && mem.fav() >= 0 ? "（先走回牠喜歡的位置）" : (drCandleX() != nil ? "（先走到蠟燭旁邊）" : "（先走回布墊）") }   // v2.64 the candle (drCandleX)
             else if away { lifeUntil = t + 1 }
             else if tel { brain.pre = .sleep; brain.preT0 = t; lifeUntil = t + 2; cutSniffs(); if sighCyc < 0 { sighNext = t } }   // 前兆: squint, one sigh, asleep 2 s later
             else { brain.naps += 1; slpOn = true; lifeSt = .sleep; cutSniffs() }
@@ -7200,9 +7206,11 @@ final class SlimeRig {
             brainGo(nil)
         case .offer:
             memOffer()   // v2.64
+        case .cat:
+            drCat()   // v2.64 擺飾變真 (web 'cat')
         case .rest:
             let low: Bool = brainM < -0.3   // v2.63 心情: in a bad mood it goes back after 8 s away, not 20
-            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : (mem.fav() >= 0 && mmOn ? "五個都不高，走回牠喜歡的位置" : "五個都不高，走回布墊") }
+            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : (mem.fav() >= 0 && mmOn ? "五個都不高，走回牠喜歡的位置" : (drCandleX() != nil ? "五個都不高，走到蠟燭旁邊" : "五個都不高，走回布墊")) }
             else { lifeUntil = t + restDur() }
         }
     }
@@ -7212,7 +7220,7 @@ final class SlimeRig {
         brain.jit(t, trust: impTrust, using: &rng)
     }
     /// The web's impBack: back after 10 min or more, the needs start again from an opening (SlimeController, before the impression is reset)
-    func brainBack() { brain.reset(t, ev: brainEv()); brainJit() }
+    func brainBack() { drReset(); brain.reset(t, ev: brainEv()); brainJit() }
     /// What the mood sees now (the web's brainReset ev, memSync)
     private func brainEv() -> SlimeBrain.Ev { SlimeBrain.Ev(h: happyT, j: echoJoyUntil, w: impWary, sc: moodScare) }
     /// The web's memSync (chooseSlime, after the impression is set): the other slime's wariness, happy moment, scare are not "just happened" (SlimeController.select)
@@ -7245,9 +7253,11 @@ final class SlimeRig {
     /// memHomeX: where home is on the sill. The cell it likes best (past 0.3); none: the mat in the middle, unless it was scared there:
     /// then where it is, unless it was scared there too: the nearest cell it was not scared in. brMem 0: the middle (the web's g.bx; no candle on the phone)
     private func memHomeX(_ g: SillGeo) -> Double {
-        if !mmOn { return g.bx }
+        let cdl = drCandleX()   // v2.64 擺飾變真 (web v2.46): at night the lit candle; nil while decoReact is off
+        if !mmOn { return cdl ?? g.bx }
         let k = mem.fav()
         if k >= 0 { return memCellX(g, k) }
+        if let cdl, mem.cell[memCellAt(cdl)] >= -0.3 { return cdl }   // nothing liked much: home beside the candle
         if mem.cell[memCellAt(g.bx)] >= -0.3 { return g.bx }   // nothing liked much: the mat in the middle
         guard !clusters.isEmpty else { return g.bx }
         let cx = clusters[gi].xc, c = memCellAt(cx)
@@ -7664,6 +7674,7 @@ extension SlimeRig {
         p.knockT = t
         if far { onEvent?(.fx(kind: "fallout", gain: max(0.3, min(1, g)), delay: 0)); return }
         onEvent?(.knock(kind: p.im == "d_candle" ? "candle" : p.kind, gain: max(0.05, min(1, g))))
+        drLook(selfT: p.selfT, fingT: p.fingT, catT: p.catT, lookAt: &p.lookAt, 0.12, p.x, p.y)   // v2.46
     }
     /// propRelease：放手；很快點一下（0.25 秒內、移動不到 0.12R）往手指的反方向晃
     private func propRelease(_ f: Finger) {
@@ -7704,6 +7715,7 @@ extension SlimeRig {
         if !q.ring || t - q.ringT < 0.16 { return }
         q.ringT = t
         onEvent?(.knock(kind: "bell", gain: max(0.08, min(1, g))))
+        drLook(selfT: q.selfT, fingT: q.fingT, catT: nil, lookAt: &q.lookAt, 0.15, q.x - sin(q.a) * q.h * 0.7, q.y + q.h * 0.7)   // v2.46
     }
     /// hangKick：搖手機（dir ±1）
     private func hangKick(_ dir: Double) {
@@ -7891,11 +7903,11 @@ extension SlimeRig {
             if abs(wrapA(p.a)) > 0.6 { p.upT = t }   // 蠟燭倒了火就熄，扶正 3 秒後再亮
             if p.held == nil {   // v2.46 倒下那一下（歪過 0.6 算倒，回到 0.3 以內才算站回來）
                 let w = abs(wrapA(p.a))
-                if w > 0.6 && !p.tip { p.tip = true; onEvent?(.fx(kind: "topple", gain: 0.7, delay: 0)) } else if w < 0.3 { p.tip = false }
+                if w > 0.6 && !p.tip { p.tip = true; drCrash(&p, 0.35); onEvent?(.fx(kind: "topple", gain: 0.7, delay: 0)) } else if w < 0.3 { p.tip = false }
             }
-            if p.y > g.fl + R * 0.9 && !p.fell { p.fell = true; propKnock(&p, 0.55, far: true) }   // 掉到窗台下面：看不到了，聽得到一聲
+            if p.y > g.fl + R * 0.9 && !p.fell { p.fell = true; propKnock(&p, 0.55, far: true); drCrash(&p, 0.45) }   // 掉到窗台下面：看不到了，聽得到一聲
             if p.y > g.fl + R * 2.5 || p.x > W + R * 2 || p.x < -R * 2 {
-                if !p.fell { propKnock(&p, 0.45, far: true) }
+                if !p.fell { propKnock(&p, 0.45, far: true); drCrash(&p, 0.45) }
                 p.gone = true; p.upT = t + 20; p.alpha = 0; p.backAt = t + 20; p.vx = 0; p.vy = 0; p.va = 0; p.fade = 0; p.held = nil
             }
             props[k] = p
@@ -7932,5 +7944,92 @@ extension SlimeRig {
     func hangAngle(_ name: String, amp: Double) -> Double {
         if dreal, let q = hangs.first(where: { $0.name == name }), q.on { return q.a }
         return decoSwing(amp)
+    }
+}
+
+// MARK: - v2.64 擺飾變真第 3 片「牠有反應」(decoReact, decoCat, decoScare; web DR, drReset, drSelf, drLook, drCrash, drCandleX, drCatPick, drCatOK, drCat, drStep,
+// v2.46, line by line; the same numbers). 只用大腦現有的五個需求，不加新數字；牠的點一個都不改。decoReact 0（或大腦關著）：drOn false，這裡什麼都不做、不抽亂數。
+// 看：東西被碰到出聲、風鈴響。牠自己帶到的、推的不算。眼睛看過去 1.4 秒、好奇 +；好奇超過 0.6 而且在休息，就伸偽足探。
+// 嚇：東西倒下或掉下窗台。怕漲 0.35／0.45 × 遠近 × 習慣（同一件每倒一次減半，只算這一次打開）× 牠自己帶倒的一半。晚 0.12 秒縮一下；睡著嚇醒。
+// 你抓著牠、摸著牠、剛放手 1 秒內不嚇，只睜大眼 0.8 秒。不記進「這格被嚇過」。
+// 蠟燭：夜晚、蠟燭亮著、在原位，而且牠沒有特別喜歡的位置：家挪到蠟燭旁邊。
+// 推：熟 0.5 以上、心情 0.2 以上、好奇 0.6 以上，休息到時間時跟其他需求一起比。走到東西旁邊、看你、伸偽足，偽足伸出去六成以後東西每秒往窗台邊挪 0.2R。一次打開最多 2 次、隔 45 秒。牠推下去的不嚇，開心一下。
+extension SlimeRig {
+    /// drReset（網頁 brainReset 裡）：每次打開、換一隻都從頭
+    func drReset() { drHab = [:]; drWideT = nil; drLookT = -9; drCats = 0; drCatT = -99; drCatLast = ""; drPush = nil }
+    private func drSelf(_ selfT: Double?, _ fingT: Double?) -> Bool { drRecent(selfT, 1.2) && !drRecent(fingT, 1.2) }
+    /// drLook：東西動了、響了，牠看過去；好奇夠高、在休息就伸偽足探
+    private func drLook(selfT: Double?, fingT: Double?, catT: Double?, lookAt: inout Double?, _ dq: Double, _ x: Double, _ y: Double) {
+        if !drOn || slpOn || drSelf(selfT, fingT) || drRecent(catT, 3) || drRecent(lookAt, 1.5) { return }
+        lookAt = t
+        brain.q = min(1, brain.q + dq); drLookT = t + 1.4; drLX = x; drLY = y
+        if brain.q > 0.6 && lifeSt == .rest && fingers.isEmpty && sillRoute == nil && !attOn && brainSillFree() && lv(params.lifeAttend) {
+            attOn = true; attAt = t + 0.45; attX = x; attY = y
+            brain.q = max(0, brain.q - 0.25)
+        }
+    }
+    /// drCrash：倒下、滑出去、落地是同一件事，4 秒內只算一次
+    private func drCrash(_ p: inout Prop, _ base: Double) {
+        if !drOn || drRecent(p.crashAt, 4) { return }
+        p.crashAt = t
+        if drRecent(p.catT, 4) { happyT = t; voice("happy", 0.6); eyeUser = t + 1.4; return }   // 牠自己推下去的：開心一下
+        guard let g = sillG, !clusters.isEmpty else { return }
+        let n = drHab[p.im] ?? 0, d = hypot(p.x - clusters[gi].xc, min(p.y, g.fl) - clusters[gi].yc), near = max(0.5, min(1, 1 - 0.5 * (d - R) / (2 * R)))
+        let amt = base * near * pow(0.5, Double(n)) * (drSelf(p.selfT, p.fingT) ? 0.5 : 1) * params.decoScare
+        drHab[p.im] = n + 1
+        var held = t >= lastTouch && t - lastTouch < 1
+        for f in fingers.values where f.mode == .grab || f.mode == .stroke || f.mode == .push { held = true }
+        if held { drHab[p.im] = n; if amt >= 0.02 { drWideT = t; eyePulse = t }; return }   // 抓著、摸著、剛放手：只睜大眼 0.8 秒，身體、怕、心情、習慣都不動
+        if amt < 0.02 { return }
+        moodScare = min(1, moodScare + amt); mem.ev.sc = max(mem.ev.sc, moodScare)   // 不記進「這格被嚇過」
+        if slpOn { if amt >= 0.08 { wake(true) } }
+        else {
+            if amt >= 0.08 { voice("startle", min(0.9, 0.4 + amt), at: t + 0.12) }
+            flAt = t + 0.12; flPre = lifeSt == .rest ? .rest : .go; flBoost = 1 + amt; eyePulse = t + 0.12
+        }
+        drLookT = t + 1.6; drLX = p.x; drLY = min(p.y, g.fl)
+    }
+    /// drCandleX：夜晚蠟燭亮著、在原位：家在蠟燭旁邊的 x；不然 nil
+    private func drCandleX() -> Double? {
+        guard drOn, sceneKind == 2, let g = sillG, let p = props.last(where: { $0.im == "d_candle" }) else { return nil }
+        if p.gone || p.fade != 0 || t - p.upT <= 3 || abs(p.x - p.hx) > R * 0.3 { return nil }
+        return max(g.l + R * 0.9, min(g.bx, p.hx + p.hw + R * 0.85))
+    }
+    /// drCatPick：站好、在原位、沒人拿著的那件；上次推過的那件讓給另一件
+    private func drCatPick() -> Int {
+        var b = -1
+        for k in props.indices {
+            let p = props[k]
+            if p.gone || p.fade != 0 || p.held != nil || p.alpha < 1 || abs(p.a) > 0.1 || abs(p.x - p.hx) > 4 { continue }
+            if b < 0 || props[b].im == drCatLast { b = k }
+        }
+        return b
+    }
+    private func drCatOK() -> Bool {
+        drOn && params.decoCat >= 0.5 && drCats < 2 && t - drCatT > 45 && impTrust >= 0.5 && (!mdOn || brainM > 0.2) && brain.q > 0.6 && sillPlane == .room && !sillInBowl
+            && brainSillFree() && fingers.isEmpty && drCatPick() >= 0
+    }
+    /// drCat：走到東西旁邊、看你、等一下、伸偽足推、再看你、再推
+    private func drCat() {
+        let k = drCatPick()
+        guard props.indices.contains(k), let g = sillG else { lifeUntil = t + restDur(); return }
+        let p = props[k], side: Double = p.hx > g.bx ? 1 : -1, tx = sillClampX(p.x - side * (p.hw + R * 1.05)), a: Double = side > 0 ? 0.3 : .pi - 0.3
+        drCats += 1; drCatT = t; drCatLast = p.im
+        brain.q = max(0, brain.q - 0.5)
+        let look: (Double) -> RouteStep = { T in .fn({ [weak self] in guard let self else { return }; self.eyeUser = self.t + T }) }
+        routeStart([.walk(surf: "floor", to: tx), look(1.6), .wait(T: 0.9),
+                    .fn({ [weak self] in guard let self else { return }; self.drPush = (k: k, side: side, route: self.sillRoute?.id ?? -1) }),
+                    .sniff(a: a, L: 1.1, T: 2.2), look(1.2), .sniff(a: a, L: 1.3, T: 2.4),
+                    .fn({ [weak self] in guard let self else { return }; self.drPush = nil; self.eyeUser = self.t + 1.2 })])
+    }
+    /// drStep（一幀一次）：偽足伸出去六成以後，東西每秒往窗台邊挪 0.2R
+    private func drStep(_ dt: Double) {
+        guard let U = drPush else { return }
+        let k = U.k
+        guard props.indices.contains(k) else { drPush = nil; return }
+        let p = props[k]
+        if !drOn || sillRoute?.id != U.route || p.gone || p.held != nil || p.fell { drPush = nil; return }
+        guard let s = sniffs.last, !(s.cut > 0), sniffEnv(s) >= 0.6 else { return }
+        props[k].vx = U.side * R * 0.2; props[k].lastHit = t; props[k].catT = t; props[k].selfT = t
     }
 }

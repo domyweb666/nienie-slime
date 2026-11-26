@@ -12,15 +12,15 @@ import Foundation
 /// the sill cut into five cells left to right, each −1 (scared there) to 1 (stroked well there); side −1 (you mostly touch its left) to 1 (its right).
 /// The liked cells stay across days, the disliked ones fade in three days (多米 11-14, 第 6 題 kept). The numbers are in Mem below; the body side
 /// (brainMem, memHomeX, memOffer, memTouch) is in SlimeRig.swift under MARK v2.64, the storage ("nienie.brain", each slime its own) in SlimeController.
-/// Still not on the phone (the decorations, 第三批第 2 項): the web's DRon() — 推東西 (drCat), looking at what moves (drLook), the scare of a fall (drCrash),
-/// the night candle as home (drCandleX). Their terms are written below as nothing where the web has them.
+/// v2.64 擺飾變真 (第三批第 2 項; the web's DRon(), v2.46): 推東西 ('cat', drCatOK in the rig) is the last choice; looking at what moves (drLook), the scare
+/// of a fall (drCrash) and the night candle as home (drCandleX) are in SlimeRig.swift under MARK v2.64 擺飾變真.
 /// What touches the body (sleep, walk, look, go home) is in SlimeRig.swift (brainStep, brainRest, brainGo, brainGoHome); this file only keeps numbers.
 /// Foundation only (the Linux check builds it with the physics files).
 struct SlimeBrain {
     /// The web's B.pre.k: what it is about to do once the 前兆 is over
     enum Pre { case sleep, greet }
-    /// The web's brainPick choices the phone can make ('offer' since v2.64 with MMon; 'cat' needs DRon: off on the phone, so it scores −1 and never wins)
-    enum Choice: String { case rest, look, go, sleep, greet, offer }
+    /// The web's brainPick choices ('offer' since v2.64 with MMon; 'cat' since v2.64 with DRon and decoCat)
+    enum Choice: String { case rest, look, go, sleep, greet, offer, cat }
 
     // the needs (the web's BRAIN starting values; brainReset puts them back)
     var z = 0.3, q = 0.3, s = 0.0, f = 0.0, e = 0.4
@@ -65,6 +65,7 @@ struct SlimeBrain {
         case .sleep: return "睡覺"
         case .greet: return "來找你"
         case .offer: return "把你常摸的那邊靠過來"
+        case .cat: return "去推東西"
         }
     }
 
@@ -191,7 +192,8 @@ struct SlimeBrain {
     /// brm: the web's BRM() (the rig's brainM: the mood, 0 while it is off).
     /// v2.64 記地方: goScared = the web's `MMon()&&SILL.plane==='room'&&BMEM.cell[memCellAt(globalC.xc)]<-.3` (sitting in a cell it was scared in: +0.4 to go);
     /// offerOK = memCanOffer() ('offer' draws its random only then, so brMem 0 draws what v2.63 drew)
-    mutating func pick(t: Double, greetLook: Bool, canGo: Bool, sleepOK: Bool, e4OK: Bool, brm: Double, goScared: Bool, offerOK: Bool) -> Choice {
+    /// catOK = drCatOK() (v2.64; 'cat' draws its random only then, so decoReact / decoCat 0 draws what brMem's version drew)
+    mutating func pick(t: Double, greetLook: Bool, canGo: Bool, sleepOK: Bool, e4OK: Bool, brm: Double, goScared: Bool, offerOK: Bool, catOK: Bool = false) -> Choice {
         let na: Double = greetLook && t < ojT ? OpenJ.n : 0.16
         let calm = 1 - f
         var c: [Score] = [Score(k: .rest, v: K.rest, why: "都不高", n: 0)]
@@ -201,7 +203,7 @@ struct SlimeBrain {
         if sleepOK && z > zAt { let r = rnd(); c.append(Score(k: .sleep, v: z * calm + (r - 0.5) * na, why: "睏", n: z)) } else { c.append(Score(k: .sleep, v: -1, why: "睏", n: z)) }
         if e4OK { let r = rnd(); c.append(Score(k: .greet, v: s * calm + (r - 0.5) * na, why: "想被摸", n: s)) } else { c.append(Score(k: .greet, v: -1, why: "想被摸", n: s)) }
         if offerOK { let r = rnd(); c.append(Score(k: .offer, v: s * calm * 0.9 + (r - 0.5) * na, why: "想被摸", n: s)) } else { c.append(Score(k: .offer, v: -1, why: "想被摸", n: s)) }   // v2.64 (web 'offer')
-        // 'cat' (去推東西, drCatOK): the decorations, 第三批第 2 項; the web draws nothing for it while it cannot be chosen
+        if catOK { let r = rnd(); c.append(Score(k: .cat, v: q * calm + 0.15 + (r - 0.5) * na, why: "好奇", n: q)) } else { c.append(Score(k: .cat, v: -1, why: "好奇", n: q)) }   // v2.64 (web 'cat', last: no draw while it cannot be chosen)
         var b = c[0]
         for x in c where x.v > b.v { b = x }
         want = b.k.rawValue
