@@ -12,6 +12,8 @@ protocol SlimeSoundSource: AnyObject {
     var rubMax: Double { get set }       // loudest the rub loop gets (the rub level passed to frame is already scaled by it)
     /// v2.61 B1 (FeelParams.snd61): the new rub loop, and the rain at 0.3 instead of 0.6 while held. false = v2.60
     var snd61: Bool { get set }
+    /// v2.63 C6 (FeelParams.rubVary): each kind of voice plays all its files, shuffled, before a new shuffle (a new round never starts with the last one). false = a random file each time
+    var voiceBag: Bool { get set }
     /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
     var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
@@ -49,6 +51,7 @@ final class SlimeAudio: SlimeSoundSource {
     var pullMax = 0.6
     var rubMax = 0.7
     var snd61 = true   // v2.61 B1
+    var voiceBag = true   // v2.63 C6
     var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
@@ -81,7 +84,7 @@ final class SlimeAudio: SlimeSoundSource {
     private let ambRatio = 1.6   // web ambVol 0.4 against lofi's 0.25: the rain bed plays about −32 dBFS, a press about −34 (ASMR: the slime in front)
 
     // ---- the table (keep in step with engine.js) ----
-    private struct Play { var gain: Double; var rate: Double; var lowpass: Double; var delay = 0.0; var deco = false }
+    private struct Play { var gain: Double; var rate: Double; var lowpass: Double; var delay = 0.0; var deco = false; var take: Int? = nil }   // take: which file (v2.63 C6 voice bag); nil = random
     private let maxVoices = 14              // one-shots at once; past this the decoration layers (air, settle, strand) are dropped
     private let retrigger = 0.06            // same kind again within 60 ms: wet layer only, × 0.6
     private static func rnd(_ a: Double, _ b: Double) -> Double { Double.random(in: a...b) }
@@ -287,7 +290,7 @@ final class SlimeAudio: SlimeSoundSource {
         guard let v = voices.first(where: { $0.busyUntil <= t }) ?? voices.min(by: { $0.busyUntil < $1.busyUntil }) else { return }
         startEngine()
         guard engine.isRunning else { return }
-        let buf = takes[Int.random(in: 0..<takes.count)]
+        let buf = takes[p.take.map { $0 % takes.count } ?? Int.random(in: 0..<takes.count)]
         let rate = p.rate * jitter()
         v.player.stop()
         v.speed.rate = Float(Self.clamp(rate, 0.25, 4))
@@ -321,7 +324,23 @@ final class SlimeAudio: SlimeSoundSource {
     }
 
     func voice(_ kind: String, gain: Double, rate: Double) {
-        one("voice.\(kind)", Play(gain: Self.clamp(gain, 0, 1), rate: rate, lowpass: 4000))
+        let key = "voice.\(kind)", n = bank[key]?.count ?? 0
+        one(key, Play(gain: Self.clamp(gain, 0, 1), rate: rate, lowpass: 4000, take: voiceBag && n > 1 ? vbagPick(key, n) : nil))
+    }
+    /// v2.63 C6 (web vbagPick): one shuffled round of a voice's files; a new round never starts with the last one.
+    private struct VBag { var n: Int; var q: [Int]; var last: Int }
+    private var vbag: [String: VBag] = [:]
+    private func vbagPick(_ key: String, _ n: Int) -> Int {
+        var b = vbag[key] ?? VBag(n: n, q: [], last: -1)
+        if b.n != n { b = VBag(n: n, q: [], last: -1) }
+        if b.q.isEmpty {
+            b.q = Array(0..<n).shuffled()
+            if n > 1 && b.q[0] == b.last { b.q.append(b.q.removeFirst()) }
+        }
+        let k = b.q.removeFirst()
+        b.last = k
+        vbag[key] = b
+        return k
     }
 
     func fx(_ kind: String, gain: Double, delay: Double) {

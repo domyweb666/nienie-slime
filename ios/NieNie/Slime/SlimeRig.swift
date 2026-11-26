@@ -291,6 +291,10 @@ final class SlimeRig {
     // the happy stand-tall and the pseudopod wag; tug: while pulled, home shifts away so the body pulls back
     private var moodC = 0.0, moodA = 0.0, moodStrain = 0.0, moodStrainMax = 0.0, moodScare = 0.0, cowerUntil = -9.0
     private var happyT = -9.0, wagT = -9.0, taps: [Double] = [], pullDX = 1.0, pullDY = 0.0, tugX = 0.0, tugY = 0.0
+    // v2.63 C6 (rubVary; web RUBV): the shuffled bag of what it does when you let go after a rub, the last one, the last hop, when the melting began;
+    // rubvS is the bag's own generator, so rubVary never draws from rng
+    private var rubvBag: [String] = [], rubvLast = "", rubvHopT = -99.0, rubvSpT = -9.0, rubvS = UInt32.random(in: 0...UInt32.max)
+    private static let rubvHop = 40.0, rubvSpread = 2.0
     // fleeing: home rushes out on an ease-out (fast, the camera lags and it leaves the screen a bit), then it curls up a moment
     private var escOn = false, escT0 = 0.0, escT = 1.0, escSX = 0.0, escSY = 0.0, escDX = 0.0, escDY = 0.0
     private var introMini = false
@@ -466,7 +470,7 @@ final class SlimeRig {
             }
             return
         }
-        if f.gentleT > 1 && moodC > 0.35 && fingers.isEmpty && !slpOn { happyT = t; wagT = t + 0.1; hop(); voice("happy") }   // v2.61 C1: !slpOn, let go still asleep (it only turned over)
+        if f.gentleT > 1 && moodC > 0.35 && fingers.isEmpty && !slpOn { rubHappy(f.fx, f.fy) }   // v2.61 C1: !slpOn, let go still asleep (it only turned over); v2.63 C6 rubVary 0 as before (tall, a wag, the hop, happy)
     }
     private func flee(_ dx: Double, _ dy: Double, _ dist: Double) {
         guard dist > 0 else { return }
@@ -474,6 +478,44 @@ final class SlimeRig {
         escOn = true; escT0 = t; escT = max(0.6, dist / (R * 2.4)); escSX = homeX; escSY = homeY
         escDX = homeX + ux * dist; escDY = homeY + uy * dist * 0.8
         wanderMoving = false; moodScare = min(1, moodScare + 0.5)
+    }
+    /// v2.63 C6 (web rubHappy, rubVary): done rubbing or stroking, it is happy. 0: tall 2 s, a wag, the hop, the happy sound (as before, every time).
+    /// 1: the hop, melting 2 s more, leaning to your finger, a sigh, from a shuffled bag (all four before a new shuffle; a new bag never starts with the last one);
+    /// the hop at most once in 40 s (its turn sooner is skipped). The three without the hop put happyT 2 s back: the mood and the memory still see it, no tall pose, no ∩.
+    /// The sounds are the old slime ones (mmm, poke, the sigh). MARK v2.63 C6
+    private func rubHappy(_ fx: Double, _ fy: Double) {
+        guard params.rubVary >= 0.5 else { happyT = t; wagT = t + 0.1; hop(); voice("happy"); return }
+        var k = ""
+        var i = 0
+        while i < 9 && k.isEmpty {
+            i += 1
+            if rubvBag.isEmpty {
+                rubvBag = rubvShuffle(["hop", "spread", "lean", "sigh"])
+                if rubvBag.first == rubvLast { rubvBag.append(rubvBag.removeFirst()) }
+            }
+            let c = rubvBag.removeFirst()
+            if c == "hop" && t - rubvHopT < Self.rubvHop { continue }
+            k = c
+        }
+        rubvLast = k
+        if k == "hop" { rubvHopT = t; happyT = t; wagT = t + 0.1; hop(); voice("happy"); return }
+        happyT = t - 2
+        if k == "spread" {   // melting 2 s more: the comfortable pose once more (5% wider, 6% lower), in over 0.3 s, out over 0.5 s after 2 s
+            rubvSpT = t; voice("mmm", 0.5)
+        } else if k == "lean" {   // leaning to your finger: the lean after a tap (E2), toward where the finger left
+            if !clusters.isEmpty { leanT = t + 0.15; leanA = atan2(fy - clusters[gi].yc, fx - clusters[gi].xc); leanS = 1 }
+            voice("poke", 0.5)
+        } else {   // a sigh: the next breath 1.8× deeper and 1.6× slower, then a 1 s pause (its own sigh)
+            if lv(effParams.lifeBreath) && sighCyc < 0 { sighCyc = Int(floor(brPhase)) + 1 }
+            if !slpOn { onEvent?(.fx(kind: "sigh", gain: 0.45, delay: 0)) }
+        }
+    }
+    private func rubvRnd() -> Double { rubvS = rubvS &* 1664525 &+ 1013904223; return Double(rubvS) / 4294967296 }
+    private func rubvShuffle(_ a: [String]) -> [String] {
+        var a = a
+        var i = a.count - 1
+        while i > 0 { let j = min(i, Int(rubvRnd() * Double(i + 1))); a.swapAt(i, j); i -= 1 }
+        return a
     }
     /// The happy hop: the intro's hop, once, without travelling (mini: a touch grabs as usual).
     private func hop() {
@@ -1085,6 +1127,7 @@ final class SlimeRig {
         dragOX = 0; dragOY = 0; dragVX = 0; dragVY = 0; dragBX = 0; dragBY = 0; dragGX = 0; dragGY = 0; dragSlipT = 0; lureOn = false; lureSn = -1; askOn = false
         e4On = false; e4Wait = -1   // v2.22
         leanT = -9; leanO = 0; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0; camRSt = 0; camRUntil = -9
+        rubvBag = []; rubvLast = ""; rubvHopT = -99; rubvSpT = -9   // v2.63 C6: the clock set back, the last hop and the melting must not sit in the future
         QDX = QX; QDY = QY; QVX = [Double](repeating: 0, count: N); QVY = QVX; QW = QVX; cvX = 0; cvY = 0; caX = 0; caY = 0; cpX = nil; cpY = nil; tickLastT = -9   // v2.25
         stkOX = 0; stkOY = 0; stkVX = 0; stkVY = 0; stkG = 0; stkLast = -9; stkSaid = false; stkPet = false; trail = []   // v2.26
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
@@ -2469,7 +2512,10 @@ final class SlimeRig {
         // done stroking (0.7 s without another): comfortable, it is happy
         if stkPet && fingers.isEmpty && t - stkLast > 0.7 {
             stkPet = false
-            if moodC > 0.35 && mat.emo >= 0.5 && !escOn { happyT = t; wagT = t + 0.1; hop(); voice("happy") }
+            if moodC > 0.35 && mat.emo >= 0.5 && !escOn {   // v2.63 C6 (web: the same line): rubVary 0 as before (tall, a wag, the hop, happy)
+                let bx = clusters.isEmpty ? homeX : clusters[gi].xc, by = clusters.isEmpty ? homeY : clusters[gi].yc
+                rubHappy(impHas ? impLX : bx, impHas ? impLY : by - R)
+            }
         }
         // the body carried: the target follows the finger's speed (400 pt a second about 0.2R), at most strokeCarry; a spring with inertia follows, let go it runs past a little and comes back
         if n > 0 && !grab {
@@ -3187,6 +3233,11 @@ final class SlimeRig {
             posX = (1 + 0.05 * cp) * (1 - 0.04 * hp) * (1 - 0.06 * cw); posY = (1 - 0.06 * cp) * (1 + 0.07 * hp) * (1 - 0.06 * cw)
             trm = R * 0.016 * min(1, moodStrain + moodScare) * (reduceMotion ? 0.5 : 1) * mat.tremble   // v2.48 tremble 0: no shiver when pulled or poked (it read as broken)
             do { let ms = brainMS, mg = max(0, ms), mb = max(0, -ms); posX *= (1 - 0.02 * mg) * (1 + 0.04 * mb); posY *= (1 + 0.04 * mg) * (1 - 0.05 * mb) }   // v2.63 心情 (web v2.42 BRMS): in a good mood a little taller, in a bad one flatter
+        }
+        if rubvSpT > -9 {   // v2.63 C6 rubVary: melting 2 s more (only rubVary 1 sets rubvSpT)
+            let u = t - rubvSpT
+            let e: Double = u < 0 ? 0 : (u < 0.3 ? u / 0.3 : (u < Self.rubvSpread ? 1 : max(0, 1 - (u - Self.rubvSpread) / 0.5)))
+            posX *= 1 + 0.05 * e; posY *= 1 - 0.06 * e
         }
         if shkT0 > 0 && t >= shkT0 && t < shkT0 + 0.6 { trm += R * 0.025 * shkAmp * exp(-(t - shkT0) / 0.2) * (reduceMotion ? 0.5 : 1) }   // v2.19 shaking off: the outline trembles too
         if iv3(mat.e3) { posX *= 1 - 0.02 * impShownTrust + 0.04 * impShownWary; posY *= 1 + 0.05 * impShownTrust - 0.06 * impShownWary }   // v2.22 E3: trusting rounder, taller; wary flatter

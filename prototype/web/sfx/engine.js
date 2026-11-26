@@ -166,13 +166,13 @@
   S.setMode = function (m) { S.mode = m; S.setMuted(m === 2); if (S.bgmG) { S.bgmT = bgmTarget(false); S.bgmG.gain.setTargetAtTime(S.bgmT, S.ctx.currentTime, 0.3); } };
   S.setVolume = function (v) { S.volume = v; if (S.master && !S.muted) S.master.gain.setTargetAtTime(v, S.ctx.currentTime, 0.02); };
 
-  function pick(key) { const l = S.buf[key]; return l && l.length ? l[Math.floor(Math.random() * l.length)] : null; }
+  function pick(key, take) { const l = S.buf[key]; return l && l.length ? l[take != null ? take % l.length : Math.floor(Math.random() * l.length)] : null; }   // v2.63 C6: take = which file (the page's shuffle bag, rubVary); none = random as before
 
   function one(key, p) {
     const c = S.ctx; if (!c || S.muted || !p) return;
     if (p.deco && S.active >= MAP.maxVoices) return;
     if (S.active >= MAP.maxVoices + 4) return;
-    const b = pick(key); if (!b) return;
+    const b = pick(key, p.take); if (!b) return;
     const src = c.createBufferSource(), g = c.createGain(), lp = c.createBiquadFilter();
     lp.type = 'lowpass'; lp.frequency.value = p.lp || 8000; lp.Q.value = 0.5;
     src.buffer = b; src.playbackRate.value = (p.r || 1) * (1 + (Math.random() * 2 - 1) * S.jitter);
@@ -213,7 +213,7 @@
   };
 
   // v2.22 它的聲音（E1）：一種情緒一層，r 由呼叫端依印象給（熟的高、戒的低）；黏液滴下是一顆小泡
-  S.voice = function (kind, g, r) { one('voice.' + kind, { g: clamp(g, 0, 1), r: r || 1, lp: 4000 }); };
+  S.voice = function (kind, g, r, take) { one('voice.' + kind, { g: clamp(g, 0, 1), r: r || 1, lp: 4000, take }); };
   // v2.30 擺飾碰到東西：kind pot 或 dish，g 力道；rate 小於 1 是掉到看不到的地方（遠一點、悶一點）
   S.knock = function (kind, g, rate) { const far = rate && rate < 1; one('prop.' + kind, { g: clamp(g, 0, 1) * (far ? 0.5 : 0.9), r: rnd(0.94, 1.06) * (far ? 0.9 : 1), lp: far ? 1200 : 5000 }); };
   // v2.50 場景聲（AI 音效，manifest fx.<kind>）：走、爬窗框、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣、擺飾倒下、掉出窗外、走過布墊。
