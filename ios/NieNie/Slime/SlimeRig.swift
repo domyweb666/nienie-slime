@@ -361,6 +361,22 @@ final class SlimeRig {
     // background), never "sad you were away". impL: where you last touched it; ask: begging after a purr (C4)
     private(set) var impTrust = 0.0, impWary = 0.0
     private var impLX = 0.0, impLY = 0.0, impHas = false, impAskUntil = -9.0
+    // v2.63 D6 (bond; web BONDK, BOND, SOOK, SOO, the same numbers, Agent's picks for 多米 to feel): trust splits in two. impTrust stays today's
+    // closeness (full after 7 s of stroking); impBond is the bond, 0...1, and it never goes down: while trust is full (≥ full) and it is still
+    // treated gently (the frames impStep adds trust on), rate a minute (about 100 minutes to 1); a yank, quick taps or a fling take nothing off.
+    // The controller keeps each slime's in UserDefaults with the trust ("bd" in nienie.imp). Nothing on screen shows it.
+    // It does one thing: a high bond (lo...hi, eased), not wary (< 0.4), the first touch more than gap s after the last hold, the flinch × (1 − k),
+    // at k 1 none, it leans to your finger instead (the E2 lean). bondLastT = the last time it was held; flBk, flBX, flBY = that touch's k and where.
+    // Soothing (SooSet): wary past w (only a yank or three quick taps get it there), a gentle hand has to add up T s first: no comfort, no purr, no
+    // nuzzle meanwhile; at T it sighs (the sigh after a rub), then as usual. sooOn soothing, sooG seconds so far, sooOK soothed (until the wariness rises again)
+    private enum BondSet { static let rate = 0.01, full = 0.95, lo = 0.3, hi = 0.7, gap = 2.0 }
+    private enum SooSet { static let w = 0.5, T = 3.0 }
+    private(set) var impBond = 0.0
+    private var bondLastT = -9.0, flBk = 0.0, flBX = 0.0, flBY = 0.0
+    private var sooOn = false, sooG = 0.0, sooOK = false
+    private var bondOn: Bool { params.bond >= 0.5 && params.imp >= 0.5 }
+    /// v2.63 D6: the controller brings a slime's bond back (launch, switching slimes); 0 with bond off
+    func setBond(_ v: Double) { impBond = v.isFinite ? max(0, min(1, v)) : 0 }
     private var askOn = false, askAt = 0.0, askX = 0.0, askY = 0.0
     // a finger resting beside it (C1, C2): sn = the pseudopod pointing at it (sniff id); stillT = how long the finger has been still;
     // touched = reached it this time; rub = the nestling sway
@@ -435,7 +451,7 @@ final class SlimeRig {
     /// What the brain is doing and why it chose the last thing (the web's 「牠在想什麼」 lines; no readout on the phone yet)
     var brainSay: (act: String, why: String) { (act: brain.act, why: brain.why) }
     /// v2.23 收集: switching slimes brings that one's impression back (this run only).
-    func setImpression(trust: Double, wary: Double) { impTrust = trust; impWary = wary; impShownTrust = trust; impShownWary = wary; impHas = false; impAskUntil = -9 }
+    func setImpression(trust: Double, wary: Double) { impTrust = trust; impWary = wary; impShownTrust = trust; impShownWary = wary; impHas = false; impAskUntil = -9; sooOn = false; sooG = 0; sooOK = false }   // v2.63 D6: soothing starts over (web chooseSlime: impReset)
     /// v2.22 E3: the body colour leans with the impression.
     var showsImpression: Bool { iv3(params.e3) }
 
@@ -615,14 +631,17 @@ final class SlimeRig {
         guard params.emo >= 0.5 else { moodStrain = 0; moodTugS = 0; tugX = 0; tugY = 0; purr = 0; escOn = false; petReset(); return }
         petStep(dt)   // v2.61 C3
         var g: Finger?
+        var soo = false   // v2.63 D6: soothing, no comfort or purr this frame
         for f in fingers.values where f.mode == .grab { if g == nil || bodyStretch(f) > bodyStretch(g!) { g = f } }
         if let g {
             let st = bodyStretch(g), sp = hypot(g.vxS, g.vyS) / R   // v2.20: how far the body itself is pulled open (dragging it along is not a hard pull)
             // v2.24 rubSpeed: the limit in real speed (60 pt a second is about 1 cm), a tickle does not count; really rubbing, comfort comes twice as fast as held still
             let v24: Bool = params.rubSpeed > 0, spPt: Double = sp * R, rubbing: Bool = v24 && spPt > R * 0.3
             let rubOK: Bool = v24 ? (spPt < params.rubSpeed * 60 && !tickOn) : sp < 2
+            let gt0: Double = g.gentleT
             g.gentleT = st < 0.6 && rubOK ? g.gentleT + dt * (rubbing ? 2 : 1) : max(0, g.gentleT - 2 * dt)
-            if g.gentleT > 1 { moodC = min(1, moodC + (rubbing ? 0.6 : 0.35) * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5)) }
+            soo = sooStep(dt, gentle: g.gentleT > gt0 || (petOn && t - petLast < 0.05))   // v2.63 D6 (bond; web: the same line): very wary, soothe first
+            if g.gentleT > 1 && !soo { moodC = min(1, moodC + (rubbing ? 0.6 : 0.35) * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5)) }
             let rough: Bool = !roughOn || g.yank   // v2.61 D1 (rough): only once this grab has been yanked
             g.strainT = st > 1.5 && rough ? g.strainT + dt : max(0, g.strainT - dt)
             let sv = max(0, min(1, (g.strainT - 0.5) / 1))
@@ -643,7 +662,8 @@ final class SlimeRig {
             moodStrain *= exp(-dt / 0.2)
             moodTugS = roughOn ? moodTugS * exp(-dt / 0.2) : 0   // v2.61 D1
             let k = 1 - exp(-dt / 6)
-            if stkG > 1 && t - stkLast < 0.05 {   // v2.26 F6: a stroke counts as comfort; the finger is on it half the time, so it rises twice as fast as a rub
+            soo = sooStep(dt, gentle: (stkG > 1 && t - stkLast < 0.05) || (petOn && t - petLast < 0.05))   // v2.63 D6 (bond)
+            if stkG > 1 && t - stkLast < 0.05 && !soo {   // v2.26 F6: a stroke counts as comfort; the finger is on it half the time, so it rises twice as fast as a rub
                 moodC = min(1, moodC + 1.2 * dt); moodA += (0.15 - moodA) * (1 - exp(-dt / 1.5))
             } else {
                 moodC -= moodC * k; moodA -= moodA * k
@@ -654,7 +674,7 @@ final class SlimeRig {
         let tg = tugBy * R * 0.35; tugX = -pullDX * tg; tugY = -pullDY * tg   // tug of war: you can still pull it
         let gentleNow: Bool = g != nil ? g!.gentleT > 1 : (stkG > 1 && t - stkLast < 0.6)
         let pt: Double = gentleNow && moodC > 0.2 ? min(1, (moodC - 0.2) / 0.5) : 0
-        let pt2: Double = petOn ? max(pt, min(1, (petG - 1) / 0.5)) : pt   // v2.61 C3: slow strokes purr too
+        let pt2: Double = soo ? 0 : (petOn ? max(pt, min(1, (petG - 1) / 0.5)) : pt)   // v2.61 C3: slow strokes purr too; v2.63 D6: soothing, none
         purr += (pt2 - purr) * (1 - exp(-dt * (1 + 0.4 * exLevel()) / 0.3))   // v2.32: excited, the purr comes sooner
         if escOn {
             let p = min(1, (t - escT0) / escT), e = 1 - pow(1 - p, 3)
@@ -1130,6 +1150,7 @@ final class SlimeRig {
         moodC = 0; moodA = 0; moodStrain = 0; moodStrainMax = 0; moodScare = 0; cowerUntil = -9; happyT = -9; wagT = -9; taps = []
         tugX = 0; tugY = 0; escOn = false; purr = 0
         moodTugS = 0; petReset(); flTc = 1; flTapQ = false; flTapAt = -9   // v2.61 D1 D2 C3 (the fingers' own go with the fingers)
+        bondLastT = -9; flBk = 0; sooOn = false; sooG = 0; sooOK = false   // v2.63 D6 (web setup: the same): the clock set back, the last hold must not sit in the future
         dentList.removeAll()
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
@@ -2220,6 +2241,7 @@ final class SlimeRig {
         // later it flinches by itself; A7 a touch on empty space within 3R makes it turn and sniff that way 0.3 s later
         // v2.20 C5: wary, it flinches sooner
         if grab && lv(params.lifeFlinch) && !(flAt > t) && !slpOn { flAt = t + (0.1 + Double.random(in: 0..<0.15, using: &rng)) * (iv2(params.impC5) ? 1 - 0.5 * impWary : 1); flPre = lifeSt; flTapAt = flAt }   // flTapAt: v2.61 D2
+        if grab { bondTouch(x, y) }   // v2.63 D6 (web: the next line): a high bond's first touch does not flinch, it leans to your finger
         if grab && params.life2 >= 0.5 { cutSniffs(); gaitOn = false; gaitK = 1; wanderMoving = false; lifeSt = slpOn ? .sleep : .rest; lifeUntil = -1; askOn = false }   // v2.61 C1: slpOn, still asleep
         let lure = !grab && allowed && (iv2(params.impC1) || iv2(params.impC2))   // v2.20: a finger on empty space goes to C1, C2 (lureStep), not just one sniff
         if !grab && allowed && !lure && lv(params.lifeAttend) {
@@ -5223,6 +5245,11 @@ final class SlimeRig {
                     if flTapQ { tapCap(a) }
                 }
                 flTapQ = false
+                if byTouch && flBk > 0 {   // v2.63 D6 (bond; web: the same line): a high bond's first touch, the flinch × (1 − k), and it leans to your finger
+                    a *= 1 - flBk
+                    if iv3(params.e2) && clusters.indices.contains(gi) { leanT = t; leanA = atan2(flBY - clusters[gi].yc, flBX - clusters[gi].xc); leanS = 1 }
+                }
+                flBk = 0
                 flAmp = a; flT0 = t; flH *= 0.55; flBoost = 1; cutSniffs()
                 if lv(params.lifeBreath) { exert = max(exert, 0.1 + 2 * a) }   // a quick breath in with it
                 if byTouch && params.flinchFx >= 0.5 && a >= FlxSet.lo * params.flinchAmp {   // v2.63 D4 (web: the same line): a small sound and a light tap on this frame; a pop just sounded, the tap only
@@ -6240,7 +6267,7 @@ final class SlimeRig {
         return 4 / (params.dentFade * (1 + 1.5 * smooth01((dn.held - 0.3) / 0.7)))
     }
     /// v2.20: the app was in the background 10 min or more: first meeting again.
-    func resetImpression() { impTrust = 0; impWary = 0; impHas = false; impAskUntil = -9 }
+    func resetImpression() { impTrust = 0; impWary = 0; impHas = false; impAskUntil = -9; impBond = 0; sooOn = false; sooG = 0; sooOK = false }   // v2.63 D6 (web impReset): the bond and soothing too
     /// At release, what kind of grab it was goes into the impression: pulled until it wanted to flee, poked in a row, flung hard → wary;
     /// a gentle one takes a fifth of the wariness off (C5 calming). Before moodRelease (which clears strainMax).
     private func impRelease(_ f: Finger) {
@@ -6255,7 +6282,32 @@ final class SlimeRig {
         else if fling { impWary += 0.1; impTrust -= 0.05 }
         else { if !(rough && f.yank) { impWary *= 0.8 }; if iv3(params.e3) && f.dragMax > R * 0.5 && !hard { impTrust += 0.12 } }   // v2.22 E3: led along gently, a little more trust
         if impWary > w0 { impWary = w0 + (impWary - w0) * params.wRate }   // v2.23 personality: how fast it turns wary
+        if impWary > w0 + 1e-9 && bondOn { sooOK = false }   // v2.63 D6: scared again, it needs soothing again
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
+    }
+    /// v2.63 D6 (bond; web bondTouch): a grab coming down: is it a high bond's first touch? More than BondSet.gap s since the last hold, not wary,
+    /// and this touch set off a flinch: k eased over the bond lo...hi, kept in flBk for the flinch's frame
+    private func bondTouch(_ x: Double, _ y: Double) {
+        guard bondOn else { return }
+        let first: Bool = !(t - bondLastT <= BondSet.gap && bondLastT <= t)
+        bondLastT = t
+        let k: Double = first && impWary < 0.4 && flAt > t && flAt == flTapAt ? smooth01((impBond - BondSet.lo) / (BondSet.hi - BondSet.lo)) : 0
+        flBk = k
+        if k > 0 { flBX = x; flBY = y }
+    }
+    /// v2.63 D6 (bond; web sooStep): very wary, a gentle hand soothes it first. gentle = a gentle hand this frame; true = no comfort and no purr
+    /// this frame (moodStep). After SooSet.T s of it, a sigh (the one after a rub), then as usual
+    private func sooStep(_ dt: Double, gentle: Bool) -> Bool {
+        guard bondOn else { sooOn = false; return false }
+        if impWary <= SooSet.w { sooOK = false }
+        if !sooOn && !sooOK && impWary > SooSet.w && gentle { sooOn = true; sooG = 0 }
+        guard sooOn else { return false }
+        if gentle { sooG += dt }
+        if sooG < SooSet.T { return true }
+        sooOn = false; sooOK = true
+        if lv(effParams.lifeBreath) && sighCyc < 0 { sighCyc = Int(floor(brPhase)) + 1 }
+        if !slpOn { onEvent?(.fx(kind: "sigh", gain: 0.45, delay: 0)) }
+        return false
     }
     /// C4 begging: released after a purr (the happy hop), 0.9 s later it reaches toward where your finger left and edges over if far;
     /// touched again within 5 s, the purr comes fast (touchBegan).
@@ -6267,6 +6319,7 @@ final class SlimeRig {
     /// Trust does not fade with time (it does not cool off because you were away).
     private func impStep(_ dt: Double) {
         guard params.imp >= 0.5 else { return }
+        let tr0 = impTrust   // v2.63 D6
         var g: Finger?
         for f in fingers.values where f.mode == .grab { if g == nil || bodyStretch(f) > bodyStretch(g!) { g = f } }
         if let g {
@@ -6288,6 +6341,10 @@ final class SlimeRig {
                 let e3m: Double = (iv3(params.e3) ? 3 : 1) * params.trRate
                 impTrust += (0.04 + 0.04 * purr) * dt * e3m
             }
+        }
+        if bondOn {   // v2.63 D6 (bond; web: the same line): trust full and still treated gently, the bond grows slowly; it only goes up
+            if g != nil { bondLastT = t }
+            if tr0 >= BondSet.full && impTrust > tr0 { impBond = min(1, impBond + BondSet.rate / 60 * dt) }
         }
         impWary *= exp(-dt / (260 * (params.wFade > 0 ? params.wFade : 1)))   // v2.57 wFade: 布丁 is scared easily and forgets fast
         impTrust = max(0, min(1, impTrust)); impWary = max(0, min(1, impWary))
@@ -6475,7 +6532,7 @@ final class SlimeRig {
             tkT = max(0, tkT - dt)
         }
         // nuzzling: swaying side to side 0.05R, 0.6 a second; the first time "mmm~"
-        if sp < 0.3 && g.stretch < 0.4 && !tickling {
+        if sp < 0.3 && g.stretch < 0.4 && !tickling && !(sooOn && bondOn) {   // v2.63 D6: being soothed it does not nuzzle or hum; after the sigh
             if nuzT0 < 0 { nuzT0 = t; nuzO = 0 }
             let u = t - nuzT0 - 0.8
             if u > 0 {

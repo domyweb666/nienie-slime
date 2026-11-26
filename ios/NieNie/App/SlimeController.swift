@@ -87,6 +87,8 @@ final class SlimeController: ObservableObject {
         if start.trKeep >= 0.5 {
             for (k, tr) in savedTrust { impressions[k] = (tr, 0) }
             if let tr = savedTrust[saved] { rig.setImpression(trust: tr, wary: 0) }
+            savedBond = Self.bondLoad(); bonds = savedBond   // v2.63 D6 (web impLoad: read even with bond 0, written back as it was)
+            if start.bond >= 0.5 && start.imp >= 0.5 { rig.setBond(savedBond[saved] ?? 0) }
         }
         for n in [1, 2] { slotSaved[n] = UserDefaults.standard.data(forKey: Self.slotKey(n)) != nil }
         feelLoad()   // 手感調節台: last time's numbers (v2.39; v2.52 the desk's v1 store)
@@ -296,19 +298,38 @@ final class SlimeController: ObservableObject {
         for (k, v) in tr { if let s = SlimeKind(rawValue: k), v.isFinite { out[s] = max(0, min(1, v)) } }
         return out
     }
-    /// Writes when a slime's trust moved by more than 0.005 since the last write (force: on leaving, any change)
+    /// v2.63 D6 (bond; web BONDS): each slime's bond, "bd" in the same "nienie.imp" ({"v":1,"tr":{…},"bd":{"taro":0.12}}); bond 0 writes none
+    private var savedBond: [SlimeKind: Double] = [:], bonds: [SlimeKind: Double] = [:]
+    private static func bondLoad() -> [SlimeKind: Double] {
+        guard let d = UserDefaults.standard.data(forKey: "nienie.imp"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              let bd = o["bd"] as? [String: Double] else { return [:] }
+        var out: [SlimeKind: Double] = [:]
+        for (k, v) in bd { if let s = SlimeKind(rawValue: k), v.isFinite { out[s] = max(0, min(1, v)) } }
+        return out
+    }
+    private var bondOn: Bool { current.bond >= 0.5 && current.imp >= 0.5 }
+    /// Writes when a slime's trust moved by more than 0.005 since the last write (force: on leaving, any change); v2.63 D6 the bond by more than 0.0001
     private func trustSave(force: Bool) {
         guard current.trKeep >= 0.5 else { return }
         var all = savedTrust
         for (k, v) in impressions { all[k] = v.trust }
         all[slime] = rig.impTrust
+        var bd = bonds
+        if bondOn { bd[slime] = rig.impBond }
         let moved = all.contains { k, v in abs(v - (savedTrust[k] ?? -1)) > (force ? 1e-6 : 0.005) }
+            || bd.contains { k, v in abs(v - (savedBond[k] ?? 0)) > (force ? 1e-6 : 1e-4) }
         guard moved else { return }
         var tr: [String: Double] = [:]
         for (k, v) in all { tr[k.rawValue] = (v * 1000).rounded() / 1000 }
-        guard let d = try? JSONSerialization.data(withJSONObject: ["v": 1, "tr": tr]) else { return }
+        var bdOut: [String: Double] = [:]
+        for (k, v) in bd where v > 0 { bdOut[k.rawValue] = (v * 10000).rounded() / 10000 }
+        var obj: [String: Any] = ["v": 1, "tr": tr]
+        if !bdOut.isEmpty { obj["bd"] = bdOut }   // v2.63 D6: only with a bond, so bond 0 writes what it wrote before
+        guard let d = try? JSONSerialization.data(withJSONObject: obj) else { return }
         UserDefaults.standard.set(d, forKey: "nienie.imp")
         savedTrust = all
+        savedBond = bd; bonds = bd
     }
     private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0, purrPhase = 0.0
     private var backgroundAt: Date?
@@ -420,6 +441,7 @@ final class SlimeController: ObservableObject {
     func select(_ k: SlimeKind) {
         guard k != slime else { return }
         impressions[slime] = (rig.impTrust, rig.impWary)
+        if bondOn { bonds[slime] = rig.impBond }   // v2.63 D6 (web chooseSlime: BONDS[old] = BOND.v)
         slime = k; material = k.material
         rig.fx = k.fx   // v2.57 the new six's signatures
         UserDefaults.standard.set(k.rawValue, forKey: "slime")
@@ -429,6 +451,7 @@ final class SlimeController: ObservableObject {
         if let imp = impressions[k] { rig.setImpression(trust: imp.trust, wary: imp.wary) }
         else if current.trKeep >= 0.5, let tr = savedTrust[k] { rig.setImpression(trust: tr, wary: 0) }   // v2.34
         else { rig.resetImpression() }
+        rig.setBond(bondOn ? (bonds[k] ?? 0) : 0)   // v2.63 D6 (web chooseSlime: impReset, then BOND.v = BONDS[new])
         rig.brainSync()   // v2.63 心情 (web chooseSlime: …IMP set; memSync(); then startIntro)
         rig.startIntro()
         sound.press(intensity: 0.5)
