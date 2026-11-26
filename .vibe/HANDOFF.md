@@ -1,6 +1,6 @@
 # Handoff: 熬夜分支做完第二批（v2.63，分支 `overnight-20261126-1110`，2026-11-26，先看這段）
 
-> 工作樹 `E:/捏捏史萊姆/nienie-slime/.claude/worktrees/overnight-20261126`。起點是 `split-merge-v1`（v2.62）合進 `feel-3x-panel-v1`（v2.61b，build 164）。**已推到 GitHub（只跑編譯），沒發 TestFlight，沒合回 `feel-3x-panel-v1`。** 細節、每項 commit、Agent 取的數字全在根目錄 `OVERNIGHT.md`。
+> 工作樹 `E:/捏捏史萊姆/nienie-slime/.claude/worktrees/overnight-20261126`。起點是 `split-merge-v1`（v2.62）合進 `feel-3x-panel-v1`（v2.61b，build 164）。**已推到 GitHub（只跑編譯），沒發 TestFlight。11-26 多米說合回主線：已快轉合進本機 `feel-3x-panel-v1`（`d73ba01`，工作樹 `prototype/web/_wt`），比 origin 多 58 個提交，還沒推。** 細節、每項 commit、Agent 取的數字全在根目錄 `OVERNIGHT.md`。
 
 ## ✅ 完成（21 項）
 - 第二批最前面：手機打開先看你（C4）、手機大腦兩片（需求和自己醒、心情）、揉夠了在手邊睡著（C9，網頁＋手機）。
@@ -14,7 +14,7 @@
 - 手機大腦的記地方（`BMEM`）、擺飾反應：第三批。
 
 ## ❓ 等多米決定
-- 合不合回 `feel-3x-panel-v1`、要不要發 TestFlight。
+- 要不要推 `feel-3x-panel-v1`、發 TestFlight（發的話手動跑 ios.yml 勾 testflight）。
 - ElevenLabs 11-21 生成那天是不是付費方案（截圖存證）；GitHub Pages 上公開的原始音檔要不要拿掉。
 - `OVERNIGHT.md`「待確認」裡每項取的數字、搖晃關著時風鈴不晃、步數權限兩句選哪句。
 
