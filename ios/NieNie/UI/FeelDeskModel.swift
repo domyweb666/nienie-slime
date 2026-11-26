@@ -15,7 +15,8 @@ struct FeelKnob: Identifiable {
     let section: String
 
     /// The name of this set of defaults. Change it when a knob's default changes for any material; the stamp below catches it if you forget.
-    static let version = "v2.61"
+    /// It is also the version the desk shows at the top, so it follows the batch (v2.63; the knobs' defaults are v2.61's, the stamp is unchanged, so no saved feel goes stale).
+    static let version = "v2.63"
 
     static let main: [FeelKnob] = [
         FeelKnob(id: "alpha", key: \.alpha, name: "軟", hint: "按三秒，看周圍跟著塌多少。越右越硬", range: 0.05...0.8, step: 0.01, section: "捏下去"),
@@ -124,6 +125,15 @@ struct FeelBatch: Equatable {
         Group(name: "聲音", ids: ["snd61"]),
         Group(name: "眼睛和旁邊", ids: ["eyeTrue", "nearFast", "greetLook"]),
         Group(name: "睡醒", ids: ["wakeSoft"]),
+    ]
+    /// v2.63 這一批 (the web's KEYS63, the same words): one button each in the desk's 「這一批（v2.63）」. Each id must also be one of `keys`
+    /// (so the three tiers still set it and it stays over a slime or material switch); not saved, like the groups.
+    struct Item: Identifiable {
+        let id: String
+        let name: String
+    }
+    static let b63: [Item] = [
+        Item(id: "greetLook", name: "打開、切回來先看你"),
     ]
     enum Tier: String, CaseIterable, Identifiable {
         case b158, fix, pull

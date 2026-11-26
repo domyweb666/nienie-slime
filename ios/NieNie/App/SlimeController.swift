@@ -108,6 +108,7 @@ final class SlimeController: ObservableObject {
             self?.sound.stopAll()
             self?.motion.stopDeviceMotionUpdates()
             self?.trustSave(force: true)   // v2.34: leaving, write the trust now
+            self?.resignedActive = true   // v2.63 C4
         }
         // v2.20: the impression lives for this run only; 10 min or more in the background and it is a first meeting again
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
@@ -128,8 +129,15 @@ final class SlimeController: ObservableObject {
         // 搖晃沉澱 (多米 11-08: shaking does nothing on build 117): a system alert resigns active without going to the background
         // (the motion & fitness prompt after 好 on the gift stone, Control Center, a banner pulled down), so willEnterForeground never came
         // and the shake stayed stopped until the app went to the background. Every return to active turns it back on
+        // v2.63 C4 (greetLook; web: visibilitychange back and blur/focus → greetArm(false)): back in the app (from the background, the lock screen,
+        // Control Center, a banner) it turns to you 0.35 s later and blinks; asleep, it wakes slowly without a sound. After willEnterForeground
+        // (the 10 min impression reset above comes first, as the web's impBack does); however long it was away, the same. greetLook 0: nothing here
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
-                                               object: nil, queue: .main) { [weak self] _ in self?.startMotion() }
+                                               object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.startMotion()
+            if self.resignedActive { self.resignedActive = false; self.rig.greetArm(open: false) }
+        }
     }
 
     /// The material's numbers with the chosen slime's shape seed and personality on top.
@@ -287,6 +295,7 @@ final class SlimeController: ObservableObject {
     }
     private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0, purrPhase = 0.0
     private var backgroundAt: Date?
+    private var resignedActive = false   // v2.63 C4: left active (background, lock screen, Control Center, a system alert); the next didBecomeActive is a coming back
 
     func report(_ s: SlimeView.FrameStats) { stats = s }
 
@@ -743,6 +752,12 @@ final class SlimeController: ObservableObject {
         for id in g.ids { batch[id] = v }
         let w: String = v ? "開" : "關"
         batchDone("\(g.name)：\(w)。")
+    }
+    /// v2.63 這一批: one switch of FeelBatch.b63 (the web's data-63k buttons), not saved
+    func batchToggle63(_ it: FeelBatch.Item) {
+        batch[it.id] = !batch[it.id]
+        let w: String = batch[it.id] ? "開" : "關"
+        batchDone("\(it.name)：\(w)。")
     }
     private func batchDone(_ note: String) {
         pushParams()

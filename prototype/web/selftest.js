@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T75（切回來也先看你：visibilitychange、blur／focus，睡著的慢慢醒不嚇；在 T74 前面跑，幾秒）
    v2.62（11-26）：加 T74（扯斷成兩隻、碰到合回，測試在 splittest.js，最後跑）；T62 也釘 split 0（真正的預設往上猛扯會斷）
    v2.61（11-25）：加 T73（慢拉往裡穿過去時跟手照舊變少，最後跑，約 30 秒）
    v2.61（11-25）：加 T72（補守預設開著、原本沒人守的開關，最後跑，約 30 秒）；T71 的換隻記憶原本恆真，改成真的開著大腦再看
@@ -1897,6 +1898,26 @@
     res.T73_slowPull = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
     res.PASS.slowPull = r.err === '' && r.on.held && r.on.strain === 0 && !r.on.esc && r.off.strain > .5 && r.on.home.every((v, i) => Math.abs(v - r.off.home[i]) <= .1) && r.on.follow.every((v, i) => Math.abs(v - r.off.follow[i]) <= .03) && r.old.home.reduce((p, q, i) => p + q - r.on.home[i], 0) >= 1 && r.on.rel === 0 && r.on.hold <= r.off.hold * 1.6 + 8;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T75 v2.63 C4 切回來也先看你（greetLook；OVERNIGHT 第 2 項，手機照這條搬）。T71 只量了打開那條；這項發真的事件（document.hidden 先蓋掉）：分頁藏起來再回來（visibilitychange）、視窗切走再切回來（blur、focus，分頁沒藏）。窗台、芋圓、真正的預設，熟 .6。
+  // 擋：醒著回來 0.6 秒內看你（EYE.user 排上）、眨一下、眼睛朝前；睡著回來當下就醒、走慢慢醒（SLP.slow）、不嚇（沒有 startle、不縮、不睜大）、不出「嗯？」，0.6 秒內看你；blur／focus 那條一樣 0.6 秒內看你。
+  // 對照：greetLook 0 醒著 1 秒內不看、睡著的照睡（證明量得到）。
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w, at: IMP.hiddenAt }, blur0 = GREET.blurT, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    let hid = false; Object.defineProperty(document, 'hidden', { configurable: true, get: () => hid });
+    const fresh = (over, tr) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(75); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = tr || 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; GREET.blurT = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; Object.assign(BRAIN, { seed: 75 }); brainReset(); };
+    const back = (over, sleep, how) => { fresh(over, .6); steps(240); if (sleep) { SLP.on = true; LIFE.st = 'sleep'; BRAIN.z = .9; steps(300); } const k0 = +SLP.k.toFixed(2); log.splice(0); EYE.user = -9; const f0 = FLN.t0;
+      if (how === 'focus') { dispatchEvent(new Event('blur')); dispatchEvent(new Event('focus')); } else { hid = true; document.dispatchEvent(new Event('visibilitychange')); hid = false; document.dispatchEvent(new Event('visibilitychange')); }
+      const now = !SLP.on; let at = -1, blink = 1, wide = 0, gaze = 9, k6 = -1;
+      for (let i = 0; i < 60; i++) { steps(1); const s = +((i + 1) / 60).toFixed(2); if (at < 0 && EYE.user > t) at = s; if (at > 0) { blink = Math.min(blink, EYE.blink); if (s - at >= .3) gaze = Math.min(gaze, Math.hypot(EYE.gx, EYE.gy)); } wide = Math.max(wide, EYE.wideD); if (i === 35) k6 = +SLP.k.toFixed(2); }
+      steps(60);
+      return { at, k0, wokeNow: now, asleep: SLP.on, slow: SLP.slow, k6, startle: log.some(x => x[0] === 'voice.startle'), ask: log.some(x => x[0] === 'voice.ask'), flinch: FLN.t0 !== f0, blink: +blink.toFixed(2), wide: +wide.toFixed(2), gaze: +gaze.toFixed(2) }; };
+    try { r.awake = back({}, false, 'vis'); r.sleep = back({}, true, 'vis'); r.focus = back({}, false, 'focus'); r.offAwake = back({ greetLook: 0 }, false, 'vis'); r.offSleep = back({ greetLook: 0 }, true, 'vis'); r.err = ''; } catch (e) { r.err = String(e); }
+    delete document.hidden; IMP.hiddenAt = I0.at; GREET.blurT = blur0;
+    Object.assign(VIEW, view0); SLIME = sl0; BMEM.cell = M0.cell; BMEM.side = M0.side; BMEM.dirty = false; IMP.tr = I0.tr; IMP.w = I0.w; Object.assign(E4, E0); Object.assign(BRAIN, B0); GREET.st = ''; GREET.until = -9; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    const lookOK = q => q.at > 0 && q.at <= .6 && q.blink <= .1 && q.gaze <= .25;
+    r.ok = !r.err && lookOK(r.awake) && !r.awake.startle && lookOK(r.focus)
+      && r.sleep.k0 > .8 && r.sleep.wokeNow && !r.sleep.asleep && r.sleep.slow && lookOK(r.sleep) && !r.sleep.startle && !r.sleep.ask && !r.sleep.flinch && r.sleep.wide < 1.05
+      && r.offAwake.at < 0 && r.offSleep.asleep && r.offSleep.at < 0;
+    res.T75_greetBack = r; res.PASS.greetBack = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     try { window.__SPLIT_PRE = PRE62; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }

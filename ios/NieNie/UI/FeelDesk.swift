@@ -56,6 +56,7 @@ struct FeelDesk: View {
                             Spacer(minLength: 0)
                         }
                         batchBox   // v2.61
+                        batch63Box   // v2.63
                         DisclosureGroup(isExpanded: $showStyles) {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(Array(stride(from: 0, to: FeelStyle.all.count, by: 2)), id: \.self) { r in
@@ -170,6 +171,21 @@ struct FeelDesk: View {
                 bigButton("乙", note: "", on: false) { controller.pullBlindPick(1) }
             }
             small("按甲或乙開始。哪邊是哪一種每次開始都重抽，按「揭曉」才會寫。手放開才會換。")
+        }
+    }
+
+    // MARK: - v2.63 這一批 (the web's box feel-63, the same words): one button for each of FeelBatch.b63
+
+    private var batch63Box: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("這一批（v2.63）").font(.rounded(13, .heavy))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), alignment: .leading, spacing: 6) {
+                ForEach(FeelBatch.b63) { it in
+                    chip(it.name, on: controller.batch[it.id]) { controller.batchToggle63(it) }
+                        .accessibilityAddTraits(controller.batch[it.id] ? .isSelected : [])
+                }
+            }
+            small("按一下關，再按開。關掉就跟改之前一樣。不跟著存檔，重開 app 會回到開。")
         }
     }
 

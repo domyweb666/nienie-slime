@@ -335,7 +335,7 @@ struct FeelParams: Equatable, Codable {
     var petSlow: Double = 1           // C3 慢摸累積: 1 = slow strokes add up, feeding only the purr and the trust; 0 = as before
     var wakeSoft: Double = 1          // C1 輕碰慢慢醒: 1 = a light touch wakes it slowly, and just opened it stays up 40 s; 0 = as before (startled awake by any touch, asleep at 30 s)
     var nearFast: Double = 1          // C2 聽節奏時照樣靠過來: 1 = it comes to the finger beside it while it listens for a rhythm too; 0 = as before
-    var greetLook: Double = 1         // C4 打開先看你: 1 = opened, it looks at you first; 0 = as before. The first batch does it on the web only: registered here, not wired yet (先不接)
+    var greetLook: Double = 1         // C4 打開先看你: 1 = opened, or back from the background / lock screen, it looks at you first (asleep: wakes slowly, no sound); 0 = as before. Wired in v2.63 (SlimeRig greetArm, greetStep)
     var brJit: Double = 1             // C7 作息亂數: 1 = on; 0 = as before. Web only: 手機沒有大腦，不接
     var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Web only: 手機沒有大腦，不接
     var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
@@ -897,7 +897,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
         TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),
 
-        // v2.61 第一批 (the same words as the web). greetLook, brJit, bumpSoft are not here: the phone does not read them yet
+        // v2.61 第一批 (the same words as the web). brJit, bumpSoft are not here: the phone does not read them yet (greetLook is read since v2.63)
         TuneField(key: \.skinU, name: "皮：不會斷的畫法 v2.61", hint: "1：先畫滿身體裡每一個小三角形，細的地方補一條保底線，拉遠、打結時皮比較不會斷開。0 回 v2.60（照外框畫）。只在果凍皮有作用", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.pullHold, name: "拉的 A3：拉長停住就定住 v2.61", hint: "1：拉開 0.6R 以上，手指停下來 0.25 秒，身體就不再自己變長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.pullWhole, name: "拉的 A4：往裡拉，整隻先走 v2.61", hint: "1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
@@ -906,6 +906,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.tapSoft, name: "慢慢點不算攻擊 v2.61", hint: "1：慢慢點牠不會嚇到，還是會縮一下，越點縮越小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.petSlow, name: "慢慢摸也算摸 v2.61", hint: "1：摸得很慢也會呼嚕、變熟。0 回 v2.60（太慢會被當成抓）", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.wakeSoft, name: "輕碰慢慢醒 v2.61", hint: "1：睡著時輕輕碰，慢慢醒；剛打開 40 秒才會睡。0 回 v2.60（一碰就嚇醒、30 秒就睡）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.greetLook, name: "打開先看你 v2.61", hint: "1：打開、切回來，先看你一眼。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.nearFast, name: "聽節奏時也會靠過來 v2.61", hint: "1：在聽你打節奏時，手指放旁邊照樣靠過來。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.eyeTrue, name: "眼睛看真的手指 v2.61", hint: "1：眼睛跟著手指現在的位置。0 回 v2.60（慢四分之一秒）", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.snd61, name: "新的揉聲 v2.61", hint: "1：揉的聲音換新的循環，抓著時雨聲變小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),

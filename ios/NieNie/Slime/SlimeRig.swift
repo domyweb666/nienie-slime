@@ -398,6 +398,10 @@ final class SlimeRig {
     private var echoPrev: [Double]?, echoPrevT = -99.0, echoSame = false, echoJoyUntil = -9.0
     private(set) var echoBeatT = -9.0
     private var swimOn = false, swimT0 = 0.0   // swimming in (cold start, a slime switch)
+    // v2.63 C4 (greetLook; web GREET, GREETK): wait = armed; open = armed by an opening (cold start, a slime switch: waits for it to land) or else by coming back
+    // (from the background, the lock screen, Control Center: waits back s); at = when it turns to you (opening: −9 until it lands); t0 = when armed;
+    // until = it looks at you till then; air = it was in the air (on the sill) since armed
+    private var greetWait = false, greetOpen = false, greetAt = -9.0, greetT0 = -9.0, greetUntil = -9.0, greetAir = false
     /// v2.23 收集: switching slimes brings that one's impression back (this run only).
     func setImpression(trust: Double, wary: Double) { impTrust = trust; impWary = wary; impShownTrust = trust; impShownWary = wary; impHas = false; impAskUntil = -9 }
     /// v2.22 E3: the body colour leans with the impression.
@@ -408,6 +412,7 @@ final class SlimeRig {
     /// hop comes closer and bigger, the last lands at home. Reduce Motion: no travel, one small hop at home.
     func startIntro() {
         slpOpenT = t   // v2.61 C1: opened, or another one swims in
+        defer { greetWait = false; greetArm(open: true) }   // v2.63 C4 (web chooseSlime: startIntro(); … GREET.st=''; greetArm(true)), after the intro has started, whether or not there is one
         guard effParams.intro >= 0.5, N > 0 else { return }
         if effParams.introSwim >= 0.5 && params.life2 >= 0.5 && lv(params.lifeGait) { swimIntro(1); return }   // v2.23 開場游過來
         var y1 = -1e9
@@ -1072,6 +1077,7 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         slpWakeT = -9; voiceLast = -9; e4LastT = -99; impAskUntil = -9   // v2.61: the same clock; left in the old one the next slime kept its eyes wide, said nothing and did not come for as long as the last one had been out
         slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
+        greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         CAPG = 1; CAPGAP = 0   // v2.54
@@ -2128,6 +2134,7 @@ final class SlimeRig {
         }
         if grab { escOn = false }   // v2.18: caught, it stops running
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)   // v2.61 C1: made here (it was made further down): softTouch keeps hold of it
+        greetWait = false   // v2.63 C4: touched, it stops waiting to look at you and does as usual (web pointerdown GREET.st='')
         if grab { swimOn = false; if !(slpOn && softTouch(f)) { wake(true) } }   // v2.23: caught while swimming in, no hello; asleep, it startles awake; v2.61 C1 (wakeSoft): trusting, it waits 0.25 s to tell a light touch
         if !grab && allowed {   // v2.23: asleep, a tap beside it wakes it (that tap is no rhythm); awake, C6 listens
             if slpOn { var db = 1e9; for i in bnd { db = min(db, hypot(X[i] - x, Y[i] - y)) }; if db < R * 2 { wake(false) }; echoTaps = [] }
@@ -2989,6 +2996,7 @@ final class SlimeRig {
         impStep(dt)   // v2.20
         e1Step(); e2Step(dt)   // v2.22
         sleepStep(dt); echoStep(dt)   // v2.23 B2, C6
+        greetStep()   // v2.63 C4 (web: right after sleepStep, echoStep)
         if mat.life2 >= 0.5 {
             lifeStep(dt, idle, engaged)   // v2.19: rest / look / go / arrive + the pulse gait + flinch, shake-off + sniffing (with lifeRest and lifeGait off, v2.18's walk-and-pause)
         } else if L > 0.5 && mat.wander > 0 && !introOn && !escOn && t > cowerUntil {
@@ -6400,6 +6408,7 @@ final class SlimeRig {
         if let g { o = params.eyeTrue >= 0.5 ? tow(g.rawX, g.rawY) : tow(g.fx, g.fy) }
         else if let pf { o = params.eyeTrue >= 0.5 ? tow(pf.rawX, pf.rawY) : tow(pf.fx, pf.fy) }
         else if echoSt != 0 { o = tow(echoX, echoY) }
+        else if greetWait && greetOpen { o = (0, 0.9) } else if t < greetUntil { o = (0, 0) }   // v2.63 C4: falling (opened), it looks down; landed, it turns to you
         else if t < eyeUser || slpOn { o = (0, 0) }
         else if escOn { o = tow(escDX, escDY) }
         else if gaitOn { o = (cos(gaitH), sin(gaitH)) }
@@ -6607,16 +6616,17 @@ final class SlimeRig {
         slpRollT = -9
     }
     /// Awake again: sharp (touched) it flinches 1.6× and opens wide; gently (a finger beside it) it just opens; then "mm?". slow (v2.61 C1): it opens slowly and not wide.
-    private func wake(_ sharp: Bool, slow: Bool = false) {
+    /// quiet (v2.63 C4, the web's `self`): it woke by itself, no "mm?" after (coming back to the app: it wakes slowly and looks at you instead).
+    private func wake(_ sharp: Bool, slow: Bool = false, quiet: Bool = false) {
         guard slpOn else { return }
         slpSlow = slow; slpTapN = 0; slpTap = nil   // v2.61 C1
         slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1, using: &rng); eyeBlinkT = t
         if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
-        slpAskAt = t + (sharp ? 0.45 : 0.3)
+        if !quiet { slpAskAt = t + (sharp ? 0.45 : 0.3) }
     }
     private func sleepStep(_ dt: Double) {
         if !iv3(params.sleep) && slpOn { wake(false) }
-        if params.wakeSoft < 0.5 { softDrop(); slpSlow = false }   // v2.61 C1 switched off
+        if params.wakeSoft < 0.5 { softDrop(); if params.greetLook < 0.5 { slpSlow = false } }   // v2.61 C1 switched off; v2.63 C4: the slow waking of coming back stays slow (the web never clears it)
         tapJudge()
         if slpOn {
             for f in fingers.values where t - f.hitT < 0.05 {   // a finger pushed in from outside touched it
@@ -6694,6 +6704,33 @@ final class SlimeRig {
         guard swimOn else { return }
         if t - swimT0 > 9 { swimOn = false; return }
         if lifeSt == .rest { swimOn = false; eyeUser = t + 2; wagT = t + 0.1; voiceLast = -9; voice("hello"); lifeUntil = t + 2.5 }
+    }
+
+    // MARK: v2.63 C4 (greetLook; .uiux/04-手感/極致優化規劃-暫定.md C4; web GREET, GREETK, greetArm, greetStep, line by line)
+    /// Opened (cold start, a slime switch) it waits to land (the sill), back in the app it waits `back` s; then it turns to you for `look` s and blinks `blink` s in,
+    /// before doing anything else. However long you were away, the same (11-14: not warmer the longer you were gone). Asleep, coming back wakes it slowly, without a sound.
+    /// A touch ends it. No sound, the body does not move: only the eyes. The web's brainJit (the opening's random start of the needs) waits for the phone's brain.
+    private enum GreetSet {
+        static let land: Double = 0.15, back: Double = 0.35, look: Double = 1.4, blink: Double = 0.25, wait: Double = 8
+    }
+    /// open: an opening; false: back from the background, the lock screen, Control Center (SlimeController on didBecomeActive after willResignActive).
+    func greetArm(open: Bool) {
+        guard params.greetLook >= 0.5, params.life2 >= 0.5, params.eyes >= 0.5, fingers.isEmpty, !greetWait else { return }
+        greetWait = true; greetOpen = open; greetT0 = t; greetUntil = -9; greetAir = false; greetAt = open ? -9 : t + GreetSet.back
+        if !open && slpOn { wake(false, slow: true, quiet: true) }
+    }
+    private func greetStep() {
+        guard greetWait else { return }
+        if !(params.greetLook >= 0.5) || !fingers.isEmpty || t < greetT0 || t - greetT0 > GreetSet.wait { greetWait = false; return }
+        if greetOpen && greetAt < 0 {   // opened: counted from the moment it lands
+            if (sillOn && (sillAir || sillRoute != nil)) || introOn || swimOn { greetAir = true; return }
+            if sillOn && !greetAir && t - greetT0 < 0.1 { return }
+            greetAt = t + GreetSet.land
+        }
+        if greetOpen && lifeSt == .rest { lifeUntil = max(lifeUntil, greetAt + GreetSet.look + 0.1) }
+        if t < greetAt { return }
+        greetWait = false; greetUntil = t + GreetSet.look; eyeUser = max(eyeUser, greetUntil); eyeBlinkT = t + GreetSet.blink; eyeNextBlink = max(eyeNextBlink, t + GreetSet.blink + 1.2)
+        if lifeSt == .rest && !slpOn { lifeUntil = max(lifeUntil, greetUntil + 0.1 + 0.6 * Double.random(in: 0..<1, using: &rng)) }
     }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.

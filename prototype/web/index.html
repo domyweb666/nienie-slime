@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>捏捏史萊姆｜形狀匹配原型 v2.62</title>
+<title>捏捏史萊姆｜形狀匹配原型 v2.63</title>
 <style>
 :root{
   --sky:#CDEBFA; --sky2:#E6F5FD; --grass:#C5E8A8; --grass-line:#A9D68A;
@@ -103,7 +103,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <canvas id="cv"></canvas>
 
 <div class="bar top">
-  <div class="brand" id="brand">捏捏<span>v2.62 <i id="v-fps" style="font-style:normal"></i></span></div>
+  <div class="brand" id="brand">捏捏<span>v2.63 <i id="v-fps" style="font-style:normal"></i></span></div>
   <button class="round" id="b-mute" aria-pressed="false" title="音樂和音效">🎵</button>
 </div>
 
@@ -221,6 +221,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
      網址 ?pull=0、?pull=1、?pull=hold,whole,soft 把拉的三顆鎖住（盲比用，畫面上不寫是哪一邊）。window.KPIOS=1 是測試掛鉤：窗台上的回家彈簧改成手機的值，平常不設
    - v2.61b（多米 11-26：湯圓的芝麻餡在白身體上像一片灰髒；不透明版的邊緣怪怪的）：兩個外觀開關，預設 0 跟 v2.61 逐點相同，兩版都留給多米比。coreSoft 1：餡範圍小三成、顏色淡一階、改用實心圓加模糊畫（原版的格紋是 Chrome 放射漸層的抖動雜點疊出來的）。
      edgeClean 1：不透明時輪廓收清楚、厚度判斷改成 .1 就蓋白、邊緣變暗那一圈拿掉、暗線淡七成（原版外圈一道灰灰糊糊、透出後面的玻璃邊）。換隻、換材質都留著，重新整理回 0
+   - v2.63（11-26 整晚，第二批前半）：調節台多一塊「這一批（v2.63）」（KEYS63，換隻、換材質留著，不進存檔），後面的開關都放這裡。先放 greetLook：網頁的行為 v2.61 就做好了（GREET；切回來是 visibilitychange、blur／focus 叫 greetArm(false)，睡著走 wake(false,true,true) 慢慢醒、不出聲），這版只是多一個切的地方，selftest T75 補量切回來那條
    ========================================================= */
 const cv=document.getElementById('cv');let ctx=cv.getContext('2d');   // v2.61：畫身體裡的東西時暫時換到暫存畫布（skinLayer），畫完換回來
 const $=id=>document.getElementById(id);
@@ -235,7 +236,9 @@ const PRESETS={
 const KEYS61=['skinU','pullHold','pullWhole','pullSoft','rough','tapSoft','petSlow','wakeSoft','nearFast','greetLook','brJit','bumpSoft','eyeTrue','snd61'],PULL3=['pullHold','pullWhole','pullSoft'];
 // 網址 ?pull=：1 三顆都開、0 三顆都關、hold,whole,soft 任選。有寫就鎖住，換隻、換材質、換存檔都照網址（開兩個分頁比的時候才不會跑掉）
 const PULLQ=(()=>{const q=new URLSearchParams(location.search).get('pull');if(q==null)return null;const w=q.split(',').map(x=>x.trim()),on=k=>q.trim()==='1'||w.includes(k)?1:0;return{pullHold:on('hold'),pullWhole:on('whole'),pullSoft:on('soft')}})();
-function matKeep(m){const o={};if(m)for(const k of KEYS61)if(typeof m[k]==='number')o[k]=m[k];return PULLQ?{...o,...PULLQ}:o}
+// v2.63 這一批的開關（調節台「這一批（v2.63）」那一塊）：[名字, 按鈕上的字]。換隻、換材質跟 KEYS61 一樣留著現在的（matKeep），不進存檔。greetLook 也在 KEYS61（三檔照樣管它），這裡只是多一個切的地方
+const KEYS63=[['greetLook','打開、切回來先看你']];
+function matKeep(m){const o={};if(m)for(const k of [...KEYS61,...KEYS63.map(q=>q[0])])if(typeof m[k]==='number')o[k]=m[k];return PULLQ?{...o,...PULLQ}:o}
 const F=[
   ['flow','流：放著會慢慢往下塌 v2.52','（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影',0,.5,.01],
   ['strandAt','黏條開著時身體拉到多長 v2.52','黏條開著，窗台上身體本身最多拉到幾個半徑，再遠的部分是黏條。v2.53 預設回到 2.4（多米 11-22：1.6 拉起來不像整隻被拉、形狀留不住）。1.6（v2.52 試過）：v2.51 的 2.4 捏著邊緣往外拉時，那一塊被拉到外框折起來（量到 16 種拉法裡 7 種折超過 120 度、同時翻面最多 62 個三角形；1.6 是 0 種、最多 1 個）。2.4 回 v2.51。黏條關掉時這條不作用，身體照「拉伸上限」拉（黏土 7）',1,8,.1],
@@ -3633,9 +3636,18 @@ const GRP61=[['皮',['skinU']],['牠怎麼記你',['rough','tapSoft','petSlow']]
     else if(a('data-61p')){const k=a('data-61p'),was=pullNow();mat[k]=on(mat[k])?0:1;pressed(was);done(PULLN[k]+'：'+word(mat[k])+'。')}
     else if(a('data-61g')!==null){const [n,ks]=GRP61[+a('data-61g')],v=ks.every(k=>on(mat[k]))?0:1;for(const k of ks)mat[k]=v;done(n+'：'+word(v)+'。')}});
   document.getElementById('feel').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.id==='feel-def'&&!PULLQ){for(const k of PULL3)mat[k]=0;DESK.base0=deskSnap();done()}});   // 回到預設：存檔裡有的都回預設，拉的三顆也算
-  {const v=document.querySelector('#feel .feel-ver');if(v)v.textContent='v2.61'}DESK.build='網頁 v2.61';
+  {const v=document.querySelector('#feel .feel-ver');if(v)v.textContent='v2.63'}DESK.build='網頁 v2.63';
   if(!DESK.stale&&!PULLQ)for(const k of PULL3)mat[k]=on(saved[k]);   // 上次留在台上的三顆
   DESK.base0=deskSnap();syncSliders();deskSync();deskSave()})();
+/* v2.63 調節台「這一批（v2.63）」：KEYS63 每顆一個按鈕，按一下關、再按開；0 就是改之前的行為。不進存檔、不寫進複製的字（v2.61 那一行已經寫了關著的 greetLook）。
+   放在「這一批（v2.61）」下面；後面的項目把開關加進 KEYS63 就會長出按鈕。手機同一塊在 FeelDesk.swift 的 batch63Box */
+(()=>{
+  const on=v=>+v>=.5?1:0,box=document.createElement('div'),b61=document.getElementById('feel-61');box.className='feel-box';box.id='feel-63';
+  box.innerHTML='<h4>這一批（v2.63）</h4><div class="feel-row"><span>單獨切</span>'+KEYS63.map(([k,n])=>`<button data-63k="${k}">${n}</button>`).join('')+'<small>按一下關，再按開。關掉就跟改之前一樣。不跟著存檔。</small></div>';
+  if(b61)b61.after(box);else document.getElementById('feel-main').insertBefore(box,document.getElementById('feel-styles'));
+  const d0=deskSync;deskSync=()=>{d0();for(const b of box.querySelectorAll('[data-63k]'))b.setAttribute('aria-pressed',String(on(mat[b.getAttribute('data-63k')])===1))};
+  box.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.getAttribute('data-63k');if(!k)return;mat[k]=on(mat[k])?0:1;syncSliders();deskSync();deskSave();const q=KEYS63.find(x=>x[0]===k);deskNote((q?q[1]:k)+'：'+(on(mat[k])?'開':'關')+'。')});
+  deskSync()})();
 </script>
 </body>
 </html>
