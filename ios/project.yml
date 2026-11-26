@@ -16,6 +16,8 @@ targets:
     type: application
     platform: iOS
     sources:
+      # NieNie/Resources/PrivacyInfo.xcprivacy (Apple privacy manifest) rides along with this path: XcodeGen puts every file
+      # that is not source code into the resources phase, so it lands in the bundle root like the .wav files beside it
       - path: NieNie
     info:
       path: NieNie/Info.plist
@@ -34,8 +36,8 @@ targets:
         # allow 120Hz on ProMotion iPhones
         CADisableMinimumFrameDurationOnPhone: true
         ITSAppUsesNonExemptEncryption: false
-        # 走路：步數決定牠身上沾到什麼；少了這行一呼叫 CMPedometer 就閃退
-        NSMotionUsageDescription: 用步數決定牠身上會沾到什麼。步數只留在這支手機上。
+        # 走路：只有調節台 walkShow 開著、在禮物石按「好」才問；少了這行一呼叫 CMPedometer 就閃退（v2.63 未做 77：拿掉「沾到什麼」，走路帶東西回來預設不做了）
+        NSMotionUsageDescription: 用你走的步數決定牠有多有精神。步數只留在這支手機上。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.domyweb.nienieslime
