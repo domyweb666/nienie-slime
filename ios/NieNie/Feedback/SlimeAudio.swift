@@ -48,6 +48,8 @@ protocol SlimeSoundSource: AnyObject {
     func ding(gain: Double)
     /// v2.50 場景聲 (`fx.<kind>` in the manifest, AI samples): crawl, climb, land, swimin, cling, unstick, drip, snore, sigh. Silent without the files.
     func fx(_ kind: String, gain: Double, delay: Double)
+    /// v2.64 擺飾變真 (`prop.<kind>` in the manifest: glass, candle, book, bell; web S.knock): a thing knocked; far = fallen out of sight (quieter, duller). Silent without the files.
+    func knock(_ kind: String, gain: Double, far: Bool)
     /// 候選 17: one release "pop" file, for Core Haptics to register (nil until there is one).
     var releaseSampleURL: URL? { get }
 }
@@ -399,6 +401,11 @@ final class SlimeAudio: SlimeSoundSource {
         if t - (lastKind[key] ?? -9) < 0.25 { return }   // the same kind at most every 0.25 s (web S.fx)
         lastKind[key] = t
         one(key, Play(gain: Self.clamp(gain, 0, 1), rate: Self.rnd(0.96, 1.04), lowpass: 9000, delay: delay))
+    }
+
+    /// v2.64 (web S.knock, the same numbers): near 0.9 × gain, pitch ±6 %, low-pass 5 kHz; far half as loud, 0.9 × the pitch, 1.2 kHz
+    func knock(_ kind: String, gain: Double, far: Bool) {
+        one("prop.\(kind)", Play(gain: Self.clamp(gain, 0, 1) * (far ? 0.5 : 0.9), rate: Self.rnd(0.94, 1.06) * (far ? 0.9 : 1), lowpass: far ? 1200 : 5000))
     }
 
     func ding(gain: Double) {

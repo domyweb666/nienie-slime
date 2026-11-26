@@ -337,7 +337,15 @@ struct FeelParams: Equatable, Codable {
     var nearFast: Double = 1          // C2 聽節奏時照樣靠過來: 1 = it comes to the finger beside it while it listens for a rhythm too; 0 = as before
     var greetLook: Double = 1         // C4 打開先看你: 1 = opened, or back from the background / lock screen, it looks at you first (asleep: wakes slowly, no sound); 0 = as before. Wired in v2.63 (SlimeRig greetArm, greetStep)
     var brJit: Double = 1             // C7 作息亂數: 1 = each waking and each sleep draws its own pace, an opening starts the needs at random; 0 = as before. Read since v2.63 (SlimeBrain)
-    var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Web only: the phone has no decorations' physics, 不接
+    var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Read since v2.64 (擺飾變真, SlimeRig selfMove / softHold); decoReal 0 never reads it
+    // v2.64 擺飾變真 (未做 24; web decoReal v2.44, decoBody, decoPush v2.45, decoReact, decoCat, decoScare v2.46; the same keys and defaults for all three materials).
+    // SlimeRig MARK v2.64 擺飾變真. decoReal 0 = v2.63 exactly (the candle and the right end baked into the picture, nothing to push, no random drawn)
+    var decoReal: Double = 1          // 擺飾變真: 1 = the candle and the jar (deco 2: the books) have weight: a tap rocks them, a finger drags or knocks them over, off the sill they come back ~20 s later; the bell and the teru bozu are pendulums
+    var decoBody: Double = 1          // 牠碰得到擺飾: 1 = its body moving through a thing carries it (slow: a nudge, fast: knocked over); a pseudopod or the body rings the bell; 0 = only fingers reach them
+    var decoPush: Double = 1          // 牠帶動東西的力道 (Agent's pick on the web): larger, things are carried and knocked over more easily
+    var decoReact: Double = 1         // 牠對擺飾有反應: 1 = it looks at what moved or rang, curious enough it reaches over; a fall startles it (wakes it), less each time; at night the lit candle is home; 0 = it does not notice
+    var decoCat: Double = 1           // 像貓一樣推東西: 1 = very trusting, in a good mood and curious it walks to the candle or the jar, looks at you, pushes it slowly to the edge (at most twice an opening); 0 = off
+    var decoScare: Double = 1         // 東西倒下牠嚇多大 (Agent's pick on the web): larger, a fall scares it more; 0 = not at all
     // v2.63 大腦第一片 (web brain v2.41, brPre v2.42, brAwakeT, brSleepT; the same keys and defaults for all three materials). SlimeBrain.swift, SlimeRig MARK v2.63 大腦
     var brain: Double = 1             // 大腦: 1 = five needs rise and fall, it does what the strongest wants; tired after a run, wakes by itself, comes to you when it wants to be stroked; 0 = as before (dice, asleep 40 s untouched, never wakes by itself)
     var brPre: Double = 1             // 換事情前的前兆: 1 = squints and sighs 2 s before sleeping, looks at you before coming; 0 = straight away
@@ -983,6 +991,13 @@ struct TuneField: Identifiable {
         TuneField(key: \.sndB6, name: "拉回去再拉有絲聲 v2.63", hint: "1（B6）：同一抓拉長、縮回去、再拉，每次往外拉都有細絲一根根斷的聲音（縮回 1.5 格就退一格，一格 0.4R）；按下去只清掉上次放手的餘韻（冒小泡），不清別的聲音。0 回改之前（同一抓只有拉得比之前都長才有絲斷聲；按下去清掉所有排著的聲音）", range: 0...1, step: 1, section: "這一批 v2.63"),
         // v2.64 大腦第三片 (the web's words for brMem, 記性 v2.43; the phone has it from v2.64)
         TuneField(key: \.brMem, name: "記性 v2.64", hint: "1：牠記得窗台上哪裡被摸得舒服、哪裡被嚇過，也記得你常從哪一邊摸牠。喜歡的那格牠會回去休息、睡覺；被嚇過的那格牠繞開。熟了以後，牠沒事時會把你常摸的那邊靠過來。喜歡的留到明天，討厭的三天退完。0 回 v2.63（家固定在窗台正中間，什麼都不記）。要大腦開著才有作用", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 擺飾變真 (the web's words for decoReal, decoBody, decoPush, decoReact, decoCat, decoScare; the phone has them from v2.64)
+        TuneField(key: \.decoReal, name: "擺飾變真 v2.64", hint: "1（未做 24，網頁 v2.44）：窗台上的蠟燭、玻璃罐（擺飾 2 時是書堆）有重量，手指點一下會晃、拖得動、推得倒，掉下窗台大約 20 秒後回來；風鈴、晴天娃娃是擺錘，手指撥得動，風鈴會響。0 回 v2.63（畫上去的圖，右端沒有罐子）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoBody, name: "牠碰得到擺飾 v2.64", hint: "1（網頁 v2.45）：牠的身體經過東西時會帶到它。慢慢流過去，輕的東西被帶著挪一小段、晃一下；你把牠甩過去、牠衝過去，東西被撞倒、撞飛；偽足或身體碰到風鈴，風鈴會晃、會響。牠自己走路撞到的只晃不倒（bumpSoft）。0：只有手指碰得到", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoPush, name: "牠帶動東西的力道", hint: "1 是網頁取的。調大東西更容易被牠帶走、撞飛；調小要更快才帶得動。蠟燭比罐子重，書堆最重", range: 0...3, step: 0.1, section: "這一批 v2.64"),
+        TuneField(key: \.decoReact, name: "牠對擺飾有反應 v2.64", hint: "1（網頁 v2.46）：東西晃了、風鈴響了，牠看過去，好奇夠高就伸偽足探；東西倒下、掉下窗台那一聲牠會縮一下、睜大眼，睡著會被嚇醒，同一件東西倒過幾次就習慣；夜晚蠟燭亮著，牠愛待在蠟燭旁邊。0：牠不知道東西動了", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoCat, name: "像貓一樣推東西 v2.64", hint: "1（網頁 v2.46）：牠很熟、心情好、好奇又高的時候，走到蠟燭或罐子旁邊，看你一眼，伸偽足慢慢把它往窗台邊推。一次打開最多 2 次。0 關", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoScare, name: "東西倒下牠嚇多大", hint: "1 是網頁取的。調大牠被倒下、掉下去的聲音嚇得更厲害；0 完全不怕", range: 0...2, step: 0.1, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }

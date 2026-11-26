@@ -224,6 +224,9 @@ final class SlimeController: ObservableObject {
             // v2.63 D4 (flinchFx): it flinched from your touch: a small pop sound (0 = a release just popped) and a light round tap, the same frame
             if gain > 0 { sound.flinch(gain: gain) }
             haptics.transient(intensity: hap, sharpness: 0.2)
+        case .knock(let kind, let gain):
+            // v2.64 擺飾變真: a thing knocked (the web's SFX.knock; no haptic, as on the web)
+            sound.knock(kind, gain: gain, far: false)
         case .nudge:
             // v2.20 C1: it swam over and touched your resting finger: one soft, round tap (lighter than a press)
             sound.press(intensity: 0.2)

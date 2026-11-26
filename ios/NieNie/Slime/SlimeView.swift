@@ -74,6 +74,9 @@ final class SlimeView: UIView {
     // the bowl's front half over it while it sits inside; 走路: the small things on the sill and the one stuck to it
     private let skyImgLayer = CALayer(), wallLayer = CALayer(), propsLayer = CALayer(), bowlFrontLayer = CALayer()
     private let bellLayer = CALayer(), teruLayer = CALayer()   // v2.37 擺飾: hanging from the frame, turned about their top
+    // v2.64 擺飾變真: the candle and the right-end thing drawn where they are (each its shadow on the sill), the lit candle's glow
+    private let propImgLayers = [CALayer(), CALayer()], propShadowLayers = [CALayer(), CALayer()], propGlowLayer = CALayer()
+    private var propImgs: [CGImage?] = [nil, nil]   // what each prop layer shows now, for the see-through skin
     private let itemsGroup = CALayer(), stuckGroup = CALayer()
     // v2.31 搖晃沉澱: inside the body (in litGroup, under the eyes) the haze, the glitter by colour, the glow; the halo outside
     private let fogLayer = CAGradientLayer(), glowLayer = CAGradientLayer(), haloLayer = CAGradientLayer()
@@ -208,6 +211,8 @@ final class SlimeView: UIView {
         layer.addSublayer(stuckGroup)   // 走路: the thing stuck to it, over the body
         bowlFrontLayer.contentsGravity = .resize; bowlFrontLayer.isHidden = true; bowlFrontLayer.zPosition = 4
         for l in [bellLayer, teruLayer] { l.contentsGravity = .resize; l.anchorPoint = CGPoint(x: 0.5, y: 0); l.isHidden = true; layer.addSublayer(l) }
+        for l in propShadowLayers + propImgLayers + [propGlowLayer] { l.contentsGravity = .resize; l.isHidden = true; layer.addSublayer(l) }   // v2.64
+        propGlowLayer.compositingFilter = "screenBlendMode"   // the web adds the glow ('lighter'); where Core Animation has no such filter it is a plain blend
         layer.addSublayer(bowlFrontLayer)   // v2.28 窗台: in front of the body and the eyes
         flashLayer.backgroundColor = UIColor.white.cgColor
         flashLayer.isHidden = true
@@ -574,8 +579,9 @@ final class SlimeView: UIView {
     private func updateScene() {
         let kind = rig.sceneKind
         let all: [CALayer] = [skyImgLayer, wallLayer, propsLayer, itemsGroup, stuckGroup, bowlFrontLayer, bellLayer, teruLayer]
+        let dyn: [CALayer] = propShadowLayers + propImgLayers + [propGlowLayer]   // v2.64: shown only while there are things to draw
         guard kind > 0, let g = rig.sillG, bounds.width > 0, bounds.height > 0 else {
-            for l in all { l.isHidden = true }
+            for l in all + dyn { l.isHidden = true }
             windowHide()
             skyLayer.isHidden = false
             for l in speckLayers { l.isHidden = false }
@@ -588,10 +594,11 @@ final class SlimeView: UIView {
         var tint: UIColor?
         if let st = stage, kind == 1, !st.night { tint = st.def.dayColor }
         let winTag: String = stage == nil ? "" : "|win" + (tint == nil ? "" : (stage?.def.id ?? ""))
-        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))|\(rig.noBowl)|\(p.props >= 0.5)|\(decoLv)" + winTag
+        let real = rig.dreal   // v2.64 擺飾變真: the candle and the right end are not in the picture
+        let key = "\(kind)|\(Int(bounds.width))|\(Int(bounds.height))|\(rig.noBowl)|\(p.props >= 0.5)|\(decoLv)|\(real)" + winTag
         if key != sceneKey {
-            guard let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g, bowl: !rig.noBowl, props: p.props >= 0.5, deco: decoLv) else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
-                for l in all { l.isHidden = true }
+            guard let imgs = SceneArt.make(kind: kind, size: bounds.size, g: g, bowl: !rig.noBowl, props: p.props >= 0.5, deco: decoLv, real: real) else {   // pictures missing: the plain sky, nothing else (the physics still has the sill)
+                for l in all + dyn { l.isHidden = true }
                 windowHide()
                 skyLayer.isHidden = false
                 return
@@ -635,9 +642,43 @@ final class SlimeView: UIView {
         // v2.37: the hanging two sit with the props (behind it on the sill, in front of it on the frame or outside); the bell swings after a shake
         bellLayer.isHidden = bellLayer.contents == nil; teruLayer.isHidden = teruLayer.contents == nil
         bellLayer.zPosition = propsLayer.zPosition; teruLayer.zPosition = propsLayer.zPosition
-        bellLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.decoSwing(0.22)))
-        teruLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.decoSwing(0.06)))
+        bellLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.hangAngle("bell", amp: 0.22)))   // v2.64: the pendulum while decoReal is on
+        teruLayer.setAffineTransform(CGAffineTransform(rotationAngle: rig.hangAngle("teru", amp: 0.06)))
         let night = kind == 2
+        // v2.64 擺飾變真 (web drawProps): each thing turned about its centre of mass, its shadow on the sill, the lit candle's glow; with the props (behind it on the sill)
+        let pv = rig.propViews, zp = propsLayer.zPosition
+        var glow = false
+        for k in 0..<2 {
+            let il = propImgLayers[k], sl = propShadowLayers[k]
+            guard k < pv.count else { il.isHidden = true; sl.isHidden = true; propImgs[k] = nil; continue }
+            let v = pv[k]
+            let im = (v.lit ? SceneArt.decoImage("candleLit", night: true) : nil) ?? SceneArt.decoImage(v.im, night: night)
+            let cg = im?.cgImage
+            il.contents = cg
+            propImgs[k] = cg
+            il.isHidden = cg == nil; il.zPosition = zp + 0.5
+            il.setAffineTransform(.identity)
+            il.bounds = CGRect(x: 0, y: 0, width: v.w, height: v.h)
+            il.anchorPoint = CGPoint(x: v.w > 0 ? v.ox / v.w : 0.5, y: v.h > 0 ? v.oy / v.h : 0.5)
+            il.position = CGPoint(x: v.x, y: v.y)
+            il.setAffineTransform(CGAffineTransform(rotationAngle: v.a))
+            il.opacity = Float(v.alpha)
+            if v.shadow > 0 {
+                let rx = v.w * 0.52 * (1 + 0.3 * abs(sin(v.a))), ry = 11 * g.U
+                if sl.contents == nil { sl.contents = SceneArt.propShadowImage().cgImage }
+                sl.isHidden = false; sl.zPosition = zp + 0.2
+                sl.frame = CGRect(x: v.x - rx, y: g.fl - 2 - ry, width: 2 * rx, height: 2 * ry)
+                sl.opacity = Float(v.shadow)
+            } else { sl.isHidden = true }
+            if v.lit {
+                glow = true
+                let c = cos(v.a), sn = sin(v.a), fy = -v.oy + v.h * 0.22, r = 150 * g.U * v.alpha
+                if propGlowLayer.contents == nil { propGlowLayer.contents = SceneArt.glowImage().cgImage }
+                propGlowLayer.zPosition = zp + 0.6
+                propGlowLayer.frame = CGRect(x: v.x - sn * fy - r, y: v.y + c * fy - r, width: 2 * r, height: 2 * r)
+            }
+        }
+        propGlowLayer.isHidden = !glow
         backSprites = rig.walkBackSprites
         place(backSprites, in: &itemLayers, group: itemsGroup, world: false, night: night)
         place(rig.walkWorldSprites, in: &stuckLayers, group: stuckGroup, world: true, night: night)
@@ -786,10 +827,14 @@ final class SlimeView: UIView {
         if p.decoThru >= 0.5 && p.water > 0 && !off.contains("refr") && rig.sillPlane == .room && !labGrey {
             var sprites: [JellySkin.Sprite] = []
             if let im = bellImage, !bellLayer.isHidden {
-                sprites.append(JellySkin.Sprite(image: im, x: Double(bellLayer.position.x), y: Double(bellLayer.position.y), w: Double(bellLayer.bounds.width), h: Double(bellLayer.bounds.height), anchorY: 0, angle: rig.decoSwing(0.22), alpha: 1))
+                sprites.append(JellySkin.Sprite(image: im, x: Double(bellLayer.position.x), y: Double(bellLayer.position.y), w: Double(bellLayer.bounds.width), h: Double(bellLayer.bounds.height), anchorY: 0, angle: rig.hangAngle("bell", amp: 0.22), alpha: 1))
             }
             if let im = teruImage, !teruLayer.isHidden {
-                sprites.append(JellySkin.Sprite(image: im, x: Double(teruLayer.position.x), y: Double(teruLayer.position.y), w: Double(teruLayer.bounds.width), h: Double(teruLayer.bounds.height), anchorY: 0, angle: rig.decoSwing(0.06), alpha: 1))
+                sprites.append(JellySkin.Sprite(image: im, x: Double(teruLayer.position.x), y: Double(teruLayer.position.y), w: Double(teruLayer.bounds.width), h: Double(teruLayer.bounds.height), anchorY: 0, angle: rig.hangAngle("teru", amp: 0.06), alpha: 1))
+            }
+            for (k, v) in rig.propViews.prefix(2).enumerated() {   // v2.64 擺飾變真: the things are no longer in the baked room, so they go in here
+                guard let im = propImgs[k], !propImgLayers[k].isHidden else { continue }
+                sprites.append(JellySkin.Sprite(image: im, x: v.x, y: v.y, w: v.w, h: v.h, anchorY: v.h > 0 ? v.oy / v.h : 0.5, angle: v.a, alpha: v.alpha))
             }
             let night = rig.sceneKind == 2
             for sp in backSprites {

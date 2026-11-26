@@ -17,6 +17,7 @@ enum SlimeEvent {
     case land(gain: Double)                  // v2.28 窗台: it landed on the sill or in the bowl after a fall or a hop
     case ding(gain: Double)                  // v2.31 搖晃沉澱: the glitter has settled, it is clear again
     case flinch(gain: Double, hap: Double)   // v2.63 D4 (flinchFx): it flinched from your touch: a small sound (gain 0 = tap only) and a light tap
+    case knock(kind: String, gain: Double)   // v2.64 擺飾變真: a thing knocked (manifest prop.<kind>: glass, candle, book, bell; the web's sfxPlay('knock.'+kind))
 }
 
 /// v2.63 B1 pull, B3 (FeelParams.pullFx; web PFX, the same numbers, Agent's picks for 多米 to hear and feel): d0 the farthest the real finger got from where it
@@ -156,8 +157,9 @@ final class SlimeRig {
     // it lifts itself until its bottom is at y (climbing strokes), plane = in or out of the bowl, drop = gravity back on, walk = along the sill
     // to x, surf = stick to a surface, wait. gt = the gravity it wants (0 while lifting), gv = the gravity it has (eased over 0.12 s);
     // tanV = walking vertically, lift = lifting itself, y1 = the body's bottom this frame.
-    private enum RouteStep { case sniff(a: Double, L: Double, T: Double), move(y: Double), plane(SillPlane, inBowl: Bool?), drop(g: Double), walk(surf: String, to: Double), surf(String), wait(T: Double), zoomHome, walkHops, turn(String) }
-    private struct Route { var steps: [RouteStep]; var i = -1; var st0 = 0.0; var y0: Double? = nil; var i0 = -1 }
+    private enum RouteStep { case sniff(a: Double, L: Double, T: Double), move(y: Double), plane(SillPlane, inBowl: Bool?), drop(g: Double), walk(surf: String, to: Double), surf(String), wait(T: Double), zoomHome, walkHops, turn(String), fn(() -> Void) }   // v2.64 fn: the web's RT.fn (推東西)
+    private struct Route { var steps: [RouteStep]; var i = -1; var st0 = 0.0; var y0: Double? = nil; var i0 = -1; var id = 0 }   // v2.64 id: the web compares the route object itself (DR.push.route)
+    private var routeSeq = 0
     private var sillRoute: Route?
     private var sillLift = false, sillTanV = false, sillSurf: String?
     private var sillGTX = 0.0, sillGTY = 1.0, sillGVX = 0.0, sillGVY = 1.0, sillY1 = 0.0
@@ -201,6 +203,41 @@ final class SlimeRig {
     var noBowl: Bool { sillOn && params.bowl < 0.5 }
     /// v2.37 擺飾: the wind bell swings after a shake (amp in radians), decaying over a few seconds
     private var decoKick = -99.0, decoDir = 1.0
+    // v2.64 擺飾變真 (未做 24; web PROPS, PROPDEF, HANG, DB, SOFTB, DR, v2.44 to v2.61): the state; the code is MARK v2.64 擺飾變真 at the end of this file
+    struct PropDef { let kind: String; let asp, wd, com, m, tap: Double; let poly: [(Double, Double)] }
+    struct Prop {
+        let im: String, kind: String
+        var tap: Double, upT = -99.0
+        var w, h, ox, oy: Double
+        var px: [Double], py: [Double], nx: [Double], ny: [Double]   // the outline (local, about the centre of mass) and each edge's outward normal
+        var r, hw, base, m, I: Double
+        var x: Double, y: Double, hx: Double, hy: Double
+        var a = 0.0, vx = 0.0, vy = 0.0, va = 0.0
+        var alpha = 1.0, fade = 0.0, gone = false, fell = false, tip = false, tc = 0
+        var lastHit: Double, backAt = 0.0, knockT = -9.0
+        var held: ObjectIdentifier? = nil
+        var hlx = 0.0, hly = 0.0                         // where the finger holds it, in its own frame
+        var fingT: Double? = nil, selfT: Double? = nil, softT: Double? = nil, softX = 0.0, softK: Double? = nil
+        var catT: Double? = nil, lookAt: Double? = nil, crashAt: Double? = nil
+        init(im: String, kind: String, tap: Double, w: Double, h: Double, ox: Double, oy: Double, px: [Double], py: [Double], nx: [Double], ny: [Double],
+             r: Double, hw: Double, base: Double, m: Double, I: Double, x: Double, y: Double, t: Double) {
+            self.im = im; self.kind = kind; self.tap = tap; self.w = w; self.h = h; self.ox = ox; self.oy = oy
+            self.px = px; self.py = py; self.nx = nx; self.ny = ny; self.r = r; self.hw = hw; self.base = base; self.m = m; self.I = I
+            self.x = x; self.y = y; self.hx = x; self.hy = y; self.lastHit = t
+        }
+    }
+    struct Hang { let name: String; let w2, damp, kick, tap: Double; let ring: Bool
+        var a = 0.0, va = 0.0, held: ObjectIdentifier? = nil, ringT = -9.0, on = false, x = 0.0, y = 0.0, w = 0.0, h = 0.0
+        var selfT: Double? = nil, fingT: Double? = nil, lookAt: Double? = nil, touch = false
+    }
+    private(set) var props: [Prop] = []
+    private var hangs: [Hang] = [Hang(name: "bell", w2: 77, damp: 0.9, kick: 1.9, tap: 2.6, ring: true), Hang(name: "teru", w2: 115, damp: 1.4, kick: 1.3, tap: 3.2, ring: false)]
+    private var decoKeyNow = -1
+    private var dbX: [Double] = [], dbY: [Double] = [], dbOK = false
+    // v2.46 第 3 片 (web DR): habituation per thing, when its eyes go to what moved, 推東西
+    private var drHab: [String: Int] = [:], drWideT: Double? = nil, drLookT = -9.0, drLX = 0.0, drLY = 0.0
+    private var drCats = 0, drCatT = -99.0, drCatLast = ""
+    private var drPush: (k: Int, side: Double, route: Int)? = nil
     func decoSwing(_ amp: Double) -> Double {
         let u = t - decoKick
         guard u >= 0, u < 6 else { return 0 }
@@ -844,6 +881,7 @@ final class SlimeRig {
         var r0x: Double? = nil, r0y = 0.0   // v2.61 A4: where it took hold, from the body's centre (r0x, r0y on the web; not the contact radius r0)
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
         enum Mode { case grab, push, none, stroke }   // v2.26 F6 stroke: sliding over it, nothing pinned
+        var propK = -1, hangN: String? = nil      // v2.64 擺飾變真: this finger holds props[propK] or the hanging one named hangN (mode .none, the web's 'prop')
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
         var slx = 0.0, sly = 0.0, slLX = Double.nan, slLY = Double.nan   // v2.48 手指讓: how far the effective position has given way to the limits, and last frame's x, y (moving back takes it up again)
         var tgx = 0.0, tgy = 0.0, lagK = 1.0         // v2.38: this frame's target for (fx, fy) and the chase rate; chased after pairStep
@@ -2236,6 +2274,30 @@ final class SlimeRig {
             }
             if !grab && allowed && walkGiftAt(sx, sy) { onGiftTap?(); return }
         }
+        // v2.64 擺飾變真 (web sillTouch): on the sill a finger off the body on a thing takes the thing (then the hanging ones); behind the bowl or outside the thing is in front of it
+        if allowed && dreal {
+            var pk = -1, hn: String? = nil
+            let pr = propAt(sx, sy)
+            if sillPlane == .room { if !grab { pk = pr; if pr < 0 { hn = hangAt(sx, sy) } } } else if pr >= 0 { grab = false; pk = pr }
+            if pk >= 0 || hn != nil {
+                let f = Finger(x: x, y: y, mode: .none, time: t)
+                f.sx = sx; f.sy = sy
+                if let hn, let k = hangs.firstIndex(where: { $0.name == hn }) {
+                    f.hangN = hn
+                    var q = hangs[k]
+                    q.held = id; hangRing(&q, 0.3)
+                    hangs[k] = q
+                } else if props.indices.contains(pk) {
+                    f.propK = pk
+                    var p = props[pk]
+                    let c = cos(p.a), s = sin(p.a), dx = x - p.x, dy = y - p.y
+                    p.held = id; p.hlx = c * dx + s * dy; p.hly = -s * dx + c * dy; p.lastHit = t; p.fade = 0; p.alpha = 1
+                    props[pk] = p
+                }
+                fingers[id] = f
+                return
+            }
+        }
         if grab { escOn = false }   // v2.18: caught, it stops running
         let f = Finger(x: x, y: y, mode: !allowed ? .none : (grab ? .grab : .push), time: t)   // v2.61 C1: made here (it was made further down): softTouch keeps hold of it
         greetWait = false   // v2.63 C4: touched, it stops waiting to look at you and does as usual (web pointerdown GREET.st='')
@@ -2615,6 +2677,8 @@ final class SlimeRig {
 
     private func release(_ id: ObjectIdentifier, quiet: Bool) {
         guard let f = fingers.removeValue(forKey: id) else { return }
+        if f.propK >= 0 { propRelease(f) }   // v2.64 擺飾變真 (web releaseFinger: propRelease, hangRelease)
+        if f.hangN != nil { hangRelease(f) }
         if f.mode == .grab { inertiaCatch() }
         for m in f.mem { GRAB[m.i] = false }
         for dn in dentList where dn.finger == id { dn.finger = nil; dn.held = t - f.tDown }   // held: how long it was pressed (D2)
@@ -2692,6 +2756,7 @@ final class SlimeRig {
         guard N > 0 else { return }
         relaxUntil = t + 0.5
         for dn in dentList { dn.p = 0; dn.v = 0; dn.p0 = 0 }
+        for k in props.indices { if props[k].gone { props[k].backAt = t } else { props[k].lastHit = -1e3 } }   // v2.64 擺飾變真 (web relax): the things go back too
     }
 
     /// VoiceOver "拉長": tug the top upward.
@@ -3236,6 +3301,7 @@ final class SlimeRig {
         remeshCalmStep(dt)   // v2.56 補點後站穩
         fxStep(dt)   // v2.57 新六隻的招牌
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
+        if sillOn && sillG != nil && !props.isEmpty { decoBody(sdt * Double(n)) } else { dbOK = false }   // v2.64 擺飾變真 v2.45: once a frame (a walk's shift is added once a frame)
         rateStep(dt)   // v2.54 快扯變硬
         capGrowStep(dt)   // v2.54 無限拉
         remeshCheck(dt)   // v2.54 補點
@@ -3631,6 +3697,11 @@ final class SlimeRig {
                 if slipOn && GRAB[i] { SLX[i] += mx; SLY[i] += my }
                 HIT[i] = abs(mx) + abs(my) > 1e-4
             }
+        }
+        if sillOn && sillG != nil {   // v2.64 擺飾變真 (web: after the walls, before ringGuard): the things, the panel changed deco / decoReal, the pendulums
+            if !props.isEmpty { propsStep(dt) }
+            if decoKey() != decoKeyNow { propsInit() }
+            if dreal { hangStep(dt) }
         }
         if mat.ringGuard > 0 { ringGuard(mat.stretchCap > 0 ? 1 - mat.capVel : 0); ringUnkink() }   // no boundary through boundary, little knots straightened; after the walls
         // v2.48 手指讓: however far the limits (cannot squeeze further, cannot flip, the sill, the walls) pushed the held patch back, the finger's effective
@@ -4235,7 +4306,7 @@ final class SlimeRig {
         sillG = nil; sillHop = nil; sillRoute = nil; sillLift = false; sillTanV = false; sillSurf = nil; sillGTX = 0; sillGTY = 1; sillGVX = 0; sillGVY = 1; gaitClimb = false
         sillPlane = .room; sillZoom = 1; sillZTG = 1; sillOutT = 0; sillCB = 0
         walkSettle()   // 走路: a rebuild with something still stuck to it puts the thing on the sill, it is not lost
-        guard sillOn, N > 0 else { sillAir = false; sillInBowl = false; sillGrab = false; sillHeld = false; return }
+        guard sillOn, N > 0 else { sillAir = false; sillInBowl = false; sillGrab = false; sillHeld = false; props.removeAll(); decoKeyNow = -1; return }
         let g = sillGeo()
         sillG = g
         sillZPX = W / 2; sillZPY = g.oy
@@ -4249,6 +4320,7 @@ final class SlimeRig {
         sillAir = true; sillC = 0; sillInBowl = false; sillWant = !noBowl; sillGrab = false; sillHeld = false
         sillPX = 0; sillPY = 0; sillVX = 0; sillVY = 0; sillFall = 0; sillLastHome = t
         camZ = 1; camX = viewV.x; camY = viewV.y; introSq = 0
+        propsInit()   // v2.64 擺飾變真 (web sillInit: propsInit())
     }
 
     /// Where home may be along the sill.
@@ -4647,7 +4719,8 @@ final class SlimeRig {
         if sillRoute != nil { routeEnd(abort: true) }
         sillStickT = -1; clingEnd()   // v2.36
         cutSniffs(); gaitOn = false; wanderMoving = false
-        sillRoute = Route(steps: steps, i: -1, st0: t)
+        routeSeq += 1
+        sillRoute = Route(steps: steps, i: -1, st0: t, id: routeSeq)
         lifeSt = .route
         routeNext()
     }
@@ -4702,6 +4775,11 @@ final class SlimeRig {
                 return
             case .wait:
                 return
+            case .fn(let f):   // v2.64 (web RT.fn): done at once; it may have ended the route
+                f()
+                guard let cur = sillRoute else { return }
+                Q = cur
+                continue
             }
         }
     }
@@ -4733,7 +4811,7 @@ final class SlimeRig {
         case .turn(let s):
             let c = s == "bar" ? sillCB : sillC
             if (c > 0 && u > 0.15) || u > 1.2 { routeNext() }
-        case .plane, .surf, .zoomHome, .walkHops:
+        case .plane, .surf, .zoomHome, .walkHops, .fn:
             routeNext()
         }
     }
@@ -4842,6 +4920,7 @@ final class SlimeRig {
     /// One shake of the phone; dx, dy is the screen direction the contents are flung relative to the phone.
     func shake(dx: Double, dy: Double) {
         decoKick = t; decoDir = dx < 0 ? -1 : 1   // v2.37 the wind bell
+        hangKick(decoDir)   // v2.64 擺飾變真 (web shkShake: hangKick(DECO.dir))
         if fx.pearls > 0 { fxPearlSink = 1 }   // v2.57 珍奶: the pearls sink to the bottom
         guard params.shake >= 0.5 else { return }
         let n = max(1, params.shakeN)
@@ -5211,6 +5290,7 @@ final class SlimeRig {
     /// v2.50 場景聲: one per stroke. Climbing (a climb route, lifting itself, on the frame) sounds like climbing, otherwise crawling on the sill.
     private func gaitSfx() {
         if gaitClimb || (sillOn && (sillTanV || sillPlane == .frame)) { onEvent?(.fx(kind: "climb", gain: 0.5, delay: 0)) }
+        else if dreal, let g = sillG, sillPlane == .room, !sillInBowl, !clusters.isEmpty, abs(clusters[gi].xc - g.bx) < 200 * g.U * 0.5 { onEvent?(.fx(kind: "cloth", gain: 0.55, delay: 0)) }   // v2.64 (web gaitSfx: on the cloth; the phone only with decoReal, so 0 is v2.63)
         else { onEvent?(.fx(kind: "crawl", gain: gaitDash ? 0.55 : 0.4, delay: 0)) }
     }
     private func strokeStart(_ K: (P: Double, c: Double, tau: Double, sd: Double, kA: Double)) {
@@ -7511,4 +7591,346 @@ extension SlimeRig: SkinMeshSource {
     var skinEdg: [Int] { EDG }
     var skinRest: (x: [Double], y: [Double]) { (Q0X, Q0Y) }
     var skinWalls: (l: Double, r: Double, b: Double) { let w = worldWalls; return (w.l, w.r, w.b) }
+}
+
+// MARK: - v2.64 擺飾變真 (未做 24; .uiux/04-手感/擺飾變真提案-暫定.md; web PROPDEF, propsInit, propIn, propAt, propHome, propKnock, propRelease, HANG, hangInit,
+// hangAt, hangRing, hangKick, hangRelease, hangStep, SOFTB, selfMove, softHold, decoBody, propPair, propsStep, v2.44 to v2.61, line by line; the same numbers).
+// 蠟燭和右端那件（擺飾 2 是書堆，其他是玻璃罐）是剛體，座標是畫面點（窗台那一層世界座標就是畫面座標）；牠推東西，東西不推牠，牠的點一個都不改。
+// 風鈴、晴天娃娃是擺錘。decoReal 0：props 是空的、擺錘關著、圖照 v2.63 烤在背景裡，不抽亂數，這裡只剩檢查開關有沒有變。
+extension SlimeRig {
+    /// 網頁的 PROPDEF（d_ 開頭那三件；v2.30 的石頭盤、盆栽〔props 2〕手機沒有）。poly：圖片 0...1 方格裡的外框
+    static let propDefs: [String: PropDef] = [
+        "d_candle": PropDef(kind: "glass", asp: 264.0 / 254, wd: 56, com: 0.62, m: 150, tap: 7, poly: [(0.12, 0.995), (0.88, 0.995), (0.97, 0.80), (0.99, 0.15), (0.90, 0.02), (0.10, 0.02), (0.01, 0.15), (0.03, 0.80)]),
+        "d_jar": PropDef(kind: "glass", asp: 342.0 / 283, wd: 60, com: 0.60, m: 70, tap: 6.5, poly: [(0.14, 0.995), (0.86, 0.995), (0.99, 0.80), (0.99, 0.38), (0.82, 0.02), (0.18, 0.02), (0.01, 0.38), (0.01, 0.80)]),
+        "d_books": PropDef(kind: "book", asp: 313.0 / 460, wd: 104, com: 0.68, m: 420, tap: 1.2, poly: [(0.04, 0.995), (0.96, 0.995), (0.99, 0.50), (0.90, 0.12), (0.62, 0), (0.36, 0), (0.08, 0.22), (0.01, 0.60)])]
+    /// 網頁 DECODEF 裡兩件掛著的寬度和長寬比
+    private static let hangDef: [String: (w: Double, asp: Double)] = ["bell": (50, 514.0 / 206), "teru": (54, 429.0 / 267)]
+    private enum PropK { static let mu = 0.55 }   // PROP_MU：窗台的摩擦
+    /// SOFTB（v2.61 C7 bumpSoft）：牠自己走路撞到的，角度最多 lean、位置最多挪 move 個半徑，碰完 hold 秒內都夾著；k 推的力道、w 最快轉速、back 每秒收回幾弧度
+    private enum SoftB { static let lean = 0.16, move = 0.08, hold = 1.6, k = 0.12, w = 1.6, back = 2.0 }
+
+    /// DREAL()：擺飾是真的（而且有擺飾、在窗台上）
+    var dreal: Bool { params.decoReal >= 0.5 && params.deco >= 0.5 && sillOn && sillG != nil }
+    /// DRon()：牠對擺飾有反應（大腦開著）
+    private var drOn: Bool { dreal && brOn && params.decoReact >= 0.5 }
+    private func decoKey() -> Int { (dreal ? 10 : 0) + Int(params.deco.rounded()) }
+    private func wrapA(_ a: Double) -> Double { atan2(sin(a), cos(a)) }
+    private func sgn(_ v: Double) -> Double { v > 0 ? 1 : (v < 0 ? -1 : 0) }
+    /// drRecent：有值、不在未來（時鐘被重建倒回去）、T 秒內
+    private func drRecent(_ v: Double?, _ T: Double) -> Bool { if let v { return t >= v && t - v < T }; return false }
+
+    /// propsInit：東西擺回原位（重建、面板改了擺飾或擺飾變真）
+    private func propsInit() {
+        props.removeAll(); decoKeyNow = decoKey(); hangInit(); drPush = nil
+        for f in fingers.values { f.propK = -1; f.hangN = nil }
+        guard dreal, let g = sillG else { return }
+        let U = g.U
+        for im in ["d_candle", Int(params.deco.rounded()) == 2 ? "d_books" : "d_jar"] {
+            guard let d = Self.propDefs[im] else { continue }
+            let wd = d.wd * U, hg = wd * d.asp
+            var P: [(Double, Double)] = d.poly.map { (($0.0 - 0.5) * wd, ($0.1 - d.com) * hg) }
+            var A = 0.0
+            for i in 0..<P.count { let a = P[i], b = P[(i + 1) % P.count]; A += a.0 * b.1 - b.0 * a.1 }
+            if A < 0 { P.reverse() }
+            var nx: [Double] = [], ny: [Double] = []
+            var r = 0.0, base = -1e9, hw = 0.0
+            for i in 0..<P.count {
+                let a = P[i], b = P[(i + 1) % P.count], ex = b.0 - a.0, ey = b.1 - a.1, l0 = hypot(ex, ey), l: Double = l0 > 0 ? l0 : 1
+                nx.append(ey / l); ny.append(-ex / l)
+                r = max(r, hypot(a.0, a.1)); base = max(base, a.1); hw = max(hw, abs(a.0))
+            }
+            let x: Double = im == "d_candle" ? g.l + wd / 2 + 8 : g.r - wd / 2 - 8, y = g.fl - base
+            props.append(Prop(im: im, kind: d.kind, tap: d.tap, w: wd, h: hg, ox: wd * 0.5, oy: hg * d.com, px: P.map { $0.0 }, py: P.map { $0.1 }, nx: nx, ny: ny,
+                              r: r, hw: hw, base: base, m: d.m, I: d.m * (wd * wd + hg * hg) / 12, x: x, y: y, t: t))
+        }
+    }
+    /// propIn：(x, y) 在外框裡（容許外面 pad 點）
+    private func propIn(_ p: Prop, _ x: Double, _ y: Double, _ pad: Double) -> Bool {
+        let c = cos(p.a), s = sin(p.a), dx = x - p.x, dy = y - p.y, lx = c * dx + s * dy, ly = -s * dx + c * dy
+        for k in 0..<min(p.px.count, p.nx.count) where (lx - p.px[k]) * p.nx[k] + (ly - p.py[k]) * p.ny[k] > pad { return false }
+        return true
+    }
+    /// propAt：畫面上這一點底下的東西，前面的先；−1 沒有
+    private func propAt(_ x: Double, _ y: Double) -> Int {
+        for k in props.indices.reversed() where !props[k].gone && props[k].alpha > 0.5 && propIn(props[k], x, y, R * 0.08) { return k }
+        return -1
+    }
+    private func propHome(_ p: inout Prop) {
+        p.x = p.hx; p.y = p.hy; p.a = 0; p.vx = 0; p.vy = 0; p.va = 0; p.gone = false; p.fell = false; p.tip = false; p.fade = 1; p.alpha = 0; p.lastHit = t
+    }
+    /// propKnock：碰到的聲音（0.14 秒內只一次）；far：掉到看不到的地方，遠遠一聲
+    private func propKnock(_ p: inout Prop, _ g: Double, far: Bool = false) {
+        if t - p.knockT < 0.14 { return }
+        p.knockT = t
+        if far { onEvent?(.fx(kind: "fallout", gain: max(0.3, min(1, g)), delay: 0)); return }
+        onEvent?(.knock(kind: p.im == "d_candle" ? "candle" : p.kind, gain: max(0.05, min(1, g))))
+    }
+    /// propRelease：放手；很快點一下（0.25 秒內、移動不到 0.12R）往手指的反方向晃
+    private func propRelease(_ f: Finger) {
+        let k = f.propK
+        guard props.indices.contains(k) else { return }
+        var p = props[k]
+        p.held = nil; p.lastHit = t; p.fingT = t
+        if t - f.tDown < 0.25 && hypot(f.rawX - f.ax, f.rawY - f.ay) < R * 0.12 { p.va += (f.ax < p.x ? 1 : -1) * p.tap; propKnock(&p, 0.22) }
+        props[k] = p
+    }
+
+    // 網頁的 HANG：a 角度（正的是下端往左），va 角速度。搖手機踢一下，手指抓著就跟手指，放手自己晃到停；風鈴會響
+    private func hangInit() {
+        for k in hangs.indices {
+            hangs[k].a = 0; hangs[k].va = 0; hangs[k].held = nil; hangs[k].ringT = -9; hangs[k].on = false; hangs[k].x = 0; hangs[k].y = 0; hangs[k].w = 0; hangs[k].h = 0
+            hangs[k].selfT = nil; hangs[k].fingT = nil; hangs[k].lookAt = nil; hangs[k].touch = false
+        }
+        guard dreal, let g = sillG else { return }
+        let U = g.U
+        var list: [(String, Double, Double)] = [("bell", g.jr - 46 * U, g.gy)]
+        if Int(params.deco.rounded()) >= 2 { list.append(("teru", g.gx + 46 * U, g.gy)) }
+        for (n, x, y) in list {
+            guard let k = hangs.firstIndex(where: { $0.name == n }), let d = Self.hangDef[n] else { continue }
+            let w = d.w * U
+            hangs[k].on = true; hangs[k].x = x; hangs[k].y = y; hangs[k].w = w; hangs[k].h = w * d.asp
+        }
+    }
+    /// hangAt：畫面上這一點底下的鐘或紙籤（上面那段細繩不算）
+    private func hangAt(_ sx: Double, _ sy: Double) -> String? {
+        guard dreal else { return nil }
+        for q in hangs where q.on {
+            let dx = sx - q.x, dy = sy - q.y, c = cos(q.a), s = sin(q.a), lx = c * dx + s * dy, ly = -s * dx + c * dy
+            if abs(lx) < q.w / 2 + 10 && ly > q.h * 0.25 && ly < q.h + 10 { return q.name }
+        }
+        return nil
+    }
+    private func hangRing(_ q: inout Hang, _ g: Double) {
+        if !q.ring || t - q.ringT < 0.16 { return }
+        q.ringT = t
+        onEvent?(.knock(kind: "bell", gain: max(0.08, min(1, g))))
+    }
+    /// hangKick：搖手機（dir ±1）
+    private func hangKick(_ dir: Double) {
+        guard dreal else { return }
+        for k in hangs.indices where hangs[k].on && hangs[k].held == nil { var q = hangs[k]; q.va += dir * q.kick; hangRing(&q, 0.5); hangs[k] = q }
+    }
+    private func hangRelease(_ f: Finger) {
+        guard let k = hangs.firstIndex(where: { $0.name == f.hangN }) else { return }
+        var q = hangs[k]
+        q.held = nil; q.fingT = t
+        if t - f.tDown < 0.25 && hypot(f.rawX - f.ax, f.rawY - f.ay) < R * 0.12 { q.va += (f.ax < q.x ? -1 : 1) * q.tap; hangRing(&q, 0.45) }
+        hangs[k] = q
+    }
+    /// hangStep（每一小步）：抓著就轉向手指；放開是有阻尼的擺；晃過正中間夠快，風鈴響
+    private func hangStep(_ dt: Double) {
+        for k in hangs.indices where hangs[k].on {
+            var q = hangs[k]
+            var hd: Finger? = nil
+            if let id = q.held { hd = fingers[id]; if hd == nil || hd?.hangN != q.name { q.held = nil; hd = nil } }
+            let a0 = q.a
+            if let hd {
+                q.fingT = t
+                let ta = max(-1.2, min(1.2, atan2(-(hd.rawX - q.x), max(8, hd.rawY - q.y))))
+                q.va += ((ta - q.a) / 0.06 - q.va) * 0.3
+            } else { q.va += (-q.w2 * sin(q.a) - q.damp * q.va) * dt }
+            q.a += q.va * dt
+            if q.a > 1.4 { q.a = 1.4; q.va = min(0, q.va) } else if q.a < -1.4 { q.a = -1.4; q.va = max(0, q.va) }
+            if a0 * q.a < 0 && abs(q.va) > 1.5 { hangRing(&q, abs(q.va) / 7) }
+            if q.held == nil && abs(q.a) < 0.002 && abs(q.va) < 0.02 { q.a = 0; q.va = 0 }
+            hangs[k] = q
+        }
+    }
+
+    /// selfMove（bumpSoft）：牠自己在動：身上沒有手指、1.5 秒內沒被碰、不在空中、沒在跳
+    private func selfMove() -> Bool {
+        if !(params.bumpSoft >= 0.5) || sillAir || sillHop != nil || sillGrab || (t >= lastTouch && t - lastTouch < 1.5) { return false }
+        for f in fingers.values where f.mode == .grab || f.mode == .stroke || (f.mode == .push && t - f.hitT < 0.5 && !f.lure) { return false }
+        return true
+    }
+    /// softHold：牠自己走路撞到的，SoftB.hold 秒內角度最多 SoftB.lean、位置最多 SoftB.move 個半徑
+    private func softHold(_ p: inout Prop, _ dt: Double) {
+        if !drRecent(p.softT, SoftB.hold) || p.held != nil || p.tip || drRecent(p.fingT, 1.2) || drRecent(p.catT, 2) { return }
+        let w = wrapA(p.a), m = R * SoftB.move
+        if abs(w) > SoftB.lean { p.a -= sgn(w) * min(abs(w) - SoftB.lean, SoftB.back * dt); if p.va * w > 0 { p.va = 0 } }
+        if p.x > p.softX + m { p.x = p.softX + m; if p.vx > 0 { p.vx = 0 } } else if p.x < p.softX - m { p.x = p.softX - m; if p.vx < 0 { p.vx = 0 } }
+    }
+    /// decoBody（一幀一次，在小步之後）：落在東西裡的點，用它們跟上一幀比真的移動了多少去帶東西（走路的整團平移也算），只往牠移動的方向推，
+    /// 牠停下來不會把東西煞住。牠的點一個都不改。掛著的兩件被穿過去的點帶著晃。
+    private func decoBody(_ dt: Double) {
+        guard dreal, params.decoBody >= 0.5, dt > 0, N > 0 else { dbOK = false; return }
+        if dbX.count != N || dbY.count != N { dbX = [Double](repeating: 0, count: N); dbY = [Double](repeating: 0, count: N); dbOK = false }
+        var ok = dbOK && sillPlane == .room
+        let lim = R * 0.4
+        if ok { for i in stride(from: 0, to: N, by: 7) where abs(X[i] - dbX[i]) > lim || abs(Y[i] - dbY[i]) > lim { ok = false; break } }   // 重擺、換層那種瞬間移動不算
+        if ok {
+            let K: Double = 14 * params.decoPush, vc = 3000.0, selfM = selfMove()
+            for k in props.indices {
+                var p = props[k]
+                if p.gone || p.alpha < 0.6 || p.held != nil || (drOn && drRecent(p.catT, 1.5)) { continue }   // v2.46 牠正在推的那件：偽足縮回來時不把它帶回來
+                let r2 = p.r * p.r
+                var n = 0, sx = 0.0, sy = 0.0, tq = 0.0, ux = 0.0, uy = 0.0
+                for i in 0..<N {
+                    let dx = X[i] - p.x, dy = Y[i] - p.y
+                    if dx * dx + dy * dy > r2 || !propIn(p, X[i], Y[i], 0) { continue }
+                    let vx = max(-vc, min(vc, (X[i] - dbX[i]) / dt)), vy = max(-vc, min(vc, (Y[i] - dbY[i]) / dt))
+                    let rx = vx - (p.vx - p.va * dy), ry = vy - (p.vy + p.va * dx)
+                    n += 1; sx += rx; sy += ry; ux += vx; uy += vy; tq += dx * ry - dy * rx
+                }
+                if n == 0 { continue }
+                let soft = selfM && !p.tip
+                if soft { if !drRecent(p.softT, SoftB.hold) { p.softX = p.x }; p.softT = t } else { p.softT = nil }
+                let fn = Double(n)
+                let cov = min(1, fn / 5), kk = K * (100 / p.m) * cov * dt, us = hypot(ux, uy) / fn
+                let ex: Double = us > 1 ? ux / fn / us : 0, ey: Double = us > 1 ? uy / fn / us : 0
+                let ru = max(0, sx / fn * ex + sy / fn * ey), mx = ru * ex, my = ru * ey, sp = ru
+                if soft {
+                    p.vx += mx * kk * SoftB.k
+                    if p.tc > 0 { p.va = max(-SoftB.w, min(SoftB.w, p.va + mx * kk / p.base * 0.6)) }
+                } else {
+                    p.vx += mx * kk
+                    if my > 0 || sp > R * 3 { p.vy += my * kk * 0.5 }   // 往上只有很快才帶得起來：牠慢慢站起來不會把東西吸上去
+                    p.va += tq / fn / (p.I / p.m) * kk * 0.6
+                    if p.tc > 0 { p.va += mx * kk / p.base * 0.6 }   // 站在窗台上：底被窗台卡住、上面被帶著走，所以往被帶的方向晃
+                }
+                if sp > R * 0.5 { p.lastHit = t; p.selfT = t }
+                if sp > R * 2.2 && !(soft && drRecent(p.softK, 6)) { if soft { p.softK = t }; propKnock(&p, min(1, sp / (R * 9))) }
+                props[k] = p
+            }
+            for k in hangs.indices where hangs[k].on && hangs[k].held == nil {
+                var q = hangs[k]
+                let c = cos(q.a), sn = sin(q.a)
+                var n = 0, sw = 0.0
+                for i in 0..<N {
+                    let dx = X[i] - q.x, dy = Y[i] - q.y
+                    if dy < 0 || dy > q.h + 4 || abs(dx) > q.h { continue }
+                    let lx = c * dx + sn * dy, ly = -sn * dx + c * dy
+                    if abs(lx) > q.w / 2 || ly < q.h * 0.25 || ly > q.h { continue }
+                    n += 1; sw += -((X[i] - dbX[i]) / dt * c + (Y[i] - dbY[i]) / dt * sn) / ly
+                }
+                if n > 0 {
+                    q.selfT = t
+                    let w = max(-12, min(12, sw / Double(n)))
+                    q.va += (w - q.va) * min(1, Double(n) / 3) * 20 * dt
+                    if !q.touch { hangRing(&q, 0.2 + abs(w) / 6) }
+                }
+                q.touch = n > 0
+                hangs[k] = q
+            }
+        }
+        for i in 0..<N { dbX[i] = X[i]; dbY[i] = Y[i] }
+        dbOK = true
+    }
+    /// propPair：A 的角推出 B 外面，再給一個回彈 0.1 的衝量
+    private func propPair(_ A: inout Prop, _ B: inout Prop) {
+        let ca = cos(A.a), sa = sin(A.a), cb = cos(B.a), sb = sin(B.a), wa = 1 / A.m, wb = 1 / B.m
+        for q in 0..<A.px.count {
+            let qx = A.px[q], qy = A.py[q]
+            let wx = A.x + ca * qx - sa * qy, wy = A.y + sa * qx + ca * qy, dx = wx - B.x, dy = wy - B.y, lx = cb * dx + sb * dy, ly = -sb * dx + cb * dy
+            var best = -1e9, bk = -1
+            for k in 0..<min(B.px.count, B.nx.count) {
+                let d = (lx - B.px[k]) * B.nx[k] + (ly - B.py[k]) * B.ny[k]
+                if d > 0 { bk = -2; break }
+                if d > best { best = d; bk = k }
+            }
+            if bk < 0 { continue }
+            let nx = cb * B.nx[bk] - sb * B.ny[bk], ny = sb * B.nx[bk] + cb * B.ny[bk], pen = -best, sum = wa + wb
+            A.x += nx * pen * 0.6 * wa / sum; A.y += ny * pen * 0.6 * wa / sum; B.x -= nx * pen * 0.6 * wb / sum; B.y -= ny * pen * 0.6 * wb / sum
+            let rax = wx - A.x, ray = wy - A.y, rbx = wx - B.x, rby = wy - B.y
+            let vn = (A.vx - A.va * ray - B.vx + B.va * rby) * nx + (A.vy + A.va * rax - B.vy - B.va * rbx) * ny
+            if vn >= 0 { continue }
+            let ra = rax * ny - ray * nx, rb = rbx * ny - rby * nx, j = -1.1 * vn / (wa + wb + ra * ra / A.I + rb * rb / B.I)
+            A.vx += nx * j * wa; A.vy += ny * j * wa; A.va += ra * j / A.I; B.vx -= nx * j * wb; B.vy -= ny * j * wb; B.va -= rb * j / B.I
+            A.lastHit = t; B.lastHit = t
+            if -vn > R * 1.2 { propKnock(&A, min(1, -vn / (R * 9))); propKnock(&B, min(1, -vn / (R * 9))) }
+        }
+    }
+    /// propsStep（每一小步）：重力、手指拿著、窗台（摩擦，很快時回彈 0.15）、躺平停住、倒下、掉出窗台再回來
+    private func propsStep(_ dt: Double) {
+        guard let g = sillG else { return }
+        let G0 = R * sillGrav
+        for k in props.indices {
+            var p = props[k]
+            if p.gone { if t >= p.backAt { propHome(&p) }; props[k] = p; continue }   // propSlotFree：這幾件一律算空著
+            if p.fade != 0 { p.alpha = max(0, min(1, p.alpha + p.fade * dt / 0.4)); if p.fade < 0 && p.alpha <= 0 { propHome(&p) } else if p.fade > 0 && p.alpha >= 1 { p.fade = 0 } }
+            var hd: Finger? = nil
+            if let id = p.held { hd = fingers[id]; if hd == nil || hd?.propK != k { p.held = nil; hd = nil } }
+            if let hd {   // 手指抓的是你按到的那一點，東西繞著那一點被帶著走。抓上面往旁邊推會倒，抓下面拖是平移
+                p.fingT = t
+                let c0 = cos(p.a), s0 = sin(p.a), rx = c0 * p.hlx - s0 * p.hly, ry = s0 * p.hlx + c0 * p.hly
+                let ex = hd.rawX - (p.x + rx), ey = hd.rawY - (p.y + ry), k2 = p.w * p.w * 0.1, den = rx * rx + ry * ry + k2
+                p.vx += (ex / 0.05 - p.vx) * 0.25; p.vy += (ey / 0.05 - p.vy) * 0.25
+                p.va += ((rx * ey - ry * ex) / den / 0.05 - p.va) * 0.2
+                if p.tc == 0 { p.va -= rx * G0 / den * dt }   // 拿離窗台時像提著：重的那頭垂下去
+                p.vy += G0 * dt * 0.5
+                p.lastHit = t
+            } else { p.vy += G0 * dt }
+            p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.va * dt
+            let c = cos(p.a), s = sin(p.a)
+            var touch = 0
+            for q in 0..<p.px.count {
+                let rx = c * p.px[q] - s * p.py[q], ry = s * p.px[q] + c * p.py[q], wx = p.x + rx, wy = p.y + ry
+                if wy > g.fl && wy < g.fl + R * 0.5 && wx > g.sl && wx < g.sr {
+                    p.y -= (wy - g.fl) * 0.7; touch += 1
+                    let vn = p.vy + p.va * rx
+                    if vn > 0 {
+                        let e: Double = vn > R * 1.5 ? 0.15 : 0, j = -(1 + e) * vn / (1 / p.m + rx * rx / p.I)
+                        p.vy += j / p.m; p.va += j * rx / p.I
+                        let vt = p.vx - p.va * ry, lim = PropK.mu * abs(j), jt = max(-lim, min(lim, -vt / (1 / p.m + ry * ry / p.I)))
+                        p.vx += jt / p.m; p.va -= ry * jt / p.I
+                        if vn > R * 1.2 { propKnock(&p, vn / (R * 9)) }
+                    }
+                }
+            }
+            softHold(&p, dt)
+            p.tc = touch
+            if p.held == nil && touch >= 2 { let f = PropK.mu * G0 * dt; p.vx = abs(p.vx) <= f ? 0 : p.vx - sgn(p.vx) * f }   // v2.45 平放著滑會被窗台磨停
+            if touch > 0 {
+                p.vx *= 0.9985; p.va *= 0.994
+                if p.held == nil && touch >= 2 && abs(p.vx) + abs(p.vy) < 7 && abs(p.va) < 0.22 {   // 兩個點著地才算停；只差一點點就慢慢躺平
+                    p.vx = 0; p.vy = 0; p.va = 0
+                    let w = wrapA(p.a)
+                    if abs(w) < 0.08 { p.a -= w * 0.2 }
+                }
+            }
+            if abs(wrapA(p.a)) > 0.6 { p.upT = t }   // 蠟燭倒了火就熄，扶正 3 秒後再亮
+            if p.held == nil {   // v2.46 倒下那一下（歪過 0.6 算倒，回到 0.3 以內才算站回來）
+                let w = abs(wrapA(p.a))
+                if w > 0.6 && !p.tip { p.tip = true; onEvent?(.fx(kind: "topple", gain: 0.7, delay: 0)) } else if w < 0.3 { p.tip = false }
+            }
+            if p.y > g.fl + R * 0.9 && !p.fell { p.fell = true; propKnock(&p, 0.55, far: true) }   // 掉到窗台下面：看不到了，聽得到一聲
+            if p.y > g.fl + R * 2.5 || p.x > W + R * 2 || p.x < -R * 2 {
+                if !p.fell { propKnock(&p, 0.45, far: true) }
+                p.gone = true; p.upT = t + 20; p.alpha = 0; p.backAt = t + 20; p.vx = 0; p.vy = 0; p.va = 0; p.fade = 0; p.held = nil
+            }
+            props[k] = p
+        }
+        if props.count > 1 {
+            for i in 0..<(props.count - 1) {
+                for j in (i + 1)..<props.count where !props[i].gone && !props[j].gone && props[i].alpha > 0.6 && props[j].alpha > 0.6 {
+                    var A = props[i], B = props[j]
+                    propPair(&A, &B); propPair(&B, &A)
+                    props[i] = A; props[j] = B
+                }
+            }
+        }
+        for k in props.indices where !props[k].gone && props[k].held == nil && props[k].fade == 0 && t - props[k].lastHit >= 25 {   // 25 秒沒人碰：倒著或移位的淡出、回原位
+            let w = wrapA(props[k].a)
+            if abs(w) > 0.08 || hypot(props[k].x - props[k].hx, props[k].y - props[k].hy) > 2 { props[k].fade = -1 } else { props[k].lastHit = t }
+        }
+    }
+
+    // MARK: 給畫面讀的（畫面點；窗台那一層世界座標就是畫面座標）
+    struct PropView { let im: String; let x, y, a, w, h, ox, oy, alpha: Double; let lit: Bool; let shadow: Double }
+    /// 蠟燭和右端那件現在在哪（擺飾變真關著時是空的）。lit：夜晚的蠟燭、站起來超過 3 秒。shadow：窗台上影子的濃淡（0 沒有），網頁 drawProps
+    var propViews: [PropView] {
+        guard dreal, let g = sillG else { return [] }
+        var o: [PropView] = []
+        for p in props where !p.gone && p.alpha > 0.01 {
+            let near = max(0, 1 - abs(g.fl - (p.y + p.base)) / (R * 0.8))
+            o.append(PropView(im: p.im, x: p.x, y: p.y, a: p.a, w: p.w, h: p.h, ox: p.ox, oy: p.oy, alpha: p.alpha,
+                              lit: p.im == "d_candle" && sceneKind == 2 && t - p.upT > 3, shadow: near > 0 && p.x > g.sl && p.x < g.sr ? near * p.alpha : 0))
+        }
+        return o
+    }
+    /// 掛著那件的角度：擺飾變真開著是擺錘，關著是 v2.37 搖手機之後的晃（amp）
+    func hangAngle(_ name: String, amp: Double) -> Double {
+        if dreal, let q = hangs.first(where: { $0.name == name }), q.on { return q.a }
+        return decoSwing(amp)
+    }
 }

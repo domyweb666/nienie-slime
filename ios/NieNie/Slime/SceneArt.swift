@@ -53,8 +53,9 @@ enum SceneArt {
     }
 
     /// kind 1 = day, 2 = night. nil when the pictures are missing from the bundle.
-    static func make(kind: Int, size: CGSize, g: SlimeRig.SillGeo, bowl: Bool = false, props oldProps: Bool = false, deco: Int = 1) -> Images? {
-        let key = "\(kind)|\(size.width)|\(size.height)|\(bowl)|\(oldProps)|\(deco)"
+    /// real (v2.64 擺飾變真, decoReal): the candle and the right-end thing are not baked in, the view draws them where they are (dynamicDeco)
+    static func make(kind: Int, size: CGSize, g: SlimeRig.SillGeo, bowl: Bool = false, props oldProps: Bool = false, deco: Int = 1, real: Bool = false) -> Images? {
+        let key = "\(kind)|\(size.width)|\(size.height)|\(bowl)|\(oldProps)|\(deco)|\(real)"
         if let c = cache[key] { return c }
         guard let plate = asset("scene-plate"), let bowlIm = asset("scene-bowl"), let succ = asset("scene-succ"), let peb = asset("scene-peb") else { return nil }
         let isNight = kind == 2
@@ -149,7 +150,8 @@ enum SceneArt {
                 return r
             }
             // v2.37 擺飾: the cloth under it, the candle on the left end (lit and untinted at night, a warm glow), books or the jar on the right end
-            if deco >= 1 {
+            if deco >= 1 && real { _ = put("cloth", g.bx, sink: 6) }   // v2.64: only the cloth stays in the picture (the web's decoDraw with DREAL)
+            if deco >= 1 && !real {
                 _ = put("cloth", g.bx, sink: 6)
                 let cx = g.l + 56 * U / 2 + 8
                 if isNight, let r = put("candleLit", cx, tint: false) {
@@ -197,6 +199,44 @@ enum SceneArt {
         let out = Images(sky: sky, wall: wall, props: props, bowlFront: front, bell: bell, teru: teru)
         cache[key] = out
         return out
+    }
+
+    // MARK: - v2.64 擺飾變真: what the view draws each frame (web propImg, propShadow, decoGlow)
+
+    private static var decoCache: [String: UIImage] = [:]
+    /// The thing's picture (d_candle → scene-deco-candle), night-tinted like the web's propImg; the lit candle is never tinted
+    static func decoImage(_ im: String, night: Bool) -> UIImage? {
+        let name = im.hasPrefix("d_") ? String(im.dropFirst(2)) : im
+        let tint = night && name != "candleLit"
+        let key = name + (tint ? "|n" : "")
+        if let c = decoCache[key] { return c }
+        guard let a = asset("scene-deco-" + name) else { return nil }
+        let out = tinted(a, tint)
+        decoCache[key] = out
+        return out
+    }
+    private static var shadowIm: UIImage?, glowIm: UIImage?
+    /// propShadow: a soft brown ellipse (rgba(120,70,40,.28) to clear), drawn scaled to rx × ry
+    static func propShadowImage() -> UIImage {
+        if let im = shadowIm { return im }
+        let im = radial([UIColor(red: 120 / 255, green: 70 / 255, blue: 40 / 255, alpha: 0.28), UIColor(red: 120 / 255, green: 70 / 255, blue: 40 / 255, alpha: 0)], [0, 1])
+        shadowIm = im
+        return im
+    }
+    /// decoGlow: the candle's warm light (the web adds it with 'lighter'; here a screen blend where Core Animation has it)
+    static func glowImage() -> UIImage {
+        if let im = glowIm { return im }
+        let im = radial([UIColor(red: 1, green: 190 / 255, blue: 110 / 255, alpha: 0.42), UIColor(red: 1, green: 160 / 255, blue: 80 / 255, alpha: 0.16), UIColor(red: 1, green: 150 / 255, blue: 70 / 255, alpha: 0)], [0, 0.35, 1])
+        glowIm = im
+        return im
+    }
+    private static func radial(_ cols: [UIColor], _ locs: [CGFloat]) -> UIImage {
+        let n: CGFloat = 128
+        return UIGraphicsImageRenderer(size: CGSize(width: n, height: n), format: format(scale: 1)).image { c in
+            guard let gr = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cols.map { $0.cgColor } as CFArray, locations: locs) else { return }
+            let o = CGPoint(x: n / 2, y: n / 2)
+            c.cgContext.drawRadialGradient(gr, startCenter: o, startRadius: 0, endCenter: o, endRadius: n / 2, options: [])
+        }
     }
 
     // MARK: - 走路: the small things (drawn by code as placeholders, assets later), 96×96, drawn about the centre
