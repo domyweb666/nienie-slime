@@ -30,6 +30,8 @@ protocol SlimeSoundSource: AnyObject {
     func strand(gain: Double)
     /// Let go. `gain` is the release event's 0.35...1; strength s = (gain − 0.35) / 0.65.
     func release(gain: Double)
+    /// v2.63 D4 (FeelParams.flinchFx): the small sound when it flinches from your touch: the release pop's air layer, quiet, a little higher. No tail
+    func flinch(gain: Double)
     /// Every frame. `rub` 0...1 (already × rubMax), `stretch` in radii of the most-stretched grabbing finger.
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool)
     /// App going to the background: loops off, nothing pending.
@@ -400,6 +402,11 @@ final class SlimeAudio: SlimeSoundSource {
         p.gain = Self.clamp(p.gain * (0.6 + 0.8 * gain), 0, 1)
         p.deco = false
         one("pull.strand", p)
+    }
+
+    /// v2.63 D4 (web SFX.flinch: the same numbers): `gain` from the rig (0.3 × the flinch's size); nothing queued, lastStretch untouched
+    func flinch(gain: Double) {
+        one("release.air", Play(gain: Self.clamp(gain, 0, 1), rate: Self.rnd(1.08, 1.16), lowpass: 7000))
     }
 
     func release(gain: Double) {

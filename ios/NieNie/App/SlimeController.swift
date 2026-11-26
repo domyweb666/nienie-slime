@@ -180,7 +180,7 @@ final class SlimeController: ObservableObject {
             // 候選 17: the pop plays as an audio event inside the haptic pattern instead of through AVAudioEngine
             let viaHaptics = p.popViaHaptics >= 0.5 && haptics.popAudioReady
             _ = rate
-            if !viaHaptics { sound.release(gain: g) }
+            if !viaHaptics && !rig.relQuiet { sound.release(gain: g) }   // v2.63 D4: the flinch sounded 0.3 s ago, the haptic pop only
             let s = max(0, min(1, (gain - 0.35) / 0.65))
             // v2.25 F5: a gentle release one tap, a hard one the whole train; with inertia on the taps follow its swing (half a period)
             let extra: Int = Int((max(0, p.popCount - 1) * s).rounded()), popGap: Double = p.inertiaHz > 0 ? 1 / (2 * p.inertiaHz) : p.popGap
@@ -210,6 +210,10 @@ final class SlimeController: ObservableObject {
         case .beat:
             // v2.23 C6: one beat of its answer to your rhythm, a soft round tap
             haptics.transient(intensity: 0.3, sharpness: 0.2)
+        case .flinch(let gain, let hap):
+            // v2.63 D4 (flinchFx): it flinched from your touch: a small pop sound (0 = a release just popped) and a light round tap, the same frame
+            if gain > 0 { sound.flinch(gain: gain) }
+            haptics.transient(intensity: hap, sharpness: 0.2)
         case .nudge:
             // v2.20 C1: it swam over and touched your resting finger: one soft, round tap (lighter than a press)
             sound.press(intensity: 0.2)

@@ -18,6 +18,7 @@ protocol SlimeSoundSource: AnyObject {
     func press(intensity: Double)
     func strand(gain: Double)
     func release(gain: Double)
+    func flinch(gain: Double)
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool)
     func stopAll()
     func voice(_ kind: String, gain: Double, rate: Double)
@@ -36,6 +37,7 @@ final class SlimeAudio: SlimeSoundSource {
     func press(intensity: Double) {}
     func strand(gain: Double) {}
     func release(gain: Double) {}
+    func flinch(gain: Double) {}
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool) {}
     func stopAll() {}
     func voice(_ kind: String, gain: Double, rate: Double) {}

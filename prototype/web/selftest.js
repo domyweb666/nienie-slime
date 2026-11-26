@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T82（D4 牠縮那一下有一小聲和一下輕震、0.3 秒內放手的「噗」不重複、連點越點越小到不出聲不震；flinchFx 0 對照；震動讀 HAP.log；在 T81 後面、T74 前面跑）
    v2.63（11-26）：加 T81（B2 按聲跟著力道、B5 嚇到開心不要啦按的聲音跟動作同一格、音檔前奏跳過；sndB2、sndB5 0 對照；在 T80 後面、T74 前面跑）；T72 釘 sndB5 0（g 推醒一醒就查 startle，嚇到那聲排到縮的那一格後查不到）
    v2.63（11-26）：加 T80（B6 拉回去再拉有絲聲、按下去只清上次放手的餘韻；sndB6 0 對照；音效接真的引擎；在 T79 後面、T74 前面跑）
    v2.63（11-26）：加 T79（C6 揉牠反應輪流、小跳 40 秒一次、叫聲洗牌袋；rubVary 0 對照；在 T78 後面、T74 前面跑）；舊項目一律 rubVary 0，T66、T67、T76 也釘 0（整份比對過，這幾項的數字會變；T65 也變，但它只跑這一項時兩版本來每次都不一樣，不是 rubVary 造成的，沒釘）
@@ -2167,6 +2168,41 @@
       && ['press', 'startle', 'happy', 'protest'].every(k => on[k] && on[k].d === 0) && !!r.off && r.off.startle.d <= -2
       && (!r.lead || B5KEYS.every(k => r.lead[k].after.every(ms => ms <= 30)));
     res.T81_sndB2B5 = r; res.PASS.sndB2B5 = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T82 v2.63 D4 牠縮那一下有一小聲和一下輕震（flinchFx；OVERNIGHT 第 12 項，手機照這條搬）。藍底、黏土真正的預設（PRE54，大腦關）。網頁沒有震動，震動看 hapEv 的紀錄（HAP.log），手機在同一個時機打真的。
+  // 每一格（一次 update）編號，聲音（sfxPlay）和震動（HAP.log）記在它出現的那一格，縮記 FLN.t0 換掉的那一格。
+  // a 點一下按著，縮了之後 0.1 秒放手：縮那格有 flinch 聲、有震；放手後沒有 release（「噗」不重複）。縮之後 0.5 秒才放：release 照響
+  // b 快點（按 0.1 秒就放，通常比縮早）：「噗」加起來只有一聲，縮那格照樣震
+  // c 連點 12 下、每下隔 4 秒（每下按到縮了再 0.1 秒放）：每一下縮多大、有沒有聲、有沒有震。縮變小、事件跟著少或停
+  // d flinchFx 0：沒有 flinch 聲、沒有震，放手的 release 照舊
+  // 擋：a 開：同格、放手 0 聲 release、0.5 秒放有 release；b 開：噗 ≤ 1、縮那格有震；c 開：後 4 下的事件數 ≤ 前 4 下、後 4 下縮的平均比前 4 下小、最後一下的事件 ≤ 第一下；d：flinch 聲 0、震 0、release 有
+  { const clock = saveClock(), r = {}, P82 = { ...PRE54.clay, intro: 0, introSwim: 0, brain: 0 }, I0 = { tr: IMP.tr, w: IMP.w };
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P82, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; FLN.say = null; GREET.st = ''; GREET.until = -9; EYE.user = -9; steps(60); };
+    let FN = 0, li = 0, hi = 0; const EVS = [];
+    const stepF = () => { steps(1); FN++; for (; li < log.length; li++) EVS.push([FN, log[li][0], log[li][1]]); for (; hi < HAP.log.length; hi++) EVS.push([FN, 'hap.' + HAP.log[hi][0], HAP.log[hi][1]]); };
+    const start = () => { FN = 0; li = log.length; hi = HAP.log.length; EVS.length = 0; };
+    const at = (k, f) => EVS.filter(e => e[1] === k && (f == null || e[0] === f));
+    // 按下去，等到縮（最多 0.5 秒），縮了之後 holdAfter 格放手；pre 格先按著（快點：按 pre 格就放、不等縮）
+    const tap = (quick, holdAfter) => { const [x, y] = sc(globalC.xc, globalC.yc), f0 = FLN.t0; ev('pointerdown', 1, x, y); let fl = null, upF = null;
+      for (let k = 0; k < 60; k++) { stepF(); if (fl == null && FLN.t0 !== f0) fl = FN; if (upF == null && ((quick && FN >= 6) || (!quick && fl != null && FN - fl >= holdAfter))) { ev('pointerup', 1, x, y); upF = FN; } if (upF != null && fl != null && FN - Math.max(upF, fl) >= 24) break; }
+      if (upF == null) { ev('pointerup', 1, x, y); upF = FN; } for (let k = 0; k < 24; k++) stepF();
+      return { fl, up: upF, amp: fl != null ? +FLN.amp.toFixed(4) : 0, snd: at('flinch').map(e => e[0]), hap: at('hap.flinch').map(e => e[0]), hapG: at('hap.flinch').map(e => e[2]), rel: at('release').length, relF: at('release').map(e => e[0]) }; };
+    const one = (over, quick, holdAfter, sd) => { fresh(over, sd); start(); const o = tap(quick, holdAfter); o.same = o.fl != null && o.snd.length === 1 && o.snd[0] === o.fl && o.hap.length === 1 && o.hap[0] === o.fl; o.poof = o.rel + o.snd.length; return o; };
+    const series = (over) => { fresh(over, 86); const o = [];
+      for (let n = 0; n < 12; n++) { start(); const q = tap(false, 6); o.push({ amp: q.amp, ev: q.snd.length + q.hap.length, snd: q.snd.length, hap: q.hap.length, rel: q.rel }); for (let k = 0; k < 240 - FN; k++) steps(1); }
+      return o; };
+    try { HAP.log = [];
+      r.a = one({}, false, 6, 82); r.aLate = one({}, false, 30, 82); r.b = one({}, true, 0, 83); r.bOff = one({ flinchFx: 0 }, true, 0, 83); r.d = one({ flinchFx: 0 }, false, 6, 82);
+      r.c = series({}); r.cOff = series({ flinchFx: 0 }); r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    HAP.log = null; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); FLN.say = null;
+    log.splice(0); IMP.tr = I0.tr; IMP.w = I0.w; impReset(); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    const c = r.c || [], sum = (a, k) => a.reduce((s, q) => s + q[k], 0), first4 = c.slice(0, 4), last4 = c.slice(-4);
+    r.cSum = c.length ? { evFirst4: sum(first4, 'ev'), evLast4: sum(last4, 'ev'), ampFirst4: +(sum(first4, 'amp') / 4).toFixed(4), ampLast4: +(sum(last4, 'amp') / 4).toFixed(4) } : null;
+    r.ok = !r.err && r.a.same && r.a.rel === 0 && r.aLate.same && r.aLate.rel === 1 && r.b.poof <= 1 && r.b.hap.length === 1 && r.b.hap[0] === r.b.fl
+      && !!r.cSum && r.cSum.evLast4 <= r.cSum.evFirst4 && r.cSum.ampLast4 < r.cSum.ampFirst4 && c[11].ev <= c[0].ev && c[0].ev === 2
+      && r.d.snd.length === 0 && r.d.hap.length === 0 && r.d.rel === 1 && r.bOff.snd.length === 0 && r.bOff.hap.length === 0 && r.bOff.rel === 1
+      && (r.cOff || []).every(q => q.ev === 0);
+    res.T82_flinchFx = r; res.PASS.flinchFx = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0

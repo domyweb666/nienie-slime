@@ -243,6 +243,8 @@
     if (now - (S.last[k] || -9) < 0.25) return; S.last[k] = now;
     one(k, { g: clamp(g, 0, 1), r: (r || 1) * rnd(0.96, 1.04), lp: 9000, delay: delay || 0 });
   };
+  // v2.63 D4（flinchFx）：牠縮那一下的小聲：放手「噗」的 air 層，小聲、高一點點（g 由頁面給，0.3 × 縮的大小）。不排餘韻、不動 lastStretch。Swift SlimeAudio.flinch 同一套
+  S.flinch = function (g) { one('release.air', { g: clamp(g, 0, 1), r: rnd(1.08, 1.16), lp: 7000 }); };
   S.drip = function (g) { one('settle.bubble', { g: clamp(g, 0, 1) * 0.6, r: rnd(0.8, 1.1), lp: 3000, deco: true }); };
   S.strand = function (gain) { const p = MAP.pull.strand(S.st); p.g = clamp(p.g * (0.6 + 0.8 * gain), 0, 1); p.deco = false; one('pull.strand', p); };
 

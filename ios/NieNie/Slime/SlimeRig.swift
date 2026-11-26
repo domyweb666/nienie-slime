@@ -16,6 +16,7 @@ enum SlimeEvent {
     case fx(kind: String, gain: Double, delay: Double)   // v2.50 場景聲 (AI samples, manifest fx.<kind>)
     case land(gain: Double)                  // v2.28 窗台: it landed on the sill or in the bowl after a fall or a hop
     case ding(gain: Double)                  // v2.31 搖晃沉澱: the glitter has settled, it is clear again
+    case flinch(gain: Double, hap: Double)   // v2.63 D4 (flinchFx): it flinched from your touch: a small sound (gain 0 = tap only) and a light tap
 }
 
 /// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
@@ -329,6 +330,12 @@ final class SlimeRig {
     private(set) var pressSnd = -1.0
     // v2.61 D2 (tapSoft; web FLN.tc, tcq, tpAt): the most a flinch from your touch may be (1 = no limit), a light tap whose flinch has not come yet, when the flinch your touch set off is due
     private var flTc = 1.0, flTapQ = false, flTapAt = -9.0
+    /// v2.63 D4 (flinchFx; web FLX, the same numbers, Agent's picks for 多米 to feel and hear): gain the sound (the release pop's air layer), hap the tap
+    /// (sharpness sh), lo below flinchAmp × lo neither, win a release this soon after the flinch's sound skips its pop sound (and the other way round)
+    private enum FlxSet { static let gain = 0.3, hap = 0.25, sh = 0.2, lo = 0.7, win = 0.3 }
+    private var flxSndT = -9.0, flxRelT = -9.0   // when the flinch last sounded, when a release last popped
+    /// v2.63 D4: true while the `.release` being sent should not play its pop sound (a flinch just sounded); the haptic pop stays
+    private(set) var relQuiet = false
     private var shkAt = -9.0, shkT0 = -9.0, shkAmp = 0.0, shkTh = 0.0      // shaking off after a hard pull; th = how far it is turned now
     // breath (A6): exert = panting 0...1 (4 s time constant, 8...10 s to normal); a sigh every 30...90 s, then a 1 s pause
     private var exert = 0.0, sighNext = -1.0, sighCyc = -1, pauseUntil = -9.0, brAmpX = 1.0, brCyc = 0
@@ -1124,7 +1131,7 @@ final class SlimeRig {
         brPhase = 0; brPrev = 0; brAmp = 1; brWave = 0; brDeepAt = -99; brGrabStart = -1; pinchA = nil; pinchB = nil
         // v2.19
         lifeSt = .rest; lifeUntil = -1; lifeLooks = 0; lifeNoGo = false; sniffs = []; attOn = false; lifeWrg = 1; goFade = 0; arrT = -9; arrOff = 0
-        gaitOn = false; gaitK = 1; gaitOff = 0; gaitV = 0; flAt = -9; flSay = nil; flT0 = -9; flAmp = 0; flH = 1; flS = 1; shkAt = -9; shkT0 = -9; shkAmp = 0; shkTh = 0
+        gaitOn = false; gaitK = 1; gaitOff = 0; gaitV = 0; flAt = -9; flSay = nil; flxSndT = -9; flxRelT = -9; flT0 = -9; flAmp = 0; flH = 1; flS = 1; shkAt = -9; shkT0 = -9; shkAmp = 0; shkTh = 0
         exert = 0; sighNext = -1; sighCyc = -1; pauseUntil = -9; brAmpX = 1; brCyc = 0; strK = 1; psm = (1, 0, 0, 1); lifeLB = 1
         // v2.20: a rebuild drops the fingers without a release, so the offset must go too or home stays off (measured on the web:
         // later tests leaned with it, a 3 s press moved 61 pt instead of 30)
@@ -2606,7 +2613,10 @@ final class SlimeRig {
                 }
             }
             lastReleaseStrength = s
+            relQuiet = params.flinchFx >= 0.5 && t >= flxSndT && t - flxSndT < FlxSet.win   // v2.63 D4 (web: the same test): the flinch sounded 0.3 s ago, no second pop sound
+            if !relQuiet { flxRelT = t }
             onEvent?(.release(gain: 0.35 + 0.65 * s, rate: 1 + 0.1 * s, special: special))
+            relQuiet = false
         }
     }
 
@@ -5190,7 +5200,7 @@ final class SlimeRig {
         if params.tapSoft >= 0.5 { flTc = min(1, flTc * exp(dt / TapSet.T)) } else { flTc = 1; flTapQ = false }   // v2.61 D2
         if let s = flSay, t >= s.at || flAt != s.at { flSay = nil; onEvent?(.voice(kind: s.kind, gain: s.gain, rate: s.rate)) }   // v2.63 B5 (web: the same line): the startle on the flinch's frame; the flinch cancelled or moved, at once
         if flAt > 0 && t >= flAt {
-            let byTap: Bool = params.tapSoft >= 0.5 && flAt == flTapAt
+            let byTouch: Bool = flAt == flTapAt, byTap: Bool = params.tapSoft >= 0.5 && byTouch   // byTouch: v2.63 D4
             flAt = -9
             if lv(params.lifeFlinch) {
                 let pre: Double = (flPre == .rest ? 1.2 : (flPre == .go ? 0.8 : 1)) * flBoost
@@ -5203,6 +5213,12 @@ final class SlimeRig {
                 flTapQ = false
                 flAmp = a; flT0 = t; flH *= 0.55; flBoost = 1; cutSniffs()
                 if lv(params.lifeBreath) { exert = max(exert, 0.1 + 2 * a) }   // a quick breath in with it
+                if byTouch && params.flinchFx >= 0.5 && a >= FlxSet.lo * params.flinchAmp {   // v2.63 D4 (web: the same line): a small sound and a light tap on this frame; a pop just sounded, the tap only
+                    let k: Double = min(1, a / max(1e-6, params.flinchAmp))
+                    let quiet: Bool = t >= flxRelT && t - flxRelT < FlxSet.win
+                    if !quiet { flxSndT = t }
+                    onEvent?(.flinch(gain: quiet ? 0 : FlxSet.gain * k, hap: FlxSet.hap * k))
+                }
             }
         }
         do {   // 60 ms in, held 50 ms, eased off over half a second
