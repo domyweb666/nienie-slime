@@ -1,6 +1,6 @@
-# Handoff: v2.61b 湯圓餡、不透明邊緣各做兩版加切換（2026-11-26，先看這段）
+# Handoff: v2.61b 湯圓餡、不透明邊緣各做兩版加切換，TestFlight build 164 已上傳（2026-11-26，先看這段）
 
-> 工作樹 `prototype/web/_wt`，分支 `feel-3x-panel-v1`。多米 11-26：湯圓餡做兩版加切換；不透明版的邊緣怪怪的。**本機提交，沒推、沒發 TestFlight。Swift 沒編譯過。**
+> 工作樹 `prototype/web/_wt`，分支 `feel-3x-panel-v1`。多米 11-26：湯圓餡做兩版加切換；不透明版的邊緣怪怪的。**多米 11-26 說推並發：已推到 `aa3b7c3`，run 45743385259 編譯過、build 164 上傳成功（02:50 UTC）。扯斷合併（`split-merge-v1`）沒包進去。**
 > 同時另一個對話在分支 `split-merge-v1` 做「扯斷成兩隻、碰到合回」（網頁 v2.62），版本號因此用 v2.61b。
 
 ## 做了什麼
@@ -13,10 +13,10 @@
 - 網頁整份 selftest 73／73 一次（兩個開關預設 0）。網頁截圖比過湯圓、芋圓、蜜蜜。
 
 ## 沒驗
-- Swift 沒編譯、沒在 iPhone 看。兩個開關開著時沒跑 selftest（只動畫面，不動物理）。
+- Swift 在 CI 編過（run 45743385259），沒在 iPhone 看。兩個開關開著時沒跑 selftest（只動畫面，不動物理）。
 
 ## 下一步
-1. 多米說推 → `git push origin feel-3x-panel-v1`，看 CI 編 Swift。多米說發才 `gh workflow run ios.yml --ref feel-3x-panel-v1 -f testflight=true`。
+1. 等多米裝 build 164，在調節台切「湯圓餡」「邊緣」兩顆比。
 2. 多米在手機上比完，定哪版當預設，另一版留著或拿掉。
 
 ---
