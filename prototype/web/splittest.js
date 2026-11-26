@@ -1,7 +1,8 @@
 /* v2.62 扯斷成兩隻、碰到合回（T74）。selftest.js 最後會 fetch 這個檔來跑；也可以單獨在 console 貼上跑（回傳 {r, pass}）。
    每一種合併動畫（mergeFx 0 到 3）各跑一次：窗台、芋圓、真正的預設；往上猛扯 → 要斷成兩隻；再猛扯第二隻、再猛扯原本那隻 → 不准斷第二次；
    把第二隻拖去碰原本那隻 → 一定合回；放著 3 秒後粒子數和原本一樣、面積回到原本 ±3%、A 的大小 k 回到 1。
-   另外：放著不碰，第二隻自己爬回去也一定合；合回之後 splitAgain 1 可以再斷、0 不行；split 0 怎麼扯都不斷。 */
+   另外：放著不碰，第二隻自己爬回去也一定合；合回之後 splitAgain 1 可以再斷、0 不行；split 0 怎麼扯都不斷。
+   mergeWait（多米 11-26：貼著晚一點再合，預設 1.5 秒）：四版都要貼滿 mergeWait 才開始合；貼著不到 mergeWait 就拖開，不准合；mergeWait 0 一碰就合。 */
 (async () => {
   const PRE = window.__SPLIT_PRE || PRESETS, ownRAF = !window.__SPLIT_PRE, raf0 = window.requestAnimationFrame, rnd0 = Math.random, view0 = { ...VIEW }, sl0 = SLIME, mat0 = mat;
   if (ownRAF) { window.requestAnimationFrame = () => 0; await new Promise(r => setTimeout(r, 80)); }
@@ -28,11 +29,11 @@
       for (let k = 0; k < 12; k++) { ev('pointermove', 1, x, y + (k % 2 ? 1 : -1) * R * .5); steps(1); } ev('pointermove', 1, x, y); steps(20); o.k = +SPLIT.k.toFixed(3);
       { let [ax, ay] = scr(globalC.xc + R * .2, globalC.yc - R * .2); ev('pointerdown', 2, ax, ay); steps(3); for (let k = 0; k < 10; k++) { ax = Math.min(W - 6, ax + R * .25); ay = Math.max(6, ay - R * .25); ev('pointermove', 2, ax, ay); steps(1); } ev('pointerup', 2, ax, ay); }
       steps(40); o.n2 = SPLIT.n; o.one = SPLIT.n === 1 && B2.on;
-      // 手指 1 把第二隻拖去碰原本那隻（每幀 0.08R），碰到就合；合完最多再等 4 秒
-      o.merged = false; o.mergeF = -1;
+      // 手指 1 把第二隻拖去碰原本那隻（每幀 0.08R），貼滿 mergeWait 秒才合（420 幀＝原本的 4 秒加 3 秒）；合完最多再等 4 秒
+      o.merged = false; o.mergeF = -1; o.waited = -1;
       if (B2.on) { let px = x, py = y;
-        for (let k = 0; k < 240 && !B2.mg; k++) { const [tx, ty] = scr(globalC.xc, globalC.yc), dx = tx - px, dy = ty - py, l = Math.hypot(dx, dy) || 1, sp = Math.min(l, R * .08); px += dx / l * sp; py += dy / l * sp; ev('pointermove', 1, px, py); steps(1); }
-        ev('pointerup', 1, px, py); let f = 0; for (; f < 240 && B2.on; f++) steps(1); o.merged = !B2.on && SPLIT.merged === 1; o.mergeF = f; }
+        for (let k = 0; k < 420 && !B2.mg; k++) { const [tx, ty] = scr(globalC.xc, globalC.yc), dx = tx - px, dy = ty - py, l = Math.hypot(dx, dy) || 1, sp = Math.min(l, R * .08); px += dx / l * sp; py += dy / l * sp; ev('pointermove', 1, px, py); steps(1); }
+        ev('pointerup', 1, px, py); let f = 0; for (; f < 240 && B2.on; f++) steps(1); o.merged = !B2.on && SPLIT.merged === 1; o.mergeF = f; o.waited = SPLIT.merged === 1 ? +SPLIT.waited.toFixed(3) : -1; }   // 窄畫面上拖不開 0.6R，通常是放手 0.6 秒後貼滿 mergeWait 才合
       steps(180); o.N0 = N0; o.N = N; o.area = +(areaA() / a0).toFixed(3); o.kEnd = SPLIT.k;
       r.fx.push(o); }
     // 放著不碰：第二隻自己爬回去
@@ -43,12 +44,28 @@
     for (const again of [1, 0]) { fresh(7421, { mergeFx: 1, rejoin: 1, splitAgain: again }); let p = yank(1, globalC.xc, globalC.yc - R * .3); ev('pointerup', 1, p[0], p[1]);
       for (let f = 0; f < 60 * 12 && (B2.on || !SPLIT.merged); f++) steps(1); steps(120); p = yank(2, globalC.xc, globalC.yc - R * .3); ev('pointerup', 2, p[0], p[1]); steps(10);
       r['again' + again] = { merged: SPLIT.merged, n: SPLIT.n }; }
+    // mergeWait：斷了、拉開，拖去碰到（touchT 開始算）。early：貼 0.5 秒就拖開 2.5R、再抓著 1 秒，不准合；zero：mergeWait 0，碰到那一幀就開始合
+    const apartThenTouch = (seed, over) => { fresh(seed, { mergeFx: 1, ...over }); let [x, y] = yank(1, globalC.xc, globalC.yc - R * .3); steps(2); const sp = B2.on;
+      // 拉開過 0.6R 才算（SPLIT.apart）：拖到離原本那隻比較遠的上角
+      const q0 = cv.getBoundingClientRect(), [ax0] = scr(globalC.xc, globalC.yc), lx = ax0 > q0.left + q0.width / 2 ? q0.left + 12 : q0.right - 12, ly = q0.top + 12;
+      for (let k = 1; k <= 30; k++) { ev('pointermove', 1, x + (lx - x) * k / 30, y + (ly - y) * k / 30); steps(1); } x = lx; y = ly; for (let k = 0; k < 90 && !SPLIT.apart; k++) steps(1); const apart = SPLIT.apart;
+      let touched = false; for (let k = 0; k < 420 && B2.on && !B2.mg && !touched; k++) { const [tx, ty] = scr(globalC.xc, globalC.yc), dx = tx - x, dy = ty - y, l = Math.hypot(dx, dy) || 1, s1 = Math.min(l, R * .08); x += dx / l * s1; y += dy / l * s1; ev('pointermove', 1, x, y); steps(1); touched = B2.touchT > 0 || !!B2.mg; }
+      return { sp, apart, touched, x, y }; };
+    { const q = apartThenTouch(7441, {}); let mx = B2.touchT; for (let k = 0; k < 30; k++) { steps(1); mx = Math.max(mx, B2.touchT); }
+      const [cx0, cy0] = scr(globalC.xc, globalC.yc); let x = q.x, y = q.y; const dx = x - cx0, dy = y - cy0, l = Math.hypot(dx, dy) || 1;
+      for (let k = 1; k <= 25; k++) { ev('pointermove', 1, x + dx / l * R * 2.5 * k / 25, y + dy / l * R * 2.5 * k / 25); steps(1); mx = Math.max(mx, B2.touchT); }
+      steps(60); r.early = { split: q.sp, apart: q.apart, touched: q.touched, maxTouch: +mx.toFixed(2), merged: SPLIT.merged, on: B2.on, mg: !!B2.mg, reset: B2.touchT === 0 }; ev('pointerup', 1, 0, 0); }
+    { const q = apartThenTouch(7451, { mergeWait: 0 }); const mg = !!B2.mg, waited = B2.mg ? +SPLIT.waited.toFixed(3) : -1; ev('pointerup', 1, q.x, q.y); let f = 0; for (; f < 240 && B2.on; f++) steps(1);
+      r.zero = { split: q.sp, apart: q.apart, mg, waited, merged: !B2.on && SPLIT.merged === 1 }; }
     // split 0：怎麼扯都不斷
     { fresh(7431, { split: 0 }); const p = yank(1, globalC.xc, globalC.yc - R * .3); ev('pointerup', 1, p[0], p[1]); steps(10); r.off = { n: SPLIT.n, on: B2.on }; }
   } catch (e) { r.err = String(e && e.stack || e).slice(0, 400); }
   upAll(); twinDrop(); SLIME = sl0; Object.assign(VIEW, view0); mat = mat0; Math.random = rnd0;
   if (ownRAF) { window.requestAnimationFrame = raf0; chooseSlime(SLIME, false, false); requestAnimationFrame(frame); }
-  const pass = r.err === '' && r.fx.length === 4 && r.fx.every(o => o.split && o.k < .8 && o.nB > 50 && o.Nsplit === o.N0 && o.one && o.n2 === 1 && o.merged && o.N === o.N0 && Math.abs(o.area - 1) <= .03 && o.kEnd === 1)
+  const MW = (PRE[SLIMES[si].mat] || {}).mergeWait;
+  const pass = r.err === '' && r.fx.length === 4 && r.fx.every(o => o.split && o.k < .8 && o.nB > 50 && o.Nsplit === o.N0 && o.one && o.n2 === 1 && o.merged && o.waited >= (MW >= 0 ? MW : 1.5) - 1e-6 && o.N === o.N0 && Math.abs(o.area - 1) <= .03 && o.kEnd === 1)
+    && r.early && r.early.split && r.early.apart && r.early.touched && r.early.maxTouch > 0 && r.early.maxTouch < 1.5 && r.early.merged === 0 && r.early.on && !r.early.mg && r.early.reset
+    && r.zero && r.zero.split && r.zero.apart && r.zero.mg && r.zero.waited >= 0 && r.zero.waited <= .02 && r.zero.merged
     && r.crawl.split && r.crawl.merged && r.crawl.N && Math.abs(r.crawl.area - 1) <= .03 && r.again1.merged === 1 && r.again1.n === 2 && r.again0.merged === 1 && r.again0.n === 1 && r.off.n === 0 && !r.off.on;
   return { r, pass };
 })();

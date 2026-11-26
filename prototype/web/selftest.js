@@ -1,6 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
-   v2.62（11-26）：加 T74（扯斷成兩隻、碰到合回，測試在 splittest.js，最後跑）
+   v2.62（11-26）：加 T74（扯斷成兩隻、碰到合回，測試在 splittest.js，最後跑）；T62 也釘 split 0（真正的預設往上猛扯會斷）
    v2.61（11-25）：加 T73（慢拉往裡穿過去時跟手照舊變少，最後跑，約 30 秒）
    v2.61（11-25）：加 T72（補守預設開著、原本沒人守的開關，最後跑，約 30 秒）；T71 的換隻記憶原本恆真，改成真的開著大腦再看
    v2.61（11-25）：加 T71（W3：睡醒、手指放旁邊、打開先看你、眼睛、換隻記憶）
@@ -1574,7 +1574,7 @@
   //   記住的形狀不超過 2.6 倍、沒有翻面、沒有 NaN；c 拉長還是留得住：放手 2 秒後記住的形狀高度至少 2.3R
   // 更廣的量法是 fuzz.js（固定種子的亂捏，30 組約一分鐘），不在這裡跑
   { const clock = saveClock(), bg0 = VIEW.bg, r = {}; VIEW.bg = 'day';
-    const SP = { ...PRE47.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0 }, OFF = { stretchCap: 0, memCap: 0 };
+    const SP = { ...PRE47.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shakeMode: 0, split: 0 }, OFF = { stretchCap: 0, memCap: 0 };   // v2.62：split 0，往上猛扯會扯斷成兩隻（qH 量到 1.81），這一項量的是扯斷之前的上下限
     const fresh = over => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(62); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); ESC.on = false; DENTS.length = 0; Object.assign(BRAIN, { seed: 62 }); brainReset(); MOOD.strain = 0; MOOD.scare = 0; steps(90); log.splice(0); };
     const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
     const inv = () => { let n = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if (.5 * ((X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a])) < -.02 * TRA[k / 3]) n++; } return n; };
