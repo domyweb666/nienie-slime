@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T76（C9 揉夠了放手，在你手邊睡著；nap 0 對照；在 T75 後面、T74 前面跑）
    v2.63（11-26）：加 T75（切回來也先看你：visibilitychange、blur／focus，睡著的慢慢醒不嚇；在 T74 前面跑，幾秒）
    v2.62（11-26）：加 T74（扯斷成兩隻、碰到合回，測試在 splittest.js，最後跑）；T62 也釘 split 0（真正的預設往上猛扯會斷）
    v2.61（11-25）：加 T73（慢拉往裡穿過去時跟手照舊變少，最後跑，約 30 秒）
@@ -1918,6 +1919,37 @@
       && r.sleep.k0 > .8 && r.sleep.wokeNow && !r.sleep.asleep && r.sleep.slow && lookOK(r.sleep) && !r.sleep.startle && !r.sleep.ask && !r.sleep.flinch && r.sleep.wide < 1.05
       && r.offAwake.at < 0 && r.offSleep.asleep && r.offSleep.at < 0;
     res.T75_greetBack = r; res.PASS.greetBack = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T76 v2.63 C9 揉夠了放手，牠在你手邊睡著（nap；OVERNIGHT 第 5 項，手機照這條搬）。窗台、芋圓、真正的預設，熟 .5；揉之前先把牠搬到窗台右邊盡頭（離布墊約 0.9R，窗台只有 3R 寬；看得出有沒有走回去）。
+  // 擋：a 一般捏 30 秒（按 1 秒、拉 1R、揉 4 秒輪三次再揉 4.5 秒，呼嚕累計不到 napPurr）放手，10 秒內不睡；b 揉夠（揉 35 秒、放手 2 秒、再揉 35 秒）放手，10 秒內睡著，睡著那一刻重心離最後摸的地方 0.5R 內、
+  // 沒走路線、放手後重心挪不到 0.3R、離布墊還在 0.5R 外（回到布墊是 0.3R 內），累計歸零；c 接著（睡了至少 3 秒）輕碰 0.13 秒、隔 1.5 秒、最多 3 下：每下都不嚇（沒有 startle、不縮），最後是慢慢醒（SLP.slow；很熟的前兩下只翻身，照 wakeSoft）。
+  // 對照：nap 0 同樣揉夠，10 秒內沒有在手邊睡著（照舊）。armedBefore：前面的項目有沒有讓 nap 動起來過（整份跑時要是 0，舊項目才不受影響）
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = { armedBefore: NAP.armN }, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    const fresh = (over, tr) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(76); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = tr || 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: 76, naps: 0 }); brainReset();
+      steps(60); moveHome(sillClampX(SILL.g.bx + R * 2) - globalC.xc, 0, DT); steps(30); };   // 搬離布墊：布墊是 SILL.g.bx（記性關掉喜歡的位置，memHomeX 就是它）
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const rub = sec => { const cx = globalC.xc, cy = globalC.yc; let q = sc(cx, cy - R * .25); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1);   // 跟 T33 同一個揉法（半徑 0.25R 的小圈，每秒半圈），圈心放在重心上
+      for (let k = 1; k <= sec * 60; k++) { const a = 2 * Math.PI * .5 * k / 60; q = sc(cx + R * .25 * Math.sin(a), cy - R * .25 * Math.cos(a)); ev('pointermove', 1, q[0], q[1]); steps(1); }
+      const lx = f.x, ly = f.y; ev('pointerup', 1, q[0], q[1]); return { lx, ly }; };
+    const mix = () => { for (let c = 0; c < 3; c++) { let q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(60); ev('pointerup', 1, q[0], q[1]); steps(30);
+        let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const ax = X[b] - R * .15, ay = Y[b]; q = sc(ax, ay); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1);
+        for (let k = 1; k <= 90; k++) { const tx = ax + R * Math.min(1, k / 60); q = [q[0] + (tx - f.x) * CAM.z, q[1] + (ay - f.y) * CAM.z]; ev('pointermove', 1, q[0], q[1]); steps(1); } ev('pointerup', 1, q[0], q[1]); steps(60);
+        rub(4); steps(30); }
+      return rub(4.5); };
+    const watch = p => { const x0 = globalC.xc, cum = +NAP.cum.toFixed(1); let napAt = -1, d = -1, cu = -1, cumAfter = -1, route = false, mv = 0;
+      for (let i = 0; i < 600; i++) { steps(1); if (SILL.route) route = true; mv = Math.max(mv, Math.abs(globalC.xc - x0)); if (napAt < 0 && SLP.on) { napAt = +((i + 1) / 60).toFixed(2); d = +(Math.hypot(globalC.xc - p.lx, globalC.yc - p.ly) / R).toFixed(2); cu = +(Math.abs(globalC.xc - SILL.g.bx) / R).toFixed(2); cumAfter = +NAP.cum.toFixed(2); } }
+      return { cum, napAt, d, cushion: cu, route, mv: +(mv / R).toFixed(2), cumAfter, asleep: SLP.on, naps: NAP.n, why: BRAIN.why, tr: +IMP.tr.toFixed(2) }; };
+    const taps = () => { const o = { asleep0: SLP.on, k0: +SLP.k.toFixed(2), taps: [] };
+      for (let n = 0; n < 3 && SLP.on; n++) { log.splice(0); const f0 = FLN.t0, q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); steps(8); ev('pointerup', 1, q[0], q[1]); steps(90); o.taps.push({ on: SLP.on, slow: SLP.slow, startle: log.some(x => x[0] === 'voice.startle'), flinch: FLN.t0 !== f0 }); }
+      o.woke = !SLP.on; o.slow = SLP.slow; return o; };
+    const enough = () => { rub(35); steps(120); return rub(35); };
+    try { fresh({}, .5); r.a = watch(mix());
+      fresh({}, .5); r.b = watch(enough()); if (r.b.napAt > 0) steps(Math.max(0, Math.round((3 - (10 - r.b.napAt)) * 60))); r.c = taps();
+      fresh({ nap: 0 }, .5); r.off = watch(enough()); r.err = ''; } catch (e) { r.err = String(e); }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0);
+    Object.assign(VIEW, view0); SLIME = sl0; BMEM.cell = M0.cell; BMEM.side = M0.side; BMEM.dirty = false; IMP.tr = I0.tr; IMP.w = I0.w; Object.assign(E4, E0); Object.assign(BRAIN, B0); GREET.st = ''; GREET.until = -9; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    r.ok = !r.err && r.a.napAt < 0 && r.a.cum < SP.napPurr && r.b.cum >= SP.napPurr && r.b.napAt > 0 && r.b.napAt <= 10 && r.b.d <= .5 && !r.b.route && r.b.mv < .3 && r.b.cushion > .5 && r.b.cumAfter < .5
+      && r.c.asleep0 && r.c.taps.length > 0 && r.c.taps.every(x => !x.startle && !x.flinch) && r.c.woke && r.c.slow && !(r.off.napAt > 0 && r.off.d <= .5);
+    res.T76_nap = r; res.PASS.nap = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     try { window.__SPLIT_PRE = PRE62; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
