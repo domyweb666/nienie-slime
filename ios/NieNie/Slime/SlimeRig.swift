@@ -5335,7 +5335,7 @@ final class SlimeRig {
     // The strand: the physical body stretches only to a stable length; the rest of the way to the finger is a chain of `gooN` nodes (the middle lags, so it
     // bends when swung), drawn into the skin's mask. The mask is blurred and thresholded anyway, so the strand joins the body round. Half-width: 0.26R at the
     // root, thinner in the middle with length but never under 0.12R (still above the threshold after the blur, it cannot vanish), 0.2R at the finger.
-    // The split: the finger farther than splitAt×R from the centre for 0.4 s, the middle pinches shut over 0.25 s; the body's end draws back, the finger's
+    // The split: the finger farther than 3.4R (strandSplitAt; from v2.62 splitAt is only the tear's) from the centre for 0.4 s, the middle pinches shut over 0.25 s; the body's end draws back, the finger's
     // end becomes the small blob (a point, a radius, a squash). The merge: left alone `rejoin` seconds it crawls back; touching the body (or dropped on it)
     // it is drawn in over 0.45 s. Both are in one mask, so a bridge forms between them by itself as they close.
     private struct Goo {
@@ -5348,6 +5348,7 @@ final class SlimeRig {
     }
     private var goo: [Goo] = []
     private let gooN = 14
+    private static let strandSplitAt = 3.4   // v2.51 the strand: the finger this many radii from the centre for 0.4 s, it pinches and parts
     // v2.62 the second slime (web B2). b2On is B2.on: remeshCheck reads it (no re-sample while there are two)
     private var b2On = false
     private struct TwinCluster { var idx: [Int]; var w: Double }
@@ -5383,6 +5384,7 @@ final class SlimeRig {
     private var twCl: [TwinCluster] = [], twGAng = 0.0, twGXC = 0.0, twGYC = 0.0   // its clusters (the last is the whole body) and the whole body's turn and centre
     private var twCellHead: [Int32] = [], twCellNext: [Int32] = []
     private var twEL: [Int] = [], twER: [Int] = [], twBlinkT = -9.0, twNextBlink = 0.0
+    private var twTouchT = 0.0   // v2.62 mergeWait: how long the two have been touching (reset when they part)
     private var twHide = false, twIdle = 0.0, twSc = 1.0, twQa = 1.0, twQp = 1.0, twAx = 1.0, twAy = 0.0, twStretch = 0.0
     private var twFg: [ObjectIdentifier: TwinFinger] = [:]
     private var twMg: TwinMerge?
@@ -5424,7 +5426,7 @@ final class SlimeRig {
             var bd = 1e18
             for i in bnd { let e = (X[i] - f.fx) * (X[i] - f.fx) + (Y[i] - f.fy) * (Y[i] - f.fy); if e < bd { bd = e; goo[q].ai = i } }   // let go, the root rides this boundary particle
             // the split: the finger far enough from the centre, long enough
-            let far: Bool = hypot(f.x - gc.xc, f.y - gc.yc) > params.splitAt * R
+            let far: Bool = hypot(f.x - gc.xc, f.y - gc.yc) > Self.strandSplitAt * R   // v2.62 fix: the strand keeps v2.51's 3.4R from the centre; splitAt is the tear's now (1.8 from where it took hold), shared it parted at 1.8R (web T63 g)
             if params.split >= 0.5 && !b2On && !splitUsed && far && goo[q].k > 0.9 { goo[q].over += dt } else { goo[q].over = max(0, goo[q].over - dt * 2) }
             goo[q].pinch = max(0, min(1, (goo[q].over - 0.4) / 0.25))
             if goo[q].pinch >= 1 { splitNow(q, f) }
@@ -5471,7 +5473,7 @@ final class SlimeRig {
     // it can be grabbed, pulled and pinched with two fingers. Area: it takes splitFrac; A's reference shape and target area shrink to the rest together (splitK, the particles stay),
     // merged k goes back to 1 and the points and the area are the original ones. At most two: while there are two neither tears. Whether it can tear again after a merge: splitAgain.
     // The merge: once pulled apart past 0.6R (or 0.6 s after it was let go), the outlines within mergeGap R (the bridge 0.5R more, the drop 0.25R, swallowing 0.1R, for the goo
-    // and the neck to have room) start mergeFx: 0 a bridge of goo, 1 squash and pop, 2 a drop and a ripple, 3 swallowed. Then it is gone and A is its old size.
+    // and the neck to have room) and touching for mergeWait seconds (parted, it starts again) start mergeFx: 0 a bridge of goo, 1 squash and pop, 2 a drop and a ripple, 3 swallowed. Then it is gone and A is its old size.
     // Left alone `rejoin` seconds it crawls back in pulses (v2.51 had that). It is drawn into A's mask, which is blurred and cut, so a round neck grows between them as they close.
     private static let mergeT: [Double] = [1.1, 0.85, 1.1, 1]   // seconds each merge plays (as the design board)
     private static let mergeReach: [Double] = [0.5, 0, 0.25, 0.1]
@@ -5588,7 +5590,7 @@ final class SlimeRig {
         twEL = near3(-rb * 0.34, -rb * 0.12); twER = near3(rb * 0.34, -rb * 0.12)
         twBlinkT = -9; twNextBlink = t + 1.5 + Double.random(in: 0..<1, using: &rng) * 3
         twCellNext = [Int32](repeating: -1, count: n)
-        b2On = true; twFg.removeAll(); twMg = nil; twHide = false; twIdle = t; twSc = 1; twQa = 1; twQp = 1; twAx = ux; twAy = uy; twStretch = 0
+        b2On = true; twFg.removeAll(); twMg = nil; twHide = false; twTouchT = 0; twIdle = t; twSc = 1; twQa = 1; twQp = 1; twAx = ux; twAy = uy; twStretch = 0
     }
 
     /// A touch landing here takes the second one: inside its outline, or within 0.25R of it outside A
@@ -5838,7 +5840,10 @@ final class SlimeRig {
             if gap > 0.6 { splitApart = true }
             let rest: Bool = twFg.isEmpty && t - twIdle > 0.6 && t - splitT0 > 0.8   // torn off still touching (common on a narrow screen): let go 0.6 s, it counts too
             let near: Double = (mat.mergeGap > 0 ? mat.mergeGap : 0.08) + Self.mergeReach[mergeFxIndex(mat)]
-            if (splitApart || rest) && gap < near { mergeStart(c, mat) }
+            if (splitApart || rest) && gap < near {   // v2.62 mergeWait (多米 11-26: touching, they merge a little later): touching this long first; parted, it starts again
+                twTouchT += dt
+                if twTouchT >= (mat.mergeWait >= 0 ? mat.mergeWait : 1.5) { twTouchT = 0; mergeStart(c, mat) }
+            } else { twTouchT = 0 }
         }
         if twMg != nil { mergeStep(dt) }
         splitKStep(dt)
@@ -5917,7 +5922,7 @@ final class SlimeRig {
 
     /// A rebuilt body starts as one again
     private func twinDrop() {
-        b2On = false; twMg = nil; twHide = false; twFg.removeAll(); splitPods.removeAll(); splitSq = nil
+        b2On = false; twMg = nil; twHide = false; twTouchT = 0; twFg.removeAll(); splitPods.removeAll(); splitSq = nil
         splitK = 1; splitWob = -9; splitUsed = false; splitMx = (1, 0, 0, 1); splitDet = 1; splitDmin = 1
     }
 
@@ -5937,6 +5942,7 @@ final class SlimeRig {
             let w: Double = 0.13 * exp(-u / 0.22) * cos(2 * Double.pi * 2.8 * u)
             a00 *= 1 - 0.7 * w; a01 *= 1 - 0.7 * w; a10 *= 1 + w; a11 *= 1 + w
         }
+        if a00 == 1 && a01 == 0 && a10 == 0 && a11 == 1 { splitMx = (1, 0, 0, 1); splitDet = 1; splitDmin = 1; return }   // not torn, not merging: exactly the identity. Turned there and back it is off by 1e-16 and substep multiplies by an almost-1 matrix every frame (web T42: a random play's jitter 19.9 against v2.61's 8.2)
         let ga: Double = clusters.isEmpty ? 0 : atan2(clusters[gi].sn, clusters[gi].cs), c: Double = cos(ga), s: Double = sin(ga)   // R(−ga)·M·R(ga)
         let b00: Double = a00 * c + a01 * s, b01: Double = -a00 * s + a01 * c, b10: Double = a10 * c + a11 * s, b11: Double = -a10 * s + a11 * c
         let n00: Double = c * b00 + s * b10, n01: Double = c * b01 + s * b11, n10: Double = -s * b00 + c * b10, n11: Double = -s * b01 + c * b11
