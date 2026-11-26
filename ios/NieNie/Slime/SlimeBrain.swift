@@ -6,9 +6,10 @@ import Foundation
 /// Five needs, each 0...1: z 睏, q 好奇, s 想被摸, f 怕 (the wariness, plus how scared it is right now), e 想動. When it is done resting, the strongest one
 /// decides what it does next; none above 0.35 and it rests on. Before sleeping it squints and sighs for 2 s, before coming to you it looks at you (前兆, brPre).
 /// Each waking and each sleep draws its own pace (作息亂數, brJit). Asleep, the 睏 runs out and it wakes by itself.
-/// Not in this slice (the phone treats them as off, the web's MDon(), MMon(), DRon() false): the mood (BRAIN.m, mS, ev, brainMood; slice 2, item 4),
-/// the remembered places (BMEM), what it does with the decorations (DR, drCat, memOffer). With those off the web's formulas lose their mood and memory terms,
-/// written below as 0 where the web has them, so the line-by-line check stays easy.
+/// v2.63 第二片「心情」(mood, moodHalf; the web's BRAIN.m, mS, ev, brainMood, BRM, BRMS, v2.42): m −1...1, a few minutes to change, back to 0.1 when nothing
+/// happens; mS the one the body shows (2 s behind). Only this opening: every reset starts it at 0.15, nothing is stored (not across days either).
+/// Not in these slices (the phone treats them as off, the web's MMon(), DRon() false): the remembered places (BMEM), what it does with the decorations
+/// (DR, drCat, memOffer). With those off the web's formulas lose their memory terms, written below as 0 where the web has them, so the line-by-line check stays easy.
 /// What touches the body (sleep, walk, look, go home) is in SlimeRig.swift (brainStep, brainRest, brainGo, brainGoHome); this file only keeps numbers.
 /// Foundation only (the Linux check builds it with the physics files).
 struct SlimeBrain {
@@ -32,6 +33,11 @@ struct SlimeBrain {
     /// v2.61 C7 (brJit): zAt how sleepy before it wants to sleep, jA how fast it gets sleepy this waking, jS how fast it sleeps it off this time;
     /// slp = asleep when they were last drawn; ojT = until when brainPick adds the opening's bigger random (OPENJ)
     var zAt = 0.5, jA = 1.0, jS = 1.0, slp = false, ojT = -9.0
+    /// v2.63 心情 (the web's B.m, B.mS): m the mood −1...1, mS what the posture shows. Read them through the rig's brainM, brainMS (0 while the mood is off)
+    var m = 0.15, mS = 0.15
+    /// The web's B.ev: what the mood saw last (MOOD.happyT, ECHO.joyUntil, IMP.w, MOOD.scare), so only a new one counts
+    struct Ev { var h = -9.0, j = -9.0, w = 0.0, sc = 0.0 }
+    var ev = Ev()
 
     /// The web's BRJ (v2.61 C7): a the waking's sleepiness rate ×a0...a1 (log-uniform), s the sleep's ×s0...s1 (squared), z the sleepiness it sleeps at,
     /// e how much of the wish to move a waking keeps at least, q the most curiosity a waking brings, lie the most seconds it lies there after waking
@@ -64,8 +70,10 @@ struct SlimeBrain {
         return Double(seed) / 4_294_967_296
     }
 
-    /// brainReset: every opening (the rig's setup) and every slime starts from the same place, however long you were away. The seed and the counts stay
-    mutating func reset(_ t: Double) {
+    /// brainReset: every opening (the rig's setup) and every slime starts from the same place, however long you were away. The seed and the counts stay.
+    /// `now`: what the mood sees at this moment (the web's ev:{h:MOOD.happyT,j:ECHO.joyUntil,w:IMP.w,sc:MOOD.scare})
+    mutating func reset(_ t: Double, ev now: Ev) {
+        m = 0.15; mS = 0.15; ev = now
         pre = nil; preT0 = 0
         z = 0.3; q = 0.3; s = 0; f = 0; e = 0.4
         want = ""; act = "休息"; why = ""; ex0 = 0; homeAt = t
@@ -82,6 +90,33 @@ struct SlimeBrain {
         e = 0.15 + 0.7 * Double.random(in: 0..<1, using: &g)
         s = 0.4 * Double.random(in: 0..<1, using: &g) * trust
         ojT = t + OpenJ.s
+    }
+
+    /// What brainMood reads this frame.
+    struct MoodIn {
+        var dt: Double
+        var on: Bool            // MDon(): BRon() && mat.mood >= .5
+        var purr: Double        // PURR
+        var happyT: Double      // MOOD.happyT
+        var joyUntil: Double    // ECHO.joyUntil
+        var wary: Double        // IMP.w
+        var scare: Double       // MOOD.scare
+        var half: Double        // mat.moodHalf
+    }
+    /// brainMood (v2.42): better with a purr (+0.05 a second), the happy moment +0.12, answering its rhythm +0.15 (a look about +0.005 is in the rig's lifeStep);
+    /// worse with the wariness (−0.12 for each 0.1 it rises), a scare (−0.04 for each 0.1), woken from sleep −0.1 (the rig's wake). Off: m and mS stay at 0.15
+    mutating func mood(_ i: MoodIn) {
+        if !i.on { m = 0.15; mS = 0.15; return }
+        if i.purr > 0.3 { m += 0.05 * i.dt }
+        if i.happyT != ev.h { if i.happyT > ev.h { m += 0.12 }; ev.h = i.happyT }
+        if i.joyUntil != ev.j { if i.joyUntil > ev.j { m += 0.15 }; ev.j = i.joyUntil }
+        if i.wary > ev.w { m -= 1.2 * (i.wary - ev.w) }
+        ev.w = i.wary
+        if i.scare > ev.sc { m -= 0.4 * (i.scare - ev.sc) }
+        ev.sc = i.scare
+        let half: Double = max(10, i.half != 0 ? i.half : 300)   // Math.max(10,mat.moodHalf||300)
+        m -= (m - 0.1) * (1 - pow(0.5, i.dt / half))
+        m = max(-1, min(1, m)); mS += (m - mS) * (1 - exp(-i.dt / 2))   // mS: 2 s to catch up, the posture does not jump
     }
 
     /// What brainStep reads from the body and the clock this frame.
@@ -104,14 +139,16 @@ struct SlimeBrain {
         var resting: Bool       // LIFE.st === 'rest'
         var jit: Bool           // mat.brJit >= .5
         var hidden: Bool        // document.hidden (the phone's rig does not step in the background: false)
+        var moodOn: Bool        // MDon() (v2.63 slice 2): BRM() is m, else 0
     }
 
     /// brainStep from `const cl=` to the four clamps: the needs rise and fall. Returns, on a waking with brJit on, how long it may lie there first
-    /// (the web's BRJ.lie*brnd()**2; the caller does LIFE.until = max(LIFE.until, t + 1.5 + that)). Mood off: mg and mb are 0 (the web's BRM() with MDon() false).
+    /// (the web's BRJ.lie*brnd()**2; the caller does LIFE.until = max(LIFE.until, t + 1.5 + that)). The caller runs mood() first (the web's brainMood(dt) at the top).
     mutating func step(_ i: In) -> Double? {
         func cl(_ v: Double) -> Double { max(0, min(1, v)) }
         let pz: Double = i.restMul != 0 ? i.restMul : 1   // mat.restMul||1
-        let mg = 0.0, mb = 0.0   // brainMood, brainMem: slice 2 and 3
+        let bm: Double = i.moodOn ? m : 0   // BRM() (brainMem: slice 3)
+        let mg: Double = max(0, bm), mb: Double = max(0, -bm)
         f = cl(max(i.wary, i.scare) + 0.35 * mb)   // 心情差：容易怕
         if i.engaged { pre = nil }
         var lie: Double? = nil
@@ -146,9 +183,10 @@ struct SlimeBrain {
     /// (look, go, sleep, greet; offer and cat draw nothing while they cannot be chosen). sleepOK here is the web's `!opening&&sleepOK()&&idleT>8`.
     /// One row of brainPick's table: the choice, its score, the need's name and value for `why`
     struct Score { let k: Choice; let v: Double; let why: String; let n: Double }
-    mutating func pick(t: Double, greetLook: Bool, canGo: Bool, sleepOK: Bool, e4OK: Bool) -> Choice {
+    /// brm: the web's BRM() (the rig's brainM: the mood, 0 while it is off)
+    mutating func pick(t: Double, greetLook: Bool, canGo: Bool, sleepOK: Bool, e4OK: Bool, brm: Double) -> Choice {
         let na: Double = greetLook && t < ojT ? OpenJ.n : 0.16
-        let calm = 1 - f, brm = 0.0   // BRM(): mood off
+        let calm = 1 - f
         var c: [Score] = [Score(k: .rest, v: K.rest, why: "都不高", n: 0)]
         do { let r = rnd(); c.append(Score(k: .look, v: q + 0.3 * f + (r - 0.5) * na, why: "好奇", n: q)) }
         if canGo { let r = rnd(); c.append(Score(k: .go, v: e * (1 - 0.5 * z) * (1 - 0.5 * f) * (1 + 0.3 * brm) + (r - 0.5) * na + 0, why: "想動", n: e)) }   // + 0: the scared cell (MMon), slice 3

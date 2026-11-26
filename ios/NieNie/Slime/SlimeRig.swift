@@ -405,6 +405,10 @@ final class SlimeRig {
     // v2.63 大腦第一片 (brain; web BRAIN, BRon): the five needs and what it chose (SlimeBrain.swift); the body side is under MARK v2.63 大腦 below
     private var brain = SlimeBrain()
     private var brOn: Bool { params.life2 >= 0.5 && params.brain >= 0.5 }
+    // v2.63 大腦第二片「心情」(mood; web MDon, BRM, BRMS): off (or the brain off) and every reader sees 0, as in slice 1
+    private var mdOn: Bool { brOn && params.mood >= 0.5 }
+    private var brainM: Double { mdOn ? brain.m : 0 }
+    private var brainMS: Double { mdOn ? brain.mS : 0 }
     /// What the brain is doing and why it chose the last thing (the web's 「牠在想什麼」 lines; no readout on the phone yet)
     var brainSay: (act: String, why: String) { (act: brain.act, why: brain.why) }
     /// v2.23 收集: switching slimes brings that one's impression back (this run only).
@@ -1083,8 +1087,8 @@ final class SlimeRig {
         slpWakeT = -9; voiceLast = -9; e4LastT = -99; impAskUntil = -9   // v2.61: the same clock; left in the old one the next slime kept its eyes wide, said nothing and did not come for as long as the last one had been out
         slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
         greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
-        brain.reset(t)   // v2.63 大腦 (web setup: brainReset()); startIntro draws the opening's needs (brainJit)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
+        brain.reset(t, ev: brainEv())   // v2.63 大腦 (web setup: brainReset()); startIntro draws the opening's needs (brainJit). After echoJoyUntil: the clock restarts here, an old one would hide the next 回你的節奏 from the mood
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         CAPG = 1; CAPGAP = 0   // v2.54
         pullStillT = 0   // v2.61
@@ -3176,6 +3180,7 @@ final class SlimeRig {
             let cp = max(0, moodC), hp = t >= happyT ? max(0, 1 - (t - happyT) / 2) : 0, cw = t < cowerUntil ? 1 : max(0, 1 - (t - cowerUntil) / 0.6)
             posX = (1 + 0.05 * cp) * (1 - 0.04 * hp) * (1 - 0.06 * cw); posY = (1 - 0.06 * cp) * (1 + 0.07 * hp) * (1 - 0.06 * cw)
             trm = R * 0.016 * min(1, moodStrain + moodScare) * (reduceMotion ? 0.5 : 1) * mat.tremble   // v2.48 tremble 0: no shiver when pulled or poked (it read as broken)
+            do { let ms = brainMS, mg = max(0, ms), mb = max(0, -ms); posX *= (1 - 0.02 * mg) * (1 + 0.04 * mb); posY *= (1 + 0.04 * mg) * (1 - 0.05 * mb) }   // v2.63 心情 (web v2.42 BRMS): in a good mood a little taller, in a bad one flatter
         }
         if shkT0 > 0 && t >= shkT0 && t < shkT0 + 0.6 { trm += R * 0.025 * shkAmp * exp(-(t - shkT0) / 0.2) * (reduceMotion ? 0.5 : 1) }   // v2.19 shaking off: the outline trembles too
         if iv3(mat.e3) { posX *= 1 - 0.02 * impShownTrust + 0.04 * impShownWary; posY *= 1 + 0.05 * impShownTrust - 0.06 * impShownWary }   // v2.22 E3: trusting rounder, taller; wary flatter
@@ -5041,7 +5046,7 @@ final class SlimeRig {
         let rm = reduceMotion
         if gaitClimb { return (1.15 * (rm ? 2 : 1), 0.32 * (rm ? 2 : 1), 0.36 * (rm ? 2 : 1), 0.34 * R * (rm ? 0.5 : 1), 0.15 * (rm ? 0.5 : 1)) }   // v2.30: climbing out of the bowl, slower and shorter strokes
         return ((gaitDash ? 0.62 : 1.1) * (rm ? 2 : 1), (gaitDash ? 0.15 : 0.25) * (rm ? 2 : 1), (gaitDash ? 0.24 : 0.35) * (rm ? 2 : 1),
-                (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1) * (1 + 0.3 * exLevel()), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))
+                (gaitDash ? 0.8 : 0.5) * R * (rm ? 0.5 : 1) * (1 + 0.3 * exLevel()) * (1 + 0.2 * brainM), (gaitDash ? 0.17 : 0.12) * (rm ? 0.5 : 1))   // v2.63 心情: a good mood, longer strides
     }
     /// v2.50 場景聲: one per stroke. Climbing (a climb route, lifting itself, on the frame) sounds like climbing, otherwise crawling on the sill.
     private func gaitSfx() {
@@ -5118,6 +5123,7 @@ final class SlimeRig {
             if lv(params.lifeFlinch) {
                 let pre: Double = (flPre == .rest ? 1.2 : (flPre == .go ? 0.8 : 1)) * flBoost
                 var a = params.flinchAmp * pre * (moodC > 0.3 ? 0.5 : 1) * flH * (reduceMotion ? 0.5 : 1) * (iv2(params.impC5) ? 1 + 1.2 * impWary : 1)   // v2.20 C5
+                a *= brainFlinch()   // v2.63 心情 (web: …*brainFlinch() on the same line)
                 if byTap {   // v2.61 D2: the more light taps, the smaller
                     a = min(a, flTc)
                     if flTapQ { tapCap(a) }
@@ -5190,6 +5196,7 @@ final class SlimeRig {
                 if lifeLooks > 0 {
                     lifeLooks -= 1
                     if brOn { brain.q = max(0, brain.q - 0.25) }   // v2.63 大腦: looking about uses up curiosity
+                    if mdOn { brain.m += 0.005 }   // v2.63 心情: a look about, a very little better (the web's; clamped in the next mood step)
                     let a = pickDir(), s = startSniff(a, params.podLen * (0.75 + 0.35 * Double.random(in: 0..<1, using: &rng)), 1.2, 0.5 + Double.random(in: 0..<1, using: &rng), 0.8)
                     lastDir = a; lifeUntil = t + s.T1 + s.T2 + s.T3 + 0.3 + Double.random(in: 0..<0.5, using: &rng)
                 } else if !lifeNoGo && canGo && (brOn ? brain.goAfterLook() : Double.random(in: 0..<1, using: &rng) < 0.65) {
@@ -6307,7 +6314,8 @@ final class SlimeRig {
     /// E2 a tap (under 0.25 s, not pulled): after the flinch it leans toward your finger and says "pu"; wary, it leans away.
     private func e2Release(_ f: Finger) {
         guard iv3(params.e2), !slpOn, t - f.tDown < 0.25, f.stretch < 0.3, !clusters.isEmpty else { return }   // v2.61 C1: !slpOn (and in impAsk)
-        leanT = t + 0.3; leanA = atan2(f.fy - clusters[gi].yc, f.fx - clusters[gi].xc); leanS = impWary > 0.4 ? -1 : 1; voice("poke", 0.7)
+        let bm = brainM   // v2.63 心情: in a bad mood it leans away, in a good one it wags too (a poke is play)
+        leanT = t + 0.3; leanA = atan2(f.fy - clusters[gi].yc, f.fx - clusters[gi].xc); leanS = impWary > 0.4 || bm < -0.35 ? -1 : 1; if bm > 0.35 { wagT = t + 0.35 }; voice("poke", 0.7)
     }
     /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free.
     private func e2Step(_ dt: Double) {
@@ -6457,7 +6465,8 @@ final class SlimeRig {
         }
         eyePoseStep(dt)   // v2.29: keep the face inside the body
         if let g, g.peak / R > 5 && bodyStretch(g) > 0.8 && (!roughOn || g.yank) { eyeSqU = t + 0.45 }   // a yank squeezes them shut (one finger drags it along, it rarely strains to flee)
-        let happy = purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil || t - snwLast < 1.2   // v2.31: shaken, ∩ like on a ride
+        let moodGlad: Bool = brainM > 0.45 && t < eyeUser && g == nil   // v2.63 心情: in a good mood, ∩ while it looks at you
+        let happy = moodGlad || purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil || t - snwLast < 1.2   // v2.31: shaken, ∩ like on a ride
         let squeeze = moodStrain > 0.4 || tickOn || (escOn && t - escT0 < 0.5) || t < eyeSqU
         let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
         if mode != eyeMode { eyeMode = mode; if mode == .open { eyeBlinkT = t - 0.08 } }   // back to open: opening from shut
@@ -6467,7 +6476,8 @@ final class SlimeRig {
         if snwK > 0.02 && g == nil { open = min(open, 1 - 0.85 * snwK * min(1, max(0, (snwCloud - 0.06) / 0.3))) }   // v2.31: eyes shut while the glitter settles, breathing with you; open again once clear
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
         if brain.pre == .sleep && brOn { open = min(open, 0.45) }   // v2.63 大腦 (web v2.42 前兆): about to sleep, the eyes half shut
-        if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
+        let moodLow: Bool = brainM < -0.35   // v2.63 心情: in a bad mood, wide (the web's DRon() term: no decorations on the phone)
+        if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) || moodLow { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
         if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
@@ -6635,7 +6645,7 @@ final class SlimeRig {
         guard slpOn else { return }
         slpSlow = slow; slpTapN = 0; slpTap = nil   // v2.61 C1
         slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1, using: &rng); eyeBlinkT = t
-        if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6 }
+        if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6; if mdOn { brain.m -= 0.1 } }   // v2.63 心情: woken with a start
         if !quiet { slpAskAt = t + (sharp ? 0.45 : 0.3) }
     }
     private func sleepStep(_ dt: Double) {
@@ -6748,17 +6758,19 @@ final class SlimeRig {
     }
 
     // MARK: v2.63 大腦第一片「需求和自己醒」(brain; .uiux/04-手感/極致優化規劃-暫定.md C7; web brainStep, brainRest, brainGo, brainGoHome, brainAtHome,
-    // brainSillFree, sleepOK, e4OK, brainJit, line by line). The numbers are in SlimeBrain.swift. Off on the phone, as the web with MDon(), MMon(), DRon() false:
-    // the mood, the remembered places (home is always the middle of the sill: memHomeX() → g.bx), the decorations (no 推東西, no candle).
+    // brainSillFree, sleepOK, e4OK, brainJit, line by line). The numbers are in SlimeBrain.swift. Off on the phone, as the web with MMon(), DRon() false:
+    // the remembered places (home is always the middle of the sill: memHomeX() → g.bx), the decorations (no 推東西, no candle).
     // brain 0: lifeStep's old dice and sleepTry's 40 s, and the sill's "back to the bowl after 25 s" (all untouched).
+    // v2.63 第二片「心情」(mood): brainMood here, read by mdOn / brainM / brainMS (posture, flinch, stride, poke, eyes, wake, pick, going home); mood 0 as slice 1.
 
     /// brainStep: the needs rise and fall every frame (before lifeStep); asleep and slept enough, it wakes by itself (v2.40: only a touch woke it).
     private func brainStep(_ dt: Double, _ engaged: Bool) {
         guard brOn else { return }
         let idleT = idleSec
+        brain.mood(SlimeBrain.MoodIn(dt: dt, on: mdOn, purr: purr, happyT: happyT, joyUntil: echoJoyUntil, wary: impWary, scare: moodScare, half: params.moodHalf))   // v2.63 brainMood (brainMem: slice 3)
         let lie = brain.step(SlimeBrain.In(dt: dt, idleT: idleT, restMul: params.restMul, e4Mul: params.e4Mul, night: sceneKind == 2, exLevel: exLevel(), exert: exert,
                                            comfort: moodC, wary: impWary, scare: moodScare, trust: impTrust, awakeT: params.brAwakeT, sleepT: params.brSleepT,
-                                           engaged: engaged, asleep: slpOn, resting: lifeSt == .rest, jit: params.brJit >= 0.5, hidden: false))
+                                           engaged: engaged, asleep: slpOn, resting: lifeSt == .rest, jit: params.brJit >= 0.5, hidden: false, moodOn: mdOn))
         if let lie { lifeUntil = max(lifeUntil, t + 1.5 + lie) }   // v2.61 C7: just woke, it may lie there a while first
         if slpOn && brain.z <= 0.02 && idleT > 3 { brain.selfWake += 1; wake(false, quiet: true) }   // slept enough: awake by itself (the web's wake(false,true))
         if brainAtHome() { brain.homeAt = t }
@@ -6834,7 +6846,8 @@ final class SlimeRig {
         let idleT = idleSec
         let opening: Bool = params.wakeSoft >= 0.5 && t >= slpOpenT && t - slpOpenT < (params.sleepAfter > 0 ? params.sleepAfter : 40)
         let canSleep: Bool = !opening && sleepOK() && idleT > 8
-        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK())
+        let bm = brainM   // read before the call: brainM reads brain, pick mutates it
+        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK(), brm: bm)
         let away: Bool = sillOn && !brainAtHome(), tel: Bool = params.brPre >= 0.5
         switch w {
         case .sleep:
@@ -6849,7 +6862,8 @@ final class SlimeRig {
         case .go:
             brainGo(nil)
         case .rest:
-            if away && t - brain.homeAt > 20 && brainGoHome() { brain.why = "五個都不高，走回布墊" }   // BRM() < −0.3 (8 s): slice 2
+            let low: Bool = brainM < -0.3   // v2.63 心情: in a bad mood it goes back after 8 s away, not 20
+            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : "五個都不高，走回布墊" }
             else { lifeUntil = t + restDur() }
         }
     }
@@ -6859,7 +6873,13 @@ final class SlimeRig {
         brain.jit(t, trust: impTrust, using: &rng)
     }
     /// The web's impBack: back after 10 min or more, the needs start again from an opening (SlimeController, before the impression is reset)
-    func brainBack() { brain.reset(t); brainJit() }
+    func brainBack() { brain.reset(t, ev: brainEv()); brainJit() }
+    /// What the mood sees now (the web's brainReset ev, memSync)
+    private func brainEv() -> SlimeBrain.Ev { SlimeBrain.Ev(h: happyT, j: echoJoyUntil, w: impWary, sc: moodScare) }
+    /// The web's memSync (chooseSlime, after the impression is set): the other slime's wariness, happy moment, scare are not "just happened" (SlimeController.select)
+    func brainSync() { brain.ev = brainEv() }
+    /// brainFlinch (v2.42): in a bad mood a touch makes it flinch bigger, in a good one smaller
+    private func brainFlinch() -> Double { let m = brainM; return 1 + 0.6 * max(0, -m) - 0.3 * max(0, m) }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
     private func twitch(_ L: Double) {

@@ -105,6 +105,7 @@ struct FeelBatch: Equatable {
         Key(id: "eyeTrue", key: \FeelParams.eyeTrue),
         Key(id: "snd61", key: \FeelParams.snd61),
         Key(id: "brain", key: \FeelParams.brain),   // v2.63 (not in the web's KEYS61: the web's tiers leave it, the phone's 「build 158」 turns it off, as build 158 had no brain)
+        Key(id: "mood", key: \FeelParams.mood),   // v2.63 slice 2, the same (build 158 had no mood)
     ]
     static let pull: [String] = ["pullHold", "pullWhole", "pullSoft"]
     static func pullName(_ id: String) -> String {
@@ -136,6 +137,7 @@ struct FeelBatch: Equatable {
     static let b63: [Item] = [
         Item(id: "greetLook", name: "打開、切回來先看你"),
         Item(id: "brain", name: "大腦：自己走、睡、醒"),
+        Item(id: "mood", name: "心情：幾分鐘慢慢變好變差"),
     ]
     enum Tier: String, CaseIterable, Identifiable {
         case b158, fix, pull

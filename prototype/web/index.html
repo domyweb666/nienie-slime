@@ -237,7 +237,7 @@ const KEYS61=['skinU','pullHold','pullWhole','pullSoft','rough','tapSoft','petSl
 // 網址 ?pull=：1 三顆都開、0 三顆都關、hold,whole,soft 任選。有寫就鎖住，換隻、換材質、換存檔都照網址（開兩個分頁比的時候才不會跑掉）
 const PULLQ=(()=>{const q=new URLSearchParams(location.search).get('pull');if(q==null)return null;const w=q.split(',').map(x=>x.trim()),on=k=>q.trim()==='1'||w.includes(k)?1:0;return{pullHold:on('hold'),pullWhole:on('whole'),pullSoft:on('soft')}})();
 // v2.63 這一批的開關（調節台「這一批（v2.63）」那一塊）：[名字, 按鈕上的字]。換隻、換材質跟 KEYS61 一樣留著現在的（matKeep），不進存檔。greetLook 也在 KEYS61（三檔照樣管它），這裡只是多一個切的地方
-const KEYS63=[['greetLook','打開、切回來先看你'],['brain','大腦：自己走、睡、醒（手機 v2.63 起有）']];   // brain：網頁 v2.41 就有，行為沒改；手機 v2.63 起有（SlimeBrain.swift）
+const KEYS63=[['greetLook','打開、切回來先看你'],['brain','大腦：自己走、睡、醒（手機 v2.63 起有）'],['mood','心情：幾分鐘慢慢變好變差（手機 v2.63 起有）']];   // brain：網頁 v2.41 就有，行為沒改；mood：網頁 v2.42 就有，行為沒改；手機 v2.63 起都有（SlimeBrain.swift）
 function matKeep(m){const o={};if(m)for(const k of [...KEYS61,...KEYS63.map(q=>q[0])])if(typeof m[k]==='number')o[k]=m[k];return PULLQ?{...o,...PULLQ}:o}
 const F=[
   ['flow','流：放著會慢慢往下塌 v2.52','（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影',0,.5,.01],

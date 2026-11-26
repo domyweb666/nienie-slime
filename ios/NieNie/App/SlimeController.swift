@@ -410,6 +410,7 @@ final class SlimeController: ObservableObject {
         if let imp = impressions[k] { rig.setImpression(trust: imp.trust, wary: imp.wary) }
         else if current.trKeep >= 0.5, let tr = savedTrust[k] { rig.setImpression(trust: tr, wary: 0) }   // v2.34
         else { rig.resetImpression() }
+        rig.brainSync()   // v2.63 心情 (web chooseSlime: …IMP set; memSync(); then startIntro)
         rig.startIntro()
         sound.press(intensity: 0.5)
     }
