@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.62（11-26）：加 T74（扯斷成兩隻、碰到合回，測試在 splittest.js，最後跑）
    v2.61（11-25）：加 T73（慢拉往裡穿過去時跟手照舊變少，最後跑，約 30 秒）
    v2.61（11-25）：加 T72（補守預設開著、原本沒人守的開關，最後跑，約 30 秒）；T71 的換隻記憶原本恆真，改成真的開著大腦再看
    v2.61（11-25）：加 T71（W3：睡醒、手指放旁邊、打開先看你、眼睛、換隻記憶）
@@ -1895,6 +1896,11 @@
     res.T73_slowPull = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
     res.PASS.slowPull = r.err === '' && r.on.held && r.on.strain === 0 && !r.on.esc && r.off.strain > .5 && r.on.home.every((v, i) => Math.abs(v - r.off.home[i]) <= .1) && r.on.follow.every((v, i) => Math.abs(v - r.off.follow[i]) <= .03) && r.old.home.reduce((p, q, i) => p + q - r.on.home[i], 0) >= 1 && r.on.rel === 0 && r.on.hold <= r.off.hold * 1.6 + 8;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE54）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
+  { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
+    try { window.__SPLIT_PRE = PRE54; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
+    o.r.sec = Math.round((performance.now() - T0) / 1000); res.T74_split = o.r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    res.PASS.split = !!o.pass; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
   Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); Object.assign(PRESETS, PRE54); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去
