@@ -3,6 +3,8 @@
 > 工作樹 `E:/捏捏史萊姆/_wt-分裂`，從 `feel-3x-panel-v1` 的 `33e3b3f` 開。**沒推、沒發 TestFlight。** 預覽伺服器 launch 名 `split-web`（8797，網址 `http://127.0.0.1:8797/index.html`）。
 > 另一個對話同時在 `_wt`（feel-3x-panel-v1）改湯圓餡和不透明皮的邊緣；這條沒碰那幾處。
 
+> **11-26 多米說推：已推 `split-merge-v1`（`32f759e`），手動跑 ios.yml（testflight=false）run 45745779522，Swift `BUILD SUCCEEDED`，沒有程式碼警告。沒發 TestFlight，沒在 iPhone 上跑過。**
+
 ## ✅ 完成
 - 設計稿（四版合併動畫，可播放、可慢放比較）：https://claude.ai/artifact/LgGRtiXohwX6By5wq3oTDq 。另外 quickstart 建了一個沒用到的空 Design 畫布 https://claude.ai/artifact/NJbPkKLRgHKgaoyZnSBmAq ，要不要刪問多米。
 - 四版合併動畫怎麼切：
