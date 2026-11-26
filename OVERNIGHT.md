@@ -25,7 +25,7 @@
 
 - [x] 1. 合併後的起點驗一次：網頁整份自測 3 次全過（也補 v2.62 少跑的 2 次）。完成標準：3 次都 74／74。
 - [x] 2. C4 手機（`2859c85`，CI run 45748592614 BUILD SUCCEEDED）：打開、從背景或鎖屏切回來，牠先轉過來看你、眨一下，睡著就慢慢醒（照網頁 `greetLook`）。完成標準：Swift 接上 `greetLook`、逐行對過網頁、CI 編過。
-- [ ] 3. 手機大腦第一片「需求和自己醒」：五個需求、放著自己走探睡醒、作息有亂數（照網頁 brain、brJit）。開關 `brain`，預設開。完成標準：Swift 逐行對網頁、Linux 替身能編的檔只用 Foundation、CI 編過；手機的「40 秒沒碰就睡、不會自己醒」在 brain 開時不再發生（讀程式確認），brain 0 跟現在一樣。
+- [x] 3. 手機大腦第一片（`dadb9c5`）「需求和自己醒」：五個需求、放著自己走探睡醒、作息有亂數（照網頁 brain、brJit）。開關 `brain`，預設開。完成標準：Swift 逐行對網頁、Linux 替身能編的檔只用 Foundation、CI 編過；手機的「40 秒沒碰就睡、不會自己醒」在 brain 開時不再發生（讀程式確認），brain 0 跟現在一樣。
 - [ ] 4. 手機大腦第二片「心情」：心情值、心情影響姿勢和反應（照網頁 mood、moodHalf）。開關 `mood`，預設開。完成標準：同上，CI 編過。
 - [ ] 5. C9 網頁：揉夠了放手，牠在你最後摸的地方趴下睡著（呼嚕累計 60 秒、手指離開 6 秒），不走回布墊；輕碰慢慢醒。開關 `nap`，預設開。完成標準：新 selftest 項目驗三件事（一般捏 30 秒不睡；揉夠那次 10 秒內睡、離最後摸的地方 0.5R 內；輕碰不嚇醒），相關舊項目不退。
 - [ ] 6. C9 搬手機。完成標準：逐行對網頁、CI 編過。
@@ -55,3 +55,4 @@
 - 11:23 推 `overnight-20261126-1110`（`fb9ade6`），手動跑 ios.yml testflight=false，run 45748592614，等結果。
 - 11:45 第 1 項過：快照 `4800f9a` 整份自測同時跑 3 次，3 次都 74／74，1386 秒。v2.62 規定的 3 次補齊。
 - 11:47 CI run 45748592614（`fb9ade6`，含第 2 項）BUILD SUCCEEDED，只有舊的 `SlimeView.swift:917` `paths` 可改 let 警告，沒上傳 TestFlight。
+- 12:05 第 3 項做完（`dadb9c5`）：新檔 `ios/NieNie/Slime/SlimeBrain.swift`（只用 Foundation，check.sh 兩個清單都加了），`SlimeRig` 約 6750 行起接 brainStep／Rest／Go／GoHome、sleepOK、e4OK、brainJit、brainBack；`brain brPre brAwakeT brSleepT` 登記，`brJit` 生效。心情、記地方、擺飾在手機一律當關。brain 0 讀程式確認跟 `2859c85` 一樣（rng 抽的次數順序不變）。網頁只改 KEYS63 一行，T71、T72、T75 各 3 次跟改前逐筆同。可疑編譯處：`SlimeBrain.swift:78` 泛型 jit、`SlimeRig.swift:6859` 同時借 brain 和 &rng、`5195` 條件裡呼叫 mutating、`e4Step` guard 三元式。推上去跑 CI，開始第 4 項。
