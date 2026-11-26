@@ -336,8 +336,13 @@ struct FeelParams: Equatable, Codable {
     var wakeSoft: Double = 1          // C1 輕碰慢慢醒: 1 = a light touch wakes it slowly, and just opened it stays up 40 s; 0 = as before (startled awake by any touch, asleep at 30 s)
     var nearFast: Double = 1          // C2 聽節奏時照樣靠過來: 1 = it comes to the finger beside it while it listens for a rhythm too; 0 = as before
     var greetLook: Double = 1         // C4 打開先看你: 1 = opened, or back from the background / lock screen, it looks at you first (asleep: wakes slowly, no sound); 0 = as before. Wired in v2.63 (SlimeRig greetArm, greetStep)
-    var brJit: Double = 1             // C7 作息亂數: 1 = on; 0 = as before. Web only: 手機沒有大腦，不接
-    var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Web only: 手機沒有大腦，不接
+    var brJit: Double = 1             // C7 作息亂數: 1 = each waking and each sleep draws its own pace, an opening starts the needs at random; 0 = as before. Read since v2.63 (SlimeBrain)
+    var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Web only: the phone has no decorations' physics, 不接
+    // v2.63 大腦第一片 (web brain v2.41, brPre v2.42, brAwakeT, brSleepT; the same keys and defaults for all three materials). SlimeBrain.swift, SlimeRig MARK v2.63 大腦
+    var brain: Double = 1             // 大腦: 1 = five needs rise and fall, it does what the strongest wants; tired after a run, wakes by itself, comes to you when it wants to be stroked; 0 = as before (dice, asleep 40 s untouched, never wakes by itself)
+    var brPre: Double = 1             // 換事情前的前兆: 1 = squints and sighs 2 s before sleeping, looks at you before coming; 0 = straight away
+    var brAwakeT: Double = 300        // 醒著多久會睏 (s): sleepiness from 0 to full untouched; twice as fast after 20 s untouched, 1.5× at night
+    var brSleepT: Double = 90         // 睡多久睡飽 (s): sleepiness from full to 0 asleep; slept off, it wakes by itself
     var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
     var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
@@ -625,7 +630,7 @@ struct TuneField: Identifiable {
     var section = "手感"
     var id: String { name }
 
-    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61"]
+    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61", "這一批 v2.63"]
 
     static let all: [TuneField] = [
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
@@ -897,7 +902,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
         TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),
 
-        // v2.61 第一批 (the same words as the web). brJit, bumpSoft are not here: the phone does not read them yet (greetLook is read since v2.63)
+        // v2.61 第一批 (the same words as the web). bumpSoft is not here: the phone does not read it (greetLook and brJit are read since v2.63)
         TuneField(key: \.skinU, name: "皮：不會斷的畫法 v2.61", hint: "1：先畫滿身體裡每一個小三角形，細的地方補一條保底線，拉遠、打結時皮比較不會斷開。0 回 v2.60（照外框畫）。只在果凍皮有作用", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.pullHold, name: "拉的 A3：拉長停住就定住 v2.61", hint: "1：拉開 0.6R 以上，手指停下來 0.25 秒，身體就不再自己變長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.pullWhole, name: "拉的 A4：往裡拉，整隻先走 v2.61", hint: "1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
@@ -910,6 +915,13 @@ struct TuneField: Identifiable {
         TuneField(key: \.nearFast, name: "聽節奏時也會靠過來 v2.61", hint: "1：在聽你打節奏時，手指放旁邊照樣靠過來。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.eyeTrue, name: "眼睛看真的手指 v2.61", hint: "1：眼睛跟著手指現在的位置。0 回 v2.60（慢四分之一秒）", range: 0...1, step: 1, section: "這一批 v2.61"),
         TuneField(key: \.snd61, name: "新的揉聲 v2.61", hint: "1：揉的聲音換新的循環，抓著時雨聲變小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.brJit, name: "作息每次不一樣 v2.61", hint: "1：醒多久、睡多久每次有點不同。0 回 v2.60（手機要大腦開著才有作用）", range: 0...1, step: 1, section: "這一批 v2.61"),
+
+        // v2.63 (the web's words for brain, brPre, brAwakeT, brSleepT; the phone has the brain from v2.63)
+        TuneField(key: \.brain, name: "大腦 v2.63", hint: "1：五個需求（睏、好奇、想被摸、怕、想動）一直在漲落，牠每做完一件事就做最強那個需求的事；跑完比較快睡、睡飽自己醒、想被摸了才來找你。0 回改之前（擲骰子決定、40 秒沒人碰就睡、睡了不會自己醒）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.brPre, name: "換事情前的前兆", hint: "1：要睡之前先瞇眼、嘆一口氣，約 2 秒後才睡；要來找你之前先看你一眼。0 決定了馬上做", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.brAwakeT, name: "醒著多久會睏（秒）", hint: "沒人碰、沒跑的情況下，睏從 0 漲到滿要幾秒；20 秒沒人碰以後漲兩倍快，夜晚背景 1.5 倍", range: 60...900, step: 10, section: "這一批 v2.63"),
+        TuneField(key: \.brSleepT, name: "睡多久睡飽（秒）", hint: "睏從滿退到 0 要睡幾秒；睡飽牠自己醒", range: 20...300, step: 5, section: "這一批 v2.63"),
     ]
 }
 

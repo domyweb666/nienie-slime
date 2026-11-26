@@ -402,6 +402,11 @@ final class SlimeRig {
     // (from the background, the lock screen, Control Center: waits back s); at = when it turns to you (opening: −9 until it lands); t0 = when armed;
     // until = it looks at you till then; air = it was in the air (on the sill) since armed
     private var greetWait = false, greetOpen = false, greetAt = -9.0, greetT0 = -9.0, greetUntil = -9.0, greetAir = false
+    // v2.63 大腦第一片 (brain; web BRAIN, BRon): the five needs and what it chose (SlimeBrain.swift); the body side is under MARK v2.63 大腦 below
+    private var brain = SlimeBrain()
+    private var brOn: Bool { params.life2 >= 0.5 && params.brain >= 0.5 }
+    /// What the brain is doing and why it chose the last thing (the web's 「牠在想什麼」 lines; no readout on the phone yet)
+    var brainSay: (act: String, why: String) { (act: brain.act, why: brain.why) }
     /// v2.23 收集: switching slimes brings that one's impression back (this run only).
     func setImpression(trust: Double, wary: Double) { impTrust = trust; impWary = wary; impShownTrust = trust; impShownWary = wary; impHas = false; impAskUntil = -9 }
     /// v2.22 E3: the body colour leans with the impression.
@@ -412,7 +417,7 @@ final class SlimeRig {
     /// hop comes closer and bigger, the last lands at home. Reduce Motion: no travel, one small hop at home.
     func startIntro() {
         slpOpenT = t   // v2.61 C1: opened, or another one swims in
-        defer { greetWait = false; greetArm(open: true) }   // v2.63 C4 (web chooseSlime: startIntro(); … GREET.st=''; greetArm(true)), after the intro has started, whether or not there is one
+        defer { greetWait = false; brainJit(); greetArm(open: true) }   // v2.63 C4 (web chooseSlime: startIntro(); … GREET.st=''; brainJit(); greetArm(true)), after the intro has started, whether or not there is one
         guard effParams.intro >= 0.5, N > 0 else { return }
         if effParams.introSwim >= 0.5 && params.life2 >= 0.5 && lv(params.lifeGait) { swimIntro(1); return }   // v2.23 開場游過來
         var y1 = -1e9
@@ -1078,6 +1083,7 @@ final class SlimeRig {
         slpWakeT = -9; voiceLast = -9; e4LastT = -99; impAskUntil = -9   // v2.61: the same clock; left in the old one the next slime kept its eyes wide, said nothing and did not come for as long as the last one had been out
         slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
         greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
+        brain.reset(t)   // v2.63 大腦 (web setup: brainReset()); startIntro draws the opening's needs (brainJit)
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         SX2 = Array(repeating: 0, count: N); SY2 = Array(repeating: 0, count: N)
         CAPG = 1; CAPGAP = 0   // v2.54
@@ -2997,6 +3003,10 @@ final class SlimeRig {
         e1Step(); e2Step(dt)   // v2.22
         sleepStep(dt); echoStep(dt)   // v2.23 B2, C6
         greetStep()   // v2.63 C4 (web: right after sleepStep, echoStep)
+        if brOn {   // v2.63 大腦 (web: if(SILL.on)sillStepPre(); brainStep(dt,engaged); before lifeStep). sillStepPre again before the substeps, as before: it only reads the fingers
+            if sillOn { sillStepPre() }
+            brainStep(dt, engaged)
+        }
         if mat.life2 >= 0.5 {
             lifeStep(dt, idle, engaged)   // v2.19: rest / look / go / arrive + the pulse gait + flinch, shake-off + sniffing (with lifeRest and lifeGait off, v2.18's walk-and-pause)
         } else if L > 0.5 && mat.wander > 0 && !introOn && !escOn && t > cowerUntil {
@@ -4245,7 +4255,7 @@ final class SlimeRig {
         }
         // left alone a while out of the bowl, it goes back
         if !sillGrab && !sillInBowl && !sillAir && sillHop == nil && sillRoute == nil && !gaitOn && !escOn && fingers.isEmpty && lifeSt == .rest && sillStickT < 0
-            && t - lastTouch > 25 && t - sillLastHome > 10 && params.envRoam > 0 {
+            && t - lastTouch > 25 && t - sillLastHome > 10 && params.envRoam > 0 && !brOn {   // v2.63 大腦: it decides itself when to go back (brainRest)
             sillLastHome = t
             if let r = rtHome() { routeStart(r) }
         }
@@ -5158,7 +5168,7 @@ final class SlimeRig {
         }
         let hear: Bool = echoSt == 1 && params.nearFast >= 0.5   // v2.61 C2 (nearFast): still listening (the finger may be there to stay): it looks at the finger beside it and comes over all the same; only answering holds it
         if echoSt != 0 && !hear { return }   // v2.23 C6: listening to your rhythm or answering it: it stays put
-        if lifeSt == .rest && sleepTry() { return }
+        if lifeSt == .rest && !brOn && sleepTry() { return }   // v2.63 大腦 on: brainRest decides whether it sleeps
         let lured = lureStep(dt)   // v2.20 C1 C2: a finger resting beside it takes over
         if hear && !lured { return }   // v2.61 C2: between two taps it does not wander off by itself
         let e4 = !lured && e4Step(dt)   // v2.22 E4: trusting and left alone a while, it comes to the front to say hello
@@ -5172,16 +5182,18 @@ final class SlimeRig {
         }
         if !lured && !e4 {
             if lifeSt == .rest && t >= lifeUntil {
-                if restOn && (Double.random(in: 0..<1, using: &rng) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1, using: &rng) < 0.45 + 0.35 * exLevel() ? 2 : 1; lifeNoGo = false; lifeUntil = t }
+                if brOn { brainRest(canGo) }   // v2.63 大腦
+                else if restOn && (Double.random(in: 0..<1, using: &rng) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1, using: &rng) < 0.45 + 0.35 * exLevel() ? 2 : 1; lifeNoGo = false; lifeUntil = t }
                 else if canGo { goStart(nil) } else { lifeUntil = t + restDur() }
             }
             if lifeSt == .look && t >= lifeUntil {
                 if lifeLooks > 0 {
                     lifeLooks -= 1
+                    if brOn { brain.q = max(0, brain.q - 0.25) }   // v2.63 大腦: looking about uses up curiosity
                     let a = pickDir(), s = startSniff(a, params.podLen * (0.75 + 0.35 * Double.random(in: 0..<1, using: &rng)), 1.2, 0.5 + Double.random(in: 0..<1, using: &rng), 0.8)
                     lastDir = a; lifeUntil = t + s.T1 + s.T2 + s.T3 + 0.3 + Double.random(in: 0..<0.5, using: &rng)
-                } else if !lifeNoGo && canGo && Double.random(in: 0..<1, using: &rng) < 0.65 {
-                    goStart(lastDir + Double.random(in: -0.175..<0.175, using: &rng))
+                } else if !lifeNoGo && canGo && (brOn ? brain.goAfterLook() : Double.random(in: 0..<1, using: &rng) < 0.65) {
+                    if brOn { brainGo(lastDir) } else { goStart(lastDir + Double.random(in: -0.175..<0.175, using: &rng)) }   // v2.63 大腦
                 } else {
                     lifeSt = .rest; lifeUntil = t + restDur()
                 }
@@ -6356,9 +6368,10 @@ final class SlimeRig {
         guard iv3(params.e4), !clusters.isEmpty else { e4On = false; return false }
         if !e4On {
             if e4Wait < 0 { e4Wait = (10 + Double.random(in: 0..<10, using: &rng)) * params.e4Mul }
-            guard impTrust > 0.5, Double(e4Count) < 3 + (2 * exLevel()).rounded(), t - lastTouch > e4Wait, t - e4LastT > 40, fingers.isEmpty, lifeSt == .rest else { return false }
+            guard impTrust > 0.5, Double(e4Count) < 3 + (2 * exLevel()).rounded(), (brOn ? brain.want == "greet" : t - lastTouch > e4Wait), t - e4LastT > 40, fingers.isEmpty, lifeSt == .rest else { return false }   // v2.63 大腦: it comes when it wants to be stroked (brainPick), not on a timer
             let q = toWorld(W / 2, viewV.y + H * 0.12), dx = q.x - clusters[gi].xc, dy = q.y - clusters[gi].yc, d = hypot(dx, dy)
             e4On = true; e4Wave = false; e4T0 = t
+            if brOn { brain.want = ""; brain.s = max(0, brain.s - 0.6) }
             if d > R * 0.6 { gaitTo(q.x, q.y, dash: d > R * 4) } else { e4Wave = true; wagT = t; voice("hello") }
             return true
         }
@@ -6453,6 +6466,7 @@ final class SlimeRig {
         if let g { open = min(open, t - g.tDown < 0.3 ? 0.55 : 0.8) }
         if snwK > 0.02 && g == nil { open = min(open, 1 - 0.85 * snwK * min(1, max(0, (snwCloud - 0.06) / 0.3))) }   // v2.31: eyes shut while the glitter settles, breathing with you; open again once clear
         do { let u = t - flT0; if flAmp > 0.02 && u >= 0 && u < 0.22 && echoSt != 2 { open = min(open, 0.3) } }
+        if brain.pre == .sleep && brOn { open = min(open, 0.45) }   // v2.63 大腦 (web v2.42 前兆): about to sleep, the eyes half shut
         if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
         if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
@@ -6732,6 +6746,120 @@ final class SlimeRig {
         greetWait = false; greetUntil = t + GreetSet.look; eyeUser = max(eyeUser, greetUntil); eyeBlinkT = t + GreetSet.blink; eyeNextBlink = max(eyeNextBlink, t + GreetSet.blink + 1.2)
         if lifeSt == .rest && !slpOn { lifeUntil = max(lifeUntil, greetUntil + 0.1 + 0.6 * Double.random(in: 0..<1, using: &rng)) }
     }
+
+    // MARK: v2.63 大腦第一片「需求和自己醒」(brain; .uiux/04-手感/極致優化規劃-暫定.md C7; web brainStep, brainRest, brainGo, brainGoHome, brainAtHome,
+    // brainSillFree, sleepOK, e4OK, brainJit, line by line). The numbers are in SlimeBrain.swift. Off on the phone, as the web with MDon(), MMon(), DRon() false:
+    // the mood, the remembered places (home is always the middle of the sill: memHomeX() → g.bx), the decorations (no 推東西, no candle).
+    // brain 0: lifeStep's old dice and sleepTry's 40 s, and the sill's "back to the bowl after 25 s" (all untouched).
+
+    /// brainStep: the needs rise and fall every frame (before lifeStep); asleep and slept enough, it wakes by itself (v2.40: only a touch woke it).
+    private func brainStep(_ dt: Double, _ engaged: Bool) {
+        guard brOn else { return }
+        let idleT = idleSec
+        let lie = brain.step(SlimeBrain.In(dt: dt, idleT: idleT, restMul: params.restMul, e4Mul: params.e4Mul, night: sceneKind == 2, exLevel: exLevel(), exert: exert,
+                                           comfort: moodC, wary: impWary, scare: moodScare, trust: impTrust, awakeT: params.brAwakeT, sleepT: params.brSleepT,
+                                           engaged: engaged, asleep: slpOn, resting: lifeSt == .rest, jit: params.brJit >= 0.5, hidden: false))
+        if let lie { lifeUntil = max(lifeUntil, t + 1.5 + lie) }   // v2.61 C7: just woke, it may lie there a while first
+        if slpOn && brain.z <= 0.02 && idleT > 3 { brain.selfWake += 1; wake(false, quiet: true) }   // slept enough: awake by itself (the web's wake(false,true))
+        if brainAtHome() { brain.homeAt = t }
+        // what it is doing (the web's B.act; DR.push 推東西 is not on the phone)
+        if slpOn { brain.act = "睡覺" }
+        else if brain.pre == .sleep { brain.act = "想睡了" }
+        else if brain.pre == .greet || brain.want == "greet" { brain.act = "看著你" }
+        else if escOn { brain.act = "逃跑" }
+        else if engaged { brain.act = "被你碰著" }
+        else if e4On { brain.act = "來找你" }
+        else if lureOn { brain.act = "注意你的手指" }
+        else if echoSt != 0 { brain.act = "回你的節奏" }
+        else if lifeSt == .look { brain.act = "張望" }
+        else if lifeSt == .go || lifeSt == .arrive || gaitOn || (sillOn && sillRoute != nil) { brain.act = "走" }
+        else { brain.act = "休息" }
+    }
+    /// sleepOK (the web's; SNW.loose: the phone's glitter has settle mode only, nothing loose)
+    private func sleepOK() -> Bool {
+        iv3(params.sleep) && !slpOn && lifeSt == .rest && fingers.isEmpty && !e4On && echoSt == 0 && !swimOn && !(snwCloud > 0.03)
+    }
+    /// e4OK: could it go to the front and say hello now
+    private func e4OK() -> Bool {
+        iv3(params.e4) && !e4On && impTrust > 0.5 && Double(e4Count) < 3 + (2 * exLevel()).rounded() && t - e4LastT > 40 && fingers.isEmpty && t - lastTouch > 6
+    }
+    /// brainAtHome: off the sill it is always home; on it, home is the middle of the sill (the web's memHomeX() with MMon and the candle off)
+    private func brainAtHome() -> Bool {
+        guard sillOn, let g = sillG, !clusters.isEmpty else { return true }
+        return sillPlane == .room && abs(clusters[gi].xc - g.bx) < R * 0.3
+    }
+    private func brainSillFree() -> Bool { !sillGrab && !sillAir && sillHop == nil && sillRoute == nil && sillStickT < 0 && !escOn }
+    /// brainGoHome: back to the middle of the sill (into the bowl when there is one). true = it set off
+    private func brainGoHome() -> Bool {
+        guard brainSillFree(), let g = sillG else { return false }
+        let hx = g.bx   // memHomeX()
+        if sillPlane == .room && !sillInBowl && abs(hx - g.bx) > 1 { gaitTo(hx, homeY, dash: false); return gaitOn || wanderMoving }   // v2.43: a favourite cell off the middle (slice 3; never while hx is the middle)
+        guard let r = rtHome() else { return false }
+        sillLastHome = t; routeStart(r)
+        return true
+    }
+    /// brainGo: on the sill it walks along it to somewhere else (toward the side it just sniffed, when it did); elsewhere goStart as before
+    private func brainGo(_ dir: Double?) {
+        if sillOn && sillPlane == .room && !sillInBowl {
+            if brainSillFree() && !clusters.isEmpty {
+                let cx0 = clusters[gi].xc
+                var x: Double? = nil
+                for _ in 0..<6 {
+                    guard let c = floorWalkX(cx0), abs(c - cx0) >= R * 0.45 else { continue }   // v2.43 the cell it was scared in (MMon): slice 3
+                    x = c
+                    if let d = dir { if (cos(d) > 0) == (c > cx0) { break } } else { break }   // sniffed one way: that way
+                }
+                if let x { gaitTo(x, homeY, dash: false) }
+            }
+        } else {
+            var d2: Double? = nil
+            if let d = dir { d2 = d + Double.random(in: -0.175..<0.175, using: &rng) }
+            goStart(d2)
+        }
+        if gaitOn || wanderMoving || (sillOn && sillRoute != nil) { brain.e = max(0, brain.e - SlimeBrain.K.go) }   // only setting off counts as having moved
+        else { lifeSt = .rest; lifeUntil = t + restDur() }
+    }
+    /// brainRest: rested long enough. A 前兆 done: now it really sleeps or comes; else the strongest need decides.
+    private func brainRest(_ canGo: Bool) {
+        let pre = brain.pre
+        brain.pre = nil
+        if pre == .sleep {
+            if sleepOK() { brain.naps += 1; slpOn = true; lifeSt = .sleep; cutSniffs() } else { lifeUntil = t + restDur() }
+            return
+        }
+        if pre == .greet {
+            if e4OK() { brain.want = "greet"; lifeUntil = t + 0.3 } else { lifeUntil = t + restDur() }
+            return
+        }
+        let idleT = idleSec
+        let opening: Bool = params.wakeSoft >= 0.5 && t >= slpOpenT && t - slpOpenT < (params.sleepAfter > 0 ? params.sleepAfter : 40)
+        let canSleep: Bool = !opening && sleepOK() && idleT > 8
+        let w = brain.pick(t: t, greetLook: params.greetLook >= 0.5, canGo: canGo, sleepOK: canSleep, e4OK: e4OK())
+        let away: Bool = sillOn && !brainAtHome(), tel: Bool = params.brPre >= 0.5
+        switch w {
+        case .sleep:
+            if away && brainGoHome() { brain.why += "（先走回布墊）" }
+            else if away { lifeUntil = t + 1 }
+            else if tel { brain.pre = .sleep; brain.preT0 = t; lifeUntil = t + 2; cutSniffs(); if sighCyc < 0 { sighNext = t } }   // 前兆: squint, one sigh, asleep 2 s later
+            else { brain.naps += 1; slpOn = true; lifeSt = .sleep; cutSniffs() }
+        case .greet:
+            if tel { brain.want = ""; brain.pre = .greet; brain.preT0 = t; eyeUser = t + 1.2; lifeUntil = t + 0.9 } else { lifeUntil = t + 0.3 }   // 前兆: a look at you first; then e4Step
+        case .look:
+            lifeSt = .look; lifeLooks = 1 + (brain.q > 0.7 ? 1 : 0); lifeNoGo = false; lifeUntil = t
+        case .go:
+            brainGo(nil)
+        case .rest:
+            if away && t - brain.homeAt > 20 && brainGoHome() { brain.why = "五個都不高，走回布墊" }   // BRM() < −0.3 (8 s): slice 2
+            else { lifeUntil = t + restDur() }
+        }
+    }
+    /// brainJit (with greetLook): an opening starts the needs at random (SlimeBrain.jit)
+    private func brainJit() {
+        guard params.greetLook >= 0.5, brOn else { return }
+        brain.jit(t, trust: impTrust, using: &rng)
+    }
+    /// The web's impBack: back after 10 min or more, the needs start again from an opening (SlimeController, before the impression is reset)
+    func brainBack() { brain.reset(t); brainJit() }
 
     /// Every few seconds a cluster gets a small impulse; sometimes the whole body.
     private func twitch(_ L: Double) {

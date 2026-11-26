@@ -20,8 +20,8 @@ print('}')
 PY
 echo "== 控制器、調節台、SwiftUI 畫面"
 swiftc -typecheck -swift-version 5 -I "$M/mod" "$S/AppStubs.swift" "$S/WindowStub.swift" "$M/ViewStub.swift" "$N/App/SlimeController.swift" "$N/UI/FeelDesk.swift" "$N/UI/FeelDeskModel.swift" "$N/UI/TunePanel.swift" "$N/UI/ContentView.swift" "$N/UI/LabProbe.swift" "$N/Slime/JellySkin.swift" \
-  "$N/Slime/FeelParams.swift" "$N/Slime/SlimeRig.swift" "$N/Slime/SlimeFuzz.swift" 2>&1 | grep -E "error:" | sed -E 's/^.*NieNie\///' | cut -c1-220
+  "$N/Slime/FeelParams.swift" "$N/Slime/SlimeRig.swift" "$N/Slime/SlimeBrain.swift" "$N/Slime/SlimeFuzz.swift" 2>&1 | grep -E "error:" | sed -E 's/^.*NieNie\///' | cut -c1-220
 echo "== SlimeView、JellySkin"
 sed -e 's/@objc private func tick/private func tick/' -e 's/#selector(tick(_:))/Selector("tick")/' -e 's/NSLog("\[windows\] reason: %@", why as NSString)/_ = why/' "$N/Slime/SlimeView.swift" > "$M/SlimeView.swift"   # Linux 沒有 Objective-C，String 也不能 as NSString
-swiftc -typecheck -swift-version 5 -I "$M/mod" "$M/SlimeView.swift" "$S/SceneStub.swift" "$S/WindowStub.swift" "$N/UI/LabProbe.swift" "$N/Slime/JellySkin.swift" "$N/Slime/SlimeRig.swift" "$N/Slime/FeelParams.swift" 2>&1 | grep -E "error:" | cut -c1-220
+swiftc -typecheck -swift-version 5 -I "$M/mod" "$M/SlimeView.swift" "$S/SceneStub.swift" "$S/WindowStub.swift" "$N/UI/LabProbe.swift" "$N/Slime/JellySkin.swift" "$N/Slime/SlimeRig.swift" "$N/Slime/SlimeBrain.swift" "$N/Slime/FeelParams.swift" 2>&1 | grep -E "error:" | cut -c1-220
 echo "== 做完（上面沒有 error 就是過）"

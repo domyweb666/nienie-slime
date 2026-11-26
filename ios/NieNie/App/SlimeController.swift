@@ -117,6 +117,7 @@ final class SlimeController: ObservableObject {
                                                object: nil, queue: .main) { [weak self] _ in
             guard let self, let at = self.backgroundAt else { return }
             if Date().timeIntervalSince(at) >= 600 {
+                self.rig.brainBack()   // v2.63 大腦 (web impBack: brainReset(); brainJit(); then the impression)
                 if self.current.trKeep >= 0.5 {   // v2.34: only the wariness goes; the trust stays
                     self.rig.setImpression(trust: self.rig.impTrust, wary: 0)
                     self.impressions = self.impressions.mapValues { (trust: $0.trust, wary: 0.0) }
