@@ -435,6 +435,10 @@ final class SlimeRig {
     private var tbAt = -9.0, tbRel = -9.0, tbX = 0.0, tbY = 0.0, tbFire = -9.0, tbUntil = -9.0
     // v2.64 D8 呼嚕時慢眨眼（slowBlink；網頁 SBL）：sblS 自己那串亂數（網頁 sblRnd）、sblAcc 呼嚕累計秒數、sblGap 這次要累計幾秒、sblT0 這次慢眨開始的時間（−9 沒在眨）
     private var sblS: UInt32 = 1, sblAcc = 0.0, sblGap = 8.0, sblT0 = -9.0
+    // v2.64 C8 十隻招牌動作、喜歡的位置（signature；網頁 SG）：sgId 是哪一隻（SlimeController 換隻時設，網頁 SLIMES[SLIME].id；"" 沒有招牌）、sgS 自己那串亂數（網頁 sgRnd）、
+    // sgAcc 醒著沒人碰累計的秒數、sgGap 這次要累計幾秒（−1 還沒抽）、sgOn 正在做的那一段、sgQ 排好的步驟、sgEye 眼睛半閉或慢慢閉上、sgWk 上次看到的醒來時間。程式在 MARK v2.64 C8
+    var sgId = ""
+    private var sgS: UInt32 = 1, sgAcc = 0.0, sgGap = -1.0, sgOn: SgRun? = nil, sgQ: [SgStep] = [], sgEye: SgEye? = nil, sgWk = -9.0
     // E4: wait = idle seconds before it comes this time; count = visits this run; wave = arrived and waving
     private var e4Wait = -1.0, e4Count = 0, e4On = false, e4Wave = false, e4T0 = 0.0, e4LastT = -99.0
     private var voiceLast = -9.0
@@ -1231,6 +1235,7 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         slpWakeT = -9; voiceLast = -9; e4LastT = -99; impAskUntil = -9   // v2.61: the same clock; left in the old one the next slime kept its eyes wide, said nothing and did not come for as long as the last one had been out
         slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
+        sgAcc = 0; sgGap = -1; sgOn = nil; sgQ = []; sgEye = nil; sgS = brain.seed ^ 0x1b87_3593; sgWk = slpWakeT   // v2.64 C8（網頁 setup：Object.assign(SG,…)）：排好的招牌跟著重建清掉；間隔第一次用到時才抽（自己那串亂數，從大腦的種子接）；放在 slpWakeT 歸零後面
         napCum = 0; napOn = false; napN = 0   // v2.63 C9 (web setup, with SLP: Object.assign(NAP,{cum:0,on:false,n:0})): a slime switch, a rebuild, a rotation start this opening's count again
         greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
@@ -5538,6 +5543,7 @@ final class SlimeRig {
             else { lifeSt = .look; lifeLooks = 0; lifeNoGo = true; lastDir = ang; lifeUntil = t + 2.8 }
         }
         if let q = ltReactQ, t >= q.at { if lured || e4 { ltReactQ?.at = -9 }; ltReact() }   // v2.64 C5 看完的小反應（手指在旁邊、來找你時不做）；lookTarget 0 時 ltReactQ 一直是 nil
+        if params.signature >= 0.5 || sgOn != nil { sgStep(dt, lured || e4) }   // v2.64 C8 招牌動作（網頁：同一個位置；signature 0 時 sgOn 一直是 nil，不呼叫）
         if !lured && !e4 && !napOn {   // v2.63 C9: the few seconds it waits to fall asleep at your hand, it does not change what it is doing (no walking, not back to the mat); nap 0: napOn is always false
             if lifeSt == .rest && t >= lifeUntil {
                 if brOn { brainRest(canGo) }   // v2.63 大腦
@@ -6775,6 +6781,192 @@ final class SlimeRig {
         }
         return nil
     }
+    // MARK: v2.64 C8 十隻各一個招牌動作、一個喜歡的位置（signature；規劃 .uiux/04-手感/極致優化規劃-暫定.md 的 C8，BATCH3 第 5、5b 項；網頁 SG、SGK、SGDEF、sgRnd、sgDef、sgGap、sgCut、
+    // sgFavX、sgHomeFav、sgLid、sgPod、sgShrink、sgFire、sgStep，逐行照搬）。
+    // 表在 .uiux/04-手感/十隻招牌-暫定.md：隻名、個性、招牌、多久一次、喜歡的位置，全是 Agent 取的，賣六隻之前要多米看過才定。
+    // 招牌動作：醒著、沒人碰、在休息或張望的時間累計到 sgGap 秒（每隻自己的範圍 lo 到 hi，自己那串亂數抽；打開後第一次減半），等下一個「休息」的空檔做一次。
+    //   只用現成的動作換節奏、幅度、方向：偽足（startSniff；疊上去的短偽足 sgPod，跟 ltTap 同一種）、朝一邊傾（leanT）、搖偽足（wagT）、整團轉著抖（shkAt，甩一甩那套）、
+    //   縮一下（flAmp、flT0 那段形狀，sgShrink）、眼睛看你（eyeUser）、眨眼、半閉（要睡了那個 0.45）、閉上（睡著那條線）、睜大（eyePulse）、快跑（gaitTo dash）、嘆一口氣（sighNext）、叫聲（既有的 mmm）。
+    //   做到一半被碰、睡著、在逃、手指放旁邊、來找你、被別的事拉走，就收掉（不補做）。
+    // 喜歡的位置（fav）：窗台五格（記地方那五格）的第幾格；走得到的是 1（左，蠟燭旁）、2（中，布墊）、3（右，罐子和風鈴下）。
+    //   只取代 memHomeX 裡「沒有特別喜歡的時候回布墊」那一步：你摸出來的喜歡、夜晚蠟燭照舊優先；那格被嚇過（< −0.3）就不去。喜歡布墊的三隻（蜜蜜、芋圓、桃桃）家跟原本一樣。
+    //   大腦想走的時候（brainGo）有 SGK.go（六成，自己那串亂數）直接走回那格；家是天生喜歡那格、離開超過 20 秒時，大腦挑到張望也先走回去（brainRest .look，第 5b 項）。
+    // 亂數只用自己那串（sgRnd，從大腦的種子接）；動作本身用到的現成函式（startSniff 的相位、voice、走路）照它們原本的抽法。
+    // signature 0：不累計、不做、不抽亂數，家照舊，跟改之前一樣。網頁的計數（SG.n、SG.log，給 T89 和「牠在想什麼」用）手機沒搬。
+    private enum SgKind { case stretch, dash, peek, sway, lounge, doze, wings, fizz, jitter, reach }
+    /// k 招牌、name 名字（大腦在做什麼那一行）、fav 喜歡那格（0 到 4）、lo 到 hi 多久一次（秒）、wake 醒來先做一次（蜜蜜）
+    private struct SgDef { let k: SgKind; let name: String; let fav: Int; let lo, hi: Double; var wake = false }
+    /// 網頁 SGDEF（鍵是 SlimeKind 的 rawValue，跟網頁 SLIMES 的 id 同名）
+    private static let sgDefs: [String: SgDef] = [
+        "honey": SgDef(k: .stretch, name: "伸懶腰", fav: 2, lo: 30, hi: 45, wake: true),
+        "mint": SgDef(k: .dash, name: "衝過去又衝回來", fav: 1, lo: 25, hi: 40),
+        "taro": SgDef(k: .peek, name: "偷看你一眼就躲", fav: 2, lo: 35, hi: 55),
+        "peach": SgDef(k: .sway, name: "撒嬌扭兩下", fav: 2, lo: 35, hi: 55),
+        "xiancao": SgDef(k: .lounge, name: "單邊撐著發呆", fav: 1, lo: 40, hi: 60),
+        "tangyuan": SgDef(k: .doze, name: "打瞌睡、抖一下醒來", fav: 1, lo: 30, hi: 45),
+        "diedou": SgDef(k: .wings, name: "兩條偽足像翅膀開合", fav: 3, lo: 35, hi: 55),
+        "qishui": SgDef(k: .fizz, name: "冒泡", fav: 3, lo: 20, hi: 35),
+        "buding": SgDef(k: .jitter, name: "左右張望再抖一下", fav: 1, lo: 35, hi: 55),
+        "zhennai": SgDef(k: .reach, name: "伸去拿罐子、嚼嚼", fav: 3, lo: 35, hi: 55),
+    ]
+    /// go：大腦想走的時候，直接走回喜歡那格的機率（網頁 SGK.go）
+    private enum SGK { static let go = 0.6 }
+    /// 正在做的那一段（網頁 SG.on）：t0 開始、end 排好的步驟最晚那一步（快跑那種）或做完（其他）、until 最晚到幾秒就收掉
+    private struct SgRun { let k: SgKind; let t0: Double; var end: Double; let until: Double }
+    /// 一個步驟裡要做的事（網頁 sgFire 裡 on(...) 的那些小函式）
+    private enum SgAct {
+        case sniff(Double, Double, Double, Double, Double)   // startSniff(a, L, T1, T2, T3)
+        case pod(Double, Double, Double, Double, Double)     // sgPod(a, L, T1, T2, T3)
+        case eyeHalf(Double)          // SG.eye = half，T 秒
+        case eyeDoze(Double, Double)  // SG.eye = doze，c 秒慢慢閉上，到 T 秒
+        case eyeOff                   // SG.eye = null
+        case sigh                     // if(BRX.sighCyc<0)BRX.sighNext=t
+        case gait(Double)             // gaitTo(x, HOMEY, true)
+        case user(Double)             // EYE.user = t + d
+        case wag(Double)              // MOOD.wagT = t + d
+        case blink                    // EYE.blinkT = t
+        case pulse                    // EYE.pulse = t
+        case lean(Double)             // E2.leanT = t; E2.leanA = a; E2.leanS = 1
+        case voice(String, Double)    // voice(k, g)
+        case shrink(Double)           // sgShrink(k)
+        case shake(Double)            // SHK.at = t; SHK.amp = amp
+    }
+    /// at 幾秒做、w 要等走到了（回到休息）才做（網頁 w）
+    private struct SgStep { let at: Double; let w: Bool; let acts: [SgAct] }
+    /// 網頁 SG.eye：half 半閉 0.45；不是 half 就是 doze（c 秒慢慢閉上，閉著到 T 秒）
+    private struct SgEye { let half: Bool; let t0, c, T: Double }
+
+    /// 網頁 sgRnd：(seed·1664525 + 1013904223) mod 2³²
+    private func sgRnd() -> Double {
+        sgS = sgS &* 1_664_525 &+ 1_013_904_223
+        return Double(sgS) / 4_294_967_296
+    }
+    private func sgDef() -> SgDef? { Self.sgDefs[sgId] }
+    /// 網頁 sgGap：這次要累計幾秒（第一次減半）；沒有招牌的那隻 9e9
+    private func sgGapRnd(_ first: Bool) -> Double {
+        guard let d = sgDef() else { return 9e9 }
+        return (d.lo + (d.hi - d.lo) * sgRnd()) * (first ? 0.5 : 1)
+    }
+    private func sgCut() { sgOn = nil; sgQ = []; sgEye = nil }
+    /// 網頁 sgFavX：窗台上牠天生喜歡那格的位置；喜歡布墊的回 nil（照原本那條路走）
+    private func sgFavX() -> Double? {
+        guard params.signature >= 0.5, sillOn, let g = sillG, let d = sgDef(), d.fav != 2 else { return nil }
+        return memCellX(g, d.fav)
+    }
+    /// 網頁 sgHomeFav：家就是牠天生喜歡的那格（不是你摸出來的、不是夜晚蠟燭、那格沒被嚇過）
+    private func sgHomeFav() -> Bool {
+        guard let x = sgFavX(), let g = sillG else { return false }
+        return memHomeX(g) == x
+    }
+    /// 網頁 sgLid：這一格眼睛最多睜多開；沒在半閉、打瞌睡回 nil
+    private func sgLid() -> Double? {
+        guard let e = sgEye else { return nil }
+        let u = t - e.t0
+        if u < 0 || u > e.T { sgEye = nil; return nil }
+        if e.half { return 0.45 }
+        return u < e.c ? 1 - smooth01(u / e.c) : 0   // doze：c 秒慢慢閉上，閉著到 T 秒
+    }
+    /// 網頁 sgPod：疊上去的偽足，不收掉正在探的那條、rng 不抽（跟 ltTap 同一種）
+    private func sgPod(_ a: Double, _ L: Double, _ T1: Double, _ T2: Double, _ T3: Double) {
+        sniffSeq += 1
+        sniffs.append(Sniff(a: a, L: L, t0: t, T1: T1, T2: T2, T3: T3, ph: 0, id: sniffSeq))
+    }
+    /// 網頁 sgShrink：只借「縮一下」的形狀（60 毫秒縮、半秒放），不算被嚇：不累習慣、不喘、不出聲、不收偽足
+    private func sgShrink(_ k: Double) { flAmp = k * params.flinchAmp * (reduceMotion ? 0.5 : 1); flT0 = t }
+    private func sgDo(_ a: SgAct) {
+        switch a {
+        case let .sniff(an, L, T1, T2, T3): startSniff(an, L, T1, T2, T3)
+        case let .pod(an, L, T1, T2, T3): sgPod(an, L, T1, T2, T3)
+        case let .eyeHalf(T): sgEye = SgEye(half: true, t0: t, c: 0, T: T)
+        case let .eyeDoze(c, T): sgEye = SgEye(half: false, t0: t, c: c, T: T)
+        case .eyeOff: sgEye = nil
+        case .sigh: if sighCyc < 0 { sighNext = t }
+        case let .gait(x): gaitTo(x, homeY, dash: true)
+        case let .user(d): eyeUser = t + d
+        case let .wag(d): wagT = t + d
+        case .blink: eyeBlinkT = t
+        case .pulse: eyePulse = t
+        case let .lean(an): leanT = t; leanA = an; leanS = 1
+        case let .voice(k, g): voice(k, g)
+        case let .shrink(k): sgShrink(k)
+        case let .shake(amp): shkAt = t; shkAmp = amp
+        }
+    }
+    /// 網頁 sgFire：排好這一隻招牌的步驟
+    private func sgFire(_ d: SgDef) {
+        guard clusters.indices.contains(gi) else { return }
+        let g: SillGeo? = sillOn ? sillG : nil
+        let qx = clusters[gi].xc, qy = clusters[gi].yc, P = Double.pi   // 網頁 globalC.xc、yc
+        let side: Double
+        if let g { side = qx >= g.bx ? 1 : -1 } else { side = qx >= cx ? 1 : -1 }   // 網頁 CX：畫面中間
+        var q: [SgStep] = [], end = t, T = 0.0
+        func on(_ at: Double, _ acts: [SgAct], _ w: Bool = false) { q.append(SgStep(at: t + at, w: w, acts: acts)); end = max(end, t + at) }
+        switch d.k {
+        case .stretch:   // 往上慢慢伸長、半閉眼，伸到頂嘆一口氣
+            on(0, [.sniff(-P / 2, 0.95, 1.6, 1, 1.4), .eyeHalf(4)]); on(1.8, [.sigh]); T = 4.4
+        case .dash:   // 快跑到另一頭、到了馬上快跑回來
+            let x0 = qx
+            let tx: Double
+            if let g { tx = sillClampX(side > 0 ? g.l + R * 0.9 : g.r - R * 0.9) } else { tx = homeX - side * R * 1.2 }
+            on(0, [.gait(tx)]); on(0.5, [.gait(x0)], true); on(0.6, [], true); T = 12
+        case .peek:
+            if impTrust >= 0.6 { on(0, [.user(1.6), .wag(0.2)]); T = 1.8 }   // 熟了：看你、搖偽足
+            else { on(0, [.user(0.9)]); on(0.9, [.blink, .sniff(side > 0 ? 0.2 : P - 0.2, 0.35, 0.25, 0.9, 0.4)]); on(2.3, [.user(0.6)]); T = 3.2 }   // 怕生：看你 0.9 秒、眨眼別開往旁邊探，再偷看一眼
+        case .sway:   // 看著你、搖偽足、左右左傾三下
+            on(0, [.user(2.4), .wag(0), .lean(P), .voice("mmm", 0.5)]); on(0.7, [.lean(0)]); on(1.4, [.lean(P)]); T = 2.4
+        case .lounge:   // 往牆那邊斜下伸一條偽足撐著 4 秒，眼睛直直看前面
+            on(0, [.sniff(side > 0 ? 0.35 : P - 0.35, 0.5, 0.8, 4, 0.9), .user(5.4)]); T = 5.8
+        case .doze:   // 眼睛 1.4 秒慢慢閉上、閉著 1.2 秒，縮一下、睜大醒來
+            on(0, [.eyeDoze(1.4, 2.6)]); on(2.6, [.eyeOff, .shrink(0.6), .blink, .pulse]); T = 4.2
+        case .wings:   // 左上右上兩條同時開、合，兩次
+            for c in [0.0, 1.0] { on(c, [.pod(-P / 2 - 0.75, 0.42, 0.3, 0.1, 0.35), .pod(-P / 2 + 0.75, 0.42, 0.3, 0.1, 0.35)]) }
+            T = 2.2
+        case .fizz:   // 上半身一個個冒出短偽足又縮掉，六顆（先抽好六顆的方向和長度，順序照網頁：方向、長度、方向、長度…）
+            var Q: [(a: Double, L: Double)] = []
+            for _ in 0..<6 { let a = -P / 2 + (sgRnd() - 0.5) * 2.4; let L = 0.16 + 0.1 * sgRnd(); Q.append((a, L)) }
+            on(0, [.blink])
+            for (i, e) in Q.enumerated() { on(Double(i) * 0.18, [.pod(e.a, e.L, 0.07, 0.03, 0.14)]) }
+            T = 1.4
+        case .jitter:   // 很快看左、看右，整團抖一下
+            on(0, [.sniff(P + 0.3, 0.35, 0.15, 0.2, 0.15), .pulse]); on(0.55, [.sniff(-0.3, 0.35, 0.15, 0.2, 0.15)]); on(1.1, [.shake(0.45)]); T = 2
+        case .reach:   // 往罐子（擺飾 2 是書堆）伸過去停一下、縮回來，縮三下像在嚼（手機的 props 只有擺飾，網頁的 r.deco 一定成立）
+            var p: Prop? = nil
+            for r in props where r.im != "d_candle" && !r.gone && r.fade == 0 { p = r }
+            let tx: Double = p?.x ?? qx + side * R * 2
+            var ty = qy
+            if let p, let g { ty = min(p.y, g.fl) }
+            let a = atan2(ty - qy, tx - qx), L = max(0.5, min(1.1, hypot(tx - qx, ty - qy) / R - 0.6))
+            on(0, [.sniff(a, L, 1, 1.2, 0.5)])
+            for u in [2.9, 3.3, 3.7] { on(u, [.shrink(0.35)]) }
+            T = 4.8
+        }
+        // 網頁 q.sort((x,y)=>x.at-y.at) 是穩定排序：同一個時間的照排進去的順序（Swift 的 sort 不保證穩定，所以帶著原本的位置比）
+        sgQ = q.enumerated().sorted { $0.element.at != $1.element.at ? $0.element.at < $1.element.at : $0.offset < $1.offset }.map { $0.element }
+        let until = t + T
+        sgOn = SgRun(k: d.k, t0: t, end: d.k == .dash ? end : until, until: until)   // 做完整段才算結束（快跑那種等走回原地）
+        lifeUntil = max(lifeUntil, until + 0.3)
+    }
+    /// 網頁 sgStep：lifeStep 每幀叫（被碰著、睡著、在逃、在聽你的節奏時 lifeStep 提早回去，不會叫到；busy：手指放旁邊、來找你）
+    private func sgStep(_ dt: Double, _ busy: Bool) {
+        guard params.signature >= 0.5, let d = sgDef() else { if sgOn != nil { sgCut() }; return }
+        if sgGap < 0 { sgGap = sgGapRnd(true) }
+        if slpWakeT != sgWk { if d.wake && slpWakeT > sgWk && slpWakeT <= t { sgAcc = max(sgAcc, sgGap) }; sgWk = slpWakeT }   // 蜜蜜：醒來先伸懶腰
+        if let o = sgOn {
+            if o.t0 > t || t > o.until || lastTouch > o.t0 || !fingers.isEmpty || slpOn || escOn || introOn || busy || (o.k != .dash && lifeSt != .rest) { sgCut(); return }
+            while let s = sgQ.first, t >= s.at {
+                if s.w && (gaitOn || wanderMoving || lifeSt != .rest) { break }   // w：等走到了（回到休息）才做下一步
+                sgQ.removeFirst()
+                for a in s.acts { sgDo(a) }
+                if s.w { lifeUntil = max(lifeUntil, o.until + 0.3) }
+            }
+            if sgQ.isEmpty && t >= o.end { sgOn = nil }
+            return
+        }
+        if lifeSt == .rest || lifeSt == .look { sgAcc += dt }
+        if lifeSt != .rest || sgAcc < sgGap || busy || (sillOn && (sillRoute != nil || sillAir || sillHop != nil)) || drPush != nil || e4On || lureOn || (brOn && brain.pre != nil) { return }
+        sgAcc = 0; sgGap = sgGapRnd(false); sgFire(d)
+    }
+
     /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free
     /// (v2.63 D3 holdTickle 1: it never breaks free, it squirms and giggles as long as you go on).
     private func e2Step(_ dt: Double) {
@@ -6944,6 +7136,7 @@ final class SlimeRig {
         if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) || moodLow || drWide { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
         if sbb != nil { open = min(open, SBLK.lid) }   // v2.64 D8 慢眨時半睜
+        if sgEye != nil && params.signature >= 0.5, let sl = sgLid() { open = min(open, sl) }   // v2.64 C8：蜜蜜伸懶腰時半閉（要睡了那個 0.45）、湯圓打瞌睡慢慢閉上（睡著那條線）
         if mode == .open && t >= eyeNextBlink && !slpOn && sbb == nil { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
         eyeBlink = sbb ?? (u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1))))   // v2.64 D8：慢眨時用慢眨的曲線
@@ -7278,6 +7471,7 @@ final class SlimeRig {
         else if brain.pre == .greet || brain.want == "greet" { brain.act = "看著你" }
         else if escOn { brain.act = "逃跑" }
         else if engaged { brain.act = "被你碰著" }
+        else if sgOn != nil { brain.act = "招牌：" + (sgDef()?.name ?? "") }   // v2.64 C8（網頁 SG.on?'招牌：'+名字）
         else if e4On { brain.act = "來找你" }
         else if lureOn { brain.act = "注意你的手指" }
         else if echoSt != 0 { brain.act = "回你的節奏" }
@@ -7314,11 +7508,14 @@ final class SlimeRig {
             if brainSillFree() && !clusters.isEmpty {
                 let cx0 = clusters[gi].xc
                 var x: Double? = nil
-                for k in 0..<6 {
-                    guard let c = floorWalkX(cx0), abs(c - cx0) >= R * 0.45 else { continue }
-                    if mmOn && mem.cell[memCellAt(c)] < -0.3 && k < 5 { continue }   // v2.43 (v2.64 on the phone): not to the cell it was scared in
-                    x = c
-                    if let d = dir { if (cos(d) > 0) == (c > cx0) { break } } else { break }   // sniffed one way: that way
+                if let fx = sgFavX(), !(mmOn && mem.fav() >= 0), abs(fx - cx0) > R * 0.45, !(mmOn && mem.cell[memCellAt(fx)] < -0.3), sgRnd() < SGK.go { x = fx }   // v2.64 C8（網頁同一行）：想動時有六成直接走回牠天生喜歡的那格（只有喜歡的不在布墊、你沒摸出別的喜歡時；signature 0 時 sgFavX 一直是 nil，不抽亂數）
+                else {
+                    for k in 0..<6 {
+                        guard let c = floorWalkX(cx0), abs(c - cx0) >= R * 0.45 else { continue }
+                        if mmOn && mem.cell[memCellAt(c)] < -0.3 && k < 5 { continue }   // v2.43 (v2.64 on the phone): not to the cell it was scared in
+                        x = c
+                        if let d = dir { if (cos(d) > 0) == (c > cx0) { break } } else { break }   // sniffed one way: that way
+                    }
                 }
                 if let x { gaitTo(x, homeY, dash: false) }
             }
@@ -7354,14 +7551,17 @@ final class SlimeRig {
         let away: Bool = sillOn && !brainAtHome(), tel: Bool = params.brPre >= 0.5
         switch w {
         case .sleep:
-            if away && brainGoHome() { brain.why += mmOn && mem.fav() >= 0 ? "（先走回牠喜歡的位置）" : (drCandleX() != nil ? "（先走到蠟燭旁邊）" : "（先走回布墊）") }   // v2.64 the candle (drCandleX)
+            if away && brainGoHome() { brain.why += mmOn && mem.fav() >= 0 ? "（先走回牠喜歡的位置）" : (drCandleX() != nil ? "（先走到蠟燭旁邊）" : (sgFavX() != nil ? "（先走回牠喜歡的位置）" : "（先走回布墊）")) }   // v2.64 the candle (drCandleX); v2.64 C8 牠天生喜歡的那格（sgFavX）
             else if away { lifeUntil = t + 1 }
             else if tel { brain.pre = .sleep; brain.preT0 = t; lifeUntil = t + 2; cutSniffs(); if sighCyc < 0 { sighNext = t } }   // 前兆: squint, one sigh, asleep 2 s later
             else { brain.naps += 1; slpOn = true; lifeSt = .sleep; cutSniffs() }
         case .greet:
             if tel { brain.want = ""; brain.pre = .greet; brain.preT0 = t; eyeUser = t + 1.2; lifeUntil = t + 0.9 } else { lifeUntil = t + 0.3 }   // 前兆: a look at you first; then e4Step
         case .look:
-            lifeSt = .look; lifeLooks = 1 + (brain.q > 0.7 ? 1 : 0); lifeNoGo = false; lifeUntil = t
+            // v2.64 C8（BATCH3 第 5b 項，網頁 sgHomeFav 那一行）：好奇一直贏的那幾隻（湯圓慢、愛睡：想動漲得慢，休息久好奇照漲）永遠輪不到下面 .rest「五個都不高、離家 20 秒走回去」那條，
+            // 走開就不回喜歡那格；家是牠天生喜歡的那格時，想張望也先走回去。signature 0 時 sgHomeFav 一直是 false，不多走、不抽亂數
+            if away && t - brain.homeAt > 20 && sgHomeFav() && brainGoHome() { brain.why += "（離開喜歡的位置太久，先走回去）" }
+            else { lifeSt = .look; lifeLooks = 1 + (brain.q > 0.7 ? 1 : 0); lifeNoGo = false; lifeUntil = t }
         case .go:
             brainGo(nil)
         case .offer:
@@ -7370,7 +7570,7 @@ final class SlimeRig {
             drCat()   // v2.64 擺飾變真 (web 'cat')
         case .rest:
             let low: Bool = brainM < -0.3   // v2.63 心情: in a bad mood it goes back after 8 s away, not 20
-            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : (mem.fav() >= 0 && mmOn ? "五個都不高，走回牠喜歡的位置" : (drCandleX() != nil ? "五個都不高，走到蠟燭旁邊" : "五個都不高，走回布墊")) }
+            if away && t - brain.homeAt > (low ? 8 : 20) && brainGoHome() { brain.why = low ? "心情不好，走回去" : (mem.fav() >= 0 && mmOn ? "五個都不高，走回牠喜歡的位置" : (drCandleX() != nil ? "五個都不高，走到蠟燭旁邊" : (sgFavX() != nil ? "五個都不高，走回牠喜歡的位置" : "五個都不高，走回布墊"))) }   // v2.64 C8 sgFavX
             else { lifeUntil = t + restDur() }
         }
     }
@@ -7414,10 +7614,12 @@ final class SlimeRig {
     /// then where it is, unless it was scared there too: the nearest cell it was not scared in. brMem 0: the middle (the web's g.bx; no candle on the phone)
     private func memHomeX(_ g: SillGeo) -> Double {
         let cdl = drCandleX()   // v2.64 擺飾變真 (web v2.46): at night the lit candle; nil while decoReact is off
-        if !mmOn { return cdl ?? g.bx }
+        let sx = sgFavX()   // v2.64 C8：這隻天生喜歡的那格（signature 0、喜歡布墊的三隻、不在窗台：nil）
+        if !mmOn { return cdl ?? sx ?? g.bx }
         let k = mem.fav()
         if k >= 0 { return memCellX(g, k) }
         if let cdl, mem.cell[memCellAt(cdl)] >= -0.3 { return cdl }   // nothing liked much: home beside the candle
+        if let sx, mem.cell[memCellAt(sx)] >= -0.3 { return sx }   // v2.64 C8（網頁同一行）：沒有你摸出來的喜歡、不是夜晚蠟燭：家在這隻天生喜歡的那格
         if mem.cell[memCellAt(g.bx)] >= -0.3 { return g.bx }   // nothing liked much: the mat in the middle
         guard !clusters.isEmpty else { return g.bx }
         let cx = clusters[gi].xc, c = memCellAt(cx)

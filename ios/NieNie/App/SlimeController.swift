@@ -75,6 +75,7 @@ final class SlimeController: ObservableObject {
         if UserDefaults.standard.bool(forKey: "nienie.clear") { start.clear = 1 }
         rig = SlimeRig(params: start)
         rig.fx = saved.fx   // v2.57 its signature
+        rig.sgId = saved.rawValue   // v2.64 C8 招牌動作、喜歡的位置是哪一隻的（網頁 SGDEF[SLIMES[SLIME].id]）
         rig.reduceMotion = reduceMotion
         if let w = WindowLibrary.def(UserDefaults.standard.string(forKey: "nienie.win") ?? "") {   // v2.59 an id this build does not know: the original window
             winId = w.id
@@ -515,6 +516,7 @@ final class SlimeController: ObservableObject {
         rig.memSave(force: true); memPut()   // v2.64 記地方 (web chooseSlime: memSave(true);memPut(), still under the old slime)
         slime = k; material = k.material
         rig.fx = k.fx   // v2.57 the new six's signatures
+        rig.sgId = k.rawValue   // v2.64 C8（下面 resetShape 重建時把排好的招牌清掉）
         UserDefaults.standard.set(k.rawValue, forKey: "slime")
         pushParams()
         activeSlot = nil

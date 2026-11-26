@@ -370,6 +370,8 @@ struct FeelParams: Equatable, Codable {
     // v2.64 D8 點牠牠頂回來、呼嚕時慢眨眼（網頁 tapBack、slowBlink；TB、TBK、tbArm、tbStep、SBL、SBLK、sblStep；三個材質同名同預設）。SlimeRig MARK v2.64 D8
     var tapBack: Double = 1           // 點牠牠頂回來：1 = 點一下，牠朝你的手指傾完再過 0.4 秒，朝你剛才點的地方頂一下（跟按著不動往手指推一下同一套，手機輕頂一下），看著你 1.5 秒；不改戒、熟、交情、心情；0 = 跟改之前一樣（傾一下就結束）
     var slowBlink: Double = 1         // 呼嚕時慢眨眼：1 = 呼嚕累計 6 到 12 秒慢眨一次（∩ 換回半睜、慢慢閉上、停一下、慢慢睜開，再回 ∩，約 2.8 秒），只用既有的眼睛形狀；0 = 跟改之前一樣（呼嚕時一直 ∩，自己那串亂數不影響別的）
+    // v2.64 C8 十隻招牌動作、喜歡的位置（網頁 signature；SG、SGDEF、sgFire、sgStep、sgFavX、sgHomeFav；三個材質同名同預設）。SlimeRig MARK v2.64 C8，哪一隻由 SlimeController 設 rig.sgId
+    var signature: Double = 1         // 十隻招牌：1 = 醒著沒人碰時每隻隔自己的時間（20 到 60 秒）做一次自己的招牌動作，窗台上家放在牠天生喜歡的那格（你摸出來的喜歡、夜晚蠟燭照舊優先；離開那格超過 20 秒，想張望也先走回去）；0 = 跟改之前一樣（十隻只差幾個數字，家都在布墊，自己那串亂數不抽）
     // v2.63 C6 (web rubVary; rubHappy, the voice shuffle bag; the same key and default for all three materials). SlimeRig MARK v2.63 C6, SlimeAudio voiceBag
     var rubVary: Double = 1           // 揉完的反應輪流: 1 = done rubbing or stroking, the hop, melting 2 s more, leaning to your finger and a sigh take turns from a shuffled bag, the hop at most once in 40 s; each kind of its sounds plays all its files before a new shuffle; 0 = as before (tall, a wag, the hop and the happy sound every time; a random file each time)
     // v2.63 B6 (web sndB6; the pull step re-arms, the press keeps what is queued except the last release's tail; the same key and default for all three materials). SlimeRig MARK v2.63 B6, SlimeAudio sndB6
@@ -1008,6 +1010,8 @@ struct TuneField: Identifiable {
         // v2.64 D8（網頁 tapBack、slowBlink 的字，第三批第 4 項）
         TuneField(key: \.tapBack, name: "點牠牠頂回來 v2.64", hint: "1（D8）：點牠一下，牠朝你的手指傾完再過 0.4 秒，朝你剛才點的地方頂一下（跟按著不動往手指推一下同一套），看著你 1.5 秒。你不接就算了，戒、熟、交情、心情都不動；你在那段時間又碰牠，照現有的回應走。戒的往反方向傾那種、在逃、睡著不頂。0 回改之前（傾一下就結束）", range: 0...1, step: 1, section: "這一批 v2.64"),
         TuneField(key: \.slowBlink, name: "呼嚕時慢眨眼 v2.64", hint: "1（D8）：呼嚕時累計 6 到 12 秒慢眨一次眼（像貓的慢眨）：∩ 換回半睜、看一下、慢慢閉上、閉著停一下、慢慢睜開，再回 ∩，約 2.8 秒。只用既有的眼睛形狀。0 回改之前（呼嚕時一直 ∩）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 C8（網頁 signature 的字，第三批第 5 項）
+        TuneField(key: \.signature, name: "十隻招牌 v2.64", hint: "1（C8）：十隻各一個招牌動作、一個喜歡的位置（表在 .uiux/04-手感/十隻招牌-暫定.md，Agent 取的，等多米看）。醒著沒人碰、在休息的空檔，每隻隔自己的時間做一次自己的招牌（蜜蜜伸懶腰、薄荷衝過去又衝回來、芋圓偷看你一眼就躲、桃桃撒嬌扭兩下、仙草單邊撐著發呆、湯圓打瞌睡抖一下醒來、蝶豆兩條偽足像翅膀開合、汽水冒泡、布丁左右張望再抖一下、珍奶伸去拿罐子再嚼嚼），只用現成的動作；窗台上家放在牠喜歡的那格（你摸出來的喜歡、夜晚蠟燭照舊優先）。0 回改之前（十隻只差幾個數字，家都在布墊）", range: 0...1, step: 1, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
