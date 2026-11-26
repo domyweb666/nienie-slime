@@ -13,7 +13,9 @@
 ## 🚧 沒做完
 1. **整份 selftest 還沒全過一次**：第一次跑在 T68（亂拉）撞到 NaN：扯斷那一刻換回原本網格，`remeshHome 0` 時 HB 是空的。已修（`dd31c82`），也把舊項目釘 split 0，**修完還沒重跑**。跑法：起 `split-web`，然後
    `node E:/捏捏史萊姆/nienie-slime/.vibe/run-selftest.mjs selftest.js http://127.0.0.1:8797/index.html <結果.json>`（腳本在主資料夾的 `.vibe`，這個工作樹沒有；約 15 到 20 分鐘，背景跑，後面不要接別的指令）。要跑 3 次。
-2. **Swift**：子代理在照搬（`SlimeRig`、`FeelParams`、`SlimeView`、`JellySkin`），交代過不碰著色器和湯圓餡、不 commit。結果回到原本那個對話；要是沒回來，`git status` 看 `ios/` 有沒有改到一半的檔，沒有就重做：照 `git show fff26c5 12a8df8 dd31c82 -- prototype/web/index.html` 逐行搬。本機沒有 swiftc，要推上去 CI 才知道編不編得過，先別推。
+2. **Swift 寫完了，沒編譯過**（本機沒有 swiftc）：`SlimeRig.swift` 5351 行起（`tw` 開頭是第二隻、`split` 開頭是 SPLIT 狀態），`FeelParams.swift` 284–291、790–797，`SlimeView.swift` 的 `drawTwin`（約 1155）和遮罩 740、837，`JellySkin.swift` 新加 `SkinMesh.polygon`（約 199，皮的演算法和著色器沒動）。
+   跟網頁不同：網格皮上第二隻用扇形三角形（很凹時會蓋出外框一點）；搭橋線切 8 段；腮紅條件跟 A 在 Swift 一樣（果凍皮、眼睛開著）；手指剛好在 A 中心時方向用 (1,0)。
+   子代理自己標的最可能編不過：`gooView`（約 5972）的 `if let g, g.str > 0 || ...` 那行、`twBnd.map` 指定給帶標籤 tuple 陣列、internal 屬性用到 private 的 `TwinMerge`；`drawTwin` 的 `sides` tuple；`twinBuild` 裡的區域函式；substep 約 3281 的 `splitMx`。
 3. Swift 寫完要逐行對網頁複查一次（另開子代理，給它程式碼不要給結論）。
 
 ## ❓ 等多米決定

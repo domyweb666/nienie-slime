@@ -111,6 +111,12 @@ final class SlimeView: UIView {
     private let eyeFillLayer = CAShapeLayer()    // v2.23 eyes, inside the body: open eyes...
     private let eyeLightLayer = CAShapeLayer()   // ...their white glints...
     private let eyeLineLayer = CAShapeLayer()    // ...and the ∩ ∪ > < and shut ones as strokes
+    // v2.62 the second slime (web twinFace): its flat body's lit part and its blush, clipped to its outline; the lump while it is swallowed; its eyes (not clipped, as on the web);
+    // the ripple inside the first one (in litGroup, clipped to it)
+    private let twinGroup = CALayer(), twinMask = CAShapeLayer(), twinBaseLayer = CAShapeLayer(), twinBulge = CAShapeLayer()
+    private let twinBlush = [CAGradientLayer(), CAGradientLayer()], twinRings = [CAShapeLayer(), CAShapeLayer()]
+    private let twinEyeFill = CAShapeLayer(), twinEyeLight = CAShapeLayer(), twinEyeLine = CAShapeLayer()
+    private var twinNow: SlimeRig.TwinView?
 
     /// Touches starting this close to the top/bottom edge are left to the system gestures.
     private let edgeBand: CGFloat = 32
@@ -185,6 +191,16 @@ final class SlimeView: UIView {
         outlineLayer.fillColor = nil
         outlineLayer.lineJoin = .round
         layer.addSublayer(outlineLayer)
+        for l in twinRings { l.fillColor = nil; l.isHidden = true; litGroup.addSublayer(l) }   // v2.62, over the first one's eyes
+        twinGroup.mask = twinMask; twinGroup.isHidden = true
+        twinBaseLayer.isHidden = true; twinGroup.addSublayer(twinBaseLayer)
+        for l in twinBlush { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; twinGroup.addSublayer(l) }
+        layer.addSublayer(twinGroup)
+        twinBulge.fillColor = nil; twinBulge.isHidden = true
+        layer.addSublayer(twinBulge)
+        twinEyeLight.fillColor = UIColor.white.cgColor
+        twinEyeLine.fillColor = nil; twinEyeLine.lineCap = .round; twinEyeLine.lineJoin = .round
+        layer.addSublayer(twinEyeFill); layer.addSublayer(twinEyeLight); layer.addSublayer(twinEyeLine)
         stuckGroup.isHidden = true; stuckGroup.zPosition = 1
         layer.addSublayer(stuckGroup)   // 走路: the thing stuck to it, over the body
         bowlFrontLayer.contentsGravity = .resize; bowlFrontLayer.isHidden = true; bowlFrontLayer.zPosition = 4
@@ -245,6 +261,7 @@ final class SlimeView: UIView {
         outlineLayer.strokeColor = bandMode ? nil : colors.line.cgColor
         outlineLayer.fillColor = bandMode ? colors.line.cgColor : nil
         eyeFillLayer.fillColor = colors.eye.cgColor; eyeLineLayer.strokeColor = colors.eye.cgColor
+        twinBaseLayer.fillColor = colors.base.cgColor; twinEyeFill.fillColor = colors.eye.cgColor; twinEyeLine.strokeColor = colors.eye.cgColor   // v2.62
         tintKey = -1
         CATransaction.commit()
     }
@@ -315,7 +332,8 @@ final class SlimeView: UIView {
             if let j = jelly { j.layer.frame = bounds; j.resize(width: Int(size.width.rounded()), height: Int(size.height.rounded()), scale: window?.screen.scale ?? UIScreen.main.scale) }
             sceneKey = ""
             for l in ([shadowLayer, shadeLayer, litGroup, litMask, baseLayer, dentShadeLayer, dentLitLayer, highlightLayer, outlineLayer, flashLayer,
-                       eyeFillLayer, eyeLightLayer, eyeLineLayer] as [CALayer]) + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) {
+                       eyeFillLayer, eyeLightLayer, eyeLineLayer, twinGroup, twinMask, twinBaseLayer, twinBulge, twinEyeFill, twinEyeLight, twinEyeLine] as [CALayer])
+                      + (speckLayers as [CALayer]) + (trailLayers as [CALayer]) + (twinRings as [CALayer]) {
                 l.frame = bounds
             }
             redraw()
@@ -709,17 +727,17 @@ final class SlimeView: UIView {
         shadeLayer.isHidden = on; baseLayer.isHidden = on; highlightLayer.isHidden = on; outlineLayer.isHidden = on
         dentShadeLayer.isHidden = on || dentShadeLayer.isHidden; dentLitLayer.isHidden = on || dentLitLayer.isHidden
         if on { for l in dentLayers { l.isHidden = true }; for l in trailLayers { l.isHidden = true } }
-        // v2.51: the strand and the small blob go into the same mask, so the skin lights them as one body
+        // v2.51: the strand and the small blob go into the same mask, so the skin lights them as one body; v2.62: the second slime's outline instead of the blob, and the merge's goo
         var extra: [CGPath] = []
         let gv = rig.gooView
+        twinNow = gv.twin
         for s in gv.segs {
             let a = rig.toScreen(s.x0, s.y0), b = rig.toScreen(s.x1, s.y1), ln = CGMutablePath()
             ln.move(to: CGPoint(x: Double(a.x), y: Double(a.y))); ln.addLine(to: CGPoint(x: Double(b.x), y: Double(b.y)))
             extra.append(ln.copy(strokingWithWidth: CGFloat(s.w * z), lineCap: .round, lineJoin: .round, miterLimit: 1))
         }
-        if let b = gv.blob {
-            let c = rig.toScreen(b.x, b.y)
-            extra.append(CGPath(ellipseIn: CGRect(x: Double(c.x) - b.rx * z, y: Double(c.y) - b.ry * z, width: b.rx * 2 * z, height: b.ry * 2 * z), transform: nil))
+        if let tw = gv.twin, tw.outline.count > 2 {
+            extra.append(bodyPath(tw.outline.map { rig.toScreen($0.x, $0.y) }))
         }
         // v2.52: the flat skin (phones without Metal, and the grey box) draws them too, in the shade colour; before, a strand there could not be seen
         if on || extra.isEmpty { gooFlatLayer.isHidden = true } else {
@@ -815,9 +833,8 @@ final class SlimeView: UIView {
             let a = rig.toScreen(s.x0, s.y0), b = rig.toScreen(s.x1, s.y1)
             skinMesh.line(a.x, a.y, b.x, b.y, s.w * z)
         }
-        if let b = gv.blob {
-            let c = rig.toScreen(b.x, b.y)
-            skinMesh.ellipse(c.x, c.y, b.rx * z, b.ry * z)
+        if let tw = gv.twin, tw.outline.count > 2 {   // v2.62
+            skinMesh.polygon(tw.outline.map { rig.toScreen($0.x, $0.y) })
         }
         return skinMesh
     }
@@ -1092,7 +1109,7 @@ final class SlimeView: UIView {
             tintKey = tk
             let tr = rig.showsImpression ? rig.impShownTrust : 0, w = rig.showsImpression ? rig.impShownWary : 0
             let sh = tinted(colors.shade, tr, w, shade: true).cgColor, ba = tinted(colors.base, tr, w).cgColor
-            shadeLayer.fillColor = sh; baseLayer.fillColor = ba
+            shadeLayer.fillColor = sh; baseLayer.fillColor = ba; twinBaseLayer.fillColor = ba
         }
         // v2.23 eyes (多米 11-02: try a face, eyes only): bean eyes looking where it looks; ∩ happy, ∪ asleep, > < squeezed, a line when shut
         let ef = CGMutablePath(), el = CGMutablePath(), eli = CGMutablePath()
@@ -1129,7 +1146,77 @@ final class SlimeView: UIView {
             }
         }
         eyeFillLayer.path = ef; eyeLineLayer.path = el; eyeLightLayer.path = eli
+        drawTwin(z: z)   // v2.62
 
         CATransaction.commit()
+    }
+
+    /// v2.62 (web twinFace): the second slime's face (eyes, blush), its flat body's lit part, the lump while it is swallowed, the ripple inside the first one
+    private func drawTwin(z: Double) {
+        func off() {
+            twinGroup.isHidden = true; twinBulge.isHidden = true
+            twinEyeFill.path = nil; twinEyeLight.path = nil; twinEyeLine.path = nil
+        }
+        guard let tw = twinNow else { off(); for l in twinRings { l.isHidden = true }; return }
+        let R: Double = rig.R * z
+        for (k, l) in twinRings.enumerated() {
+            guard k < tw.rings.count else { l.isHidden = true; continue }
+            let q = tw.rings[k], c = rig.toScreen(q.x, q.y), r: Double = q.r * z
+            l.isHidden = false
+            l.path = CGPath(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2), transform: nil)
+            l.lineWidth = CGFloat(q.w * z)
+            l.strokeColor = colors.light.withAlphaComponent(CGFloat(max(0, min(1, q.alpha)))).cgColor
+        }
+        let P: [(x: Double, y: Double)] = tw.outline.map { rig.toScreen($0.x, $0.y) }
+        guard P.count > 2 else { off(); return }
+        let path = bodyPath(P), flat = !jellyOn
+        twinMask.path = path
+        twinBaseLayer.isHidden = !flat
+        if flat { twinBaseLayer.path = bodyPath(P, dx: -R * 0.05, dy: -R * 0.06) }   // the flat skin: the shade is the extra shape (gooFlatLayer), the body colour up-left of it
+        if tw.bulge > 0 {
+            twinBulge.isHidden = false; twinBulge.path = path; twinBulge.lineWidth = CGFloat(R * 0.04)
+            twinBulge.strokeColor = colors.shade.withAlphaComponent(CGFloat(min(1, 0.7 * tw.bulge))).cgColor
+        } else { twinBulge.isHidden = true }
+        let ef = CGMutablePath(), el = CGMutablePath(), eli = CGMutablePath()
+        var blushOn = false
+        if let e = tw.eyes {
+            let S: Double = e.size * z, l = rig.toScreen(e.lx, e.ly), r = rig.toScreen(e.rx, e.ry), a: Double = atan2(r.y - l.y, r.x - l.x)
+            let sides: [((x: Double, y: Double), Double)] = [(l, -1.0), (r, 1.0)]
+            if jellyOn {   // the blush as the first one's (the flat skin has none)
+                blushOn = true
+                let pink0 = UIColor(red: 1, green: 132 / 255, blue: 150 / 255, alpha: 0.72).cgColor, pink1 = UIColor(red: 1, green: 132 / 255, blue: 150 / 255, alpha: 0.42).cgColor, pink2 = UIColor(red: 1, green: 132 / 255, blue: 150 / 255, alpha: 0).cgColor
+                for (k, sd) in sides.enumerated() {
+                    let bl = twinBlush[k], c0 = sd.0, s: Double = sd.1
+                    bl.isHidden = false
+                    bl.bounds = CGRect(x: 0, y: 0, width: S * 0.26, height: S * 0.16)
+                    bl.position = CGPoint(x: c0.x + cos(a) * s * S * 0.23, y: c0.y + sin(a) * s * S * 0.23 + S * 0.11)
+                    bl.colors = [pink0, pink1, pink2]; bl.locations = [0, 0.55, 1]
+                }
+            }
+            let js: Double = jellyOn ? 0.68 : 1, ew: Double = S * 0.082 * js, eh: Double = S * 0.118 * js, ox: Double = e.ox * z, oy: Double = e.oy * z
+            twinEyeLine.lineWidth = CGFloat(max(2, S * 0.034))
+            for sd in sides {
+                let x: Double = sd.0.x + ox, y: Double = sd.0.y + oy
+                if e.squeeze {   // pulled open: > <
+                    let q: Double = -sd.1
+                    el.move(to: CGPoint(x: x + q * ew * 0.9, y: y - eh * 0.55))
+                    el.addLine(to: CGPoint(x: x - q * ew * 0.8, y: y))
+                    el.addLine(to: CGPoint(x: x + q * ew * 0.9, y: y + eh * 0.55))
+                    continue
+                }
+                let hh: Double = eh * e.open
+                if hh < ew * 0.35 {   // shut: the sleeping arc
+                    let ar: Double = ew * 1.15, cy0: Double = y - eh * 0.35
+                    el.move(to: CGPoint(x: x + ar * cos(Double.pi * 0.15), y: cy0 + ar * sin(Double.pi * 0.15)))
+                    el.addArc(center: CGPoint(x: x, y: cy0), radius: CGFloat(ar), startAngle: CGFloat(Double.pi * 0.15), endAngle: CGFloat(Double.pi * 0.85), clockwise: false)
+                    continue
+                }
+                ef.addEllipse(in: CGRect(x: x - ew, y: y - hh, width: 2 * ew, height: 2 * hh))
+                if hh > ew * 0.7 { let lr: Double = ew * 0.34; eli.addEllipse(in: CGRect(x: x - ew * 0.32 - lr, y: y - hh * 0.4 - lr, width: 2 * lr, height: 2 * lr)) }
+            }
+        }
+        if !blushOn { for l in twinBlush { l.isHidden = true } }
+        twinEyeFill.path = ef; twinEyeLine.path = el; twinEyeLight.path = eli
+        twinGroup.isHidden = !(flat || blushOn)
     }
 }

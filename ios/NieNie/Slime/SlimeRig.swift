@@ -378,12 +378,12 @@ final class SlimeRig {
         guard params.eyes >= 0.5, !eyeL.isEmpty, !eyeR.isEmpty else { return nil }
         if let pz = eyePose, effParams.noFlip > 0 {   // v2.29: the gaze and the dodge are already inside the pose
             return EyeView(lx: pz.lx, ly: pz.ly, rx: pz.rx, ry: pz.ry, gx: eyeGX, gy: eyeGY, lookX: 0, lookY: 0, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
-                           size: R * params.eyeSize, spread: max(0.8, min(1.3, hypot(pz.rx - pz.lx, pz.ry - pz.ly) / eyeD0)), mode: eyeMode)
+                           size: R * params.eyeSize * splitK, spread: max(0.8, min(1.3, hypot(pz.rx - pz.lx, pz.ry - pz.ly) / eyeD0)), mode: t < splitHappy ? .happy : eyeMode)
         }
         let l = eyeAt(eyeL), r = eyeAt(eyeR)
         let ga: Double = params.gazeAmp * (1 - 0.8 * eyeDK)   // v2.24: the whole face slides on the body; the closer the finger, the less it slides toward it
         return EyeView(lx: l.x, ly: l.y, rx: r.x, ry: r.y, gx: eyeGX, gy: eyeGY, lookX: eyeGX * ga + eyeDX, lookY: eyeGY * ga * 0.75 + eyeDY, open: eyeOpenD, wide: eyeWideD, blink: eyeBlink,
-                       size: R * params.eyeSize, spread: max(0.8, min(1.3, hypot(r.x - l.x, r.y - l.y) / eyeD0)), mode: eyeMode)
+                       size: R * params.eyeSize * splitK, spread: max(0.8, min(1.3, hypot(r.x - l.x, r.y - l.y) / eyeD0)), mode: t < splitHappy ? .happy : eyeMode)   // v2.62: A smaller after a tear; happy eyes after a swallow
     }
     // B2 sleep: k eases 0...1 (1.6 s falling asleep, 0.25 s waking); lastAny = the last touch anywhere (a tap on empty space counts)
     private var slpSnoreAt = 0.0   // v2.50 next sleeping breath sound
@@ -737,6 +737,7 @@ final class SlimeRig {
     private var builtLimbs = -1.0, builtSize = -1.0, builtDens = -1.0
 
     final class Finger {
+        var splitT = 0.0          // v2.62: how long it has been pulled far and fast enough to tear
         var tug: Bool? = nil      // v2.51: grabbed near the outline: it pulls a strand out, the body is not carried (nil = not judged yet)
         var r0x: Double? = nil, r0y = 0.0   // v2.61 A4: where it took hold, from the body's centre (r0x, r0y on the web; not the contact radius r0)
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
@@ -840,7 +841,7 @@ final class SlimeRig {
     }
 
     private func defineShape() {
-        goo.removeAll(); b2On = false; b2Held = false; b2ID = nil   // v2.51: a rebuilt body starts whole
+        goo.removeAll(); twinDrop()   // v2.51: a rebuilt body starts whole; v2.62 one slime again
         lumpShape = Int(params.limbs.rounded()) <= 0 && params.lump > 0 ? makeLump(seed: Int(params.seed.rounded()), k: params.lump) : nil
         var r = LCG(seed: Int(params.seed.rounded()) * 7 + 3)
         ph = [r.next() * 6.28, r.next() * 6.28, r.next() * 6.28, (-72 + (r.next() - 0.5) * 30) * .pi / 180]
@@ -2111,8 +2112,8 @@ final class SlimeRig {
         if introOn { let mini = introMini; endIntro(); if !mini { return } }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab; during a happy hop it grabs as usual
         let (x, y) = toWorld(sx, sy)
         slpLastAny = t   // v2.23 B2: a tap anywhere counts as someone there
-        if allowed && b2On && !b2Held && b2Merge <= 0 && hypot(x - b2X, y - b2Y) < b2R * 1.5 && !insideBody(x, y) {   // v2.51: this touch picks up the small blob
-            b2Held = true; b2ID = id; b2TX = x; b2TY = y; b2SX = sx; b2SY = sy; b2SqV += 2; lastTouch = t
+        if allowed && b2On && twMg == nil && twinHit(x, y) {   // v2.62: this touch takes the second slime (several fingers can)
+            twinGrab(id, x, y, sx, sy, effParams)
             onEvent?(.press(gain: 0.3))
             return
         }
@@ -2172,7 +2173,7 @@ final class SlimeRig {
     /// only on frames that received a fresh move event (Apple: predicted touches are temporary and must be
     /// replaced as real touches arrive). `distance` is the true travelled distance from coalesced touches.
     func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, predictedX: Double?, predictedY: Double?, distance: Double, radius: Double = 0) {
-        if b2On && b2Held && b2ID == id { b2TX += (x - b2SX) / camZ; b2TY += (y - b2SY) / camZ; b2SX = x; b2SY = y; return }   // v2.51: the touch holding the small blob
+        if let tf = twFg[id] { tf.x += (x - tf.sx) / camZ; tf.y += (y - tf.sy) / camZ; tf.sx = x; tf.sy = y; return }   // v2.62: a touch holding the second slime, in the world only its real movement
         guard let f = fingers[id] else { return }
         // in the world the finger only follows its real movement: screen travel ÷ the current zoom (v2.15). From v2.12 the screen point was
         // mapped back every frame, so as the view backed off a resting finger ran outward in the world, the shape stretched, the view
@@ -2192,7 +2193,7 @@ final class SlimeRig {
     }
 
     func touchEnded(_ id: ObjectIdentifier, time: TimeInterval) {
-        if b2Drop(id) { return }   // v2.51
+        if twFg[id] != nil { twinRelease(id); return }   // v2.62
         guard let f = fingers[id] else { return }
         // 候選 26 放手黏連: lifted slowly (under one radius per second) the grab holds on for `stick` seconds, the patch
         // staying at the fingertip; a flick lets go at once. A tiny tick marks the stick, the pop comes at the real release
@@ -2535,13 +2536,14 @@ final class SlimeRig {
 
     /// The system took the touch away (edge gesture, call, app switch): let go quietly, no pop.
     func touchCancelled(_ id: ObjectIdentifier) {
-        if b2Drop(id) { return }   // v2.51
+        if twFg[id] != nil { twinRelease(id); return }   // v2.62
         release(id, quiet: true)
     }
 
     func cancelAllTouches() {
         for f in fingers.values { for m in f.mem { GRAB[m.i] = false } }
         fingers.removeAll()
+        twFg.removeAll()   // v2.62
         softDrop()   // v2.61 C1: the app went to the background
         dragRelease(glide: false)   // v2.20: the offset joins home, as on a normal release
         lastTouch = t
@@ -2756,7 +2758,7 @@ final class SlimeRig {
         pairStep(dt)   // v2.38 the limit between two fingers, and tearing
         for f in fingers.values { f.fx += (f.tgx - f.fx) * f.lagK; f.fy += (f.tgy - f.fy) * f.lagK }
         strokeStep(dt)   // v2.26 F6
-        gooStep(dt); b2Step(dt)   // v2.51 the strand, the small blob
+        gooStep(dt); splitCheck(dt); twinStep(dt)   // v2.51 the strand; v2.62 the tear, the second slime
         dragStep(dt)   // v2.20 D1: home follows `drag` of the fingers' travel; how far the body itself is pulled open (sb); C3 slipping free
 
         // press flat: as far as the finger went down (relative to the height when it began) the remembered shape squashes,
@@ -2957,6 +2959,7 @@ final class SlimeRig {
             }
             // area: along the reference boundary, the area the pods add (∮ r·Δr + Δr²/2 dθ), taken back all round with the
             // same (r/Rb)² weight (only subtracting each pod's mean left the area 3% to 5% high)
+            twinPods()   // v2.62 the merge's lumps and ripples
             podShift = 0
             if !podE.isEmpty {
                 let Rb = R * 0.98, nb = bnd.count
@@ -3275,6 +3278,11 @@ final class SlimeRig {
             let d00 = 1 + ka * cu * cu + kb * su * su, d01 = (ka - kb) * cu * su, d11 = 1 + ka * su * su + kb * cu * cu
             m00 = bsx * flS * d00; m01 = bsx * flS * d01; m10 = bsy * flS * d01; m11 = bsy * flS * d11
         }
+        if splitMx.m00 != 1 || splitMx.m01 != 0 || splitMx.m10 != 0 || splitMx.m11 != 1 {   // v2.62 torn, A smaller; merging, squashed and springing up (already in the reference shape's frame)
+            let q = splitMx
+            let a: Double = q.m00 * m00 + q.m01 * m10, b: Double = q.m00 * m01 + q.m01 * m11, c: Double = q.m10 * m00 + q.m11 * m10, d: Double = q.m10 * m01 + q.m11 * m11
+            m00 = a; m01 = b; m10 = c; m11 = d
+        }
         psm = (m00, m01, m10, m11)
         // 3 shape matching: each cluster's best rigid fit pulls its particles
         for i in 0..<N { GX[i] = 0; GY[i] = 0; GW[i] = 0 }
@@ -3302,7 +3310,7 @@ final class SlimeRig {
         }
         // area pressure: when squashed or stretched the area drops, push goals outward so sides bulge
         let A = polygonArea()
-        let A0p = (mat.press2 >= 0.5 ? A0 * (1 + mat.pressArea * pressSum) : A0) * flS * flS   // v2.16 P1: pressed from the front it thins, so it looks bigger; v2.19 the flinch really shrinks it (else the area pressure pushes it back)
+        let A0p = (mat.press2 >= 0.5 ? A0 * (1 + mat.pressArea * pressSum) : A0) * flS * flS * splitDet   // v2.62 splitDet: torn, the target area shrinks with it. v2.16 P1: pressed from the front it thins, so it looks bigger; v2.19 the flinch really shrinks it (else the area pressure pushes it back)
         let ap = max(-0.12, min(0.12, (sqrt(A0p / A) - 1) * mat.areaGain))
         let gcx = clusters[gi].xc, gcy = clusters[gi].yc
         let pf = pressField()
@@ -3501,7 +3509,7 @@ final class SlimeRig {
         // Known limit (2026-11-01): particle non-penetration cannot stop a *segment* crossing. Pushing a tentacle's
         // root towards its tip (compressing it) occasionally folds it for a few frames; widening the boundary-to-boundary
         // distance to 1.2h was tried and did not help. Candidate fixes: 手感精修提案 第 41 條.
-        let dmin = h * 0.6, dmin2 = dmin * dmin, inv = 1 / dmin
+        let dmin = h * 0.6 * splitDmin, dmin2 = dmin * dmin, inv = 1 / dmin   // v2.62 splitDmin: shrunk or squashed, the spacing shrinks too
         // 第 36 條: fixed-size hashed cell lists instead of a Dictionary built 240 times a second (no allocation per
         // substep; a bucket collision only costs an extra distance check)
         let buckets = 1024
@@ -5323,7 +5331,7 @@ final class SlimeRig {
         } else { pairOver = 0 }
     }
     /// Tearing: an ordinary release (feel, trust, mood the same), the stretch counted full so the pop is the biggest; that finger holds nothing until lifted.
-    // MARK: - v2.51 黏條、分裂、黏合 (多米 11-22). Port of the web's strandStep / splitNow / b2Step / extraMask.
+    // MARK: - v2.51 黏條、分裂 (多米 11-22). Port of the web's strandStep / splitNow / extraMask. From v2.62 the split makes a second slime (below, 扯斷成兩隻).
     // The strand: the physical body stretches only to a stable length; the rest of the way to the finger is a chain of `gooN` nodes (the middle lags, so it
     // bends when swung), drawn into the skin's mask. The mask is blurred and thresholded anyway, so the strand joins the body round. Half-width: 0.26R at the
     // root, thinner in the middle with length but never under 0.12R (still above the threshold after the blur, it cannot vanish), 0.2R at the finger.
@@ -5340,10 +5348,52 @@ final class SlimeRig {
     }
     private var goo: [Goo] = []
     private let gooN = 14
-    private var b2On = false, b2Held = false, b2Air = true
-    private var b2ID: ObjectIdentifier?
-    private var b2X = 0.0, b2Y = 0.0, b2VX = 0.0, b2VY = 0.0, b2R = 0.0, b2G = 1.0, b2Sq = 0.0, b2SqV = 0.0
-    private var b2TX = 0.0, b2TY = 0.0, b2SX = 0.0, b2SY = 0.0, b2Idle = 0.0, b2Merge = 0.0
+    // v2.62 the second slime (web B2). b2On is B2.on: remeshCheck reads it (no re-sample while there are two)
+    private var b2On = false
+    private struct TwinCluster { var idx: [Int]; var w: Double }
+    /// A touch holding the second slime (web B2.fg): world position (it follows only the real movement, as the body's fingers), its lagged position, where it took hold, the last screen point, the grabbed patch
+    private final class TwinFinger {
+        var x, y, fx, fy: Double
+        let ax, ay: Double
+        var sx, sy: Double
+        let mem: [(i: Int, ox: Double, oy: Double, w: Double)]
+        var dead = false   // the merge took it away; nothing until it lifts
+        init(x: Double, y: Double, sx: Double, sy: Double, mem: [(i: Int, ox: Double, oy: Double, w: Double)]) {
+            self.x = x; self.y = y; fx = x; fy = y; ax = x; ay = y; self.sx = sx; self.sy = sy; self.mem = mem
+        }
+    }
+    /// The merge playing (web B2.mg): which one, when, how long; how much has flowed in; the direction to A; where the second one started; the gap then; the touching pair (B, A);
+    /// the touching point from A's centre; what the drawing needs (web mg.draw: str, bridge, ring, bulge, shut)
+    private final class TwinMerge {
+        let fx: Int
+        let t0: Double, T: Double, ux: Double, uy: Double, bx0: Double, by0: Double, gap0: Double
+        let bi: Int, ai: Int
+        let rx: Double, ry: Double
+        var mass = 0.0, gul = false, pop = false
+        var str = 0.0, bridge = 0.0, ring = 0.0, bulge = 0.0, shut = 0.0
+        init(fx: Int, t0: Double, T: Double, ux: Double, uy: Double, bx0: Double, by0: Double, gap0: Double, bi: Int, ai: Int, rx: Double, ry: Double) {
+            self.fx = fx; self.t0 = t0; self.T = T; self.ux = ux; self.uy = uy; self.bx0 = bx0; self.by0 = by0; self.gap0 = gap0; self.bi = bi; self.ai = ai; self.rx = rx; self.ry = ry
+        }
+    }
+    private var twN = 0, twH = 10.0, twR = 0.0, twA0 = 1.0
+    private var twBnd: [Int] = [], twBndL: [Double] = [], twBI: [Int] = []
+    private var twX: [Double] = [], twY: [Double] = [], twPX: [Double] = [], twPY: [Double] = []
+    private var twQ0X: [Double] = [], twQ0Y: [Double] = [], twQX: [Double] = [], twQY: [Double] = []
+    private var twGX: [Double] = [], twGY: [Double] = [], twGW: [Double] = [], twGWT: [Double] = []
+    private var twCl: [TwinCluster] = [], twGAng = 0.0, twGXC = 0.0, twGYC = 0.0   // its clusters (the last is the whole body) and the whole body's turn and centre
+    private var twCellHead: [Int32] = [], twCellNext: [Int32] = []
+    private var twEL: [Int] = [], twER: [Int] = [], twBlinkT = -9.0, twNextBlink = 0.0
+    private var twHide = false, twIdle = 0.0, twSc = 1.0, twQa = 1.0, twQp = 1.0, twAx = 1.0, twAy = 0.0, twStretch = 0.0
+    private var twFg: [ObjectIdentifier: TwinFinger] = [:]
+    private var twMg: TwinMerge?
+    // web SPLIT: how many tears and merges; when it tore; A's size k (eased); the second one's share; torn this time (one at a time); pulled apart past 0.6R since;
+    // A's reference scaling (mx, already in the reference shape's frame), its determinant and the shrink of the no-overlap distance; the squash, the wobble, the happy eyes; the lumps on A (pods)
+    private var splitN = 0, splitMerged = 0, splitT0 = -9.0, splitFracNow = 0.45, splitUsed = false, splitApart = false
+    private(set) var splitK = 1.0
+    private var splitMx: (m00: Double, m01: Double, m10: Double, m11: Double) = (1, 0, 0, 1)
+    private var splitDet = 1.0, splitDmin = 1.0, splitWob = -9.0, splitHappy = -9.0
+    private var splitSq: (ux: Double, uy: Double, a: Double, p: Double)?
+    private var splitPods: [(a: Double, amp: Double, sig: Double)] = []
 
     private func gooW(_ q: Goo, _ u: Double) -> Double {
         let wr: Double = R * 0.26, wm: Double = R * max(0.12, 0.26 / (1 + q.L / (R * 1.4))), wt: Double = R * 0.2
@@ -5375,7 +5425,7 @@ final class SlimeRig {
             for i in bnd { let e = (X[i] - f.fx) * (X[i] - f.fx) + (Y[i] - f.fy) * (Y[i] - f.fy); if e < bd { bd = e; goo[q].ai = i } }   // let go, the root rides this boundary particle
             // the split: the finger far enough from the centre, long enough
             let far: Bool = hypot(f.x - gc.xc, f.y - gc.yc) > params.splitAt * R
-            if params.split >= 0.5 && !b2On && far && goo[q].k > 0.9 { goo[q].over += dt } else { goo[q].over = max(0, goo[q].over - dt * 2) }
+            if params.split >= 0.5 && !b2On && !splitUsed && far && goo[q].k > 0.9 { goo[q].over += dt } else { goo[q].over = max(0, goo[q].over - dt * 2) }
             goo[q].pinch = max(0, min(1, (goo[q].over - 0.4) / 0.25))
             if goo[q].pinch >= 1 { splitNow(q, f) }
         }
@@ -5409,75 +5459,517 @@ final class SlimeRig {
 
     private func splitNow(_ q: Int, _ f: Finger) {
         let m = goo[q].n[gooN / 2]
-        b2On = true; b2X = f.x; b2Y = f.y; b2VX = 0; b2VY = 0; b2R = R * 0.46; b2G = 0.5; b2Sq = 0; b2SqV = 3
-        b2Held = true; b2ID = goo[q].id; b2TX = f.x; b2TY = f.y; b2SX = f.sx; b2SY = f.sy; b2Idle = t; b2Merge = 0; b2Air = true
         goo[q].free = true; goo[q].pinch = 0; goo[q].over = 0; goo[q].tx = m.x; goo[q].ty = m.y
-        tearFinger(f)   // the finger lets go of the body (the rip and the drip); the touch now holds the small blob
+        twinSpawn(f)   // v2.51 the strand pinches and parts; from v2.62 what comes off is a second slime you can pinch (the same touch holds it)
     }
 
-    /// The touch holding the small blob lifted (or was taken away).
-    private func b2Drop(_ id: ObjectIdentifier) -> Bool {
-        guard b2On, b2Held, b2ID == id else { return false }
-        b2Held = false; b2ID = nil; b2Idle = t
-        let sp = hypot(b2VX, b2VY), cap = R * 8
-        if sp > cap { b2VX *= cap / sp; b2VY *= cap / sp }
-        onEvent?(.release(gain: 0.4, rate: 1.1, special: false))
-        return true
+    // MARK: - v2.62 扯斷成兩隻、碰到合回一隻 (多米 11-26). Port of the web's splitCheck / twinSpawn / twinBuild / twinSub / twinMem / twinStep / mergeStart / mergeStep / mergeEnd / twinDrop / splitKStep.
+    // The tear: a grabbing finger pulled more than splitAt radii from where it took hold (a phone held upright is 3.7R wide, from the centre it could hardly be reached),
+    // outward, faster than splitV radii a second on screen (the same ruler as v2.61's yank), for 0.05 s. With the strand on it is v2.51's pinch instead.
+    // At the tear the same touch takes the second one; A lets go and springs back, the remembered shape eases back over half a second (what was pulled out is the second one now).
+    // The second one is a whole small slime: its own particles (A's spacing), clusters, area pressure, ring rope, clay memory, gravity, the sill and the walls, eyes, blush;
+    // it can be grabbed, pulled and pinched with two fingers. Area: it takes splitFrac; A's reference shape and target area shrink to the rest together (splitK, the particles stay),
+    // merged k goes back to 1 and the points and the area are the original ones. At most two: while there are two neither tears. Whether it can tear again after a merge: splitAgain.
+    // The merge: once pulled apart past 0.6R (or 0.6 s after it was let go), the outlines within mergeGap R (the bridge 0.5R more, the drop 0.25R, swallowing 0.1R, for the goo
+    // and the neck to have room) start mergeFx: 0 a bridge of goo, 1 squash and pop, 2 a drop and a ripple, 3 swallowed. Then it is gone and A is its old size.
+    // Left alone `rejoin` seconds it crawls back in pulses (v2.51 had that). It is drawn into A's mask, which is blurred and cut, so a round neck grows between them as they close.
+    private static let mergeT: [Double] = [1.1, 0.85, 1.1, 1]   // seconds each merge plays (as the design board)
+    private static let mergeReach: [Double] = [0.5, 0, 0.25, 0.1]
+    private static func sstep(_ x: Double) -> Double { let u: Double = max(0, min(1, x)); return u * u * (3 - 2 * u) }
+    private static func sbump(_ x: Double) -> Double { x <= 0 || x >= 1 ? 0 : sin(.pi * x) }
+    private func mergeFxIndex(_ mat: FeelParams) -> Int {
+        guard mat.mergeFx.isFinite else { return 0 }
+        let r = Int(mat.mergeFx.rounded())
+        return ((r % 4) + 4) % 4
     }
 
-    private func b2Step(_ dt: Double) {
-        guard b2On, !clusters.isEmpty else { return }
+    private func splitCheck(_ dt: Double) {
+        let mat = effParams
+        guard mat.split >= 0.5, !(mat.strand >= 0.5), !b2On, !splitUsed, !introOn, !clusters.isEmpty else { return }   // the strand on: gooStep's way
         let gc = clusters[gi]
-        b2G += (1 - b2G) * (1 - exp(-dt / 0.12))
-        if b2Merge > 0 {   // drawn into the body
-            b2Merge += dt / 0.45
-            let k = 1 - exp(-dt / 0.12)
-            b2X += (gc.xc - b2X) * k; b2Y += (gc.yc - b2Y) * k
-            if b2Merge >= 1.9 {
-                b2On = false
-                voiceLast = -9; voice("gulp", 0.6)
-                onEvent?(.press(gain: 0.3))
-                if sillOn && !introOn { introSq = 0.12 }   // the body bulges once
-                eyeUser = t + 1.2
-            }
-            return
+        for f in Array(fingers.values) where f.mode == .grab {
+            let ox: Double = f.x - gc.xc, oy: Double = f.y - gc.yc, d: Double = hypot(f.x - f.ax, f.y - f.ay) / R
+            let vx: Double = f.vxS, vy: Double = f.vyS, v: Double = hypot(vx, vy) * camZ / R
+            if d > mat.splitAt && v > mat.splitV && ox * vx + oy * vy > 0 { f.splitT += dt } else { f.splitT = max(0, f.splitT - dt) }
+            if f.splitT >= 0.05 { twinSpawn(f); return }
         }
-        if b2Held {
-            lastTouch = t; b2Idle = t
-            let k = 1 - exp(-dt / 0.04), ox = b2X, oy = b2Y
-            b2X += (b2TX - b2X) * k; b2Y += (b2TY - b2Y) * k
-            b2VX = (b2X - ox) / dt; b2VY = (b2Y - oy) / dt; b2Air = true
-        } else {
-            if !fingers.isEmpty { b2Idle = t }
-            let wl = worldWalls, rr = b2R * 0.85
-            let room: Bool = sillOn && sillG != nil
-            if room { b2VY += R * sillGrav * dt; b2VX *= exp(-dt / (b2Air ? 2 : 0.15)) } else { b2VX *= exp(-dt / 0.6); b2VY *= exp(-dt / 0.6) }
-            if t - b2Idle > params.rejoin {   // left alone: it crawls back in pulses
-                let dx: Double = gc.xc - b2X, dy: Double = room ? 0 : gc.yc - b2Y
-                let l: Double = max(1e-9, hypot(dx, dy)), ph: Double = sin((t - b2Idle) * 5), p: Double = max(0, ph)
-                b2VX = dx / l * R * 1.3 * p * p
-                if !room { b2VY = dy / l * R * 1.3 * p * p }
-                b2Sq += (0.1 * ph - b2Sq) * (1 - exp(-dt / 0.05))
-            }
-            b2X += b2VX * dt; b2Y += b2VY * dt
-            if wl.b.isFinite && b2Y > wl.b - rr {
-                if b2Air && b2VY > R * 2 { b2SqV += min(6, b2VY / R * 0.5); onEvent?(.fx(kind: "land", gain: min(0.6, 0.15 + b2VY / (R * 20)), delay: 0)) }
-                b2Y = wl.b - rr; b2VY = 0; b2Air = false
-            } else if room { b2Air = true }
-            if wl.l.isFinite && b2X < wl.l + rr { b2X = wl.l + rr; b2VX = abs(b2VX) * 0.3 }
-            if wl.r.isFinite && b2X > wl.r - rr { b2X = wl.r - rr; b2VX = -abs(b2VX) * 0.3 }
-            if wl.t.isFinite && b2Y < wl.t + rr { b2Y = wl.t + rr; b2VY = abs(b2VY) * 0.3 }
-            // touching the body: merge
-            var bd = 1e18
-            for i in bnd { let e = (X[i] - b2X) * (X[i] - b2X) + (Y[i] - b2Y) * (Y[i] - b2Y); if e < bd { bd = e } }
-            if insideBody(b2X, b2Y) || bd.squareRoot() < b2R * 0.75 { b2Merge = 0.001; onEvent?(.fx(kind: "cling", gain: 0.5, delay: 0)) }
-        }
-        b2SqV += (-b2Sq * 140 - b2SqV * 9) * dt; b2Sq += b2SqV * dt
-        b2Sq = max(-0.35, min(0.35, b2Sq))
     }
 
-    /// What the skin draws besides the body, in world points: the strand as round-capped segments (full width), the small blob as an ellipse.
-    var gooView: (segs: [(x0: Double, y0: Double, x1: Double, y1: Double, w: Double)], blob: (x: Double, y: Double, rx: Double, ry: Double)?) {
+    private func twinSpawn(_ f: Finger) {
+        guard !clusters.isEmpty, N > 0, let id = fingers.first(where: { $0.value === f })?.key else { return }
+        let mat = effParams, gc = clusters[gi], fx: Double = f.fx, fy: Double = f.fy
+        var ux: Double = gc.xc - fx, uy: Double = gc.yc - fy
+        let ul: Double = hypot(ux, uy)
+        if ul > 1e-9 { ux /= ul; uy /= ul } else { ux = 1; uy = 0 }   // the web divides by 1 here (all its points would land on one spot)
+        let frac: Double = max(0.2, min(0.6, mat.splitFrac > 0 ? mat.splitFrac : 0.45))
+        splitFracNow = frac
+        let rb: Double = (frac * A0 / .pi).squareRoot(), x: Double = f.x, y: Double = f.y, sx: Double = f.sx, sy: Double = f.sy
+        twinBuild(fx + ux * rb * 0.3, fy + uy * rb * 0.3, rb, ux, uy, mat)
+        tearFinger(f); relaxUntil = max(relaxUntil, t + 0.5); CAPG = 1   // A: let go, the memory of what was pulled out eases off in half a second
+        if remN > 0, mat.remeshHome >= 0.5, HB.count == bnd.count, remesh(back: true) { remN = 0; remCalm = t + max(0, mat.remeshCalm); remLast = t }   // re-sampled: back to the mesh it was built with (no re-sample while there are two), so the points add up again after the merge
+        twinGrab(id, x, y, sx, sy, mat)
+        splitN += 1; splitT0 = t; splitUsed = true; splitApart = false
+    }
+
+    private func twArea(_ px: [Double], _ py: [Double]) -> Double {
+        let b = twBnd, n = b.count
+        guard n > 2 else { return 0 }
+        var A = 0.0
+        for k in 0..<n { let i = b[k], j = b[(k + 1) % n]; A += px[i] * py[j] - px[j] * py[i] }
+        return abs(A) / 2
+    }
+
+    private func twinBuild(_ cx: Double, _ cy: Double, _ rb: Double, _ ux: Double, _ uy: Double, _ mat: FeelParams) {
+        let hh: Double = h
+        let p0: Double = Double.random(in: 0..<1, using: &rng) * 6.283, p1: Double = Double.random(in: 0..<1, using: &rng) * 6.283
+        func rr(_ a: Double) -> Double { rb * (1 + 0.045 * sin(2 * a + p0) + 0.03 * sin(3 * a + p1)) }
+        var pts: [(x: Double, y: Double)] = [], bn: [Int] = []
+        let M: Int = max(20, Int((2 * Double.pi * rb / (hh * 1.05)).rounded()))
+        for m in 0..<M {
+            let a: Double = -Double.pi / 2 + Double(m) / Double(M) * 2 * Double.pi, r: Double = rr(a)
+            bn.append(pts.count); pts.append((x: cos(a) * r, y: sin(a) * r * 0.94))
+        }
+        var row = 0, gy: Double = -rb * 1.2
+        while gy <= rb * 1.2 {
+            var gx: Double = -rb * 1.2 + (row % 2 == 1 ? hh / 2 : 0)
+            while gx <= rb * 1.2 {
+                if hypot(gx, gy / 0.94) <= rr(atan2(gy / 0.94, gx)) - hh * 0.3 {
+                    var dm = 1e9
+                    for k in bn { dm = min(dm, hypot(pts[k].x - gx, pts[k].y - gy)) }
+                    if dm > hh * 0.7 { pts.append((x: gx, y: gy)) }
+                }
+                gx += hh
+            }
+            gy += hh * 0.87; row += 1
+        }
+        let n = pts.count
+        var mx = 0.0, my = 0.0
+        for p in pts { mx += p.x; my += p.y }
+        mx /= Double(n); my /= Double(n)
+        let z = [Double](repeating: 0, count: n)
+        twN = n; twBnd = bn; twH = hh; twR = rb
+        twX = z; twY = z; twPX = z; twPY = z; twQ0X = z; twQ0Y = z; twQX = z; twQY = z; twGX = z; twGY = z; twGW = z; twGWT = z
+        let vx: Double = -uy, vy: Double = ux, ea: Double = 1.45, ep: Double = 1 / 1.45   // just torn: drawn out along the tear, let go it springs back round (that is the shape matching's own bounce)
+        for i in 0..<n {
+            let qx: Double = pts[i].x - mx, qy: Double = pts[i].y - my, al: Double = qx * ux + qy * uy, pe: Double = qx * vx + qy * vy
+            twQ0X[i] = qx; twQX[i] = qx; twQ0Y[i] = qy; twQY[i] = qy
+            let px: Double = cx + ux * al * ea + vx * pe * ep, py: Double = cy + uy * al * ea + vy * pe * ep
+            twX[i] = px; twPX[i] = px; twY[i] = py; twPY[i] = py
+        }
+        let nb = bn.count
+        twBndL = []
+        for k in 0..<nb { let i = bn[k], j = bn[(k + 1) % nb]; twBndL.append(hypot(twQ0X[j] - twQ0X[i], twQ0Y[j] - twQ0Y[i])) }
+        twBI = [Int](repeating: -1, count: n)
+        for k in 0..<nb { twBI[bn[k]] = k }
+        twA0 = twArea(twQ0X, twQ0Y)
+        twCl = []
+        let cs: Double = R * mat.cSpace, cr: Double = R * mat.cRad
+        if cs > 0 {
+            var yy: Double = -rb * 1.3
+            while yy <= rb * 1.3 {
+                var xx: Double = -rb * 1.3
+                while xx <= rb * 1.3 {
+                    var idx: [Int] = []
+                    for i in 0..<n where hypot(twQ0X[i] - xx, twQ0Y[i] - yy) < cr { idx.append(i) }
+                    if idx.count >= 5 { twCl.append(TwinCluster(idx: idx, w: 1)) }
+                    xx += cs
+                }
+                yy += cs
+            }
+        }
+        twCl.append(TwinCluster(idx: Array(0..<n), w: mat.wGlobal))   // the whole body, last
+        twGAng = 0; twGXC = cx; twGYC = cy
+        func near3(_ x: Double, _ y: Double) -> [Int] {
+            var o: [(d: Double, i: Int)] = []
+            for i in 0..<n { o.append((d: hypot(twQ0X[i] - x, twQ0Y[i] - y), i: i)) }
+            o.sort { $0.d < $1.d }
+            return o.prefix(3).map { $0.i }
+        }
+        twEL = near3(-rb * 0.34, -rb * 0.12); twER = near3(rb * 0.34, -rb * 0.12)
+        twBlinkT = -9; twNextBlink = t + 1.5 + Double.random(in: 0..<1, using: &rng) * 3
+        twCellNext = [Int32](repeating: -1, count: n)
+        b2On = true; twFg.removeAll(); twMg = nil; twHide = false; twIdle = t; twSc = 1; twQa = 1; twQp = 1; twAx = ux; twAy = uy; twStretch = 0
+    }
+
+    /// A touch landing here takes the second one: inside its outline, or within 0.25R of it outside A
+    private func twinHit(_ x: Double, _ y: Double) -> Bool {
+        guard b2On, !twHide, twMg == nil else { return false }
+        let n = twBnd.count
+        guard n > 2 else { return false }
+        var c = false, j = n - 1
+        for k in 0..<n {
+            let i1 = twBnd[k], i2 = twBnd[j]
+            let ax: Double = twX[i1], ay: Double = twY[i1], bx: Double = twX[i2], by: Double = twY[i2]
+            if (ay > y) != (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax { c.toggle() }
+            j = k
+        }
+        if c { return true }
+        if insideBody(x, y) { return false }
+        var d = 1e18
+        for i in twBnd { let dx: Double = twX[i] - x, dy: Double = twY[i] - y; d = min(d, dx * dx + dy * dy) }
+        return d.squareRoot() < R * 0.25
+    }
+
+    private func twinGrab(_ id: ObjectIdentifier, _ x: Double, _ y: Double, _ sx: Double, _ sy: Double, _ mat: FeelParams) {
+        let rg: Double = R * max(0.2, mat.grabR)
+        var mem: [(i: Int, ox: Double, oy: Double, w: Double)] = []
+        for i in 0..<twN {
+            let d: Double = hypot(twX[i] - x, twY[i] - y)
+            if d < rg { let u: Double = d / rg; mem.append((i: i, ox: twX[i] - x, oy: twY[i] - y, w: 1 - u * u)) }
+        }
+        if mem.isEmpty {
+            var o: [(d: Double, i: Int)] = []
+            for i in 0..<twN { o.append((d: hypot(twX[i] - x, twY[i] - y), i: i)) }
+            o.sort { $0.d < $1.d }
+            for q in o.prefix(4) { mem.append((i: q.i, ox: twX[q.i] - x, oy: twY[q.i] - y, w: 0.6)) }
+        }
+        twFg[id] = TwinFinger(x: x, y: y, sx: sx, sy: sy, mem: mem)
+        twIdle = t
+    }
+
+    private func twinRelease(_ id: ObjectIdentifier) {
+        guard let f = twFg.removeValue(forKey: id) else { return }
+        twIdle = t
+        if f.dead || !b2On { return }
+        let cap: Double = R * 8 * lastSdt   // flung, at most 8R a second (the same number as v2.51)
+        for i in 0..<twN {
+            let vx: Double = twX[i] - twPX[i], vy: Double = twY[i] - twPY[i], v: Double = hypot(vx, vy)
+            if v > cap { twPX[i] = twX[i] - vx * cap / v; twPY[i] = twY[i] - vy * cap / v }
+        }
+        onEvent?(.release(gain: 0.4, rate: 1.1, special: false))
+    }
+
+    private func twinSub(_ dt: Double, _ mat: FeelParams) {
+        let n = twN, nb = twBnd.count
+        guard n > 0, nb > 2, twX.count == n, twBndL.count == nb, twBI.count == n else { return }
+        let damp: Double = min(0.995, mat.damp), alpha: Double = min(1, mat.alpha), wl = worldWalls
+        let G: Double = sillOn && sillG != nil ? R * sillGrav : 0
+        for i in 0..<n {
+            let vx: Double = (twX[i] - twPX[i]) * damp, vy: Double = (twY[i] - twPY[i]) * damp
+            twPX[i] = twX[i]; twPY[i] = twY[i]
+            twX[i] += vx; twY[i] += vy + G * dt * dt
+        }
+        for i in 0..<n { twGWT[i] = 0 }
+        for f in twFg.values where !f.dead {
+            for m in f.mem where m.i < n {
+                let k: Double = min(0.95, mat.grabK * m.w)
+                twX[m.i] += (f.fx + m.ox - twX[m.i]) * k; twY[m.i] += (f.fy + m.oy - twY[m.i]) * k
+                if m.w > twGWT[m.i] { twGWT[m.i] = m.w }
+            }
+        }
+        // shape matching: the reference shape × sc (shrinks while it flows in), qa along (ax, ay) and qp across (squashed, crawling), and a little breath
+        let breath: Double = 0.025 * sin(t * 2 * Double.pi / 3.4) * (twFg.isEmpty ? 1 : 0.5)
+        let s: Double = twSc * (1 + breath), ux: Double = twAx, uy: Double = twAy, qa: Double = twQa, qp: Double = twQp
+        let m00: Double = s * (qa * ux * ux + qp * uy * uy), m01: Double = s * (qa - qp) * ux * uy, m11: Double = s * (qa * uy * uy + qp * ux * ux)
+        for i in 0..<n { twGX[i] = 0; twGY[i] = 0; twGW[i] = 0 }
+        let last = twCl.count - 1
+        for c in 0..<twCl.count {
+            let idx = twCl[c].idx, w: Double = twCl[c].w
+            if idx.isEmpty { continue }
+            let m = Double(idx.count)
+            var xc = 0.0, yc = 0.0, qcx = 0.0, qcy = 0.0
+            for i in idx { xc += twX[i]; yc += twY[i]; qcx += twQX[i]; qcy += twQY[i] }
+            xc /= m; yc /= m; qcx /= m; qcy /= m
+            var a = 0.0, b = 0.0, cc = 0.0, d = 0.0
+            for i in idx {
+                let px: Double = twX[i] - xc, py: Double = twY[i] - yc, ex: Double = twQX[i] - qcx, ey: Double = twQY[i] - qcy
+                let qx: Double = m00 * ex + m01 * ey, qy: Double = m01 * ex + m11 * ey
+                a += px * qx; b += px * qy; cc += py * qx; d += py * qy
+            }
+            let ang: Double = atan2(cc - b, a + d), cs: Double = cos(ang), sn: Double = sin(ang)
+            if c == last { twGAng = ang; twGXC = xc; twGYC = yc }
+            for i in idx {
+                let ex: Double = twQX[i] - qcx, ey: Double = twQY[i] - qcy
+                let qx: Double = m00 * ex + m01 * ey, qy: Double = m01 * ex + m11 * ey
+                twGX[i] += (xc + cs * qx - sn * qy) * w; twGY[i] += (yc + sn * qx + cs * qy) * w; twGW[i] += w
+            }
+        }
+        let A: Double = twArea(twX, twY)
+        let want: Double = (twA0 * s * s * qa * qp / max(1, A)).squareRoot()
+        let ap: Double = max(-0.12, min(0.12, (want - 1) * mat.areaGain)), cx: Double = twGXC, cy: Double = twGYC
+        for i in 0..<n where twGW[i] > 0 {
+            let gx: Double = cx + (twGX[i] / twGW[i] - cx) * (1 + ap), gy: Double = cy + (twGY[i] / twGW[i] - cy) * (1 + ap)
+            let ka: Double = alpha * (1 - mat.grabHold * twGWT[i])
+            twX[i] += (gx - twX[i]) * ka; twY[i] += (gy - twY[i]) * ka
+        }
+        if twFg.isEmpty && twMg == nil {   // turning back upright: kinematic, no speed left
+            let r: Double = -twGAng * min(0.2, max(mat.upright, 0.01)), c: Double = cos(r), sn: Double = sin(r)
+            for i in 0..<n {
+                var dx: Double = twX[i] - cx, dy: Double = twY[i] - cy
+                twX[i] = cx + dx * c - dy * sn; twY[i] = cy + dx * sn + dy * c
+                dx = twPX[i] - cx; dy = twPY[i] - cy
+                twPX[i] = cx + dx * c - dy * sn; twPY[i] = cy + dx * sn + dy * c
+            }
+        }
+        // the ring rope (A's rule: 0.6 to 2.4 times, the top following the remembered shape)
+        let lo0: Double = 0.6 * min(1, s * min(qa, qp))
+        for _ in 0..<2 {
+            for k in 0..<nb {
+                let i = twBnd[k], j = twBnd[(k + 1) % nb]
+                let dx: Double = twX[j] - twX[i], dy: Double = twY[j] - twY[i], dh: Double = hypot(dx, dy), d: Double = dh > 0 ? dh : 1e-6
+                let l0: Double = twBndL[k], hi: Double = max(l0, hypot(twQX[j] - twQX[i], twQY[j] - twQY[i])) * 2.4, lo: Double = l0 * lo0
+                var c = 0.0
+                if d > hi { c = (d - hi) / d } else if d < lo { c = (d - lo) / d }
+                if c == 0 { continue }
+                let wi: Double = twGWT[i] != 0 ? 0.15 : 0.5, wj: Double = twGWT[j] != 0 ? 0.15 : 0.5, sw: Double = wi + wj
+                twX[i] += dx * c * wi / sw; twY[i] += dy * c * wi / sw; twX[j] -= dx * c * wj / sw; twY[j] -= dy * c * wj / sw
+            }
+        }
+        // no overlap (0.6 of the spacing; the eight ring neighbours either side are the rope's)
+        do {
+            let dmin: Double = twH * 0.6 * min(1, s * min(qa, qp)), d2m: Double = dmin * dmin, inv: Double = 1 / max(1e-3, dmin)
+            let buckets = 1024
+            if twCellNext.count != n { twCellNext = [Int32](repeating: -1, count: n) }
+            if twCellHead.count != buckets { twCellHead = [Int32](repeating: -1, count: buckets) }
+            for b in 0..<buckets { twCellHead[b] = -1 }
+            func key(_ gx: Int, _ gy: Int) -> Int { ((gx &* 73856093) ^ (gy &* 19349663)) & (buckets - 1) }
+            for i in 0..<n {
+                let b = key(Int(floor(twX[i] * inv)), Int(floor(twY[i] * inv)))
+                twCellNext[i] = twCellHead[b]; twCellHead[b] = Int32(i)
+            }
+            for i in 0..<n {
+                let gx = Int(floor(twX[i] * inv)), gy = Int(floor(twY[i] * inv))
+                for ox in -1...1 {
+                    for oy in -1...1 {
+                        var j = Int(twCellHead[key(gx + ox, gy + oy)])
+                        while j >= 0 {
+                            defer { j = Int(twCellNext[j]) }
+                            if j <= i { continue }
+                            if twBI[i] >= 0 && twBI[j] >= 0 {
+                                let di = abs(twBI[i] - twBI[j])
+                                if min(di, nb - di) <= 8 { continue }
+                            }
+                            let dx: Double = twX[j] - twX[i], dy: Double = twY[j] - twY[i], q: Double = dx * dx + dy * dy
+                            if q >= d2m || q < 1e-9 { continue }
+                            let d: Double = q.squareRoot(), c: Double = (dmin - d) / d
+                            let wi: Double = twGWT[i] != 0 ? 0.3 : 1, wj: Double = twGWT[j] != 0 ? 0.3 : 1, sw: Double = wi + wj
+                            twX[i] -= dx * c * wi / sw; twY[i] -= dy * c * wi / sw; twX[j] += dx * c * wj / sw; twY[j] += dy * c * wj / sw
+                        }
+                    }
+                }
+            }
+        }
+        for i in 0..<n {
+            if twY[i] > wl.b { twY[i] = wl.b; twPX[i] += (twX[i] - twPX[i]) * 0.35 }
+            if twY[i] < wl.t { twY[i] = wl.t }
+            if twX[i] < wl.l { twX[i] = wl.l }
+            if twX[i] > wl.r { twX[i] = wl.r }
+        }
+    }
+
+    /// Clay memory: held, it remembers what it was pinched into (aligned with its turn); untouched it eases back at `recover`; the remembered shape centred, kept at its own area
+    private func twinMem(_ dt: Double, _ mat: FeelParams) {
+        let n = twN, s = twSc
+        guard n > 0, s >= 0.3, twQX.count == n else { return }
+        let cs: Double = cos(twGAng), sn: Double = sin(twGAng)
+        let grab: Bool = twFg.values.contains(where: { !$0.dead })
+        if grab && mat.creep > 0 {
+            let k: Double = 1 - exp(-mat.creep * 0.5 * dt), y0: Double = R * max(0, mat.yield) * 0.1
+            for i in 0..<n {
+                let lx: Double = twX[i] - twGXC, ly: Double = twY[i] - twGYC
+                let qx: Double = (cs * lx + sn * ly) / s, qy: Double = (-sn * lx + cs * ly) / s
+                let ex: Double = qx - twQX[i], ey: Double = qy - twQY[i], e: Double = hypot(ex, ey)
+                if e > y0 { let f: Double = k * (e - y0) / e; twQX[i] += ex * f; twQY[i] += ey * f }
+            }
+        } else if !grab {
+            let k: Double = 1 - exp(-max(mat.recover, 0.02) * dt)
+            for i in 0..<n { twQX[i] += (twQ0X[i] - twQX[i]) * k; twQY[i] += (twQ0Y[i] - twQY[i]) * k }
+        }
+        var mx = 0.0, my = 0.0
+        for i in 0..<n { mx += twQX[i]; my += twQY[i] }
+        mx /= Double(n); my /= Double(n)
+        let g: Double = (twA0 / max(1, twArea(twQX, twQY))).squareRoot()   // the area does not move with the centring
+        for i in 0..<n { twQX[i] = (twQX[i] - mx) * g; twQY[i] = (twQY[i] - my) * g }
+    }
+
+    /// The whole of it moved, its last positions with it (no speed left)
+    private func twinMove(_ dx: Double, _ dy: Double) {
+        for i in 0..<twN { twX[i] += dx; twY[i] += dy; twPX[i] += dx; twPY[i] += dy }
+    }
+    private func twinCenter() -> (x: Double, y: Double) {
+        guard twN > 0 else { return (0, 0) }
+        var x = 0.0, y = 0.0
+        for i in 0..<twN { x += twX[i]; y += twY[i] }
+        return (x / Double(twN), y / Double(twN))
+    }
+    /// The nearest pair of outline points (its, A's) and their distance; 0 once one of its points is inside A
+    private func twinContact() -> (d: Double, bi: Int, ai: Int) {
+        var d = 1e18, bi = -1, ai = -1
+        for i in twBnd {
+            let x: Double = twX[i], y: Double = twY[i]
+            if insideBody(x, y) {
+                var q = 1e18, aj = -1
+                for j in bnd { let dx: Double = X[j] - x, dy: Double = Y[j] - y, e: Double = dx * dx + dy * dy; if e < q { q = e; aj = j } }
+                return (0, i, aj)
+            }
+            for j in bnd { let dx: Double = X[j] - x, dy: Double = Y[j] - y, e: Double = dx * dx + dy * dy; if e < d { d = e; bi = i; ai = j } }
+        }
+        return (d.squareRoot(), bi, ai)
+    }
+
+    private func twinStep(_ dt: Double) {
+        guard b2On, !clusters.isEmpty, twN > 0 else { splitKStep(dt); return }
+        let mat = effParams, gc = clusters[gi]
+        let kl: Double = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1
+        for f in twFg.values { f.fx += (f.x - f.fx) * kl; f.fy += (f.y - f.fy) * kl }
+        var st = 0.0
+        for f in twFg.values where !f.dead { st = max(st, hypot(f.x - f.ax, f.y - f.ay) / R) }
+        twStretch = st
+        if !twFg.isEmpty { twIdle = t; slpLastAny = t }
+        if twMg == nil {
+            var ta = 1.0, tp = 1.0
+            if twFg.isEmpty && t - twIdle > mat.rejoin && !twHide {   // left alone rejoin seconds: it crawls back in pulses
+                let c = twinCenter(), dx: Double = gc.xc - c.x, dy: Double = sillOn ? 0 : gc.yc - c.y, dl: Double = hypot(dx, dy), l: Double = dl > 0 ? dl : 1
+                let ph: Double = sin((t - twIdle) * 5), p: Double = max(0, ph)
+                twinMove(dx / l * R * 1.3 * p * p * dt, dy / l * R * 1.3 * p * p * dt)
+                twAx = dx / l; twAy = dy / l; ta = 1 + 0.1 * ph; tp = 1 / ta
+            }
+            let k: Double = 1 - exp(-dt / 0.08)
+            twQa += (ta - twQa) * k; twQp += (tp - twQp) * k
+        }
+        if !twHide {
+            let ns = max(1, Int((dt * 240).rounded())), sdt = dt / Double(ns)   // A's substep
+            for _ in 0..<ns { twinSub(sdt, mat) }
+            twinMem(dt, mat)
+        }
+        if t > twNextBlink { twBlinkT = t; twNextBlink = t + 2 + 4 * Double.random(in: 0..<1, using: &rng) }
+        if twMg == nil && !twHide && t - splitT0 > 0.35 {
+            let c = twinContact(), gap: Double = c.d / R
+            if gap > 0.6 { splitApart = true }
+            let rest: Bool = twFg.isEmpty && t - twIdle > 0.6 && t - splitT0 > 0.8   // torn off still touching (common on a narrow screen): let go 0.6 s, it counts too
+            let near: Double = (mat.mergeGap > 0 ? mat.mergeGap : 0.08) + Self.mergeReach[mergeFxIndex(mat)]
+            if (splitApart || rest) && gap < near { mergeStart(c, mat) }
+        }
+        if twMg != nil { mergeStep(dt) }
+        splitKStep(dt)
+    }
+
+    // The merges (mergeFx). All of them: mass is how much of it has flowed into A (0 to 1), A's size k = √(1 − frac·(1 − mass)), its own sc = √(1 − mass), so the area is
+    // kept all the way. Its place is moved toward where this one wants it every frame (kinematic). The lumps and the ripple on A ride the pseudopods' road (podE, the area
+    // made up by itself); the squash and the pop are in A's reference scaling (splitMx).
+    private func mergeStart(_ c: (d: Double, bi: Int, ai: Int), _ mat: FeelParams) {
+        guard !clusters.isEmpty, c.ai >= 0, c.ai < N, c.bi >= 0, c.bi < twN else { return }
+        let fx = mergeFxIndex(mat), b = twinCenter(), gc = clusters[gi]
+        for f in twFg.values { f.dead = true }   // the fingers let go of it as it merges (they hold nothing until lifted)
+        var ux: Double = gc.xc - b.x, uy: Double = gc.yc - b.y
+        let dl: Double = hypot(ux, uy), l: Double = dl > 0 ? dl : 1
+        ux /= l; uy /= l
+        let pax: Double = X[c.ai], pay: Double = Y[c.ai], pbx: Double = twX[c.bi], pby: Double = twY[c.bi]
+        twMg = TwinMerge(fx: fx, t0: t, T: Self.mergeT[fx], ux: ux, uy: uy, bx0: b.x, by0: b.y, gap0: c.d, bi: c.bi, ai: c.ai,
+                         rx: (pax + pbx) / 2 - gc.xc, ry: (pay + pby) / 2 - gc.yc)
+        twAx = ux; twAy = uy
+        onEvent?(.fx(kind: "cling", gain: 0.5, delay: 0))
+    }
+
+    private func mergeStep(_ dt: Double) {
+        guard let g = twMg, !clusters.isEmpty else { return }
+        let tau: Double = t - g.t0, gc = clusters[gi], cx: Double = gc.xc + g.rx, cy: Double = gc.yc + g.ry, aAng: Double = atan2(g.ry, g.rx), rb: Double = twR
+        let b = twinCenter()
+        var tx: Double = b.x, ty: Double = b.y, mass = 0.0, qa = 1.0, qp = 1.0
+        g.str = 0; g.bridge = 0; g.ring = 0; g.bulge = 0; g.shut = 0
+        splitPods.removeAll(); splitSq = nil
+        let inAx: Double = gc.xc + (cx - gc.xc) * 0.45, inAy: Double = gc.yc + (cy - gc.yc) * 0.45   // halfway from the touching point to A's centre: where it flows to
+        switch g.fx {
+        case 0:   // a bridge of goo: a strand out from each (0.2 s) → they join and thicken (0.25) → it slides in along the bridge (0.35) → A bulges on that side (0.4)
+            g.str = Self.sstep(tau / 0.2); g.bridge = Self.sstep((tau - 0.2) / 0.25)
+            let v: Double = Self.sstep((tau - 0.45) / 0.35)
+            mass = v; qa = 1 + 0.1 * g.str * (1 - v); qp = 1 / qa
+            tx = g.bx0 + (inAx - g.bx0) * v; ty = g.by0 + (inAy - g.by0) * v
+            splitPods.append((a: aAng, amp: R * 0.2 * Self.sbump((tau - 0.6) / 0.5), sig: 0.45))
+        case 1:   // squash and pop: pushed together both squash (0.15) → a beat (0.1) → pop, it joins (0.08), A springs up tall and wobbles two or three times (0.6). Timing as the design board
+            let q: Double = Self.sstep(tau / 0.15) * (1 - Self.sstep((tau - 0.25) / 0.06)), push: Double = min(1, tau / 0.15) * (g.gap0 + rb * 0.25)
+            tx = g.bx0 + g.ux * push; ty = g.by0 + g.uy * push; qa = 1 - 0.28 * q; qp = 1 + 0.22 * q
+            splitSq = (ux: g.ux, uy: g.uy, a: 1 - 0.14 * q, p: 1 + 0.1 * q)
+            mass = Self.sstep((tau - 0.25) / 0.08)
+            if mass > 0 { tx += (inAx - tx) * mass; ty += (inAy - ty) * mass }
+            if tau >= 0.25 && !g.pop { g.pop = true; splitWob = t; onEvent?(.release(gain: 0.6, rate: 1.2, special: false)); voice("gulp", 0.5) }
+        case 2:   // a drop and a ripple: a round neck grows between them (0.3) → it flows in (0.3) → ripples run both ways round the outline, two rings on the body (0.5). Timing as the design board
+            let nk: Double = Self.sstep(tau / 0.3), push: Double = nk * (g.gap0 + rb * 0.3), v: Double = Self.sstep((tau - 0.3) / 0.3)
+            mass = v; tx = g.bx0 + g.ux * push; ty = g.by0 + g.uy * push; tx += (inAx - tx) * v; ty += (inAy - ty) * v
+            let p: Double = (tau - 0.6) / 0.5
+            if p > 0 && p < 1 {
+                let th: Double = Double.pi * Self.sstep(p), am: Double = R * 0.1 * (1 - p) * min(1, p * 6)
+                splitPods.append((a: aAng + th, amp: am, sig: 0.3)); splitPods.append((a: aAng - th, amp: am, sig: 0.3))
+                g.ring = p
+            }
+        default:   // swallowed: A opens toward it and wraps round (0.3) → it is a lump inside moving to the middle, eyes shut (0.4) → A blinks happily (0.3). Timing as the design board
+            let r: Double = Self.sstep(tau / 0.3), v: Double = Self.sstep((tau - 0.3) / 0.4)
+            splitPods.append((a: aAng, amp: R * 0.34 * r * (1 - v), sig: 0.55))
+            let near: Double = min(1, tau / 0.3) * max(0, g.gap0 - rb * 0.05)
+            tx = g.bx0 + g.ux * near; ty = g.by0 + g.uy * near; tx += (gc.xc - tx) * v; ty += (gc.yc - ty) * v
+            mass = Self.sstep((tau - 0.4) / 0.3)
+            g.bulge = tau > 0.25 && mass < 0.98 ? 1 - mass : 0
+            g.shut = Self.sstep((tau - 0.3) / 0.25)
+            if tau > 0.76 && splitHappy < g.t0 { splitHappy = t + 0.18 }
+        }
+        g.mass = max(g.mass, mass); twSc = max(0, 1 - g.mass).squareRoot(); twQa = qa; twQp = qp; twAx = g.ux; twAy = g.uy
+        if !twHide { let k: Double = 1 - exp(-dt / 0.05); twinMove((tx - b.x) * k, (ty - b.y) * k) }
+        if g.mass > 0.5 && !g.gul { g.gul = true; if g.fx != 1 { voice("gulp", 0.55) }; onEvent?(.press(gain: 0.3)) }
+        if g.mass >= 0.98 { twHide = true }
+        if tau >= g.T { mergeEnd() }
+    }
+
+    private func mergeEnd() {
+        b2On = false; twMg = nil; twHide = false; twFg.removeAll(); splitPods.removeAll(); splitSq = nil; splitMerged += 1
+        if params.splitAgain >= 0.5 { splitUsed = false }
+        eyeUser = t + 1.2
+    }
+
+    /// A rebuilt body starts as one again
+    private func twinDrop() {
+        b2On = false; twMg = nil; twHide = false; twFg.removeAll(); splitPods.removeAll(); splitSq = nil
+        splitK = 1; splitWob = -9; splitUsed = false; splitMx = (1, 0, 0, 1); splitDet = 1; splitDmin = 1
+    }
+
+    /// A's size and squash: a world matrix (k × squashed along the touch × the spring up and the wobble) turned into A's reference frame; substep puts it before the performed scaling
+    private func splitKStep(_ dt: Double) {
+        let tg: Double = splitKTarget()
+        splitK += (tg - splitK) * (1 - exp(-dt / 0.12))
+        if abs(splitK - 1) < 1e-4 && tg == 1 { splitK = 1 }
+        var a00: Double = splitK, a01 = 0.0, a10 = 0.0, a11: Double = splitK
+        if let q = splitSq {
+            let ax: Double = q.ux, ay: Double = q.uy
+            let m00: Double = q.a * ax * ax + q.p * ay * ay, m01: Double = (q.a - q.p) * ax * ay, m11: Double = q.a * ay * ay + q.p * ax * ax
+            a00 *= m00; a01 = splitK * m01; a10 = a01; a11 *= m11
+        }
+        let u: Double = t - splitWob
+        if u >= 0 && u < 1.2 {
+            let w: Double = 0.13 * exp(-u / 0.22) * cos(2 * Double.pi * 2.8 * u)
+            a00 *= 1 - 0.7 * w; a01 *= 1 - 0.7 * w; a10 *= 1 + w; a11 *= 1 + w
+        }
+        let ga: Double = clusters.isEmpty ? 0 : atan2(clusters[gi].sn, clusters[gi].cs), c: Double = cos(ga), s: Double = sin(ga)   // R(−ga)·M·R(ga)
+        let b00: Double = a00 * c + a01 * s, b01: Double = -a00 * s + a01 * c, b10: Double = a10 * c + a11 * s, b11: Double = -a10 * s + a11 * c
+        let n00: Double = c * b00 + s * b10, n01: Double = c * b01 + s * b11, n10: Double = -s * b00 + c * b10, n11: Double = -s * b01 + c * b11
+        splitMx = (n00, n01, n10, n11)
+        splitDet = n00 * n11 - n01 * n10
+        let sqMin: Double = splitSq.map { min($0.a, $0.p) } ?? 1
+        splitDmin = min(1, splitK * sqMin)
+    }
+    private func splitKTarget() -> Double {
+        guard b2On else { return 1 }
+        return max(0, 1 - splitFracNow * (1 - (twMg?.mass ?? 0))).squareRoot()
+    }
+    /// The merge's lumps and ripples on A, on the pseudopods' road (before their area is made up)
+    private func twinPods() {
+        guard !splitPods.isEmpty, !clusters.isEmpty else { return }
+        let ga: Double = atan2(clusters[gi].sn, clusters[gi].cs), rm: Double = reduceMotion ? 0.5 : 1
+        for p in splitPods where p.amp > 0 {
+            let a: Double = p.a - ga
+            podE.append((ca: cos(a), sa: sin(a), amp: p.amp * rm, sig: p.sig, bend: 0))
+        }
+    }
+
+    /// v2.62 the second slime as drawn (world points): its outline (empty once it has flowed in), its eyes (nil when too small or the eyes are off), the ripple inside A, the lump while swallowed
+    struct TwinEyes { let lx, ly, rx, ry, ox, oy, size, open: Double; let squeeze: Bool }
+    struct TwinView {
+        var outline: [(x: Double, y: Double)] = []
+        var eyes: TwinEyes? = nil
+        var rings: [(x: Double, y: Double, r: Double, alpha: Double, w: Double)] = []
+        var bulge = 0.0
+    }
+
+    /// What the skin draws besides the body, in world points: the strand (and the merge's goo) as round-capped segments (full width), the second slime.
+    var gooView: (segs: [(x0: Double, y0: Double, x1: Double, y1: Double, w: Double)], twin: TwinView?) {
         var segs: [(x0: Double, y0: Double, x1: Double, y1: Double, w: Double)] = []
         for q in goo where q.k >= 0.03 {
             for i in 0..<(gooN - 1) {
@@ -5486,12 +5978,51 @@ final class SlimeRig {
                 segs.append((q.n[i].x, q.n[i].y, q.n[i + 1].x, q.n[i + 1].y, w))
             }
         }
-        var blob: (x: Double, y: Double, rx: Double, ry: Double)? = nil
-        if b2On {
-            let sh: Double = b2Merge > 0 ? max(0, 1 - max(0, b2Merge - 0.9)) : 1, rad: Double = b2R * b2G * sh
-            if rad > 1 { blob = (b2X, b2Y + rad * b2Sq * 0.6, rad * (1 + b2Sq), rad * (1 - b2Sq)) }
+        guard b2On, twN > 0 else { return (segs, nil) }
+        var v = TwinView()
+        let g = twMg
+        if let g, g.ring > 0, !clusters.isEmpty {   // mergeFx 2: the rings on A's body (drawn clipped to it)
+            let gc = clusters[gi], rx: Double = gc.xc + g.rx, ry: Double = gc.yc + g.ry, p: Double = g.ring, w: Double = R * 0.05 * (1 - 0.5 * p)
+            v.rings.append((x: rx, y: ry, r: R * (0.15 + 1.5 * p), alpha: 0.55 * (1 - p), w: w))
+            let p2: Double = p - 0.25
+            if p2 > 0 { v.rings.append((x: rx, y: ry, r: R * (0.15 + 1.5 * p2), alpha: 0.45 * (1 - p2 / 0.75), w: w)) }
         }
-        return (segs, blob)
+        if twHide { return (segs, v) }
+        v.outline = twBnd.map { i -> (x: Double, y: Double) in (x: twX[i], y: twY[i]) }
+        if let g, g.str > 0 || g.bridge > 0, g.ai >= 0, g.ai < N, g.bi >= 0, g.bi < twN {   // mergeFx 0: the goo, into the same mask
+            let pax: Double = X[g.ai], pay: Double = Y[g.ai], pbx: Double = twX[g.bi], pby: Double = twY[g.bi]
+            let mx: Double = (pax + pbx) / 2, my: Double = (pay + pby) / 2 + (sillOn ? hypot(pax - pbx, pay - pby) * 0.06 : 0)
+            if g.bridge > 0 {   // a quadratic from it to A through the sagging middle, in 8 pieces
+                let w: Double = R * 0.13 + twR * 0.75 * g.bridge * (1 - 0.5 * g.mass)
+                var lx: Double = pbx, ly: Double = pby
+                for s in 1...8 {
+                    let u: Double = Double(s) / 8, mu: Double = 1 - u
+                    let qx: Double = mu * mu * pbx + 2 * mu * u * mx + u * u * pax, qy: Double = mu * mu * pby + 2 * mu * u * my + u * u * pay
+                    segs.append((lx, ly, qx, qy, w)); lx = qx; ly = qy
+                }
+            } else {
+                segs.append((pbx, pby, pbx + (mx - pbx) * g.str, pby + (my - pby) * g.str, R * 0.13))
+                segs.append((pax, pay, pax + (mx - pax) * g.str, pay + (my - pay) * g.str, R * 0.13))
+            }
+        }
+        let S: Double = R * params.eyeSize * splitFracNow.squareRoot() * twSc
+        if S >= 2 && params.eyes >= 0.5 && !twEL.isEmpty && !twER.isEmpty {
+            var lx = 0.0, ly = 0.0, rx = 0.0, ry = 0.0
+            for i in twEL { lx += twX[i]; ly += twY[i] }
+            for i in twER { rx += twX[i]; ry += twY[i] }
+            lx /= Double(twEL.count); ly /= Double(twEL.count); rx /= Double(twER.count); ry /= Double(twER.count)
+            let bk: Double = t - twBlinkT < 0.14 ? 0.1 : 1
+            var shut: Double = g?.shut ?? 0
+            if let g, g.fx != 3 { shut = max(shut, Self.sstep((g.mass - 0.6) / 0.3)) }
+            var lkx = 0.0, lky = 0.0
+            if let g { lkx = g.ux; lky = g.uy } else if !clusters.isEmpty {   // it looks at A
+                let c = twinCenter(), dx: Double = clusters[gi].xc - c.x, dy: Double = clusters[gi].yc - c.y, dl: Double = hypot(dx, dy), l: Double = dl > 0 ? dl : 1
+                lkx = dx / l; lky = dy / l
+            }
+            v.eyes = TwinEyes(lx: lx, ly: ly, rx: rx, ry: ry, ox: lkx * S * 0.03, oy: lky * S * 0.02, size: S, open: bk * (1 - shut), squeeze: twStretch > 1.2 && g == nil)
+        }
+        v.bulge = g?.bulge ?? 0
+        return (segs, v)
     }
 
     private func tearFinger(_ f: Finger) {

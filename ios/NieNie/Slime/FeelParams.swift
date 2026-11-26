@@ -281,9 +281,14 @@ struct FeelParams: Equatable, Codable {
     var lump: Double = 1              // irregular outline (web shape.js): heavy below, a bump leaning to one side on top, a smaller one low on the other side; 0 = the near-round blob of v2.50. Rebuilds the body
     var strand: Double = 0            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
     var tugEdge: Double = 0        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
-    var split: Double = 1             // the finger farther than splitAt×R from the body's centre for 0.4 s: the strand pinches and parts, the finger's end becomes a second small blob (no face). At most two. 0 off
-    var splitAt: Double = 3.4
-    var rejoin: Double = 6            // seconds left alone before the small blob crawls back and merges; dropped on the body it merges at once
+    var split: Double = 1             // v2.62 (多米 11-26): held and pulled past splitAt×R from where it took hold, the finger fast (splitV), it tears into two pinchable slimes; touching, they merge back with mergeFx. At most two. With the strand on: v2.51 (the strand pinches and parts). 0 off
+    var splitAt: Double = 1.8         // v2.62: how far the finger is pulled from where it took hold (radii; 3.4 before, measured from the centre). With the strand on: from the body's centre, as v2.51
+    var splitV: Double = 10           // v2.62: the finger faster than this on screen (radii a second) counts as a tear (v2.61's yank is 6)
+    var splitFrac: Double = 0.45      // v2.62: the share of the area the second one takes; the first shrinks to the rest, merged they add up to the whole again
+    var splitAgain: Double = 1        // v2.62: 1 = merged back, it can tear again (多米 has not decided; this for now); 0 = once per opening
+    var mergeFx: Double = 0           // v2.62: the merge animation: 0 a bridge of goo, 1 squash and pop, 2 a drop and a ripple, 3 swallowed (all four made, 多米 compares)
+    var mergeGap: Double = 0.08       // v2.62: the two outlines this close (radii) count as touching, the merge starts
+    var rejoin: Double = 6            // seconds left alone before the second one crawls back (in pulses); touching, the merge plays
     var endless: Double = 1           // v2.54 無限拉 (多米 11-22: pulled 5 cm it grew 3 cm and stopped; it should stretch without end and stay under the finger): the finger never gives way, the soft limits (maxPull, memMax) are off, and each edge's hard limit widens by `capG` while the held patch cannot keep up; 0 = v2.53
     var growK: Double = 1.5           // how fast the edge limits widen while the held patch lags the finger (e to this power a second)
     var growMax: Double = 12          // the most the edge limits widen
@@ -782,9 +787,14 @@ struct TuneField: Identifiable {
         TuneField(key: \.lump, name: "不規則外形 v2.51", hint: "（多米 11-22：預設形狀要不規則）1：下盤重、上面一個歪向一邊的鼓包；0 回 v2.50 接近圓的團塊", range: 0...1, step: 0.1),
         TuneField(key: \.strand, name: "黏條 v2.51", hint: "（多米 11-22：不能破皮；手指拉到哪就延長到哪）1：身體只拉到穩定的長度，再遠用一條黏條接到手指，不會斷；0 回 v2.50", range: 0...1, step: 1),
         TuneField(key: \.tugEdge, name: "捏邊緣算拉、捏中間算拿 v2.51", hint: "手指按下的地方離外框這麼近（×半徑）以內，就只把那塊拉出去；更靠中間照舊整隻被拖著走。0 一律整隻拖走", range: 0...1, step: 0.02),
-        TuneField(key: \.split, name: "拉到極限分成兩團 v2.51", hint: "手指離身體中心超過「分裂距離」再撐 0.4 秒，黏條中間收腰、斷開，手指那頭變成小的一團；最多兩團。0 關", range: 0...1, step: 1),
-        TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "手指離身體中心多遠才算拉到極限", range: 2...8, step: 0.2),
-        TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
+        TuneField(key: \.split, name: "扯斷成兩隻 v2.62", hint: "（多米 11-26）1：抓著拉開超過「分裂距離」、手指又快（「扯斷速度」），就斷成兩隻，兩隻都能捏；碰到播合併動畫變回一隻。一次最多兩隻。0 關（黏條開著時照 v2.51 收腰斷開）", range: 0...1, step: 1),
+        TuneField(key: \.splitV, name: "扯斷速度（半徑／秒）v2.62", hint: "手指在螢幕上每秒快過幾個半徑才算太激烈（v2.61 的快扯是 6）", range: 4...30, step: 0.5),
+        TuneField(key: \.splitFrac, name: "斷下來那隻多大 v2.62", hint: "第二隻拿走幾成面積，原本那隻縮成剩下的；合回去兩邊加起來回到原本", range: 0.2...0.6, step: 0.05),
+        TuneField(key: \.splitAgain, name: "合回去之後還能再斷 v2.62", hint: "1：合回一隻之後重新算，可以再斷一次（多米還沒定，先照這個）；0：這次打開只斷一次", range: 0...1, step: 1),
+        TuneField(key: \.mergeFx, name: "合併動畫 v2.62", hint: "0 黏絲搭橋、1 擠扁彈回、2 水滴加波紋、3 吞下去（四版都做，多米自己比）", range: 0...3, step: 1),
+        TuneField(key: \.mergeGap, name: "碰到的距離（×半徑）v2.62", hint: "兩隻外框靠到這麼近就算碰到，開始合", range: 0...0.4, step: 0.02),
+        TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "黏條開著：手指離身體中心多遠算拉到極限。v2.62 扯斷：手指從抓下去的地方拉開多遠（預設 1.8）", range: 2...8, step: 0.2),
+        TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "第二隻沒人碰這麼久，自己一縮一衝爬回去；碰到就播合併動畫", range: 1...30, step: 1),
         TuneField(key: \.endless, name: "無限拉 v2.54", hint: "（多米 11-22：拉五公分只長三公分，要能無限擴張、跟手）1：手指不讓、拉伸上限不作用，邊拉滿了上限自己放寬，整條一起變長；0 回 v2.53", range: 0...1, step: 1),
         TuneField(key: \.pullCreep, name: "無限拉：拉長時定型速度", hint: "往外拉開 0.6R 起慢慢換成這個速度（1.8R 全換）：記形追得上手指，放手才不會縮回一截。揉、刷、兩指擠照舊用「定型速度」", range: 0...60, step: 1),
         TuneField(key: \.homeFloor, name: "抓著時家不壓進窗台 v2.55", hint: "（11-23：抓頭頂往上拉 2.5 到 3.5R 按住一秒多，身體下半被壓進窗台、扁成一條、翻面上百個）1：抓著時家最低只到身體底部剛好碰到地面；0 回 v2.54b", range: 0...1, step: 0.05),

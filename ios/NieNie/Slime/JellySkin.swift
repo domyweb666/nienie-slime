@@ -195,6 +195,24 @@ final class SkinMesh {
         fanN = steps * 3
     }
 
+    /// v2.62's second slime: its outline as a fan of plain triangles about its centre, screen points. After `update`, once a frame (in place of the ellipse).
+    func polygon(_ pts: [(x: Double, y: Double)]) {
+        let m = pts.count
+        guard m > 2 else { return }
+        v.need(n + 3 * m, keep: n)
+        var cx = 0.0, cy = 0.0
+        for q in pts { cx += q.x; cy += q.y }
+        cx /= Double(m); cy /= Double(m)
+        let p = v.p + n
+        for s in 0..<m {
+            let a = pts[s], b = pts[(s + 1) % m]
+            p[3 * s] = SIMD2<Float>(Float(cx), Float(cy))
+            p[3 * s + 1] = SIMD2<Float>(Float(a.x), Float(a.y))
+            p[3 * s + 2] = SIMD2<Float>(Float(b.x), Float(b.y))
+        }
+        fanN = 3 * m
+    }
+
     /// The same union as a path, for what is clipped to the body (the eyes, the blush, the filling, the glitter). The outline's winding number at a point is its
     /// upright triangles minus its flipped ones, so adding each flipped one twice the upright way leaves every covered point above zero (the fill is non-zero).
     /// Nothing flipped and nothing thin, it is `body` itself.
