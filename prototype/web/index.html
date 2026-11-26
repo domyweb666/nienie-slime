@@ -219,6 +219,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
      只接在清透皮那條畫法，平塗、別的皮、WebGL 開不起來時自動用舊外框。拉的三顆開關預設關：pullHold（拉長停住就定住）、pullWhole（往身體裡拉先搬整隻）、pullSoft（拉很長放手收回去：先不逃、回正限速、放手 0.8 秒限速、縮短了才換網格、手指在動才放寬上限、停住最多漂 0.3R）。
      其他十個（rough tapSoft petSlow wakeSoft nearFast greetLook brJit bumpSoft eyeTrue snd61）各自的行為寫在 ROUGH、TAPK、PETK、WAKEK、lifeStep 的 hear、GREET、BRJ、SOFTB、eyeStep、sfx/engine.js。換隻的地方記性每隻分開（BMEMS，沒有開關）。十四個全 0 要跟 v2.60 逐點相同；換隻、換材質都留著（matKeep）。調節台多「這一批」一塊；拉的三顆進存檔，其他不進。
      網址 ?pull=0、?pull=1、?pull=hold,whole,soft 把拉的三顆鎖住（盲比用，畫面上不寫是哪一邊）。window.KPIOS=1 是測試掛鉤：窗台上的回家彈簧改成手機的值，平常不設
+   - v2.61b（多米 11-26：湯圓的芝麻餡在白身體上像一片灰髒；不透明版的邊緣怪怪的）：兩個外觀開關，預設 0 跟 v2.61 逐點相同，兩版都留給多米比。coreSoft 1：餡範圍小三成、顏色淡一階、改用實心圓加模糊畫（原版的格紋是 Chrome 放射漸層的抖動雜點疊出來的）。
+     edgeClean 1：不透明時輪廓收清楚、厚度判斷改成 .1 就蓋白、邊緣變暗那一圈拿掉、暗線淡七成（原版外圈一道灰灰糊糊、透出後面的玻璃邊）。換隻、換材質都留著，重新整理回 0
    ========================================================= */
 const cv=document.getElementById('cv');let ctx=cv.getContext('2d');   // v2.61：畫身體裡的東西時暫時換到暫存畫布（skinLayer），畫完換回來
 const $=id=>document.getElementById(id);
@@ -368,6 +370,8 @@ const F=[
   ['cling','黏牆（v2.36）','1（多米 11-07：像章魚黏在牆上，捏下來會抵抗）：把牠慢慢放在窗框旁邊會黏住，貼牆那圈像吸盤釘在牆上，8 到 15 秒後自己爬下來；抓著往外拉，拉開超過一段（熟的 1R、戒的 1.5R）才一顆一顆剝開，眼睛 > <、發抖，剩最後幾顆一起放掉彈回手指；放手時還沒剝完就彈回牆上。牠自己不會去窗框（只跟碗互動照舊）。0 回 v2.35：只跟碗互動時放在窗框旁邊不會黏',0,1,1],
   ['trKeep','熟留下來（v2.34）','1（多米 11-07 定位：陪伴寵物要記得你）：熟每隻分開存在這支手機，關掉、隔天再開都還在，走得少、幾天沒來都不會掉；戒照樣只活在這一次（背景 10 分鐘歸零）；0 回 v2.33：熟跟戒一起歸零。切了重新整理才生效',0,1,1],
   ['clear','十隻都換成亮面透明 v2.60','（多米 11-24：史萊姆造型回到之前的不透明版本）0：不透明（預設），照「身體上的亮點」和「身體多不透明」兩條。1：十隻都換回 v2.53b 到 v2.59 的亮面透明，亮點當 1、不透明當 0，那兩條不作用；換史萊姆、換材質都留著，重新整理回 0。v2.57 只管新六隻的那個開關（look6）換成這條',0,1,1],
+  ['coreSoft','湯圓的餡：小而淡 v2.61b','（多米 11-26：餡在白身體上像一片灰髒）0：原版（範圍大、深灰）。1：範圍小三成、顏色淡一階帶一點紫，邊不再有一格一格的紋路。只有湯圓看得到；換史萊姆、換材質都留著，重新整理回 0',0,1,1],
+  ['edgeClean','不透明的邊緣：乾淨 v2.61b','（多米 11-26：不透明版的邊緣怪怪的）0：原版（外圈一道灰灰糊糊、看得到後面的玻璃邊，裡面再一圈暗線）。1：輪廓收清楚、白色蓋到靠近邊緣、暗線淡掉七成。亮面透明時不作用；換史萊姆、換材質都留著，重新整理回 0',0,1,1],
   ['skinU','皮：不會斷的畫法 v2.61','1：先畫滿身體裡每一個小三角形，細的地方補一條保底線，拉遠、打結時皮比較不會斷開，手指底下也看得到。0 回 v2.60（照外框畫）。只在清透皮有作用',0,1,1],
   ['pullHold','拉的 A3：拉長停住就定住 v2.61','1：拉開 0.6R 以上，手指停下來 0.25 秒，身體就不再自己變長。0 回 v2.60',0,1,1],
   ['pullWhole','拉的 A4：往裡拉，整隻先走 v2.61','1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60',0,1,1],
@@ -3120,9 +3124,9 @@ void main(){float sum=0.,w=0.;int N=int(ceil(s*2.6));for(int i=-N;i<=N;i++){floa
   FS=`#version 300 es
 precision highp float;in vec2 v;out vec4 o;
 uniform sampler2D M,B1,B2,BG;uniform vec2 res;uniform float rpx;uniform vec4 uD[6];uniform int nD;
-uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc,rnd,wet,water,refr,absorb,opq,cov1;
+uniform vec3 cEdge,cCore,cLine,cGlow;uniform float aEdge,aCore,amb,dif,glow,line,nk,shin,s0,s1,spec,sheen,arc,rnd,wet,water,refr,absorb,opq,cov1,ec;
 float H1(vec2 uv){float h=.45*smoothstep(0.,1.,texture(B1,uv).r);vec2 px=uv*res;for(int i=0;i<nD;i++){vec2 q=(px-uD[i].xy)/uD[i].z;h-=uD[i].w*.24*exp(-dot(q,q)*1.6);}return h;}
-void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05,rnd+.05,texture(B1,v).r):smoothstep(.18,.82,m);if(cov<=0.){o=vec4(0.);return;}if(cov1>.5){o=vec4(cov);return;}   /* v2.47 rnd：外框改用模糊過的遮罩切，尖角、細刺自己變圓，凹進去的地方像水一樣連起來 */
+void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05*(1.-.6*ec),rnd+.05*(1.-.6*ec),texture(B1,v).r):smoothstep(mix(.18,.38,ec),mix(.82,.62,ec),m);if(cov<=0.){o=vec4(0.);return;}if(cov1>.5){o=vec4(cov);return;}   /* v2.47 rnd：外框改用模糊過的遮罩切，尖角、細刺自己變圓，凹進去的地方像水一樣連起來 */
   vec2 e=2./res,E=8./res;float gx=(H1(v+vec2(e.x,0.))-H1(v-vec2(e.x,0.)))/4.+.55*(texture(B2,v+vec2(E.x,0.)).r-texture(B2,v-vec2(E.x,0.)).r)/16.,gy=(H1(v+vec2(0.,e.y))-H1(v-vec2(0.,e.y)))/4.+.55*(texture(B2,v+vec2(0.,E.y)).r-texture(B2,v-vec2(0.,E.y)).r)/16.;
   vec3 n=normalize(vec3(-gx*rpx*nk,-gy*rpx*nk,1.)),L=normalize(vec3(-.5,.72,.9)),Hv=normalize(L+vec3(0.,0.,1.));
   float b1=texture(B1,v).r,b2=texture(B2,v).r,thick=smoothstep(.08,.8,b2),fres=pow(1.-n.z,2.);
@@ -3132,9 +3136,9 @@ void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05,rnd+.05,texture
   /* v2.49 看得出是水（多米 11-16：要看得出來是由水份組成的，95% 是水）：身體後面的東西透過牠看得到，而且被彎曲（邊緣彎最多，像隔著水滴看）；
      薄的地方幾乎沒顏色，厚的地方才染上牠的顏色；背光那側的內緣聚一道亮光；邊緣反射天光 */
   if(water>0.){vec2 ro=-n.xy*rpx*refr/res*(.3+.7*thick);vec3 bg=texture(BG,v+ro).rgb;vec3 T=mix(vec3(1.),cCore,clamp(thick*absorb+.05,0.,1.));
-    vec3 w=bg*T+cGlow*smoothstep(.15,.8,tr)*(.2+.8*fres)*glow*.5;w=mix(w,col,clamp(smoothstep(.03,.35,thick)*opq,0.,1.));   /* v2.51 厚的地方蓋掉後面的東西 */
-    w*=1.-.16*smoothstep(.2,.55,fres)*(1.-smoothstep(.55,.9,fres));w=mix(w,vec3(.95,.98,1.),fres*.3);c=mix(c,vec4(w,1.),water);}
-  c=mix(c,vec4(cLine,1.),(1.-smoothstep(.5,.66,b1))*line);
+    vec3 w=bg*T+cGlow*smoothstep(.15,.8,tr)*(.2+.8*fres)*glow*.5;w=mix(w,col,clamp(smoothstep(.03*(1.-ec),mix(.35,.1,ec),thick)*opq,0.,1.));   /* v2.51 厚的地方蓋掉後面的東西 */
+    w*=1.-.16*(1.-ec)*smoothstep(.2,.55,fres)*(1.-smoothstep(.55,.9,fres));w=mix(w,vec3(.95,.98,1.),fres*.3);c=mix(c,vec4(w,1.),water);}
+  c=mix(c,vec4(cLine,1.),(1.-smoothstep(.5,.66,b1))*line*(1.-.7*ec));
   float nh=max(dot(n,Hv),0.);c.rgb+=vec3(pow(nh,shin*.22)*sheen*(1.-thick*.4))*c.a;
   c=mix(c,vec4(1.),smoothstep(s0,s1,pow(nh,shin))*spec);
   /* v2.47 水潤：主亮點旁邊多一顆小亮點，邊緣一圈反光 */
@@ -3148,7 +3152,7 @@ void main(){float m=texture(M,v).r,cov=rnd>0.?smoothstep(rnd-.05,rnd+.05,texture
   const q=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
   JEL.float=!!(gl.getExtension('EXT_color_buffer_float')||gl.getExtension('EXT_color_buffer_half_float'));gl.disable(gl.BLEND);
   JEL.uB={};for(const n of ['t','d','s'])JEL.uB[n]=gl.getUniformLocation(JEL.pB,n);
-  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc','rnd','wet','BG','water','refr','absorb','opq','cov1'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
+  JEL.uF={};for(const n of ['M','B1','B2','res','rpx','uD','nD','cEdge','cCore','cLine','cGlow','aEdge','aCore','amb','dif','glow','line','nk','shin','s0','s1','spec','sheen','arc','rnd','wet','BG','water','refr','absorb','opq','cov1','ec'])JEL.uF[n]=gl.getUniformLocation(JEL.pF,n);
   JEL.tM=gl.createTexture();JEL.params(gl,JEL.tM);JEL.tBG=gl.createTexture();JEL.params(gl,JEL.tBG);JEL.bc=document.createElement('canvas');JEL.b2=JEL.bc.getContext('2d');
   try{skinInit(gl,prog,VS)}catch(err){SKIN.m=null;console.warn(err)}gl.bindVertexArray(null);gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);   // v2.61
   JEL.gl=gl;JEL.c=c;JEL.mc=document.createElement('canvas');JEL.m=JEL.mc.getContext('2d',{willReadFrequently:false});JEL.w=0;
@@ -3201,7 +3205,7 @@ function jelRender(P,tr,col){const gl=JEL.gl,m=JEL.m,sk=jelSkin(),k=1/DPR,zoom=M
   // v2.49：這一刻畫布上已經畫好的背景（場景、擺飾、東西）縮成一倍貼圖，給皮折射用。只在水的皮開著時才傳
   const wat=(sk.wet||0)>0&&mat.water>0&&!LAB.off.refr?Math.min(1,mat.water):0;
   if(wat>0){JEL.b2.setTransform(1,0,0,1,0,0);JEL.b2.drawImage(cv,0,0,W,H);gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,JEL.tBG);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,JEL.bc);gl.uniform1i(U.BG,3)}
-  SKIN.covered=wat>=1;gl.uniform1f(U.water,wat);gl.uniform1f(U.refr,mat.refr*jelBreath());gl.uniform1f(U.absorb,mat.absorb);gl.uniform1f(U.opq,lookOpaque());
+  SKIN.covered=wat>=1;gl.uniform1f(U.water,wat);gl.uniform1f(U.refr,mat.refr*jelBreath());gl.uniform1f(U.absorb,mat.absorb);gl.uniform1f(U.opq,lookOpaque());gl.uniform1f(U.ec,lookOpaque()>0&&mat.edgeClean>=.5?1:0);
   const ds=new Float32Array(24);let nd=0;for(const d of LAB.off.dent?[]:DENTS){const r=R*mat.dentSize*d.d;if(r<.5||nd>=6)continue;const x=X[d.i],y=Y[d.i];ds[nd*4]=toX(x,y);ds[nd*4+1]=H-toY(x,y);ds[nd*4+2]=r*zoom*1.2;ds[nd*4+3]=Math.min(1,d.d);nd++}
   gl.uniform4fv(U.uD,ds);gl.uniform1i(U.nD,nd);
   const b=jelColor(tint(col('--body'))),sh=jelColor(tint(col('--shade'),true)),ln=jelColor(col('--line'));
@@ -3225,13 +3229,13 @@ function drawBubbles(P){const nb=LAB.off.bubbles?0:Math.round(mat.bubbles||0);if
     ctx.beginPath();ctx.arc(x-r*.38,y-r*.38,r*.2,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.9)';ctx.fill()}
   ctx.restore()}
 /* ---------- v2.52 新的六隻各自的招牌（多米 11-22）。畫在果凍皮上面、腮紅和眼睛底下，剪在身體外框裡；跟腮紅同一種畫法，著色器不動 ---------- */
-const CORE={n:0,list:[]};   // 湯圓：芝麻餡掛在身體中間偏下的十來顆粒子上，身體被拉長，餡跟著被拉開
+const CORE={n:0,list:[],sn:0,soft:[],cv:null};   // 湯圓：芝麻餡掛在身體中間偏下的十來顆粒子上，身體被拉長，餡跟著被拉開
 function fxInner(cy,rad,max){const cand=[];for(let i=0;i<N;i++)if(BIDX[i]<0&&TID[i]<0&&Math.hypot(Q0X[i],Q0Y[i]-R*cy)<R*rad)cand.push(i);const st=Math.max(1,Math.ceil(cand.length/max)),o=[];for(let k=0;k<cand.length;k+=st)o.push(cand[k]);return o}   // 參考形狀裡，圓心 (0,cy·R)、半徑 rad·R 內的身體粒子，均勻挑最多 max 顆；只看編號，不抽亂數
 const PEARL={n:0,list:[],sink:0};   // 珍奶：肚子裡的珍珠。每顆追著身體裡的一顆粒子，慢 0.14 秒，身體一動珍珠晚一點才跟上，看起來像在裡面滾；sink：搖了之後沉到底
 function fxShake(){if(FX().pearls)PEARL.sink=1}
 const CAP={flow:0};   // 布丁：頭上那層焦糖。flow 0 到 1：被捏著的時候往下流，放手慢慢回去
 const STAIN=[];   // 蝶豆：手指揉過的地方變紫。i 粒子、k 多紫、r 多大（×R）、hot 這一幀有沒有被揉
-function fxReset(){STAIN.length=0;CORE.n=0;CAP.flow=0;PEARL.n=0;PEARL.sink=0}
+function fxReset(){STAIN.length=0;CORE.n=0;CORE.sn=0;CAP.flow=0;PEARL.n=0;PEARL.sink=0}
 function fxStep(dt){const f=FX();
   if(f.pearls){if(PEARL.n!==N){PEARL.n=N;const used=new Set();PEARL.list=[];for(let k=0;k<f.pearls;k++){const u=f.pearls>1?k/(f.pearls-1)-.5:0,tx=u*R*.95,ty=R*(k%2?.58:.38+.04*(k%3));let bi=-1,bd=1e9;for(let i=0;i<N;i++){if(BIDX[i]>=0||TID[i]>=0||used.has(i))continue;const d=Math.hypot(Q0X[i]-tx,Q0Y[i]-ty);if(d<bd){bd=d;bi=i}}if(bi>=0){used.add(bi);PEARL.list.push({i:bi,x:X[bi],y:Y[bi]})}}}   // 肚子下半，一高一低錯開（第一版照編號挑，五顆排成斜線擠在眼睛旁邊，像多了三顆眼睛；第二版排成一條弧，像嘴）
     PEARL.sink*=Math.exp(-dt/5);let by=-1e9,cx=0;for(const i of bnd){if(Y[i]>by)by=Y[i];cx+=X[i]}cx/=bnd.length;
@@ -3245,10 +3249,20 @@ function fxStep(dt){const f=FX();
       s.hot=true;s.k=Math.min(1,s.k+dt*1.1)}
     for(let n=STAIN.length-1;n>=0;n--){const s=STAIN[n];s.r+=(.8-s.r)*(1-Math.exp(-dt/5));if(!s.hot)s.k*=Math.exp(-dt/7);if(s.k<.01||s.i>=N)STAIN.splice(n,1)}}   // 揉著的時候 1 秒紫到底；放開 7 秒退到三成多；一邊慢慢暈開到 0.8R
   else if(STAIN.length)STAIN.length=0}
+// v2.61b coreSoft（多米 11-26：湯圓的餡在不透明白身體上像一片灰髒，改小改淡，兩版切換）：範圍 .44R→.3R、顏色淡一階帶一點紫、最深的地方約原版一半。
+// 原版那一格一格的紋路是 Chrome 每個放射漸層都加抖動雜點，二十二顆淡的疊起來就看得到。這版不用漸層：實心圓在四分之一大小的暫存畫布上疊成一團、模糊一次，放大貼上，整片 .3 透明
+const CORE_SOFT='rgb(96,84,92)';
+function coreSoft(){if(CORE.sn!==N){CORE.sn=N;CORE.soft=fxInner(.42,.3,14)}const L=CORE.soft.filter(i=>i<N);if(!L.length)return;const rr=R*.2,bl=R*.14,k=.25;
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const i of L){if(X[i]<x0)x0=X[i];if(X[i]>x1)x1=X[i];if(Y[i]<y0)y0=Y[i];if(Y[i]>y1)y1=Y[i]}const pad=rr+bl*2.5;x0-=pad;y0-=pad;x1+=pad;y1+=pad;
+  const w=Math.ceil((x1-x0)*k)+2,h=Math.ceil((y1-y0)*k)+2,c=CORE.cv||(CORE.cv=document.createElement('canvas'));if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;
+  const g=c.getContext('2d'),blur='filter' in g;g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,w,h);if(blur)g.filter=`blur(${bl*k}px)`;g.setTransform(k,0,0,k,-x0*k,-y0*k);
+  if(blur){g.fillStyle=CORE_SOFT;g.beginPath();for(const i of L){g.moveTo(X[i]+rr,Y[i]);g.arc(X[i],Y[i],rr+bl*.5,0,Math.PI*2)}g.fill();g.filter='none'}
+  else for(const i of L){const q=g.createRadialGradient(X[i],Y[i],0,X[i],Y[i],rr+bl*2);q.addColorStop(0,'rgba(96,84,92,.35)');q.addColorStop(1,'rgba(96,84,92,0)');g.fillStyle=q;g.beginPath();g.arc(X[i],Y[i],rr+bl*2,0,Math.PI*2);g.fill()}   // 舊的 Safari 沒有 filter：退回漸層
+  ctx.save();ctx.globalAlpha*=.3;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(c,x0,y0,w/k,h/k);ctx.restore()}
 function fxBlob(x,y,rr,c,a){const g=ctx.createRadialGradient(x,y,0,x,y,rr);g.addColorStop(0,`rgba(${c[0]},${c[1]},${c[2]},${a})`);g.addColorStop(.55,`rgba(${c[0]},${c[1]},${c[2]},${a*.5})`);g.addColorStop(1,`rgba(${c[0]},${c[1]},${c[2]},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,rr,0,Math.PI*2);ctx.fill()}
 function drawFx(P){const f=FX();if(f===FX0)return;ctx.save();fxClip(P);
   if(f.purple)for(const s of STAIN)if(s.i<N)fxBlob(X[s.i],Y[s.i],R*s.r,f.purple,.78*s.k);
-  if(f.core){if(CORE.n!==N){CORE.n=N;CORE.list=fxInner(.4,.44,22)}for(const i of CORE.list)fxBlob(X[i],Y[i],R*.34,f.core,.1)}   // 二十來顆淡的疊起來才是均勻的一團；顆數少、每顆濃，看起來像髒污
+  if(f.core){if(mat.coreSoft>=.5)coreSoft();else{if(CORE.n!==N){CORE.n=N;CORE.list=fxInner(.4,.44,22)}for(const i of CORE.list)fxBlob(X[i],Y[i],R*.34,f.core,.1)}}   // 二十來顆淡的疊起來才是均勻的一團；顆數少、每顆濃，看起來像髒污
   if(f.pearls)for(const p of PEARL.list){const rr=R*.1;ctx.beginPath();ctx.arc(p.x,p.y,rr,0,Math.PI*2);ctx.fillStyle='rgba(43,27,20,.92)';ctx.fill();ctx.beginPath();ctx.arc(p.x-rr*.22,p.y-rr*.22,rr*.52,0,Math.PI*2);ctx.fillStyle='rgba(98,64,46,.5)';ctx.fill()}   // 不打白色亮點（多米 11-22），用淺一階的褐色做出圓的感覺
   if(f.cap){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of P){if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1]}
     // 永遠在畫面上最高的那一邊：從外框最高點往下量，不看身體轉了幾度。下緣是幾條往下滴的弧，位置照身體中心算，身體移動時滴的地方跟著走
@@ -3384,14 +3398,14 @@ function frame(now){
 function applySlimeColors(s){const st=document.documentElement.style;['--body','--shade','--line','--hi','--eye'].forEach((k,i)=>st.setProperty(k,s.c[i]))}
 let hintT=null;function hint(s){const h=$('hint');h.textContent=s;h.classList.remove('off');clearTimeout(hintT);hintT=setTimeout(()=>h.classList.add('off'),2600)}
 function chooseSlime(i,intro,say){if(mat.imp>=.5)IMPS[SLIMES[SLIME].id]={tr:IMP.tr,w:IMP.w};memSave(true);memPut();
-  const s=SLIMES[i],one0=mat?mat.one:null,clr0=mat?mat.clear:0,keep61=matKeep(mat);SLIME=i;try{localStorage.setItem('nienie.slime',s.id)}catch(_){}
-  mat={...PRESETS[s.mat],seed:s.seed,...s.p,...viewOver(),...keep61};if(one0!=null&&one0<.5)mat.one=one0;if(clr0>=.5)mat.clear=clr0;curMat=s.mat;labRegrey();applySlimeColors(s);   // v2.52：面板把「一隻為主」關掉之後，換史萊姆不要又把底部那排收起來（原本換一次就被材質預設值蓋回 1）。v2.60：clear 是十隻一起換，也留著
+  const s=SLIMES[i],one0=mat?mat.one:null,clr0=mat?mat.clear:0,look0=mat?{coreSoft:mat.coreSoft||0,edgeClean:mat.edgeClean||0}:{},keep61=matKeep(mat);SLIME=i;try{localStorage.setItem('nienie.slime',s.id)}catch(_){}
+  mat={...PRESETS[s.mat],seed:s.seed,...s.p,...viewOver(),...keep61,...look0};if(one0!=null&&one0<.5)mat.one=one0;if(clr0>=.5)mat.clear=clr0;curMat=s.mat;labRegrey();applySlimeColors(s);   // v2.52：面板把「一隻為主」關掉之後，換史萊姆不要又把底部那排收起來（原本換一次就被材質預設值蓋回 1）。v2.60：clear 是十隻一起換，也留著
   for(let k=0;k<SLIMES.length;k++)$('s-'+k).setAttribute('aria-pressed',String(k===i));
   setup();fxReset();impReset();const o=IMPS[s.id];if(o){IMP.tr=o.tr;IMP.w=o.w}IMPD.tr=IMP.tr;IMPD.w=IMP.w;memGet();memSync();
   syncSliders();if(intro){startIntro();SLP.openT=t;GREET.st='';brainJit();greetArm(true)}if(say)hint(s.name+'：'+s.desc)}
 SLIMES.forEach((s,k)=>{const b=document.createElement('button');b.id='s-'+k;b.setAttribute('aria-pressed','false');b.innerHTML=`<i style="background:${s.c[0]}"></i>${s.name}`;
   b.addEventListener('click',()=>{if(k!==SLIME)chooseSlime(k,true,true)});$('slimes').appendChild(b)});
-function setMat(name){const s=SLIMES[SLIME],clr0=mat.clear;mat={...PRESETS[name],seed:s.seed,...s.p,...viewOver(),...matKeep(mat)};if(clr0>=.5)mat.clear=clr0;curMat=name;labRegrey();syncSliders()}
+function setMat(name){const s=SLIMES[SLIME],clr0=mat.clear;mat={...PRESETS[name],seed:s.seed,...s.p,...viewOver(),...matKeep(mat),coreSoft:mat.coreSoft||0,edgeClean:mat.edgeClean||0};if(clr0>=.5)mat.clear=clr0;curMat=name;labRegrey();syncSliders()}
 for(const k of ['jelly','mochi','clay'])$('tm-'+k).addEventListener('click',()=>setMat(k));
 $('b-reset').addEventListener('click',()=>{relax()});   // 揉回原形：用動畫不瞬移（換種子才走 setup）
 $('b-float').addEventListener('click',()=>{FLOAT=!FLOAT;$('b-float').setAttribute('aria-pressed',String(FLOAT));$('b-float').textContent=FLOAT?'懸空（多米定案）':'地面（對照用）';setup();dump()});

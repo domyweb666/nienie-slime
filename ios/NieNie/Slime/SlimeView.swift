@@ -87,6 +87,7 @@ final class SlimeView: UIView {
     // v2.57 新六隻的招牌 (web drawFx): on the jelly skin, under the blush and the eyes, clipped to the body by litGroup
     private let fxGroup = CALayer()
     private let fxStainLayers = (0..<6).map { _ in CAGradientLayer() }, fxCoreLayers = (0..<22).map { _ in CAGradientLayer() }
+    private let fxCoreSoftGroup = CALayer(), fxCoreSoftLayers = (0..<14).map { _ in CAGradientLayer() }   // v2.61b coreSoft: solid round spots with soft edges, the group at 0.3 (web: a blurred union at 0.3)
     private let fxPearlLayer = CAShapeLayer(), fxPearlLitLayer = CAShapeLayer(), fxCapGrad = CAGradientLayer(), fxCapMask = CAShapeLayer()
     private let bubbleRing = CAShapeLayer(), bubbleDot = CAShapeLayer(), causticShade = CAGradientLayer(), causticLight = CAGradientLayer()   // v2.49 water: bubbles inside it, gathered light under it
     private let glitLayers = [CAShapeLayer(), CAShapeLayer(), CAShapeLayer(), CAShapeLayer()]
@@ -170,6 +171,8 @@ final class SlimeView: UIView {
         for l in [bubbleRing, bubbleDot] { l.zPosition = -0.4; l.isHidden = true; layer.addSublayer(l) }
         litGroup.addSublayer(fxGroup); fxGroup.isHidden = true   // v2.57, under the blush
         for l in fxStainLayers + fxCoreLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; fxGroup.addSublayer(l) }
+        fxCoreSoftGroup.opacity = 0.3; fxCoreSoftGroup.allowsGroupOpacity = true; fxCoreSoftGroup.isHidden = true; fxGroup.addSublayer(fxCoreSoftGroup)
+        for l in fxCoreSoftLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; fxCoreSoftGroup.addSublayer(l) }
         fxCapGrad.mask = fxCapMask; fxCapGrad.startPoint = CGPoint(x: 0.5, y: 0); fxCapGrad.endPoint = CGPoint(x: 0.5, y: 1); fxCapGrad.isHidden = true; fxGroup.addSublayer(fxCapGrad)
         fxPearlLayer.fillColor = UIColor(red: 43 / 255, green: 27 / 255, blue: 20 / 255, alpha: 0.92).cgColor; fxPearlLitLayer.fillColor = UIColor(red: 98 / 255, green: 64 / 255, blue: 46 / 255, alpha: 0.5).cgColor   // no white glint (多米 11-22): a lighter brown makes it round
         fxGroup.addSublayer(fxPearlLayer); fxGroup.addSublayer(fxPearlLitLayer)
@@ -782,7 +785,7 @@ final class SlimeView: UIView {
         j.render(path: body, rpx: R, dents: Array(dents.prefix(6)), body: tinted(colors.base, tr, w), shade: tinted(colors.shade, tr, w, shade: true), line: colors.line,
                  skin: skin, round: round,
                  water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
-                 shine: p.lookShine, opaque: p.lookOpaque,   // v2.60 (多米 11-24): opaque, no highlights, all ten; the panel's 外觀 chip (clear) makes them glossy and see-through
+                 shine: p.lookShine, opaque: p.lookOpaque, edgeClean: p.lookEdgeClean,   // v2.61b edgeClean (多米 11-26). v2.60 (多米 11-24): opaque, no highlights, all ten; the panel's 外觀 chip (clear) makes them glossy and see-through
                  extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"), mesh: mesh)
         if LabProbe.shared.skinOn {   // v2.61 A7
             let fill: [CGPath] = mesh == nil ? [body] + extra : []
@@ -838,7 +841,17 @@ final class SlimeView: UIView {
             if let pp = fx.purple, k < v.stains.count { let s = v.stains[k], p = rig.toScreen(s.x, s.y); soft(l, p.x, p.y, s.r * z, pp, 0.78 * s.k) } else { l.isHidden = true }
         }
         for (k, l) in fxCoreLayers.enumerated() {
-            if let c = fx.core, k < v.core.count { let p = rig.toScreen(v.core[k].x, v.core[k].y); soft(l, p.x, p.y, Rz * 0.34, c, 0.1) } else { l.isHidden = true }
+            if let c = fx.core, v.coreSoft.isEmpty, k < v.core.count { let p = rig.toScreen(v.core[k].x, v.core[k].y); soft(l, p.x, p.y, Rz * 0.34, c, 0.1) } else { l.isHidden = true }
+        }
+        // v2.61b coreSoft (多米 11-26: the core looked like a grey smudge on the white body): fewer, smaller, lighter. Each spot is solid to 0.2R and fades out by 0.48R,
+        // they add up to one lump at full strength and the group draws it at 0.3 (web coreSoft: solid circles, blurred 0.14R, at 0.3)
+        fxCoreSoftGroup.isHidden = v.coreSoft.isEmpty
+        let cs = UIColor(red: 96 / 255, green: 84 / 255, blue: 92 / 255, alpha: 1), csR = Rz * 0.48
+        for (k, l) in fxCoreSoftLayers.enumerated() {
+            guard k < v.coreSoft.count else { l.isHidden = true; continue }
+            let p = rig.toScreen(v.coreSoft[k].x, v.coreSoft[k].y)
+            l.isHidden = false; l.bounds = CGRect(x: 0, y: 0, width: 2 * csR, height: 2 * csR); l.position = CGPoint(x: p.x, y: p.y)
+            l.colors = [cs.cgColor, cs.cgColor, cs.withAlphaComponent(0.35).cgColor, cs.withAlphaComponent(0).cgColor]; l.locations = [0, 0.42, 0.7, 1]
         }
         if v.pearls.isEmpty { fxPearlLayer.path = nil; fxPearlLitLayer.path = nil } else {
             let dark = CGMutablePath(), lit = CGMutablePath(), rr = Rz * 0.1
