@@ -431,6 +431,10 @@ final class SlimeRig {
     private func iv3(_ v: Double) -> Bool { params.life2 >= 0.5 && v >= 0.5 }
     // E2: lean* = leans toward the finger (S −1: wary, away); nuz* = nuzzling; tkTimes = when the tickling finger turned back
     private var leanO = 0.0, leanT = -9.0, leanA = 0.0, leanS = 1.0, nuzT0 = -1.0, nuzO = 0.0, nuzSaid = false, tkTimes: [Double] = [], tkT = 0.0, gigNext = 0.0
+    // v2.64 D8 點牠牠頂回來（tapBack；網頁 TB）：tbAt 排好要頂的時間（−9 沒排）、tbRel 點的那一刻、tbX／tbY 你點的地方、tbFire 頂的那一刻、tbUntil 看著你到幾秒。程式在 MARK v2.64 D8
+    private var tbAt = -9.0, tbRel = -9.0, tbX = 0.0, tbY = 0.0, tbFire = -9.0, tbUntil = -9.0
+    // v2.64 D8 呼嚕時慢眨眼（slowBlink；網頁 SBL）：sblS 自己那串亂數（網頁 sblRnd）、sblAcc 呼嚕累計秒數、sblGap 這次要累計幾秒、sblT0 這次慢眨開始的時間（−9 沒在眨）
+    private var sblS: UInt32 = 1, sblAcc = 0.0, sblGap = 8.0, sblT0 = -9.0
     // E4: wait = idle seconds before it comes this time; count = visits this run; wave = arrived and waving
     private var e4Wait = -1.0, e4Count = 0, e4On = false, e4Wave = false, e4T0 = 0.0, e4LastT = -99.0
     private var voiceLast = -9.0
@@ -1220,6 +1224,7 @@ final class SlimeRig {
         e4On = false; e4Wait = -1   // v2.22
         leanT = -9; leanO = 0; nuzT0 = -1; nuzO = 0; nuzSaid = false; tkTimes = []; tkT = 0; gigNext = 0; camRSt = 0; camRUntil = -9
         rubvBag = []; rubvLast = ""; rubvHopT = -99; rubvSpT = -9   // v2.63 C6: the clock set back, the last hop and the melting must not sit in the future
+        tbAt = -9; tbRel = -9; tbFire = -9; tbUntil = -9; sblAcc = 0; sblT0 = -9; sblS = brain.seed ^ 0x27d4_eb2f; sblGap = SBLK.lo + (SBLK.hi - SBLK.lo) * sblRnd()   // v2.64 D8（網頁 setup：Object.assign(TB,…)、Object.assign(SBL,…)）：排好的頂回來、慢眨跟著重建清掉；慢眨自己那串亂數從大腦的種子接，rng 不多抽
         ltCur = nil; ltReactQ = nil; ltHabT = [:]; ltS = brain.seed ^ 0x5bd1_e995   // v2.64 C5（網頁 setup：Object.assign(LT,…)）：排好的反應、看過的對象跟著重建清掉；自己那串亂數從大腦的種子接（brainReset 不動種子，所以放在 brain.reset 前後都一樣）
         QDX = QX; QDY = QY; QVX = [Double](repeating: 0, count: N); QVY = QVX; QW = QVX; cvX = 0; cvY = 0; caX = 0; caY = 0; cpX = nil; cpY = nil; tickLastT = -9   // v2.25
         stkOX = 0; stkOY = 0; stkVX = 0; stkVY = 0; stkG = 0; stkLast = -9; stkSaid = false; stkPet = false; trail = []   // v2.26
@@ -3230,6 +3235,7 @@ final class SlimeRig {
         moodColorStep(dt)
         impStep(dt)   // v2.20
         e1Step(); e2Step(dt)   // v2.22
+        if params.tapBack >= 0.5 || tbAt >= 0 || tbUntil >= 0 { tbStep() }   // v2.64 D8 頂回來（網頁：e2Step 後面）
         sleepStep(dt); napStep(dt); echoStep(dt)   // v2.23 B2, C6; v2.63 C9 nap at your hand (web: the same place)
         greetStep()   // v2.63 C4 (web: right after sleepStep, echoStep)
         if brOn {   // v2.63 大腦 (web: if(SILL.on)sillStepPre(); brainStep(dt,engaged); before lifeStep). sillStepPre again before the substeps, as before: it only reads the fingers
@@ -6710,6 +6716,64 @@ final class SlimeRig {
         guard iv3(params.e2), !slpOn, t - f.tDown < 0.25, f.stretch < 0.3, !clusters.isEmpty else { return }   // v2.61 C1: !slpOn (and in impAsk)
         let bm = brainM   // v2.63 心情: in a bad mood it leans away, in a good one it wags too (a poke is play)
         leanT = t + 0.3; leanA = atan2(f.fy - clusters[gi].yc, f.fx - clusters[gi].xc); leanS = impWary > 0.4 || bm < -0.35 ? -1 : 1; if bm > 0.35 { wagT = t + 0.35 }; voice("poke", 0.7)
+        if params.tapBack >= 0.5 { tbArm(f) }   // v2.64 D8：傾完再頂回來
+    }
+
+    // MARK: v2.64 D8 點牠牠頂回來、呼嚕時慢眨眼（tapBack、slowBlink；規劃 .uiux/04-手感/極致優化規劃-暫定.md 的 D8，BATCH3 第 4 項；網頁 TB、TBK、tbArm、tbStep、SBL、SBLK、sblRnd、sblStep）
+    // 原本點一下傾一下就結束。
+    // tapBack：點一下（E2 那一下：0.25 秒內、沒拉開）之後牠朝你的手指傾一下（放手後 0.3 秒起、0.7 秒），傾完再過 TBK.gap 秒，朝你剛才點的地方再頂一下
+    //   （跟「按著不動往手指推一下」同一套：E2 那一傾加 .nudge，手機輕頂一下），同時看著你 TBK.look 秒（eyeUser）；在休息就多待這 1.5 秒不換事情。
+    //   你不接就算了：不改戒、熟、交情、心情，什麼都不記。等的那段你又碰牠（手指按著、碰到身體）就不頂，照現有的回應走；看著你那 1.5 秒裡再碰也一樣，沒有另外的獎勵。
+    //   只在牠朝你傾的時候排（戒的往反方向傾那種不頂）；睡著、在逃（連點三下）、開場、窗台上在走路線或在空中不頂。
+    // slowBlink：呼嚕（purr > 0.3，跟眼睛 ∩ 同一條線）累計 sblGap 秒（SBLK.lo 到 hi，自己那串亂數抽）就慢眨一次：∩ 先換回半睜（SBLK.lid）、看一下，
+    //   慢慢閉上、閉著停一下、慢慢睜開，再回 ∩。只用既有的眼睛形狀（睜開的橢圓、閉著的一條線）；中間被擠成 > <、睡著就停掉。慢眨那段不跑平常的眨眼（也不抽它的亂數）。
+    // 兩顆都 0：不排、不畫，跟改之前一樣。rng 一個都不多抽（sblRnd 是自己那串，從大腦的種子接）。
+    private enum TBK { static let gap = 0.4, look = 1.5 }
+    /// pre 半睜、see 看一下、close 慢慢閉、hold 閉著、reopen 慢慢睜（網頁 SBLK.open）、post 再睜一下回 ∩（秒）；lid 慢眨時睜多開；lo、hi 呼嚕累計幾秒眨一次
+    private enum SBLK { static let lo = 6.0, hi = 12.0, pre = 0.3, see = 0.5, close = 0.5, hold = 0.5, reopen = 0.6, post = 0.4, lid = 0.8 }
+    /// 網頁 tbArm：E2 點一下排好頂回來（傾完再 TBK.gap 秒）
+    private func tbArm(_ f: Finger) {
+        if leanS < 0 || escOn || slpOn { return }
+        tbAt = leanT + 0.7 + TBK.gap; tbRel = t; tbX = f.fx; tbY = f.fy; tbUntil = -9
+    }
+    /// 網頁 tbStep：每幀（e2Step 後面）。到時間就頂、看著你；你又碰就取消
+    private func tbStep() {
+        guard params.tapBack >= 0.5 else { tbAt = -9; tbUntil = -9; return }
+        if tbRel > t || tbAt > t + 5 || tbUntil > t + 5 { tbAt = -9; tbUntil = -9 }   // 時鐘倒回去（重建）
+        if tbUntil > t && (!fingers.isEmpty || lastTouch > tbFire) { tbUntil = -9 }   // 看著你的時候你又碰：照現有的回應走，不另外給什麼
+        if tbAt < 0 || t < tbAt { return }
+        tbAt = -9
+        if !fingers.isEmpty || lastTouch > tbRel || escOn || slpOn || introOn || !iv3(params.e2) || (sillOn && (sillRoute != nil || sillAir)) { return }
+        guard clusters.indices.contains(gi) else { return }
+        let a = atan2(tbY - clusters[gi].yc, tbX - clusters[gi].xc)
+        leanT = t; leanA = a; leanS = 1; onEvent?(.nudge)   // 網頁 E2.nudgeT = t（手機輕頂一下）
+        tbFire = t; tbUntil = t + TBK.look; eyeUser = max(eyeUser, tbUntil)
+        if lifeSt == .rest { lifeUntil = max(lifeUntil, tbUntil) }
+    }
+    /// 網頁 sblRnd：(seed·1664525 + 1013904223) mod 2³²
+    private func sblRnd() -> Double {
+        sblS = sblS &* 1_664_525 &+ 1_013_904_223
+        return Double(sblS) / 4_294_967_296
+    }
+    /// 網頁 sblStep：eyeStep 每幀叫（mode 是這一格本來的表情）；回傳慢眨這一格的眨眼量（1 睜、0 閉），沒在慢眨回 nil
+    private func sblStep(_ dt: Double, _ mode: EyeMode) -> Double? {
+        if sblT0 > t { sblT0 = -9 }
+        if sblT0 >= 0 {
+            let u = t - sblT0
+            if u >= SBLK.pre + SBLK.see + SBLK.close + SBLK.hold + SBLK.reopen + SBLK.post || mode == .squeeze || mode == .sleep || slpOn { sblT0 = -9; return nil }
+            var v = u
+            if v < SBLK.pre { return smooth01(v / SBLK.pre) }; v -= SBLK.pre
+            if v < SBLK.see { return 1 }; v -= SBLK.see
+            if v < SBLK.close { return 1 - smooth01(v / SBLK.close) }; v -= SBLK.close
+            if v < SBLK.hold { return 0 }; v -= SBLK.hold
+            if v < SBLK.reopen { return smooth01(v / SBLK.reopen) }
+            return 1
+        }
+        if purr > 0.3 && mode == .happy && !slpOn {
+            sblAcc += dt
+            if sblAcc >= sblGap { sblAcc = 0; sblGap = SBLK.lo + (SBLK.hi - SBLK.lo) * sblRnd(); sblT0 = t; return 0 }
+        }
+        return nil
     }
     /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free
     /// (v2.63 D3 holdTickle 1: it never breaks free, it squirms and giggles as long as you go on).
@@ -6865,7 +6929,9 @@ final class SlimeRig {
         let moodGlad: Bool = brainM > 0.45 && t < eyeUser && g == nil   // v2.63 心情: in a good mood, ∩ while it looks at you
         let happy = moodGlad || purr > 0.3 || (t >= happyT && t - happyT < 1.6) || (e4On && e4Wave) || t < echoJoyUntil || t - snwLast < 1.2   // v2.31: shaken, ∩ like on a ride
         let squeeze = moodStrain > 0.4 || tickOn || (escOn && t - escT0 < 0.5) || t < eyeSqU
-        let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
+        var mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
+        let sbb: Double? = params.slowBlink >= 0.5 ? sblStep(dt, mode) : nil   // v2.64 D8 慢眨：這段換回睜眼的形狀，眨眼量照慢眨的曲線
+        if sbb != nil { mode = .open }
         if mode != eyeMode { eyeMode = mode; if mode == .open { eyeBlinkT = t - 0.08 } }   // back to open: opening from shut
         var open = 1.0, wide = 1.0
         if slpOn || slpK > 0.02 { open = max(0, 1 - slpK * 1.5) }
@@ -6877,9 +6943,10 @@ final class SlimeRig {
         let drWide: Bool = drOn && drRecent(drWideT, 0.8)   // v2.64 擺飾變真: a fall while you hold it: only the eyes go wide
         if impWary > 0.5 || moodScare > 0.3 || (t - slpWakeT < 0.8 && !slpSlow) || moodLow || drWide { wide = 1.18 }   // v2.61 C1: woken slowly, not wide
         do { let u = t - eyePulse; if u >= 0 && u < 0.15 { wide *= 1 + 0.15 * sin(.pi * u / 0.15) } }
-        if mode == .open && t >= eyeNextBlink && !slpOn { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
+        if sbb != nil { open = min(open, SBLK.lid) }   // v2.64 D8 慢眨時半睜
+        if mode == .open && t >= eyeNextBlink && !slpOn && sbb == nil { eyeBlinkT = t; eyeNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : (2 + Double.random(in: 0..<4, using: &rng)) * (1 - 0.3 * exLevel())) }
         let u = t - eyeBlinkT
-        eyeBlink = u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1)))
+        eyeBlink = sbb ?? (u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1))))   // v2.64 D8：慢眨時用慢眨的曲線
         let k = 1 - exp(-dt / 0.05)
         eyeOpenD += (open - eyeOpenD) * k; eyeWideD += (wide - eyeWideD) * k
     }

@@ -367,6 +367,9 @@ struct FeelParams: Equatable, Codable {
     var lookNoDown: Double = 1        // 張望不朝下: 1 = on the sill a sniff no longer points down into the ledge (the lower half is mirrored over the horizon, so only up and the sides; no extra draws from the rng); floating it is left alone; 0 = as before (0 to 360 degrees, about four in ten down)
     // v2.64 C5 張望有對象（網頁 lookTarget；pickDir、ltPick、ltReact；三個材質同名同預設）。SlimeRig MARK v2.64 C5，窗景那一種在 SlimeView winMover
     var lookTarget: Double = 1        // 張望有對象：1 = 張望時朝你碰過的地方、窗景裡在動的東西、在晃的風鈴、旁邊的擺飾探，看完一個小反應（靠一下、眨眼、偽足再點一下）；沒有對象照舊亂抽；0 = 跟 v2.63 一樣（只亂抽，看完沒有反應，自己那串亂數也不抽）
+    // v2.64 D8 點牠牠頂回來、呼嚕時慢眨眼（網頁 tapBack、slowBlink；TB、TBK、tbArm、tbStep、SBL、SBLK、sblStep；三個材質同名同預設）。SlimeRig MARK v2.64 D8
+    var tapBack: Double = 1           // 點牠牠頂回來：1 = 點一下，牠朝你的手指傾完再過 0.4 秒，朝你剛才點的地方頂一下（跟按著不動往手指推一下同一套，手機輕頂一下），看著你 1.5 秒；不改戒、熟、交情、心情；0 = 跟改之前一樣（傾一下就結束）
+    var slowBlink: Double = 1         // 呼嚕時慢眨眼：1 = 呼嚕累計 6 到 12 秒慢眨一次（∩ 換回半睜、慢慢閉上、停一下、慢慢睜開，再回 ∩，約 2.8 秒），只用既有的眼睛形狀；0 = 跟改之前一樣（呼嚕時一直 ∩，自己那串亂數不影響別的）
     // v2.63 C6 (web rubVary; rubHappy, the voice shuffle bag; the same key and default for all three materials). SlimeRig MARK v2.63 C6, SlimeAudio voiceBag
     var rubVary: Double = 1           // 揉完的反應輪流: 1 = done rubbing or stroking, the hop, melting 2 s more, leaning to your finger and a sigh take turns from a shuffled bag, the hop at most once in 40 s; each kind of its sounds plays all its files before a new shuffle; 0 = as before (tall, a wag, the hop and the happy sound every time; a random file each time)
     // v2.63 B6 (web sndB6; the pull step re-arms, the press keeps what is queued except the last release's tail; the same key and default for all three materials). SlimeRig MARK v2.63 B6, SlimeAudio sndB6
@@ -1002,6 +1005,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.decoScare, name: "東西倒下牠嚇多大", hint: "1 是網頁取的。調大牠被倒下、掉下去的聲音嚇得更厲害；0 完全不怕", range: 0...2, step: 0.1, section: "這一批 v2.64"),
         // v2.64 C5（網頁 lookTarget 的字，第三批第 3 項）
         TuneField(key: \.lookTarget, name: "張望有對象 v2.64", hint: "1（C5）：張望時探的方向有對象：你最近碰過的地方、窗景裡正在動的東西、在晃的風鈴、旁邊的擺飾，看完有一個小反應（碰過的地方朝那邊靠一下、被嚇過的往反方向縮一下；會動的東西和風鈴眨一下眼、偽足再點一下；擺飾偽足再點一下）。沒有對象時照舊亂抽。0 回 v2.63（方向只亂抽，看完沒有反應）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 D8（網頁 tapBack、slowBlink 的字，第三批第 4 項）
+        TuneField(key: \.tapBack, name: "點牠牠頂回來 v2.64", hint: "1（D8）：點牠一下，牠朝你的手指傾完再過 0.4 秒，朝你剛才點的地方頂一下（跟按著不動往手指推一下同一套），看著你 1.5 秒。你不接就算了，戒、熟、交情、心情都不動；你在那段時間又碰牠，照現有的回應走。戒的往反方向傾那種、在逃、睡著不頂。0 回改之前（傾一下就結束）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.slowBlink, name: "呼嚕時慢眨眼 v2.64", hint: "1（D8）：呼嚕時累計 6 到 12 秒慢眨一次眼（像貓的慢眨）：∩ 換回半睜、看一下、慢慢閉上、閉著停一下、慢慢睜開，再回 ∩，約 2.8 秒。只用既有的眼睛形狀。0 回改之前（呼嚕時一直 ∩）", range: 0...1, step: 1, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
