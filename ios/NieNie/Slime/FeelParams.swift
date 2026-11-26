@@ -353,6 +353,8 @@ struct FeelParams: Equatable, Codable {
     // v2.63 D3 (web holdScared, holdTickle; dragStep's C3, releaseFinger, e2Step; the same keys and defaults for all three materials). SlimeRig MARK v2.63 D3
     var holdScared: Double = 1        // 怕的不滑走: 1 = very wary and held open 1R for 1.5 s, it no longer slips from the finger: it protests, squeezes its eyes, again every 1.5 s still held, and walks off when let go; 0 = as before (it slips and slinks off)
     var holdTickle: Double = 1        // 搔癢不掙脫: 1 = tickled it keeps squirming and giggling as long as you go on, it never breaks free nor turns to protesting; 0 = as before (free after tickFree s, protesting the last 2)
+    // v2.63 C5 (web lookNoDown; pickDir; the same key and default for all three materials). SlimeRig MARK v2.63 C5
+    var lookNoDown: Double = 1        // 張望不朝下: 1 = on the sill a sniff no longer points down into the ledge (the lower half is mirrored over the horizon, so only up and the sides; no extra draws from the rng); floating it is left alone; 0 = as before (0 to 360 degrees, about four in ten down)
     var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
     var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
@@ -941,6 +943,8 @@ struct TuneField: Identifiable {
         // v2.63 D3 (the web's words for holdScared, holdTickle)
         TuneField(key: \.holdScared, name: "怕的不滑走 v2.63", hint: "1（D3）：戒很高時被拉開 1R 撐 1.5 秒，不再從手指滑掉；改成抗議一聲、眼睛 > <，還撐著每 1.5 秒再抗議，放手後往反方向走開。0 回改之前（撐到就滑走、往反方向溜）", range: 0...1, step: 1, section: "這一批 v2.63"),
         TuneField(key: \.holdTickle, name: "搔癢不掙脫 v2.63", hint: "1（D3）：一直撥一直扭、一直咯咯，不會掙脫躲開，也不換成抗議聲。0 回改之前（撥「撥多久掙脫」秒就掙脫，最後 2 秒先抗議）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 C5 (the web's words for lookNoDown)
+        TuneField(key: \.lookNoDown, name: "張望不朝下 v2.63", hint: "1（C5）：坐在窗台上時，張望伸偽足探的方向不再朝下（朝下那條會被窗台板擋住，什麼都看不到）；朝下的那一半照水平線鏡射到上面，所以只探上面和左右。懸空時不管。0 回改之前（0 到 360 度亂抽，約四成朝下）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
 

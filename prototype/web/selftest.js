@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T78（C5 張望不朝窗台下面；lookNoDown 0 對照；在 T77 後面、T74 前面跑）；T44、T45、T46、T48、T55、T74 釘 lookNoDown 0（整份比對過，這六項的數字會變）
    v2.63（11-26）：加 T77（D3 怕的不滑走、搔癢不掙脫、兩指照舊撕開；兩顆 0 對照；在 T76 後面、T74 前面跑）
    v2.63（11-26）：加 T76（C9 揉夠了放手，在你手邊睡著；nap 0 對照；在 T75 後面、T74 前面跑）
    v2.63（11-26）：加 T75（切回來也先看你：visibilitychange、blur／focus，睡著的慢慢醒不嚇；在 T74 前面跑，幾秒）
@@ -1036,7 +1037,7 @@
     VIEW.skin = 'flat'; res.T43_v228 = r43;
     res.PASS.v228 = !r43.jelFail && r43.moved === 0 && r43.flatSame && ['A', 'B', 'C'].every(k => Array.isArray(r43.skins[k]) && r43.skins[k].join() !== bg0.join()); }
   // T44 v2.28 窗台：有重力、坐得進碗、不飄走、不穿地板。背景藍的舊項目完全不受影響（SILL.on 關）
-  { const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, emo: 0, life2: 0, seed: 12, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0 };
+  { const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, emo: 0, life2: 0, seed: 12, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, lookNoDown: 0 };   // v2.63 C5：張望不朝下（lookNoDown）預設 1 之後窗台上張望的方向變了，這一項量的是舊規格，釘 0
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; }, top = () => { let m = 1e9; for (const i of bnd) m = Math.min(m, Y[i]); return m; };
     const fresh = () => { mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; };
     const worst = n => { let lo = 1e9, hi = -1e9, x0 = 1e9, x1 = -1e9, sx = 0, ar0 = 9, ar1 = 0, maxFold = 0; for (let k = 0; k < n; k++) { steps(1); lastTouch = t; const b = bottom(); lo = Math.min(lo, b); hi = Math.max(hi, b); for (const i of bnd) { x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); } const a = area() / A0; ar0 = Math.min(ar0, a); ar1 = Math.max(ar1, a); } return { lo, hi, x0, x1, ar0, ar1 }; };
@@ -1076,7 +1077,7 @@
   // 眼睛任何一幀都在外框裡；記住的形狀沒有翻面的三角形；放手 1 秒後外框沒有交叉；交叉的幀數很少；身體不會爆開；猛扯不會有黏液。
   // 同時量關掉防打結（OFF29）的結果當對照，黏土的留形不能因此變差。
   { const clock = saveClock(); const r = {}, OFF29 = { noFlip: 0, gripUp: .2, homeCap: 0, fingerSolid: 0, softWall: 0 };
-    const SP = n => ({ ...P27[n], limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 7 });
+    const SP = n => ({ ...P27[n], limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 7, lookNoDown: 0 });   // v2.63 C5：張望不朝下（lookNoDown）預設 1 之後窗台上張望的方向變了，這一項量的是舊規格，釘 0
     const center = () => { const g = SILL.g, dx = W / 2 - g.bx; g.bx = W / 2; PROPS.length = 0; for (let i = 0; i < N; i++) { X[i] += dx; PX[i] += dx; } CX += dx; HOMEX += dx; };   // v2.30 碗移到左邊，這組路徑會把手指帶到畫面外（x<0），真人做不到；量身體本身就把碗放回中間、拿掉擺飾，跟 v2.29 同一件事
     const flips = (AX, AY) => { let f = 0; for (let k = 0; k < TRI.length; k += 3) { const a = TRI[k], b = TRI[k + 1], c = TRI[k + 2]; if ((AX[b] - AX[a]) * (AY[c] - AY[a]) - (AY[b] - AY[a]) * (AX[c] - AX[a]) <= 0) f++; } return f; };
     const paths = { whirl: (k, cx, cy) => k < 30 ? [[1, cx + R * (.75 + 1.45 * k / 30), cy - R * .6 * k / 30]] : k < 210 ? [[1, cx + R * 2.2 * Math.cos(-.27 + (k - 30) / 180 * Math.PI * 4), Math.max(60, cy + R * 2.2 * Math.sin(-.27 + (k - 30) / 180 * Math.PI * 4))]] : null,
@@ -1109,7 +1110,7 @@
 
   // T46 v2.30 環境互動（多米 11-06：跨出窗外、爬窗邊、打翻擺飾、爬出爬進碗）。標準清單 v2.30 每一條：路線走得完、換層時不重疊也不跳、手指那幾條、自己跑 2 分鐘不爆。T45 不退步由 PASS.knot 管
   // v2.31（多米 11-07）：碗回中間、擺飾拿掉、牠只跟碗互動。擺飾那幾項刪掉；爬窗框、窗外的路線用 envFrame 1 量（程式還在，預設不走）
-  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, envFrame: 1, props: 0 };
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, envFrame: 1, props: 0, lookNoDown: 0 };   // v2.63 C5：張望不朝下（lookNoDown）預設 1 之後窗台上張望的方向變了，這一項量的是舊規格，釘 0
     const fresh = sd => { Math.random = seeded(sd || 4601); mat = { ...SP }; setup(); WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     let aborts = 0; const re0 = routeEnd; routeEnd = function (a) { if (a && SILL.route) aborts++; return re0(a); };
     const bottom = () => { let m = -1e9; for (const i of bnd) m = Math.max(m, Y[i]); return m; };
@@ -1188,7 +1189,7 @@
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
 
   // T48 v2.31 搖晃沉澱（多米 11-07：互動改成搖手機，像雪花球）與散出來吃回來（第二種玩法）。搖三下就滿、第四下不會更多、牠在碗裡彈但不出碗、物理沒壞；放著約 30 秒沉澱清透（叮一聲、睜眼、發光，只清一次）；沉澱時慢呼吸、閉眼；沉到一半捏牠又濁回去；堆的形狀三種都會出現；亮粉都在身體裡；藍底也能搖；搖會叫醒；關掉就沒有
-  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, shake: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0 };
+  { const clock = saveClock(); const r = {}, SP = { ...P27.clay, shake: 1, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bowl: 1, bodySize: .27, intro: 0, introSwim: 0, seed: 12, emo: 0, life2: 1, lifeGait: 1, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, sleep: 0, echo: 0, envRoam: 0, catPush: 0, lookNoDown: 0 };   // v2.63 C5：張望不朝下（lookNoDown）預設 1 之後窗台上張望的方向變了，這一項量的是舊規格，釘 0
     const fresh = (sd, over) => { Math.random = seeded(sd || 4801); mat = { ...SP, ...(over || {}) }; setup(); E2.tk.length = 0; E2.tkT = 0; ESC.on = false; WANDER.moving = false; WANDER.next = t + 1e5; lastTouch = t; steps(240); lastTouch = t; };
     const run = (n, f) => { for (let k = 0; k < n; k++) { steps(1); if (f) f(k); } };
     const cl = () => +SNW.cloud.toFixed(3);
@@ -1389,7 +1390,7 @@
   // T55 v2.41 大腦（多米 11-14：像真實世界的動物，有牠自己的一套行為邏輯）。窗台上照 app 的預設（芋圓、熟 0.7），舊項目一律關大腦。
   // a 放著不碰 300 秒：醒著的時間裡休息佔 0.35 到 0.75、有張望有走、睏高了會睡、睡飽自己醒（v2.40 睡了不會自己醒）、沒有 0.5 秒內就換事情、想動不會一直滿格；
   // b 喘（跑完、被大力拉）那一下：睏漲、想動退；c 睏 0.9 開始：15 秒內就睡；睏 0 開始：60 秒內不睡；d brain 0：需求不動、不會自己醒（回 v2.40）
-  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, decoReact: 0 };
+  { const clock = saveClock(); const TARO = SLIMES[2], r = {}, e4c = E4.count, e4t = E4.lastT, SP = { ...P27R[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, decoReact: 0, lookNoDown: 0 };   // v2.63 C5：張望不朝下（lookNoDown）預設 1 之後窗台上張望的方向變了，這一項量的是舊規格，釘 0
     const run = (over, sec, pre) => { Math.random = seeded(55); mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; impReset(); IMP.tr = .7; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 0; E4.lastT = -99; Object.assign(BRAIN, { seed: 55, naps: 0, selfWake: 0 }); BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; if (pre) pre();
       const c = {}; let short = 0, last = '', lastI = 0, eTop = 0, n = 0, napAt = -1;
       for (let i = 0; i < sec * 60; i++) { update(DT); const a = BRAIN.act; c[a] = (c[a] || 0) + 1; if (a !== last) { if (last && i - lastI < 30) short++; last = a; lastI = i; } if (BRAIN.e > .98) eTop++; if (napAt < 0 && SLP.on) napAt = +(i / 60).toFixed(1); n++; }
@@ -1990,9 +1991,39 @@
       && r.tear.torn && r.tear.dMax > 621
       && r.pullOff.slip >= 5 && r.tickleOff.free >= 4 && r.tickleOff.free <= 9 && r.tickleOff.protest >= 1 && r.tearOff.torn;
     res.T77_hold = r; res.PASS.hold = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T78 v2.63 C5 張望不朝窗台下面（lookNoDown；OVERNIGHT 第 8 項，手機照這條搬）。窗台、芋圓、真正的預設（PRE54）。
+  // 「朝下」照 11-24 稽核 P4 的量法：張望偽足的方向 sin > 0.3（畫面 y 往下，正下方左右約 72 度內），那條伸出去會被窗台板擋住（P4 量到身體底緣 0 點）。
+  // 擋：a 坐在窗台上、沒摸過，直接抽 255 次張望方向（pickDir）：lookNoDown 1 朝下 0 次；0 朝下 25% 到 55%（稽核放著 80 分鐘量到 104／255，41%）；兩邊抽完 255 次後下一個亂數一樣（1 不多抽、不少抽亂數）
+  //     b 戒 0.9、最後摸在身體頂上（戒的往反方向探，就是朝下）：抽 255 次，1 朝下 0 次；0 朝下 30% 以上；兩邊下一個亂數一樣
+  //     c 放著不碰 6 分鐘（大腦、心情照常，休息、睡、張望自己來），真的伸出去的張望偽足：1 朝下 0 次、張望 8 次以上；0 張望 8 次以上時朝下至少 1 次；1 跟 0 都零自交
+  //     d 懸空（窗台關）時不折：lookNoDown 1 抽 255 次照樣有朝下（25% 以上）
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, pd0 = pickDir, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    const base = Math.floor(seeded(78)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(78) 的種子，每一輪不同
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd + base); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = 0; IMPD.tr = 0; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; PAIR.tearT = -9; PAIR.over = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: sd }); brainReset(); steps(60); };
+    const down = a => Math.sin(a) > .3;
+    const draw255 = (over, sd, prep) => { fresh(over, sd); if (prep) prep(); Math.random = seeded(sd + base + 1); let n = 0, cosR = 0, cosL = 0; for (let k = 0; k < 255; k++) { const a = pickDir(); if (down(a)) n++; if (Math.cos(a) > .3) cosR++; if (Math.cos(a) < -.3) cosL++; } return { sill: SILL.on, down: n, frac: +(n / 255).toFixed(2), right: cosR, left: cosL, next: Math.random() }; };
+    const wary = () => { let b = -1; for (const i of bnd) if (b < 0 || Y[i] < Y[b]) b = i; IMP.has = true; IMP.lx = X[b]; IMP.ly = Y[b]; IMP.w = .9; IMPD.w = .9; IMP.tr = 0; };
+    const idle = (over, sd) => { fresh(over, sd); const got = []; let pend = []; pickDir = () => { const a = pd0(); pend.push(a); return a; };
+      const seen = new Set(), o = { looks: 0, down: 0, up: 0, side: 0, xs: 0, acts: {} };
+      try { for (let k = 0; k < 60 * 360; k++) { steps(1); for (const s of LIFE.sns) if (!seen.has(s)) { seen.add(s); if (pend.includes(s.a)) { got.push(s.a); pend = pend.filter(x => x !== s.a); } } pend.length = 0;
+          if (k % 30 === 0) { o.acts[BRAIN.act] = (o.acts[BRAIN.act] || 0) + 1; if (selfX()) o.xs++; } } }
+      finally { pickDir = pd0; }
+      o.looks = got.length; o.down = got.filter(down).length; o.up = got.filter(a => Math.sin(a) < -.3).length; o.side = o.looks - o.down - o.up; return o; };
+    try { r.a = draw255({}, 78); r.aOff = draw255({ lookNoDown: 0 }, 78); r.b = draw255({}, 7801, wary); r.bOff = draw255({ lookNoDown: 0 }, 7801, wary); r.d = draw255({ sill: 0 }, 7802);
+      r.c = idle({}, 7803); r.cOff = idle({ lookNoDown: 0 }, 7803); r.err = ''; } catch (e) { r.err = String(e); }
+    pickDir = pd0;
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0);
+    Object.assign(VIEW, view0); SLIME = sl0; BMEM.cell = M0.cell; BMEM.side = M0.side; BMEM.dirty = false; IMP.tr = I0.tr; IMP.w = I0.w; impReset(); Object.assign(E4, E0); Object.assign(BRAIN, B0); GREET.st = ''; GREET.until = -9; PAIR.tearT = -9; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    r.ok = !r.err && r.a.sill && r.a.down === 0 && r.aOff.frac >= .25 && r.aOff.frac <= .55 && r.a.next === r.aOff.next && r.a.left > 0 && r.a.right > 0
+      && r.b.down === 0 && r.bOff.frac >= .3 && r.b.next === r.bOff.next
+      && r.c.looks >= 8 && r.c.down === 0 && r.c.xs === 0 && r.cOff.xs === 0 && (r.cOff.looks < 8 || r.cOff.down >= 1)
+      && !r.d.sill && r.d.frac >= .25;
+    for (const k of ['a', 'aOff', 'b', 'bOff', 'd']) delete r[k].next;
+    res.T78_lookNoDown = r; res.PASS.lookNoDown = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
-    try { window.__SPLIT_PRE = PRE62; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
+    const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
+    try { window.__SPLIT_PRE = P74; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
     o.r.sec = Math.round((performance.now() - T0) / 1000); res.T74_split = o.r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     res.PASS.split = !!o.pass; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();

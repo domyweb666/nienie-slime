@@ -5020,7 +5020,13 @@ final class SlimeRig {
         if Double.random(in: 0..<1, using: &rng) < 0.2 { d += 5 + Double.random(in: 0..<6, using: &rng) }
         return d * params.restMul * (1 - 0.5 * exLevel()) * (1 + 0.5 * max(0, moodC)) * (1 - 0.5 * max(moodA, moodScare)) * (iv2(params.impC5) ? 1 - 0.4 * impWary : 1)   // v2.20 C5: wary rests less
     }
+    /// v2.63 C5 (web pickDir, lookNoDown): on the sill a sniff pointing down (screen y grows down, sin > 0) is mirrored over the horizon;
+    /// no extra draws from rng, so lookNoDown 0 is as before. MARK v2.63 C5
     private func pickDir() -> Double {
+        let a = pickDir0()
+        return params.lookNoDown >= 0.5 && sillOn && sin(a) > 0 ? -a : a
+    }
+    private func pickDir0() -> Double {
         if hypot(homeX - cx, homeY - cy) > W * 2.5 { return atan2(cy - homeY, cx - homeX) + Double.random(in: -0.6..<0.6, using: &rng) }   // too far out: sniff back
         if iv2(params.impC5) && impHas {   // v2.20: trusting sniffs toward where you last touched it (and mostly goes), wary the other way
             let dx = impLX - homeX, dy = impLY - homeY, d = hypot(dx, dy), ta = atan2(dy, dx), r = Double.random(in: 0..<1, using: &rng)
