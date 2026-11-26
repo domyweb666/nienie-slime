@@ -1,3 +1,35 @@
+# Handoff: 扯斷成兩隻、碰到合回（v2.62，分支 `split-merge-v1`，2026-11-26，先看這段）
+
+> 工作樹 `E:/捏捏史萊姆/_wt-分裂`，從 `feel-3x-panel-v1` 的 `33e3b3f` 開。**沒推、沒發 TestFlight。** 預覽伺服器 launch 名 `split-web`（8797，網址 `http://127.0.0.1:8797/index.html`）。
+> 另一個對話同時在 `_wt`（feel-3x-panel-v1）改湯圓餡（`drawFx`、`CORE`）和不透明皮的邊緣（著色器、`JellySkin`）；這條沒碰那幾處，合併時 `draw()` 裡 `inBody` 那一行可能小衝突（這條在那行加了 `twinFace(col,false)`）。
+
+## ✅ 完成
+- 設計稿（四版合併動畫，可播放、可慢放比較）：https://claude.ai/artifact/LgGRtiXohwX6By5wq3oTDq 。Design 類型不能寫腳本動畫，做成 HTML 頁。另外 quickstart 建了一個沒用到的空 Design 畫布 https://claude.ai/artifact/NJbPkKLRgHKgaoyZnSBmAq ，要不要刪問多米。
+- 網頁（`dd31c82`）：`index.html` 搜 `v2.62`。舊的 v2.51 小團 `B2` 升級成第二隻真的軟體（`twinBuild`、`twinSub`、`twinMem`），畫進 A 的同一張遮罩（`extraMask`），臉另外畫（`twinFace`）。A 不換粒子：參考形狀和目標面積一起縮（`SPLIT.k`、`SPLIT.mx` 乘進 substep 的 m00..m11、`A0p×SPLIT.det`、互不穿透 `×SPLIT.dmin`）。合併鼓包、波紋借偽足 `POD.E`（`twinPods`）。參數、秒數、做法在 `.uiux/04-手感/參數表-暫定.md` 最後一節。
+- 扯斷條件 `splitCheck`：手指從抓下去的地方拉開 > `splitAt` 1.8R、往外、螢幕速度 > `splitV` 10R/s、連 0.05 秒。原本從中心量 3.4R，手機橫向只有約 3.7R 寬，橫著拉不到，所以改量拉開距離。
+- 自測 T74（`splittest.js`，selftest 最後 fetch 它；也能單獨在 console 跑）：四版都會斷、斷了再猛扯兩隻都不斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%（擠扁那版量到 0.977 到 0.981，最接近門檻）、A 回到原本大小；放著自己爬回去也合；splitAgain 1 能再斷、0 不能；split 0 不斷。單獨跑過三次都過。
+- 舊項目 T65 到 T73 釘 `split 0`（`PRE54`），T74 和跑完還原用真正的預設（`PRE62`）。
+
+## 🚧 沒做完
+1. **整份 selftest 還沒全過一次**：第一次跑在 T68（亂拉）撞到 NaN：扯斷那一刻換回原本網格，`remeshHome 0` 時 HB 是空的。已修（`dd31c82`），也把舊項目釘 split 0，**修完還沒重跑**。跑法：起 `split-web`，然後
+   `node E:/捏捏史萊姆/nienie-slime/.vibe/run-selftest.mjs selftest.js http://127.0.0.1:8797/index.html <結果.json>`（腳本在主資料夾的 `.vibe`，這個工作樹沒有；約 15 到 20 分鐘，背景跑，後面不要接別的指令）。要跑 3 次。
+2. **Swift**：子代理在照搬（`SlimeRig`、`FeelParams`、`SlimeView`、`JellySkin`），交代過不碰著色器和湯圓餡、不 commit。結果回到原本那個對話；要是沒回來，`git status` 看 `ios/` 有沒有改到一半的檔，沒有就重做：照 `git show fff26c5 12a8df8 dd31c82 -- prototype/web/index.html` 逐行搬。本機沒有 swiftc，要推上去 CI 才知道編不編得過，先別推。
+3. Swift 寫完要逐行對網頁複查一次（另開子代理，給它程式碼不要給結論）。
+
+## ❓ 等多米決定
+1. 合回之後還能不能再斷：先照「合回後重新算一次」（`splitAgain` 1）；0 是這次打開只斷一次。
+2. 四版合併動畫（`mergeFx` 0 到 3）哪版當預設，現在是 0 黏絲搭橋。隱藏面板「合併動畫 v2.62」切換。
+3. 扯斷門檻 `splitAt` 1.8、`splitV` 10 是猜的，要真機試：太容易斷就調高 `splitV`。
+4. 斷下來掉在牠頭上（窗台有重力）會直接合回去；窄畫面上兩隻常常貼著，第二隻放手 0.6 秒後碰著就合。要不要讓兩隻多玩一下再合。
+5. 要不要推、發 TestFlight。
+
+## 📌 已查清、下次別再查
+- 遮罩是模糊再切邊，兩隻一碰就是一個輪廓，所以搭橋、水滴兩版要在還沒碰到時就開始（`MERGE_REACH` .5、.25R）。
+- 手機版沒有大腦；網頁的扯斷不碰大腦。
+- 測試用內建瀏覽器時一律帶 `tabId`，別的子代理可能也開著分頁。
+
+---
+
 # Handoff: 修洞做完（網頁 `0844ceb`、Swift `e345785`，11-25 已推到 `2a215f2`，Swift 在 CI 編過），網頁自測 73／73 三次，T70 長版紅一項（2026-11-25，先看這段）
 
 > 多米 11-24 三題：① 還有哪些規劃沒做；② 十隻改回不透明；③ 兩個最大要求（手感好、真實寵物感）要極致優化還缺什麼。三題都有答案了。
