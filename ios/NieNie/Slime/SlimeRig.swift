@@ -323,6 +323,10 @@ final class SlimeRig {
     // flinch (A5): at = when, t0 = started, amp, H = habituation (×0.55 a flinch, back with a 7 s time constant), s = current scale,
     // pre = what it was doing before the touch (resting flinches more)
     private var flAt = -9.0, flT0 = -9.0, flAmp = 0.0, flH = 1.0, flS = 1.0, flPre = LifeState.rest
+    private struct FlSay { var at: Double; var kind: String; var gain: Double; var rate: Double }   // v2.63 B5: a startle waiting for its flinch (web FLN.say)
+    private var flSay: FlSay? = nil
+    /// v2.63 B2: the press sound's own loudness for the `.press` event being sent (from pressForce), −1 = use the event's gain as before
+    private(set) var pressSnd = -1.0
     // v2.61 D2 (tapSoft; web FLN.tc, tcq, tpAt): the most a flinch from your touch may be (1 = no limit), a light tap whose flinch has not come yet, when the flinch your touch set off is due
     private var flTc = 1.0, flTapQ = false, flTapAt = -9.0
     private var shkAt = -9.0, shkT0 = -9.0, shkAmp = 0.0, shkTh = 0.0      // shaking off after a hard pull; th = how far it is turned now
@@ -1120,7 +1124,7 @@ final class SlimeRig {
         brPhase = 0; brPrev = 0; brAmp = 1; brWave = 0; brDeepAt = -99; brGrabStart = -1; pinchA = nil; pinchB = nil
         // v2.19
         lifeSt = .rest; lifeUntil = -1; lifeLooks = 0; lifeNoGo = false; sniffs = []; attOn = false; lifeWrg = 1; goFade = 0; arrT = -9; arrOff = 0
-        gaitOn = false; gaitK = 1; gaitOff = 0; gaitV = 0; flAt = -9; flT0 = -9; flAmp = 0; flH = 1; flS = 1; shkAt = -9; shkT0 = -9; shkAmp = 0; shkTh = 0
+        gaitOn = false; gaitK = 1; gaitOff = 0; gaitV = 0; flAt = -9; flSay = nil; flT0 = -9; flAmp = 0; flH = 1; flS = 1; shkAt = -9; shkT0 = -9; shkAmp = 0; shkTh = 0
         exert = 0; sighNext = -1; sighCyc = -1; pauseUntil = -9; brAmpX = 1; brCyc = 0; strK = 1; psm = (1, 0, 0, 1); lifeLB = 1
         // v2.20: a rebuild drops the fingers without a release, so the offset must go too or home stays off (measured on the web:
         // later tests leaned with it, a 3 s press moved 61 pt instead of 30)
@@ -2169,9 +2173,10 @@ final class SlimeRig {
     }
 
     /// `allowed` is false for touches in the system-gesture bands near the screen edges.
-    /// `radius` is UITouch.majorRadius (contact size, points; 0 if unknown).
+    /// `radius` is UITouch.majorRadius (contact size, points; 0 if unknown). `force` (v2.63 B2) is UITouch.force / maximumPossibleForce
+    /// where there is 3D Touch, −1 otherwise (the UI layer reads it; this file stays Foundation only).
     /// `x, y` are screen points; the rig turns them into world points through the camera.
-    func touchBegan(_ id: ObjectIdentifier, x sx: Double, y sy: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0) {
+    func touchBegan(_ id: ObjectIdentifier, x sx: Double, y sy: Double, time: TimeInterval, allowed: Bool = true, radius: Double = 0, force: Double = -1) {
         guard N > 0 else { return }
         if introOn { let mini = introMini; endIntro(); if !mini { return } }   // v2.17: a touch on the way brings it home at once (eased in 0.25 s); this touch does not grab; during a happy hop it grabs as usual
         let (x, y) = toWorld(sx, sy)
@@ -2217,7 +2222,9 @@ final class SlimeRig {
         if grab {
             if clusters.indices.contains(gi) { f.r0x = x - clusters[gi].xc; f.r0y = y - clusters[gi].yc }   // v2.61 A4
             fingerGrab(f, id: id, x: x, y: y)
+            pressSnd = params.sndB2 >= 0.5 ? pressForce(force: force, radius: radius) : -1   // v2.63 B2 (web: sfxPlay('press', pressForce(e))); the haptic keeps the event's 0.7
             onEvent?(.press(gain: 0.7))
+            pressSnd = -1
             // press flat (多米 2026-11-01: wanted to see it): a press counts only if it lands on the upper half; remember the
             // height and the bottom then (the invisible table is at that bottom)
             if params.pressFlat > 0 {
@@ -5181,6 +5188,7 @@ final class SlimeRig {
         // A5 flinch when its time comes (resting before the touch ×1.2, walking ×0.8; comfortable half; each flinch ×0.55, back with 7 s)
         flH += (1 - flH) * (1 - exp(-dt / 7))
         if params.tapSoft >= 0.5 { flTc = min(1, flTc * exp(dt / TapSet.T)) } else { flTc = 1; flTapQ = false }   // v2.61 D2
+        if let s = flSay, t >= s.at || flAt != s.at { flSay = nil; onEvent?(.voice(kind: s.kind, gain: s.gain, rate: s.rate)) }   // v2.63 B5 (web: the same line): the startle on the flinch's frame; the flinch cancelled or moved, at once
         if flAt > 0 && t >= flAt {
             let byTap: Bool = params.tapSoft >= 0.5 && flAt == flTapAt
             flAt = -9
@@ -6357,10 +6365,20 @@ final class SlimeRig {
     // MARK: - v2.22 voice (E1), every action answered (E2), the impression shows (E3), comes to say hello (E4)
 
     /// E1: one of its small sounds; trusting a little higher, wary lower; at most one every 0.3 s.
-    private func voice(_ kind: String, _ g: Double = 0.8) {
+    private func voice(_ kind: String, _ g: Double = 0.8, at: Double? = nil) {
         guard iv3(params.e1), t - voiceLast >= 0.3 else { return }
         voiceLast = t
-        onEvent?(.voice(kind: kind, gain: g, rate: (1 + 0.1 * impTrust - 0.08 * impWary) * Double.random(in: 0.96..<1.04, using: &rng) * params.voicePitch))
+        let r: Double = (1 + 0.1 * impTrust - 0.08 * impWary) * Double.random(in: 0.96..<1.04, using: &rng) * params.voicePitch
+        if let at, at > t, params.sndB5 >= 0.5 { flSay = FlSay(at: at, kind: kind, gain: g, rate: r); return }   // v2.63 B5 (web voice(kind, g, at)): `at` is the flinch (flAt); the sound waits for that frame
+        onEvent?(.voice(kind: kind, gain: g, rate: r))
+    }
+    /// v2.63 B2 (web pressForce, B2K): the press sound from how hard the finger landed: the 3D Touch force where there is one, else the contact
+    /// size (majorRadius 18 pt a fingertip … 42 pt a flat pad), 0.35 … 0.95; neither → 0.7 as before.
+    private enum B2Set { static let lo = 0.35, hi = 0.95, rLo = 18.0, rHi = 42.0 }
+    private func pressForce(force: Double, radius: Double) -> Double {
+        var k = -1.0
+        if force > 0 { k = force } else if radius > 1.5 { k = (radius - B2Set.rLo) / (B2Set.rHi - B2Set.rLo) }
+        return k < 0 ? 0.7 : B2Set.lo + (B2Set.hi - B2Set.lo) * max(0, min(1, k))
     }
     private func firstGrab() -> Finger? { fingers.values.first { $0.mode == .grab } }
     /// E1: pulled until it wants to flee → "mm-mm"; purring → "mmm~" (once a grab each).
@@ -6717,7 +6735,7 @@ final class SlimeRig {
         guard slpOn else { return }
         slpSlow = slow; slpTapN = 0; slpTap = nil   // v2.61 C1
         slpOn = false; slpWakeT = t; slpNearT = 0; lifeSt = .rest; lifeUntil = t + 1.5 + Double.random(in: 0..<1, using: &rng); eyeBlinkT = t
-        if sharp { voiceLast = -9; voice("startle"); flAt = t + 0.05; flPre = .rest; flBoost = 1.6; if mdOn { brain.m -= 0.1 } }   // v2.63 心情: woken with a start
+        if sharp { voiceLast = -9; voice("startle", at: t + 0.05); flAt = t + 0.05; flPre = .rest; flBoost = 1.6; if mdOn { brain.m -= 0.1 } }   // v2.63 心情: woken with a start
         if !quiet { slpAskAt = t + (sharp ? 0.45 : 0.3) }
     }
     private func sleepStep(_ dt: Double) {

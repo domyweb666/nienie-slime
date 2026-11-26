@@ -376,8 +376,10 @@ final class SlimeView: UIView {
         if labCircle { circleFollow(touches, with: event, down: true); return }
         for t in touches {
             let p = t.location(in: self)
+            let fmax = Double(t.maximumPossibleForce)   // v2.63 B2: 3D Touch; 0 where there is none (then the rig reads majorRadius)
+            let force: Double = fmax > 0 && t.force > 0 ? min(1, Double(t.force) / fmax) : -1
             rig.touchBegan(ObjectIdentifier(t), x: Double(p.x), y: Double(p.y), time: t.timestamp,
-                           allowed: touchAllowed(p), radius: Double(t.majorRadius))
+                           allowed: touchAllowed(p), radius: Double(t.majorRadius), force: force)
         }
     }
 

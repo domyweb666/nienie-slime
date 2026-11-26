@@ -16,6 +16,8 @@ protocol SlimeSoundSource: AnyObject {
     var voiceBag: Bool { get set }
     /// v2.63 B6 (FeelParams.sndB6): a press clears only the last release's tail (the settle bubbles), not the drip after a tear or other delayed sounds. false = a press clears everything queued
     var sndB6: Bool { get set }
+    /// v2.63 B5 (FeelParams.sndB5): startle, happy, protest and the press's wet layer play a copy of each file without its quiet lead-in (made at load). false = the files as they are
+    var sndB5: Bool { get set }
     /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
     var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
@@ -55,6 +57,7 @@ final class SlimeAudio: SlimeSoundSource {
     var snd61 = true   // v2.61 B1
     var voiceBag = true   // v2.63 C6
     var sndB6 = true   // v2.63 B6
+    var sndB5 = true   // v2.63 B5
     var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
@@ -118,6 +121,7 @@ final class SlimeAudio: SlimeSoundSource {
     private let engine = AVAudioEngine()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
     private var bank: [String: [AVAudioPCMBuffer]] = [:]   // "press.body" → takes
+    private var bankB5: [String: [AVAudioPCMBuffer]] = [:]   // v2.63 B5: the same takes without their lead-in, same order
 
     private final class Voice {
         let player = AVAudioPlayerNode()
@@ -241,8 +245,42 @@ final class SlimeAudio: SlimeSoundSource {
                     if kind == "release", layer == "air" || layer == "all", releaseSampleURL == nil { releaseSampleURL = fileURL }
                 }
                 bank["\(kind).\(layer)"] = buffers
+                if B5Set.keys.contains("\(kind).\(layer)") { bankB5["\(kind).\(layer)"] = buffers.map { leadTrim($0) } }   // v2.63 B5
             }
         }
+    }
+
+    /// v2.63 B5 (web leadTrim, B5K; the same numbers): these files start with a quiet lead-in (the loudest part 60 to 267 ms in), heard as a beat late.
+    /// The file is left alone: a copy starts 20 ms before the first −6 dB point (5 ms blocks, max of |x|, half the file's peak) when that is later
+    /// than 30 ms, with a 13 ms raised-cosine fade in.
+    private enum B5Set {
+        static let keys: Set<String> = ["voice.startle", "voice.happy", "voice.protest", "press.wet"]
+        static let thr: Float = 0.5, late = 0.03, keep = 0.02, fade = 0.013
+    }
+    private func leadTrim(_ b: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+        guard let d = b.floatChannelData?[0] else { return b }
+        let sr: Double = b.format.sampleRate, len = Int(b.frameLength), w = max(1, Int((0.005 * sr).rounded())), nb = len / w
+        guard nb > 0 else { return b }
+        var env = [Float](repeating: 0, count: nb)
+        var pk: Float = 0
+        for k in 0..<nb {
+            var m: Float = 0
+            for i in (k * w)..<((k + 1) * w) { m = max(m, abs(d[i])) }
+            env[k] = m
+            pk = max(pk, m)
+        }
+        var on = 0
+        while on < nb && env[on] < pk * B5Set.thr { on += 1 }
+        let onset = Double(on * w) / sr
+        guard onset > B5Set.late else { return b }
+        let skip = Int(((onset - B5Set.keep) * sr).rounded()), n = len - skip, fade = max(1, Int((B5Set.fade * sr).rounded()))
+        guard n > 0, let o = AVAudioPCMBuffer(pcmFormat: b.format, frameCapacity: AVAudioFrameCount(n)), let out = o.floatChannelData?[0] else { return b }
+        o.frameLength = AVAudioFrameCount(n)
+        for i in 0..<n {
+            let g: Float = i < fade ? Float(0.5 - 0.5 * cos(Double.pi * Double(i) / Double(fade))) : 1
+            out[i] = d[i + skip] * g
+        }
+        return o
     }
 
     /// Reads a file and converts it to the engine's mono 48k float format.
@@ -279,7 +317,7 @@ final class SlimeAudio: SlimeSoundSource {
     private func jitter() -> Double { 1 + Double.random(in: -pitchJitter...pitchJitter) }
 
     private func one(_ key: String, _ p: Play) {
-        guard !muted, let takes = bank[key], !takes.isEmpty else { return }
+        guard !muted, let takes = (sndB5 ? bankB5[key] : nil) ?? bank[key], !takes.isEmpty else { return }   // v2.63 B5: the trimmed copies where there are
         if p.delay > 0 {
             var q = p
             q.delay = 0

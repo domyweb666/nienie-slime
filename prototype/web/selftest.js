@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T81（B2 按聲跟著力道、B5 嚇到開心不要啦按的聲音跟動作同一格、音檔前奏跳過；sndB2、sndB5 0 對照；在 T80 後面、T74 前面跑）；T72 釘 sndB5 0（g 推醒一醒就查 startle，嚇到那聲排到縮的那一格後查不到）
    v2.63（11-26）：加 T80（B6 拉回去再拉有絲聲、按下去只清上次放手的餘韻；sndB6 0 對照；音效接真的引擎；在 T79 後面、T74 前面跑）
    v2.63（11-26）：加 T79（C6 揉牠反應輪流、小跳 40 秒一次、叫聲洗牌袋；rubVary 0 對照；在 T78 後面、T74 前面跑）；舊項目一律 rubVary 0，T66、T67、T76 也釘 0（整份比對過，這幾項的數字會變；T65 也變，但它只跑這一項時兩版本來每次都不一樣，不是 rubVary 造成的，沒釘）
    v2.63（11-26）：加 T78（C5 張望不朝窗台下面；lookNoDown 0 對照；在 T77 後面、T74 前面跑）；T44、T45、T46、T48、T55、T74 釘 lookNoDown 0（整份比對過，這六項的數字會變）
@@ -1833,7 +1834,7 @@
   // d brJit：只跑大腦那條算式，睡醒的間隔開著散、關著幾乎一樣。e bumpSoft：牠自己（沒有手指）帶過去的罐子不倒、歪的慢慢收回來不跳；關掉會倒；手指推照舊倒。f snd61：抓著時雨 0.3，關掉 0.6。
   // g wakeSoft：從外面推進來碰熟睡的熟牠，每秒 3、3.5R 慢慢醒不嚇，每秒 5R 照舊嚇醒；很熟的睡著被按著不往手指推、不蹭、不出聲。h 重建時往回拔（tugS）歸零。
   // i ?pull= 鎖住時存 1 到存 3、匯入、盲比紀錄都不帶網址的值（用 srcdoc 開一頁、假的 localStorage，不碰使用者存的）；沒鎖住時照舊
-  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, T0 = performance.now(), M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, E0 = { count: E4.count, lastT: E4.lastT }, B0 = { ...BRAIN }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, T0 = performance.now(), M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, E0 = { count: E4.count, lastT: E4.lastT }, B0 = { ...BRAIN }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, sndB5: 0 };   // v2.63 B5：sndB5 1 時嚇到那一聲排到縮的那一格（晚 0.05 秒），g 推醒那條一醒就查有沒有 startle，會查不到；這一項量的是改之前的規格，釘 0
     const fresh = (over, tr) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(72); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = tr || 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.leanT = -9; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; Object.assign(BRAIN, { seed: 72 }); brainReset(); log.splice(0); };
     const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; }, heard = k => log.some(x => x[0] === k), up = q => Math.abs(Math.atan2(Math.sin(q.a), Math.cos(q.a)));
     const taps = over => { fresh(over, .3); steps(300); IMP.w = 0; const amp = []; for (let k = 0; k < 6; k++) { const q = sc(globalC.xc, globalC.yc), t1 = t; FLN.H = 1; ev('pointerdown', 1, q[0], q[1]); steps(6); ev('pointerup', 1, q[0], q[1]); steps(66); amp.push(FLN.t0 > t1 ? +FLN.amp.toFixed(4) : 0); } return { amp, w: +IMP.w.toFixed(3) }; };
@@ -2121,6 +2122,51 @@
       && (!r.loaded || (r.bPull.afterMin > 0 && r.bRub.afterMin > 0))
       && (!r.qOn || (r.qOn.tail === 0 && r.qOn.other === 1 && r.qOff.tail === 0 && r.qOff.other === 0));
     res.T80_sndB6 = r; res.PASS.sndB6 = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T81 v2.63 B2 按聲跟著力道、B5 嚇到開心不要啦按的聲音跟動作同一格（sndB2、sndB5；OVERNIGHT 第 11 項，手機照這條搬）。藍底、黏土真正的預設（PRE54，大腦關）。
+  // a B2：身體中間按下去，發真的 PointerEvent 帶接觸大小或壓力：指尖輕點（半徑 18）對指腹重壓（半徑 42）；壓力 0.15 對 0.9（沒有面積）；都沒有（跟其他測試一樣）。記按下那一聲的音量（sfxPlay press）；sndB2 0 對照
+  // b B5 同一格：每一格（一次 update）編號，聲音事件記在它出現的那一格（按下、放手在兩次 update 之間發，算下一格，就是畫面第一次畫出來那一格），動作也記第一次看得到的那一格：
+  //   按：press 聲、手指第一次按下去（f.pressOn）；嚇到：睡著時抓下去：startle 聲、縮（FLN.t0 換）；開心：摸一摸放手（rubVary 0，摸夠了、舒服設好，0.3 秒一聲的門清掉）：happy 聲、挺高（MOOD.happyT 換）；
+  //   不要啦：右邊緣往右拉 3R 撐住（rough、slide 關）：protest 聲、扯到想逃（MOOD.strain 過 0.5）
+  // c B5 音檔開頭：四種（voice.startle、voice.happy、voice.protest、press.wet）每個檔開頭到 −6 dB 的毫秒、最大聲的毫秒，切前、切後（音效有載到才量）
+  // 擋：a 開：重 ≥ 輕 × 1.5（面積、壓力兩條都是）、都沒有是 0.7；關：全部 0.7
+  //     b 開：四種都差 0 格；關：嚇到的聲音比縮早 2 格以上（改之前先叫、0.05 秒後才縮）
+  //     c 開：切後每個檔到 −6 dB 都在 30 毫秒內（音效有載到才量）
+  { const clock = saveClock(), r = {}, P81 = { ...PRE54.clay, intro: 0, introSwim: 0, brain: 0, rubVary: 0 }, I0 = { tr: IMP.tr, w: IMP.w };
+    const B5KEYS = ['voice.startle', 'voice.happy', 'voice.protest', 'press.wet'];
+    let loaded = false;
+    try { if (SFX && SFX.manifest) { SFX.init(); for (let i = 0; i < 120 && !loaded; i++) { loaded = B5KEYS.every(k => SFX.buf[k] && SFX.buf[k].length > 0 && SFX.bufB5 && SFX.bufB5[k] && SFX.bufB5[k].length === SFX.buf[k].length); if (!loaded) await new Promise(q => setTimeout(q, 50)); } } } catch (_) {}
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const pe = (type, id, x, y, o) => cv.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch', isPrimary: id === 1, ...(o || {}) }));
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P81, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; FLN.say = null; GREET.st = ''; GREET.until = -9; EYE.user = -9; steps(60); };
+    // 每一格編號；聲音事件記在出現的那一格
+    let FN = 0, li = 0; const EVS = []; const stepF = () => { steps(1); FN++; for (; li < log.length; li++) EVS.push([FN, log[li][0], log[li][1]]); };
+    const start = () => { FN = 0; li = log.length; EVS.length = 0; };
+    const first = k => { const e = EVS.find(x => x[1] === k); return e ? e[0] : null; };
+    const tapG = (over, o) => { fresh(over, 81); const [x, y] = sc(globalC.xc, globalC.yc), n0 = log.length; pe('pointerdown', 1, x, y, o); const e = log.slice(n0).find(q => q[0] === 'press'); steps(6); pe('pointerup', 1, x, y, o); steps(30); return e ? e[1] : null; };
+    const b2 = over => ({ light: tapG(over, { width: 36, height: 36 }), heavy: tapG(over, { width: 84, height: 84 }), pLight: tapG(over, { pressure: .15 }), pHeavy: tapG(over, { pressure: .9 }), none: tapG(over, {}) });
+    const sync = over => { const o = {}; let act;
+      // 按
+      fresh(over, 82); start(); { const [x, y] = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, x, y); act = null; for (let k = 0; k < 20; k++) { stepF(); const f = fingers.get(1); if (act == null && f && f.pressOn) act = FN; } ev('pointerup', 1, x, y); steps(30); o.press = { snd: first('press'), act }; }
+      // 嚇到：睡著時抓下去
+      fresh(over, 83); steps(60); SLP.on = true; LIFE.st = 'sleep'; SLP.k = 1; IMP.tr = 0; IMPD.tr = 0; start(); { const f0 = FLN.t0, [x, y] = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, x, y); act = null; for (let k = 0; k < 30; k++) { stepF(); if (act == null && FLN.t0 !== f0) act = FN; } ev('pointerup', 1, x, y); steps(30); o.startle = { snd: first('voice.startle'), act, woke: !SLP.on }; }
+      // 開心：摸一摸放手（rubHappy：摸夠了 gentleT > 1、舒服 MOOD.c > 0.35）
+      fresh(over, 84); { const [x, y] = sc(globalC.xc, globalC.yc), u = R * CAM.z; ev('pointerdown', 1, x, y); for (let k = 1; k <= 90; k++) { const a = 2 * Math.PI * k / 90; ev('pointermove', 1, x + Math.sin(a) * .2 * u, y + (1 - Math.cos(a)) * .1 * u); steps(1); }
+        const f = fingers.get(1); if (f) f.gentleT = Math.max(f.gentleT || 0, 2); MOOD.c = Math.max(MOOD.c, .6); voice.last = -9; start(); const h0 = MOOD.happyT; ev('pointerup', 1, x, y); act = null; for (let k = 0; k < 30; k++) { stepF(); if (act == null && MOOD.happyT !== h0) act = FN; } o.happy = { snd: first('voice.happy'), act }; }
+      // 不要啦：右邊緣往右拉 3R 撐住，扯到想逃（rough、slide 關：扯到想逃要猛扯、拖著走會一直跟上，這裡只量聲音和動作是不是同一格）
+      fresh({ rough: 0, slide: 0, ...over }, 85); { let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; const [x, y] = sc(X[b] - R * .15, Y[b]), u = R * CAM.z; ev('pointerdown', 1, x, y); steps(12); start(); act = null; let xx = x;
+        for (let k = 0; k < 300; k++) { if (k < 45) { xx = x + 3 * u * (k + 1) / 45; ev('pointermove', 1, xx, y); } stepF(); if (act == null && MOOD.strain > .5) act = FN; if (act != null && first('voice.protest') != null) break; }
+        ev('pointerup', 1, xx, y); steps(30); o.protest = { snd: first('voice.protest'), act }; }
+      for (const k in o) o[k].d = o[k].snd != null && o[k].act != null ? o[k].snd - o[k].act : null;
+      return o; };
+    const lead = () => { if (!loaded || !SFX.onsetOf) return null; const o = {}; for (const k of B5KEYS) { const a = SFX.buf[k].map(SFX.onsetOf), b = SFX.bufB5[k].map(SFX.onsetOf); o[k] = { before: a.map(q => q.on), peak: a.map(q => q.pk), after: b.map(q => q.on), peakAfter: b.map(q => q.pk) }; } return o; };
+    try { r.loaded = loaded; r.b2 = b2({}); r.b2Off = b2({ sndB2: 0 }); r.on = sync({}); r.off = sync({ sndB5: 0 }); r.lead = lead(); r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); FLN.say = null;
+    log.splice(0); IMP.tr = I0.tr; IMP.w = I0.w; impReset(); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    const B = r.b2 || {}, F = r.b2Off || {}, on = r.on || {};
+    r.ok = !r.err && B.heavy >= B.light * 1.5 && B.pHeavy >= B.pLight * 1.5 && B.none === .7 && ['light', 'heavy', 'pLight', 'pHeavy', 'none'].every(k => F[k] === .7)
+      && ['press', 'startle', 'happy', 'protest'].every(k => on[k] && on[k].d === 0) && !!r.off && r.off.startle.d <= -2
+      && (!r.lead || B5KEYS.every(k => r.lead[k].after.every(ms => ms <= 30)));
+    res.T81_sndB2B5 = r; res.PASS.sndB2B5 = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0

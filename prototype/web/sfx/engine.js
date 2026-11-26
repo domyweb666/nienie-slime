@@ -58,6 +58,7 @@
     // 底是兩分鐘無縫循環，事件照 amb.json 的頻率隨機冒出來（大小、左右、音高每次不同），聽不出循環。lofi 照舊
     // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
     snd61: 1,   // v2.61 B1：揉的新循環（rub.loop61）和抓著時雨降到 0.3；0 回 rub.loop、0.6
+    b5: 1, bufB5: {},   // v2.63 B5（sndB5）：嚇到、開心、不要啦、按的濕聲用跳過前奏的那一份（bufB5，載入時從同一個檔做的，leadTrim）；0 回原本的
     b6: 1,      // v2.63 B6（sndB6）：按下去只清上次放手的餘韻（排程裡 tail 的那幾顆），別的照放；0 回改之前（按下去整排清掉）
     amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
   };
@@ -158,8 +159,8 @@
     S.master = c.createGain(); S.master.gain.value = S.muted ? 0 : S.volume; S.master.connect(c.destination);
     startBgm();
     for (const k of Object.keys(S.manifest)) for (const layer of Object.keys(S.manifest[k])) {
-      const key = k + '.' + layer; S.buf[key] = [];
-      for (const f of S.manifest[k][layer]) fetch(S.base + f).then(r => r.arrayBuffer()).then(ab => c.decodeAudioData(ab)).then(b => S.buf[key].push(b)).catch(() => {});
+      const key = k + '.' + layer, b5 = B5K.keys.includes(key); S.buf[key] = []; if (b5) S.bufB5[key] = [];
+      for (const f of S.manifest[k][layer]) fetch(S.base + f).then(r => r.arrayBuffer()).then(ab => c.decodeAudioData(ab)).then(b => { S.buf[key].push(b); if (b5) S.bufB5[key].push(leadTrim(b)); }).catch(() => {});   // v2.63 B5：同一個回呼裡推，兩邊的順序一樣（洗牌袋的檔號對得上）
     }
   };
 
@@ -167,7 +168,24 @@
   S.setMode = function (m) { S.mode = m; S.setMuted(m === 2); if (S.bgmG) { S.bgmT = bgmTarget(false); S.bgmG.gain.setTargetAtTime(S.bgmT, S.ctx.currentTime, 0.3); } };
   S.setVolume = function (v) { S.volume = v; if (S.master && !S.muted) S.master.gain.setTargetAtTime(v, S.ctx.currentTime, 0.02); };
 
-  function pick(key, take) { const l = S.buf[key]; return l && l.length ? l[take != null ? take % l.length : Math.floor(Math.random() * l.length)] : null; }   // v2.63 C6: take = which file (the page's shuffle bag, rubVary); none = random as before
+  // v2.63 B5：這四種音檔開頭有一段很小聲的前奏（量到最大聲晚 60 到 267 毫秒），聽起來像比動作晚一拍。不改音檔：載入時每個檔另外做一份跳過前奏的，
+  // 開頭到 −6 dB（5 毫秒一格取最大值，到全檔最大的一半）超過 late 秒，就從那一點前 keep 秒開始放，頭 fade 秒升餘弦淡入。Swift SlimeAudio 同一套數字（B5Set）
+  const B5K = { keys: ['voice.startle', 'voice.happy', 'voice.protest', 'press.wet'], thr: 0.5, late: 0.03, keep: 0.02, fade: 0.013 };
+  function onsetOf(b) {   // 開頭到 −6 dB 的毫秒（on）、最大聲那一格的毫秒（pk）
+    const sr = b.sampleRate, w = Math.max(1, Math.round(0.005 * sr)), nb = Math.floor(b.length / w), env = new Float32Array(nb); let pk = 0, pi = 0;
+    for (let k = 0; k < nb; k++) { let m = 0; for (let ch = 0; ch < b.numberOfChannels; ch++) { const d = b.getChannelData(ch); for (let i = k * w; i < (k + 1) * w; i++) { const a = Math.abs(d[i]); if (a > m) m = a; } } env[k] = m; if (m > pk) { pk = m; pi = k; } }
+    let on = 0; while (on < nb && env[on] < pk * B5K.thr) on++;
+    return { on: Math.round(on * w / sr * 1000), pk: Math.round(pi * w / sr * 1000), at: on * w / sr };
+  }
+  function leadTrim(b) {
+    const o = onsetOf(b); if (o.at <= B5K.late || !S.ctx) return b;
+    const sr = b.sampleRate, skip = Math.round((o.at - B5K.keep) * sr), n = b.length - skip, fade = Math.round(B5K.fade * sr); if (n <= 0) return b;
+    const out = S.ctx.createBuffer(b.numberOfChannels, n, sr);
+    for (let ch = 0; ch < b.numberOfChannels; ch++) { const s = b.getChannelData(ch), d = out.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = s[i + skip] * (i < fade ? 0.5 - 0.5 * Math.cos(Math.PI * i / fade) : 1); }
+    return out;
+  }
+  S.onsetOf = onsetOf; S.B5K = B5K;
+  function pick(key, take) { const l = S.b5 && S.bufB5[key] && S.bufB5[key].length ? S.bufB5[key] : S.buf[key]; return l && l.length ? l[take != null ? take % l.length : Math.floor(Math.random() * l.length)] : null; }   // v2.63 C6: take = which file (the page's shuffle bag, rubVary); none = random as before
 
   function one(key, p) {
     const c = S.ctx; if (!c || S.muted || !p) return;

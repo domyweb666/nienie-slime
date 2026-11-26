@@ -10,6 +10,7 @@ protocol SlimeSoundSource: AnyObject {
     var snd61: Bool { get set }
     var voiceBag: Bool { get set }
     var sndB6: Bool { get set }
+    var sndB5: Bool { get set }
     var engineLatency: Double { get }
     var settleAmt: Double { get set }
     var music: Double { get set }
@@ -29,6 +30,7 @@ final class SlimeAudio: SlimeSoundSource {
     var snd61 = true
     var voiceBag = true
     var sndB6 = true
+    var sndB5 = true
     var engineLatency: Double { 0 }
     func setAmbience(_ name: String) {}
     func press(intensity: Double) {}

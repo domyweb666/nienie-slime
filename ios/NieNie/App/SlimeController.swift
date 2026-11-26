@@ -161,7 +161,7 @@ final class SlimeController: ObservableObject {
             let probe = LabProbe.shared   // v2.61 B7: timed only while the desk is open, and only what really sounds or taps
             let heard: Bool = soundHeard, felt: Bool = hapticFelt
             if heard { probe.soundStart() }
-            sound.press(intensity: pressIntensity(gain, radius: rig.maxTouchRadius, weight: p.sndPressSize))
+            sound.press(intensity: rig.pressSnd >= 0 ? rig.pressSnd : pressIntensity(gain, radius: rig.maxTouchRadius, weight: p.sndPressSize))   // v2.63 B2: the force (or contact size) read at the touch itself
             if heard { probe.soundEnd() }
             if felt { probe.hapStart() }
             haptics.transient(intensity: 0.25 + 0.35 * gain, sharpness: p.pressSharp)
@@ -332,6 +332,7 @@ final class SlimeController: ObservableObject {
         sound.snd61 = current.snd61 >= 0.5   // v2.61 B1
         sound.voiceBag = current.rubVary >= 0.5   // v2.63 C6
         sound.sndB6 = current.sndB6 >= 0.5   // v2.63 B6
+        sound.sndB5 = current.sndB5 >= 0.5   // v2.63 B5
         sound.settleAmt = current.sndSettle
         sound.music = soundMode == 0 && !labGrey ? current.volMusic : 0
     }

@@ -164,6 +164,8 @@ public final class UITouch: Hashable {
     public func previousLocation(in v: UIView?) -> CGPoint { .zero }
     public var timestamp: TimeInterval { 0 }
     public var majorRadius: CGFloat { 0 }
+    public var force: CGFloat { 0 }
+    public var maximumPossibleForce: CGFloat { 0 }
 }
 public final class UIEvent {
     public func coalescedTouches(for t: UITouch) -> [UITouch]? { nil }
