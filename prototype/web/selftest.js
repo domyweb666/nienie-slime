@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T86（未做 83 調節台換材質、回到預設牠不彈一下：真正的預設、窗台和藍底，換果凍、換麻糬、果凍放 4 秒再回預設，之後 1.5 秒外框每格最大位移；deskSmooth 0 對照；在 T85 後面、T74 前面跑）
    v2.63（11-26）：加 T85（B9 動一點一顆：手指每走一小段一顆顆粒、手停就停、兩倍速約兩倍顆、每秒最多 20 顆、循環聲一半；sndGrain 0 沒有顆粒、其他聲音逐筆一樣；在 T84 後面、T74 前面跑）
    v2.63（11-26）：T77 釘 bond 0（整份比對兩版找出，其他項目逐筆同；T42 毫秒、T65 到 T67、T81 載入順序本來每次都不同）。T74 第一組合回面積 0.996 變 1.003：在 T74 裡釘 bond 0 也一樣，是前面多跑了 T84、T85 留下的狀態，沒釘
    v2.63（11-26）：加 T84（D6 戒高溫柔摸先 3 秒嘆氣才呼嚕、三分鐘後照常；交情只升不降、每分鐘 0.01、高的第一下不縮朝手指靠；存檔 bd；畫面沒有天數等級；bond 0 對照；在 T83 後面、T74 前面跑）
@@ -2317,6 +2318,30 @@
     r.ok = !r.err && r.v1.n > 0 && r.v1.after === 0 && r.v2.after === 0 && r.ratio >= 1.6 && r.ratio <= 2.4 && r.v2.gMean > r.v1.gMean && r.v8.perS <= 20
       && r.off.n === 0 && r.sameOther && (r.v1.gr == null || (r.v1.gr === .5 && r.off.gr === 1));
     res.T85_sndGrain = r; res.PASS.sndGrain = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T86 v2.63 未做 83 調節台換材質、回到預設不彈一下（deskSmooth；OVERNIGHT 第 17 項，手機照這條搬）。真正的預設（PRE62，大腦關：量的 1.5 秒裡不准自己走開）、真正的畫面（VIEW0：窗台）和藍底各一次。
+  // 每次這隻（SLIME）重新開始、放 4 秒，然後 a 換成果凍、b 換成麻糬、c 換果凍放 4 秒再回到預設（setMat(這隻的材質)：調節台按鈕叫的就是這個；不按按鈕，按鈕會寫使用者的存檔）、n 不換（對照），
+  // 之後 1.5 秒每一格外框每一點移了多少（半徑），取最大。deskSmooth 0 同樣再跑一次（改之前）。
+  // 擋：窗台（真正的畫面）1 的時候每一種最大 ≤ 0.15R、三種的最大 ≤ 0 那邊最大的三成，0 的時候換果凍、換麻糬至少 0.5R（量得到彈）；
+  // 藍底材質之間身體大小不同（0.27、0.3，窗台一律 0.27），要真的重建，外形換成新的那一下還在：每一種 ≤ 0.25R、三種的最大 ≤ 0 那邊最大的三成；每一次結束自交 0
+  { const clock = saveClock(), r = {}, PS = { ...PRESETS }, V86 = { ...VIEW }, I0 = { tr: IMP.tr, w: IMP.w };
+    const mv = (a, b) => { let m = 0; const n = Math.min(a[0].length, b[0].length); for (let i = 0; i < n; i++) m = Math.max(m, Math.hypot(a[0][i] - b[0][i], a[1][i] - b[1][i])); return m / R; };
+    const sb = () => [bnd.map(i => X[i]), bnd.map(i => Y[i])];
+    const one = (bg, ds, act) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Object.assign(VIEW, VIEW0, { bg });
+      for (const k in PRE62) PRESETS[k] = { ...PRE62[k], brain: 0, intro: 0, introSwim: 0, deskSmooth: ds };
+      Math.random = seeded(86); mat = { ...mat, deskSmooth: ds }; chooseSlime(SLIME, false, false); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; WANDER.moving = false; WANDER.next = 99; steps(240);
+      if (act === 'c') { setMat('jelly'); steps(240); }
+      if (act === 'a' || act === 'c') setMat(act === 'a' ? 'jelly' : SLIMES[SLIME].mat); else if (act === 'b') setMat('mochi');
+      let p = sb(), m = 0; for (let k = 0; k < 90; k++) { steps(1); const c = sb(); m = Math.max(m, mv(c, p)); p = c; }
+      return { m: +m.toFixed(3), x: selfX() }; };
+    try {
+      for (const bg of ['day', 'blue']) for (const ds of [1, 0]) for (const act of ['n', 'a', 'b', 'c']) r[bg + ds + act] = one(bg, ds, act);
+      const mx = k => Math.max(...['a', 'b', 'c'].map(a => r[k + a].m));
+      r.sillOn = mx('day1'); r.sillOff = mx('day0'); r.blueOn = mx('blue1'); r.blueOff = mx('blue0'); r.selfX = Object.values(r).filter(v => v && typeof v === 'object').reduce((s, v) => s + v.x, 0);
+      r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0);
+    Object.assign(PRESETS, PS); Object.assign(VIEW, V86); log.splice(0); IMP.tr = I0.tr; IMP.w = I0.w; impReset(); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    r.ok = !r.err && r.sillOn <= .15 && r.sillOn <= .3 * r.sillOff && r.day0a.m >= .5 && r.day0b.m >= .5 && r.blueOn <= .25 && r.blueOn <= .3 * r.blueOff && r.selfX === 0;
+    res.T86_deskSmooth = r; res.PASS.deskSmooth = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0

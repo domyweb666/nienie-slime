@@ -2694,6 +2694,44 @@ final class SlimeRig {
         onEvent?(.release(gain: 0.6, rate: 1, special: false))
     }
 
+    /// v2.63 未做 83 (deskSmooth; web deskRebuild): a shape parameter changed (the desk's material switch, 回到預設, a slider, a slot). 0: setup as before
+    /// (home, and on the sill dropped from above the bowl: up 0.7R and back down, the bounce). 1: only floppy changed (the three materials differ in
+    /// nothing else): the same points and rest shape, floppy only sets the tentacle softness KF, so it changes in place, no rebuild (the molded shape,
+    /// where it is and what it does all stay). Seed, size, density, limbs or the sill changed: on the sill's floor (not on the frame, outside, falling or held)
+    /// or with no sill, rebuilt and the whole body moved back where it was (on the floor by its bottom, with no sill by its centre), home, camera and
+    /// in the bowl or not as they were; otherwise as before. Verlet: positions and the previous frame move together (setup leaves PX = X: still no speed)
+    private func deskRebuild() {
+        guard params.deskSmooth >= 0.5, N > 0 else { setup(width: W, height: H); return }
+        if params.seed == builtSeed && params.limbs == builtLimbs && params.bodySize == builtSize && params.dens == builtDens && (params.scene >= 0.5) == (builtScene >= 0.5) {
+            for i in 0..<N { KF[i] = TID[i] >= 0 ? 1 - params.floppy * TU[i] : 1 }   // setup's KF = 1 − floppy × u (after a remesh TID is all −1 and KF all 1: the same)
+            builtFloppy = params.floppy
+            return
+        }
+        let on0 = sillOn
+        let onFloor = on0 && !sillAir && sillPlane == .room && !sillGrab && !sillHeld
+        if on0 && !onFloor { setup(width: W, height: H); return }
+        var mx = 0.0, my = 0.0, y1 = -1e9
+        for i in 0..<N { mx += X[i]; my += Y[i] }
+        mx /= Double(N); my /= Double(N)
+        for i in bnd { y1 = max(y1, Y[i]) }
+        let air0 = sillAir, inBowl0 = sillInBowl, want0 = sillWant
+        let cx0 = cx, cy0 = cy, homeX0 = homeX, homeY0 = homeY
+        let camZ0 = camZ, camX0 = camX, camY0 = camY
+        let folX0 = folX, folY0 = folY, folVX0 = folVX, folVY0 = folVY, folChase0 = folChase
+        setup(width: W, height: H)
+        guard sillOn == on0 else { return }
+        var nx = 0.0, ny = 0.0, n1 = -1e9
+        for i in 0..<N { nx += X[i]; ny += Y[i] }
+        nx /= Double(N); ny /= Double(N)
+        for i in bnd { n1 = max(n1, Y[i]) }
+        let dx = mx - nx, dy = onFloor ? y1 - n1 : my - ny
+        for i in 0..<N { X[i] += dx; PX[i] += dx; Y[i] += dy; PY[i] += dy }
+        cx = cx0; cy = cy0; homeX = homeX0; homeY = homeY0
+        if onFloor { sillAir = air0; sillInBowl = inBowl0; sillWant = want0 }
+        camZ = camZ0; camX = camX0; camY = camY0
+        folX = folX0; folY = folY0; folVX = folVX0; folVY = folVY0; folChase = folChase0
+    }
+
     // MARK: - Per-frame
 
     func update(_ dt: Double) {
@@ -2701,7 +2739,7 @@ final class SlimeRig {
         guardFold()   // v2.52 A5
         t += dt
         if params.seed != builtSeed || params.floppy != builtFloppy || params.limbs != builtLimbs || params.bodySize != builtSize || params.dens != builtDens || (params.scene >= 0.5) != (builtScene >= 0.5) {   // v2.59: day to night does not rebuild it (as on the web)
-            setup(width: W, height: H)
+            deskRebuild()   // v2.63 未做 83 (deskSmooth 0: setup as before)
         } else if params.cSpace != builtSpace || params.cRad != builtRad {
             buildClusters()
         }

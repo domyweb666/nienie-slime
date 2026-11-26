@@ -118,6 +118,7 @@ struct FeelBatch: Equatable {
         Key(id: "flinchFx", key: \FeelParams.flinchFx),   // v2.63 D4, the same (build 158 flinched without a sound or a tap)
         Key(id: "sndB5", key: \FeelParams.sndB5),   // v2.63 B5, the same (build 158 played the lead-ins, the startle before the flinch)
         Key(id: "sndB6", key: \FeelParams.sndB6),   // v2.63 B6, the same (build 158 snapped no strand on a second pull, and a press cleared every queued sound)
+        Key(id: "deskSmooth", key: \FeelParams.deskSmooth),   // v2.63 未做 83, the same (build 158 jumped up and dropped back onto the sill on a material switch or 回到預設)
     ]
     static let pull: [String] = ["pullHold", "pullWhole", "pullSoft"]
     static func pullName(_ id: String) -> String {
@@ -162,6 +163,7 @@ struct FeelBatch: Equatable {
         Item(id: "pullFx", name: "慢慢拉 0.4 秒內就聽得到、摸得到"),
         Item(id: "bond", name: "怕的要哄、熟了第一下不縮、朝手指靠"),
         Item(id: "sndGrain", name: "聲音跟著手走：動一點一顆（預設關，等聽）"),
+        Item(id: "deskSmooth", name: "調節台換材質、回預設不彈一下"),
     ]
     enum Tier: String, CaseIterable, Identifiable {
         case b158, fix, pull
