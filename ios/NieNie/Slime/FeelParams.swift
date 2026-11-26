@@ -375,6 +375,10 @@ struct FeelParams: Equatable, Codable {
     // v2.64 B9 撞側牆出聲、揉的痕跡（網頁 sndWall、rubTrail；WALL、WALLK、wallSides、wallStep、RTK、drawRubTrail；三個材質同名同預設）。SlimeRig MARK v2.64 B9，痕跡畫在 SlimeView drawRubTrail
     var sndWall: Double = 1           // 撞側牆出聲：1 = 身體撞到側牆（窗台兩端、在窗框上時左右窗框、藍底時鏡頭最遠的左右邊）出一聲落地聲（fx.land），整團往牆每秒 2R 以下不響、2 到 10R 音量 0.15 到 0.6、越大力越低一點，0.6 秒內不連發；只有聲音不震；0 = 跟改之前一樣（不呼叫）
     var rubTrail: Double = 1          // 揉的痕跡：1 = 果凍皮上也畫手指走過的痕跡（v2.26 就有在算，以前只畫在平塗皮）：角色陰影色一條實心帶子，越舊越淡，dentTrail 秒淡完；0 = 跟改之前一樣（果凍皮上不畫）
+    // v2.64 B8 起步跟手（網頁 startFollow、SFK、lagK，1505203；三個材質同名同預設）。SlimeRig SfSet、lagK；甲乙盲比在 SlimeController（B8Blind）
+    var startFollow: Double = 0       // 起步跟手：1 = 手一動，被抓那塊的慢一拍先用 20 毫秒，真手指走 0.6R 內照走的距離直線變回 lag，停 80 毫秒歸零（下一次起步又快）；0 = 跟改之前一樣（lagK 就是原本的 1 − exp(−dt／lag)）
+    // v2.64 未做 18 震動晚畫面（只有手機有，網頁沒有震動）。SlimeHaptics delay；三選一盲比在 SlimeController（HapDelayBlind）
+    var hapDelay: Double = 0          // 震動晚畫面幾毫秒：所有震動（連續型、事件型）交給震動引擎自己的時鐘晚這麼多才發，聲音和畫面不動；0 = 跟改之前一樣（全部立刻發）
     // v2.63 C6 (web rubVary; rubHappy, the voice shuffle bag; the same key and default for all three materials). SlimeRig MARK v2.63 C6, SlimeAudio voiceBag
     var rubVary: Double = 1           // 揉完的反應輪流: 1 = done rubbing or stroking, the hop, melting 2 s more, leaning to your finger and a sigh take turns from a shuffled bag, the hop at most once in 40 s; each kind of its sounds plays all its files before a new shuffle; 0 = as before (tall, a wag, the hop and the happy sound every time; a random file each time)
     // v2.63 B6 (web sndB6; the pull step re-arms, the press keeps what is queued except the last release's tail; the same key and default for all three materials). SlimeRig MARK v2.63 B6, SlimeAudio sndB6
@@ -1018,6 +1022,10 @@ struct TuneField: Identifiable {
         // v2.64 B9（網頁 sndWall、rubTrail 的字，第三批第 6 項；「先離開」照網頁程式寫 0.15R，網頁面板字寫 0.1R）
         TuneField(key: \.sndWall, name: "撞側牆出聲 v2.64", hint: "1（B9）：身體撞到側牆（窗台兩邊的牆、在窗框上時左右窗框、藍底時鏡頭最遠的左右邊）出一聲，用落地那個音檔（fx.land），撞得越快越大聲、低一點；每秒 2R 以下（慢慢靠過去、偽足碰到）不響，同一面牆要先離開 0.15R 才算下一次，0.6 秒內不連發。只有聲音，手機不震（網頁沒有震動）。0 回改之前（撞牆沒聲音）", range: 0...1, step: 1, section: "這一批 v2.64"),
         TuneField(key: \.rubTrail, name: "揉的痕跡 v2.64", hint: "1（B9，未做 13）：揉、摸的時候看得到手指走過的痕跡：一條角色陰影色的實心帶子，越舊越淡，0.5 秒（「手指走過的痕跡（秒）」）淡完。痕跡原本就有在算，只是果凍皮那條路沒畫。0 回改之前（果凍皮上看不到；平塗皮照舊畫一暗一亮的溝）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 B8（網頁 startFollow 的字，第三批第 7 項；甲乙盲比在面板「這一批（v2.64）盲比」那兩顆大鈕）
+        TuneField(key: \.startFollow, name: "起步跟手 v2.64", hint: "1（B8）：手一動，被抓那塊的慢一拍先用 20 毫秒，手指走 0.6R 內照走的距離直線變回原本的慢一拍，手指停 80 毫秒歸零（下一次起步又快）。慢一拍的尾巴不變，只改開頭。扯斷出來的第二團不套。正在 B8 盲比時甲乙那組蓋過這條。0 回改之前", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 未做 18（只有手機）
+        TuneField(key: \.hapDelay, name: "震動晚畫面（毫秒）v2.64", hint: "未做 18：所有震動（拉、揉的連續震動和按、放手、顆粒這些單下）比畫面晚這麼多毫秒才發，聲音和畫面照舊。交給震動引擎排時間，不卡畫面。研究說晚一點可能摸起來更軟（Han 2024、敲擊研究），Apple 說要同步，所以要盲比 0、20、40。正在震動早晚盲比時三選一那組蓋過這條。0 回改之前（全部立刻發）", range: 0...60, step: 5, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }

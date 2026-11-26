@@ -22,6 +22,23 @@ final class SlimeHaptics {
     private var popAudioID: CHHapticAudioResourceID?
     private var popAudioURL: URL?
     private(set) var popAudioReady = false
+    /* v2.64 未做 18（震動晚畫面 0、20、40 毫秒盲比；FeelParams.hapDelay，控制器換成秒放進來）：所有震動比畫面晚這麼多秒。
+       做法：不 sleep、不開計時器、不排閉包，交給震動引擎自己的時鐘（engine.currentTime + delay）排時間，所以不擋主執行緒、不掉幀，也不用捕捉 self。
+       - 事件型（按、放手的啵、顆粒、呼嚕、落地……）：同一個 pattern 照舊一次建好，player.start(atTime:) 排在 delay 之後。排好的 player 留在 held 裡
+         直到播完（delay + 2 秒），免得還沒輪到就被放掉。
+       - 連續型（拉、揉的那條長震動）：每一幀照舊在主執行緒算強度，開、改強度、自己收掉三件事都排在「現在 + delay」，等於整條曲線往後平移 delay，
+         順序不會亂（每一幀排的時間都比上一幀晚）。開的那一下強度另外寫進 pattern 本身（relativeTime 0），不管引擎先處理哪一個都不會先衝到滿；
+         pattern 60 秒循環一次會回到開頭那個強度，所以晚發時每 0.5 秒補送一次現在的強度。外部叫停（進背景、灰盒、關震動）照舊立刻停。
+       - 候選 17 把啵的錄音放進震動 pattern 時，錄音拆出去照舊立刻播（那是聲音，不跟著晚）。觸覺階梯（面板測試鈕）照舊立刻震。
+       - 0 跟改之前一模一樣：每一個呼叫照舊用 CHHapticTimeImmediate，不進 held、不補送 */
+    var delay: Double = 0 { didSet { if !delay.isFinite || delay < 0 { delay = 0 } else if delay > 0.2 { delay = 0.2 } } }
+    private var held: [(until: CFTimeInterval, player: CHHapticPatternPlayer)] = []
+    private var lastSentAt: CFTimeInterval = 0
+    private func hold(_ p: CHHapticPatternPlayer) {
+        let now = CACurrentMediaTime()
+        held.removeAll { $0.until < now }
+        held.append((until: now + delay + 2, player: p))
+    }
 
     /// Hysteresis (手感精修提案 第 16 條): the continuous player starts above `onThreshold`, and stops
     /// only below `offThreshold` after at least `minOn`, so the engine does not click on and off
@@ -87,12 +104,23 @@ final class SlimeHaptics {
                     CHHapticEventParameter(parameterID: .hapticIntensity, value: 1),
                     CHHapticEventParameter(parameterID: .hapticSharpness, value: sharp),
                 ], relativeTime: 0, duration: 60)
-                let player = try engine.makeAdvancedPlayer(with: CHHapticPattern(events: [event], parameters: []))
-                player.loopEnabled = true
-                try player.sendParameters([CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0)],
-                                          atTime: CHHapticTimeImmediate)
-                try player.start(atTime: CHHapticTimeImmediate)
-                continuous = player
+                if delay > 0 {   // v2.64 未做 18：開的那一下排在 delay 之後，強度也寫進 pattern 本身
+                    let at: TimeInterval = engine.currentTime + delay
+                    let ctl = CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0)
+                    let player = try engine.makeAdvancedPlayer(with: CHHapticPattern(events: [event], parameters: [ctl]))
+                    player.loopEnabled = true
+                    try? player.sendParameters([ctl], atTime: at)
+                    try player.start(atTime: at)
+                    continuous = player
+                    lastSentAt = CACurrentMediaTime()
+                } else {
+                    let player = try engine.makeAdvancedPlayer(with: CHHapticPattern(events: [event], parameters: []))
+                    player.loopEnabled = true
+                    try player.sendParameters([CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0)],
+                                              atTime: CHHapticTimeImmediate)
+                    try player.start(atTime: CHHapticTimeImmediate)
+                    continuous = player
+                }
                 lastSentIntensity = intensity
                 lastSentSharpness = sharp
                 baseSharpness = sharp
@@ -103,22 +131,29 @@ final class SlimeHaptics {
             return
         }
         if intensity < offThreshold && CACurrentMediaTime() - continuousStartedAt >= minOn {
-            stopContinuous()
+            if delay > 0 { stopLate() } else { stopContinuous() }   // v2.64 未做 18：自己收掉的那一下也晚 delay
             return
         }
         // only send meaningful changes; flooding the engine every frame adds nothing
+        // v2.64 未做 18：晚發時每 0.5 秒補送一次（pattern 循環回開頭時強度會跳回開的那一下）；delay 0 時 refresh 一直是 false
+        let refresh: Bool = delay > 0 && CACurrentMediaTime() - lastSentAt > 0.5
         var params: [CHHapticDynamicParameter] = []
-        if abs(intensity - lastSentIntensity) > 0.015 {
+        if abs(intensity - lastSentIntensity) > 0.015 || refresh {
             params.append(CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0))
             lastSentIntensity = intensity
         }
-        if abs(sharp - lastSentSharpness) > 0.02 {
+        if abs(sharp - lastSentSharpness) > 0.02 || refresh {
             // the sharpness control is an offset added to the event's own sharpness (−1...1)
             params.append(CHHapticDynamicParameter(parameterID: .hapticSharpnessControl, value: sharp - baseSharpness, relativeTime: 0))
             lastSentSharpness = sharp
         }
         if !params.isEmpty {
-            try? continuous?.sendParameters(params, atTime: CHHapticTimeImmediate)
+            if delay > 0, let engine {   // v2.64 未做 18：改強度也排在 delay 之後
+                try? continuous?.sendParameters(params, atTime: engine.currentTime + delay)
+                lastSentAt = CACurrentMediaTime()
+            } else {
+                try? continuous?.sendParameters(params, atTime: CHHapticTimeImmediate)
+            }
         }
     }
 
@@ -143,13 +178,28 @@ final class SlimeHaptics {
         lastSentSharpness = -1
     }
 
-    private func play(_ events: [CHHapticEvent]) {
+    /// v2.64 未做 18：連續型自己收掉時，停在 delay 之後（跟它前面排好的強度同一條時間線）
+    private func stopLate() {
+        guard let player = continuous else { return }
+        if let engine { try? player.stop(atTime: engine.currentTime + delay); hold(player) } else { try? player.stop(atTime: CHHapticTimeImmediate) }   // 留著到停完
+        continuous = nil
+        lastSentIntensity = -1
+        lastSentSharpness = -1
+    }
+
+    /// late（v2.64 未做 18）：delay > 0 時排在 delay 之後；false 照舊立刻播（觸覺階梯、啵的錄音）
+    private func play(_ events: [CHHapticEvent], late: Bool = true) {
         guard !events.isEmpty, enabled, supported else { return }
         startEngine()
         guard let engine, engineRunning else { return }
         do {
             let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: []))
-            try player.start(atTime: CHHapticTimeImmediate)
+            if late && delay > 0 {
+                try player.start(atTime: engine.currentTime + delay)
+                hold(player)
+            } else {
+                try player.start(atTime: CHHapticTimeImmediate)
+            }
         } catch {}
     }
 
@@ -166,9 +216,9 @@ final class SlimeHaptics {
             play([CHHapticEvent(eventType: .hapticContinuous, parameters: [
                 CHHapticEventParameter(parameterID: .hapticIntensity, value: clamp01(intensity)),
                 CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.05),
-            ], relativeTime: 0, duration: 0.5)])
+            ], relativeTime: 0, duration: 0.5)], late: false)
         } else {
-            play([tap(intensity: intensity, sharpness: 0.25, at: 0)])
+            play([tap(intensity: intensity, sharpness: 0.25, at: 0)], late: false)
         }
     }
 
@@ -185,9 +235,10 @@ final class SlimeHaptics {
         var events: [CHHapticEvent] = []
         // 候選 17: the recorded pop as an audio event at time 0 of the same pattern (CHHapticEvent(audioResourceID:), docs checked 2026-11)
         if let vol = audioVolume, let id = popAudioID {
-            events.append(CHHapticEvent(audioResourceID: id,
-                                        parameters: [CHHapticEventParameter(parameterID: .audioVolume, value: clamp01(vol))],
-                                        relativeTime: 0))
+            let a = CHHapticEvent(audioResourceID: id,
+                                  parameters: [CHHapticEventParameter(parameterID: .audioVolume, value: clamp01(vol))],
+                                  relativeTime: 0)
+            if delay > 0 { play([a], late: false) } else { events.append(a) }   // v2.64 未做 18：錄音是聲音，不跟著晚
         }
         for k in 0..<max(1, min(6, count)) {
             events.append(tap(intensity: amp, sharpness: sharpness, at: Double(k) * max(0.03, gap)))

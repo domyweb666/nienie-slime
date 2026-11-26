@@ -29,6 +29,15 @@ final class SlimeController: ObservableObject {
     /// v2.61 甲乙 in progress
     @Published private(set) var pullBlind: PullBlind?
     @Published var pullWhat: PullBlind.What = .all
+    /// v2.64 B8 盲比、震動晚畫面盲比（BATCH3 第 8 項之 7；規劃「開關和比法」：哪邊是新的不寫，手放開再切）。
+    /// b8Want、hapWant 是面板上亮的那顆（nil = 不比）；b8Live、hapLive 是身上真的在用的，手不在身上（!rig.isTouched）才從 want 換過來（blindApply）
+    @Published private(set) var b8Want: Int?
+    @Published private(set) var b8Kind: B8Blind.Kind = .both
+    @Published private(set) var hapWant: Int?
+    @Published private(set) var blindWaiting = false
+    @Published private(set) var blindNote = ""
+    private var b8Live: B8Blind.Arm?
+    private var hapLive: Double?   // 毫秒
     /// v2.21 speaker button: 0 music and sounds, 1 sounds only, 2 silent
     @Published var soundMode = 0 { didSet { sound.muted = soundMode == 2 || labGrey; syncAudio() } }
     /// v2.40 環境音: "rain", "fire", "noise" (pink noise, 11-22) or "lofi", kept in UserDefaults (long press the speaker button to choose)
@@ -241,6 +250,7 @@ final class SlimeController: ObservableObject {
     /// Called by the slime view once per display frame, after the rig stepped.
     func frame(dt: Double) {
         if pullBlind?.pending != nil && !rig.isTouched { pullBlindApply() }   // v2.61 甲乙: the hand is off the body
+        if blindWaiting && !rig.isTouched { blindApply() }   // v2.64 B8、震動早晚盲比：手放開才換
         let p = current
         // v2 layered sound: the strand loop, strands, rub loop and the after-release tail all follow the physics here
         sound.pullOpen = p.pullFx >= 0.5 ? rig.pullOpen : 0   // v2.63 B1 pull (web SFX.frame st.open)
@@ -410,7 +420,13 @@ final class SlimeController: ObservableObject {
     private func pushParams() {
         var p = current
         if labGrey { p.greyBox() }   // v2.52 灰盒 (3-2): only the physics is left; the sliders keep their own numbers
+        // v2.64 B8 盲比（網頁 lagNow、sfOn）：比的時候只蓋物理用的這一份，台上的數字（params、current、存檔、滑桿、複製）不動。慢一拍只換黏土的，起步跟手哪個材質都換
+        if let a = b8Live {
+            if material == .clay { p.lag = a.lag }
+            p.startFollow = a.sf
+        }
         rig.params = p
+        haptics.delay = (hapLive ?? p.hapDelay) / 1000   // v2.64 未做 18：毫秒換秒；盲比時三選一那顆蓋過滑桿
         syncAudio()
         syncSensors()   // v2.63 (未做 82)
         haptics.setAudioThroughHaptics(current.popViaHaptics >= 0.5, url: sound.releaseSampleURL)
@@ -927,6 +943,89 @@ final class SlimeController: ObservableObject {
         pushParams()
     }
 
+    // MARK: - v2.64 B8 盲比、震動晚畫面盲比（BATCH3 第 8 項之 7）
+
+    /// 網頁 b8Map：這一種比法甲對到哪一組（0：甲是現在；1：甲是新），沒抽過才抽，存「nienie.b8」
+    private func b8Map() -> Int {
+        var m: [String: Int] = B8Blind.parse(UserDefaults.standard.data(forKey: B8Blind.key))
+        if let v = m[b8Kind.rawValue] { return v }
+        let v: Int = Bool.random() ? 1 : 0
+        m[b8Kind.rawValue] = v
+        if let d = B8Blind.encode(m) { UserDefaults.standard.set(d, forKey: B8Blind.key) }
+        return v
+    }
+    /// 甲乙丙各對到 0、20、40 哪一個，沒排過才排，存「nienie.hapDelay」
+    private func hapPerm() -> [Int] {
+        if let p = HapDelayBlind.parse(UserDefaults.standard.data(forKey: HapDelayBlind.key)) { return p }
+        let p: [Int] = HapDelayBlind.shuffled()
+        if let d = HapDelayBlind.encode(p) { UserDefaults.standard.set(d, forKey: HapDelayBlind.key) }
+        return p
+    }
+    /// 甲（0）、乙（1），nil = 不比（網頁 data-b8 那三顆）
+    func b8Pick(_ side: Int?) {
+        if let s = side, s != 0 && s != 1 { return }
+        b8Want = side
+        blindChanged(side.map { "現在摸\(B8Blind.name($0))（\(b8Kind.name)）。用同一個手勢捏幾下，再換另一個。" } ?? "B8 不比了，回到台上的數字。")
+    }
+    /// 比法：兩樣一起、只比起步、只比慢一拍（網頁 data-b8s）
+    func b8PickKind(_ k: B8Blind.Kind) {
+        b8Kind = k
+        blindChanged("比法：\(k.name)。" + (b8Want.map { "現在摸\(B8Blind.name($0))。" } ?? "按甲或乙開始。"))
+    }
+    /// 網頁 b8Shuffle：這一種比法重抽
+    func b8Shuffle() {
+        var m: [String: Int] = B8Blind.parse(UserDefaults.standard.data(forKey: B8Blind.key))
+        m[b8Kind.rawValue] = nil
+        if let d = B8Blind.encode(m) { UserDefaults.standard.set(d, forKey: B8Blind.key) }
+        _ = b8Map()
+        blindChanged("B8 重抽好了（\(b8Kind.name)）。")
+    }
+    /// 長按「B8 盲比」1 秒（網頁 b8Answer、b8Log）：記一行在盲比紀錄，複製數值帶得出去
+    func b8Reveal() {
+        let a: String = B8Blind.answer(b8Kind, map: b8Map(), cur: b8Want)
+        blindLog("B8 看答案", a)
+        blindNote = a + " 已經記一行，複製數值時會帶上。"
+    }
+    /// 甲乙丙（0、1、2），nil = 不比
+    func hapPick(_ side: Int?) {
+        if let s = side, !HapDelayBlind.names.indices.contains(s) { return }
+        hapWant = side
+        blindChanged(side.map { "震動早晚：現在摸\(HapDelayBlind.name($0))。同一個手勢捏、拉、放手幾下，再換另一顆。" } ?? "震動早晚不比了，回到滑桿的數字。")
+    }
+    func hapShuffle() {
+        UserDefaults.standard.removeObject(forKey: HapDelayBlind.key)
+        _ = hapPerm()
+        blindChanged("震動早晚重抽好了。")
+    }
+    /// 長按「震動早晚」1 秒
+    func hapReveal() {
+        let a: String = HapDelayBlind.answer(hapPerm(), cur: hapWant)
+        blindLog("震動早晚看答案", a)
+        blindNote = a + " 已經記一行，複製數值時會帶上。"
+    }
+    private func blindChanged(_ note: String) {
+        blindWaiting = true
+        if rig.isTouched {
+            blindNote = note + "（手放開才換）"
+        } else {
+            blindNote = note
+            blindApply()
+        }
+    }
+    private func blindApply() {
+        blindWaiting = false
+        b8Live = b8Want.map { B8Blind.arm(b8Kind, map: b8Map(), side: $0).arm }
+        hapLive = hapWant.map { HapDelayBlind.delay(hapPerm(), side: $0) }
+        pushParams()
+    }
+    private func blindLog(_ head: String, _ answer: String) {
+        let c = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: Date())
+        func p2(_ x: Int?) -> String { let v: Int = x ?? 0; return v < 10 ? "0\(v)" : "\(v)" }
+        feelLog.append("\(head) \(p2(c.month))-\(p2(c.day)) \(p2(c.hour)):\(p2(c.minute))｜\(answer)")
+        if feelLog.count > 60 { feelLog.removeFirst(feelLog.count - 60) }
+        feelSave()
+    }
+
     /// v2.52 A2: what the sliders say against what the physics really uses (a scene or a mode can override a slider)
     var feelEffective: FeelEffective { FeelEffective(current, grey: labGrey) }
 
@@ -956,6 +1055,9 @@ final class SlimeController: ObservableObject {
         if let f = fuzzSummary { extra.append(f.text) }
         if LabProbe.shared.lagAny { extra.append(lagCopy) }   // v2.61 B7
         extra.append(batch.line)   // v2.61
+        // v2.64：只寫在摸哪一顆、比什麼，不寫哪邊是新的（網頁 deskText 的「B8 盲比：」那一行）
+        extra.append("B8 盲比：" + (b8Want.map { "在摸\(B8Blind.name($0))（\(b8Kind.name)）" } ?? "沒在比")
+                     + "｜震動晚畫面盲比：" + (hapWant.map { "在摸\(HapDelayBlind.name($0))" } ?? "沒在比"))
         return FeelExport.text(header: feelHeader, slimeName: slime.name, current: feelPick(),
                                effectivePull: eff.used.maxPull != eff.set.maxPull ? eff.used.maxPull : nil,
                                slots: feelSlots, changed: feelChanged, log: feelLog, extra: extra)

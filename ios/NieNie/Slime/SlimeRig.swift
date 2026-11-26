@@ -25,6 +25,8 @@ enum SlimeEvent {
 /// took hold must pass this (radii) before it counts as opening; tv the new-ground speed's smoothing (s); g, v the strand loop's floor (pullMax × g × min(1, speed ÷ v));
 /// v0 the new-ground speed (radii a second) that lifts the haptic floor, hap its size, ta / tr its rise / fall time constants. Used by SlimeController and SlimeAudio too
 enum PullFxSet { static let d0 = 0.05, tv = 0.06, g = 0.3, v = 0.5, v0 = 0.15, hap = 0.08, ta = 0.04, tr = 0.2 }
+/// v2.64 B8 起步跟手（startFollow；網頁 SFK，1505203）：起步的時間常數（秒）、手指走多遠（R）變回慢一拍、停多久（秒）歸零、每格動多少（R）以下算停
+enum SfSet { static let t0 = 0.02, lead = 0.6, stop = 0.08, eps = 0.002 }
 
 /// Shape-matching soft body (Müller 2005), a port of `prototype/web/index.html` v2.5
 /// (v2.2 plus the first batch of 手感精修提案, 2026-11-01: press spread, dwell-gated plasticity,
@@ -970,6 +972,7 @@ final class SlimeRig {
         var ax, ay, x, y, fx, fy: Double            // anchor, chase target, lagged effective position
         var slx = 0.0, sly = 0.0, slLX = Double.nan, slLY = Double.nan   // v2.48 手指讓: how far the effective position has given way to the limits, and last frame's x, y (moving back takes it up again)
         var tgx = 0.0, tgy = 0.0, lagK = 1.0         // v2.38: this frame's target for (fx, fy) and the chase rate; chased after pairStep
+        var sfD = 0.0, sfS = 0.0, sfTau = 0.0       // v2.64 B8 起步跟手（網頁 f.sfD、f.sfS、f.sfTau）：這次起步後真手指走了多遠（世界座標）、停了多久（秒）、這一格用的時間常數
         var rawX, rawY, lastRawX, lastRawY: Double   // real finger position (never a prediction)
         var predX = 0.0, predY = 0.0, hasPrediction = false, movedThisFrame = false
         var vx = 0.0, vy = 0.0                       // raw per-frame velocity of the real finger
@@ -2973,6 +2976,7 @@ final class SlimeRig {
             f.movedThisFrame = false
             // velocity from the real finger: raw, ~30 ms smoothed, and a ~80 ms decaying peak for the release pop
             f.vx = (f.rawX - f.lastRawX) / dt; f.vy = (f.rawY - f.lastRawY) / dt
+            let sfMv: Double = hypot(f.rawX - f.lastRawX, f.rawY - f.lastRawY)   // v2.64 B8：真手指這一格動了多少（網頁 hypot(f.x−f.lx, f.y−f.ly)），只給 lagK 用
             f.lastRawX = f.rawX; f.lastRawY = f.rawY
             let kv = 1 - exp(-dt / 0.03)
             f.vxS += (f.vx - f.vxS) * kv; f.vyS += (f.vy - f.vyS) * kv
@@ -3006,7 +3010,7 @@ final class SlimeRig {
                 }
             }
             f.slLX = f.x; f.slLY = f.y
-            f.tgx = tx; f.tgy = ty; f.lagK = mat.lag > 0 ? 1 - exp(-dt / mat.lag) : 1   // v2.38: the target first; chased after the two-finger limit (pairStep)
+            f.tgx = tx; f.tgy = ty; f.lagK = lagK(f, dt, lag: mat.lag, sf: mat.startFollow >= 0.5, mv: sfMv)   // v2.38: the target first; chased after the two-finger limit (pairStep). v2.64 B8 起步跟手在 lagK
             if f.mode == .grab {
                 let st = hypot(ex, ey) / R, step = Int(floor(st * 2.5))
                 f.stretch = st; f.ex = ex; f.ey = ey
@@ -6262,6 +6266,24 @@ final class SlimeRig {
             for j in bnd { let dx: Double = X[j] - x, dy: Double = Y[j] - y, e: Double = dx * dx + dy * dy; if e < d { d = e; bi = i; ai = j } }
         }
         return (d.squareRoot(), bi, ai)
+    }
+
+    /* v2.64 B8 起步跟手（startFollow；網頁 lagK，1505203；BATCH3 第 7 項、第 8 項之 7）。開著時慢一拍的時間常數從 SfSet.t0（20 毫秒）起，
+       照真手指這次起步後走了多遠（sfD，世界座標）在 SfSet.lead（0.6R）內直線變回 lag；每格動不到 SfSet.eps（0.002R）算停，停滿 SfSet.stop（80 毫秒）sfD 歸零，
+       下一次起步又快。lag 本身比 20 毫秒還短就照 lag。不抽亂數；sf 關時就是原本那一行 1 − exp(−dt／lag)，連 sfD、sfS 都不碰。
+       扯斷出來的第二團（twinStep）照網頁不套起步跟手。網頁用 f.x − f.lx（真指標），手機用 rawX − lastRawX（真手指，不含預測） */
+    private func lagK(_ f: Finger, _ dt: Double, lag L: Double, sf: Bool, mv: Double) -> Double {
+        guard sf else { return L > 0 ? 1 - exp(-dt / L) : 1 }
+        if mv > SfSet.eps * R {
+            f.sfD += mv; f.sfS = 0
+        } else {
+            f.sfS += dt
+            if f.sfS >= SfSet.stop { f.sfD = 0 }
+        }
+        let u: Double = R > 0 ? min(1, f.sfD / (SfSet.lead * R)) : 1
+        let ta: Double = L <= SfSet.t0 ? L : SfSet.t0 + (L - SfSet.t0) * u
+        f.sfTau = ta
+        return ta > 0 ? 1 - exp(-dt / ta) : 1
     }
 
     private func twinStep(_ dt: Double) {

@@ -104,6 +104,7 @@ struct TunePanel: View {
                 chip("立刻沉澱") { controller.shakeSettleNow() }
                 Spacer(minLength: 0)
             }
+            blindBox   // v2.64 這一批（v2.64）的盲比：B8 甲乙、震動早晚甲乙丙
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -171,6 +172,64 @@ struct TunePanel: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(.white)
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
         .frame(maxWidth: 460)
+    }
+
+    /* v2.64 這一批（v2.64）盲比（BATCH3 第 8 項之 7；規劃「開關和比法」：iPhone 放「甲」「乙」兩顆大鈕，哪邊是新的不寫，手放開再切）。
+       B8：甲、乙、不比，下面一排是比法（兩樣一起、只比起步、只比慢一拍，照網頁）和洗牌。震動早晚（未做 18）：甲、乙、丙對到 0、20、40 毫秒，不寫哪個是哪個。
+       長按左邊的「B8 盲比」「震動早晚」1 秒看答案（記一行在盲比紀錄）。放在滑桿上面，不用捲到最下面那一節 */
+    private var blindBox: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                blindLabel("B8 盲比") { controller.b8Reveal() }
+                bigChip("甲", on: controller.b8Want == 0) { controller.b8Pick(0) }
+                bigChip("乙", on: controller.b8Want == 1) { controller.b8Pick(1) }
+                chip("不比", on: controller.b8Want == nil) { controller.b8Pick(nil) }
+                Spacer(minLength: 0)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(B8Blind.Kind.allCases) { k in
+                        chip(k.button, on: controller.b8Kind == k) { controller.b8PickKind(k) }
+                    }
+                    chip("洗牌") { controller.b8Shuffle() }
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {   // 五顆加字，小手機一排放不下時可以橫著滑
+                HStack(spacing: 8) {
+                    blindLabel("震動早晚") { controller.hapReveal() }
+                    ForEach(HapDelayBlind.names.indices, id: \.self) { i in
+                        bigChip(HapDelayBlind.name(i), on: controller.hapWant == i) { controller.hapPick(i) }
+                    }
+                    chip("不比", on: controller.hapWant == nil) { controller.hapPick(nil) }
+                    chip("洗牌") { controller.hapShuffle() }
+                }
+            }
+            Text(controller.blindNote.isEmpty ? "這一批（v2.64）盲比：哪邊是新的不寫，手放開才換。長按左邊的字 1 秒看答案，看完按洗牌重抽。" : controller.blindNote)
+                .font(.rounded(11, .medium))
+                .foregroundStyle(Palette.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func blindLabel(_ title: String, reveal: @escaping () -> Void) -> some View {
+        Text(title)
+            .font(.rounded(13, .heavy))
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 1) { reveal() }
+            .accessibilityHint("長按一秒看答案")
+    }
+
+    /// v2.64 盲比用的大鈕
+    private func bigChip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.rounded(20, .heavy))
+                .frame(minWidth: 44, minHeight: 40)
+                .padding(.horizontal, 6)
+                .foregroundStyle(on ? .white : Palette.ink)
+                .background(Capsule().fill(on ? Palette.ink : .white).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
+        }
+        .buttonStyle(.plain)
     }
 
     private static let ladderSteps: [Double] = [0.03, 0.05, 0.08, 0.12, 0.2, 0.3, 0.5, 0.8]

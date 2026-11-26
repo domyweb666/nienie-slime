@@ -15,8 +15,8 @@ struct FeelKnob: Identifiable {
     let section: String
 
     /// The name of this set of defaults. Change it when a knob's default changes for any material; the stamp below catches it if you forget.
-    /// It is also the version the desk shows at the top, so it follows the batch (v2.63; the knobs' defaults are v2.61's, the stamp is unchanged, so no saved feel goes stale).
-    static let version = "v2.63"
+    /// It is also the version the desk shows at the top, so it follows the batch (v2.64; the knobs' defaults are v2.61's, the stamp is unchanged, so no saved feel goes stale).
+    static let version = "v2.64"
 
     static let main: [FeelKnob] = [
         FeelKnob(id: "alpha", key: \.alpha, name: "軟", hint: "按三秒，看周圍跟著塌多少。越右越硬", range: 0.05...0.8, step: 0.01, section: "捏下去"),
@@ -265,6 +265,98 @@ struct PullBlind {
         let c = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: date)
         func p2(_ x: Int?) -> String { let v = x ?? 0; return v < 10 ? "0\(v)" : "\(v)" }
         return "甲乙 \(p2(c.month))-\(p2(c.day)) \(p2(c.hour)):\(p2(c.minute))｜\(what.name)｜\(answer)｜換了 \(switches) 次、\(Int((now - startedAt).rounded())) 秒"
+    }
+}
+
+/* v2.64 B8 盲比（BATCH3 第 7 項、第 8 項之 7；網頁 B8SETS、b8Map、b8Arm、b8Desc、b8Answer、b8Shuffle，1505203）。
+   兩組：arms[0] 一律是「現在」（慢一拍 0.22、起步跟手關），arms[1] 是「新」（0.12、開；只比一樣時只換那一樣）。慢一拍只換黏土的（控制器管）。
+   甲乙對到哪一組存在 UserDefaults「nienie.b8」，格式跟網頁 localStorage 一樣（{"both":0,"sf":1}，每一種比法分開抽），甲是 arms[map]、乙是 arms[1 − map]。
+   第一次用到才抽，畫面上不寫；看答案、洗牌照網頁 */
+enum B8Blind {
+    enum Kind: String, CaseIterable, Identifiable {
+        case both, sf, lag
+        var id: String { rawValue }
+        /// 網頁 B8SETS[k].name
+        var name: String {
+            switch self {
+            case .both: return "慢一拍和起步跟手一起"
+            case .sf: return "只比起步跟手（慢一拍都 0.22）"
+            case .lag: return "只比慢一拍（起步跟手都關）"
+            }
+        }
+        /// 網頁調節台那一列的按鈕字
+        var button: String {
+            switch self {
+            case .both: return "兩樣一起"
+            case .sf: return "只比起步"
+            case .lag: return "只比慢一拍"
+            }
+        }
+        /// [現在, 新]
+        var arms: [Arm] {
+            switch self {
+            case .both: return [Arm(lag: 0.22, sf: 0), Arm(lag: 0.12, sf: 1)]
+            case .sf: return [Arm(lag: 0.22, sf: 0), Arm(lag: 0.22, sf: 1)]
+            case .lag: return [Arm(lag: 0.22, sf: 0), Arm(lag: 0.12, sf: 0)]
+            }
+        }
+    }
+    struct Arm: Equatable {
+        let lag: Double
+        let sf: Double
+    }
+    static let key = "nienie.b8"
+    static func name(_ side: Int) -> String { side == 0 ? "甲" : "乙" }
+    /// 讀「nienie.b8」：壞掉的、不是 0 或 1 的都丟掉（網頁 b8Map 的 JSON.parse 失敗就當空的）
+    static func parse(_ d: Data?) -> [String: Int] {
+        guard let d, let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [:] }
+        var m: [String: Int] = [:]
+        for (k, v) in o { if let n = (v as? NSNumber)?.intValue, n == 0 || n == 1 { m[k] = n } }
+        return m
+    }
+    static func encode(_ m: [String: Int]) -> Data? { try? JSONSerialization.data(withJSONObject: m, options: [.sortedKeys]) }
+    /// 甲（side 0）或乙（side 1）摸到的那一組；i = 0 現在、1 新
+    static func arm(_ k: Kind, map: Int, side: Int) -> (arm: Arm, i: Int) {
+        let i: Int = max(0, min(1, side == 0 ? map : 1 - map))
+        return (k.arms[i], i)
+    }
+    /// 網頁 b8Desc
+    static func desc(_ a: Arm, i: Int) -> String {
+        let who: String = i == 1 ? "新" : "現在", sf: String = a.sf >= 0.5 ? "開" : "關"
+        return "\(who)（慢一拍 \(FeelKnob.fmt(a.lag))、起步跟手\(sf)）"
+    }
+    /// 網頁 b8Answer
+    static func answer(_ k: Kind, map: Int, cur: Int?) -> String {
+        let a = arm(k, map: map, side: 0), b = arm(k, map: map, side: 1)
+        let now: String = cur.map { name($0) } ?? "（不比）"
+        return "B8 盲比（\(k.name)）：甲＝\(desc(a.arm, i: a.i))；乙＝\(desc(b.arm, i: b.i))。現在在摸\(now)。"
+    }
+}
+
+/* v2.64 未做 18 震動晚畫面 0、20、40 毫秒盲比（只有手機；BATCH3 第 8 項之 7）。三顆「甲」「乙」「丙」各對到 0、20、40 其中一個，
+   怎麼對由第一次用到時隨機排，存在 UserDefaults「nienie.hapDelay」（[2,0,1] 是甲 40、乙 0、丙 20），畫面上不寫；看答案、洗牌照 B8 */
+enum HapDelayBlind {
+    static let ms: [Double] = [0, 20, 40]
+    static let key = "nienie.hapDelay"
+    static let names = ["甲", "乙", "丙"]
+    static func name(_ side: Int) -> String { names.indices.contains(side) ? names[side] : "?" }
+    /// 要剛好是 0、1、2 各一次才收
+    static func parse(_ d: Data?) -> [Int]? {
+        guard let d, let o = (try? JSONSerialization.jsonObject(with: d)) as? [Any] else { return nil }
+        let v: [Int] = o.compactMap { ($0 as? NSNumber)?.intValue }
+        return v.count == ms.count && v.sorted() == Array(ms.indices) ? v : nil
+    }
+    static func encode(_ perm: [Int]) -> Data? { try? JSONSerialization.data(withJSONObject: perm) }
+    static func shuffled() -> [Int] { Array(ms.indices).shuffled() }
+    /// 這一顆是幾毫秒（排法壞了當 0，不會越界）
+    static func delay(_ perm: [Int], side: Int) -> Double {
+        guard perm.indices.contains(side), ms.indices.contains(perm[side]) else { return 0 }
+        return ms[perm[side]]
+    }
+    static func answer(_ perm: [Int], cur: Int?) -> String {
+        let parts: [String] = names.indices.map { "\(names[$0])＝\(FeelKnob.fmt(delay(perm, side: $0))) 毫秒" }
+        let now: String = cur.map { name($0) } ?? "（不比）"
+        return "震動晚畫面盲比：" + parts.joined(separator: "；") + "。現在在摸\(now)。"
     }
 }
 
