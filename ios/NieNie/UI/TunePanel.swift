@@ -50,6 +50,12 @@ struct TunePanel: View {
                 chip(controller.glossyClear ? "外觀：亮面透明" : "外觀：不透明", on: controller.glossyClear) { controller.glossyClear.toggle() }
                 Spacer(minLength: 0)
             }
+            // v2.61b (多米 11-26): 湯圓's core and the opaque edge, each in two versions to compare on the phone
+            HStack(spacing: 6) {
+                chip(controller.coreSoft ? "湯圓餡：小而淡" : "湯圓餡：原版", on: controller.coreSoft) { controller.coreSoft.toggle() }
+                chip(controller.edgeClean ? "邊緣：乾淨" : "邊緣：原版", on: controller.edgeClean) { controller.edgeClean.toggle() }
+                Spacer(minLength: 0)
+            }
 
             // v2.23: the material moved here from the bottom bar (the same slime on another material, for blind tests)
             HStack(spacing: 6) {

@@ -250,6 +250,7 @@ struct FeelParams: Equatable, Codable {
     var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
     // v2.57 (the six new slimes, web v2.52): seconds alone before it falls asleep (湯圓 25), how fast wariness fades (× 260 s; 布丁 0.12, scared easily but forgets fast)
     var sleepAfter: Double = 40, wFade: Double = 1
+    var coreSoft: Double = 0, edgeClean: Double = 0   // v2.61b (多米 11-26), the panel's two chips, every material: 1 = 湯圓's core smaller and lighter; 1 = the opaque body's edge clean (no grey see-through rim, the dark line 70% lighter)
     var clear: Double = 0             // v2.60 (多米 11-24: back to the opaque body; v2.57's switch for the six new ones now covers all ten): 1 = all ten glossy and see-through as in v2.53b to v2.59 (shine 1, opaque 0); 0 = shine and opaque below. Set from the panel's chip, for every material
     // v2.47 (多米 11-16, phone video of build 127: pulled about, some places turn sharp; pulled too long it twitches; take the powder out; it should look full of water)
     var pressPull: Double = 1         // 1: the press spread fades once the finger has pulled away from where it landed (0.15R to 0.6R). Measured: pulled 3R and held still, the patch under the finger was still spread 0.3R (the grab radius), tearing it: 18 flipped triangles, the guard pushing 5 pt back every frame. 0 = v2.46
@@ -353,6 +354,7 @@ struct FeelParams: Equatable, Codable {
     /// v2.60 what the skin really draws with: `clear` makes all ten glossy and see-through, otherwise the two numbers as they are. Web: lookShine, lookOpaque
     var lookShine: Double { clear >= 0.5 ? 1 : shine }
     var lookOpaque: Double { clear >= 0.5 ? 0 : opaque }
+    var lookEdgeClean: Double { lookOpaque > 0 && edgeClean >= 0.5 ? 1 : 0 }   // v2.61b: nothing to clean when it is see-through
 }
 
 /// v2.57 a new slime's signature (web `fx`): purple where it is rubbed (蝶豆), fog when shaken (汽水), a sesame core (湯圓), a caramel cap (布丁), pearls (珍奶). RGB 0...255.

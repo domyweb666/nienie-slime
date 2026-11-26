@@ -20,6 +20,9 @@ final class SlimeController: ObservableObject {
     /// glossyClear (v2.60, 多米 11-24: back to the opaque body): all ten glossy and see-through as in v2.53b to v2.59. Its own key: the one v2.57 kept meant the opposite, for six of them
     @Published var showAll = UserDefaults.standard.bool(forKey: "nienie.showAll") { didSet { UserDefaults.standard.set(showAll, forKey: "nienie.showAll"); pushParams() } }
     @Published var glossyClear = UserDefaults.standard.bool(forKey: "nienie.clear") { didSet { UserDefaults.standard.set(glossyClear, forKey: "nienie.clear"); pushParams() } }
+    /// v2.61b (多米 11-26): two looks to compare, kept like the chip above. coreSoft: 湯圓's sesame core smaller and lighter. edgeClean: the opaque body's edge without the grey see-through rim
+    @Published var coreSoft = UserDefaults.standard.bool(forKey: "nienie.coreSoft") { didSet { UserDefaults.standard.set(coreSoft, forKey: "nienie.coreSoft"); pushParams() } }
+    @Published var edgeClean = UserDefaults.standard.bool(forKey: "nienie.edgeClean") { didSet { UserDefaults.standard.set(edgeClean, forKey: "nienie.edgeClean"); pushParams() } }
     /// v2.61 第一批: the fourteen switches, laid over every material and slime (changing either leaves them as they are). Not kept for the next launch,
     /// except the three of the pull, which come back with the desk's numbers
     @Published private(set) var batch = FeelBatch()
@@ -135,6 +138,7 @@ final class SlimeController: ObservableObject {
         slime.apply(&p)
         if showAll { p.one = 0 }   // v2.57
         p.clear = glossyClear ? 1 : 0   // v2.60
+        p.coreSoft = coreSoft ? 1 : 0; p.edgeClean = edgeClean ? 1 : 0   // v2.61b
         batch.apply(to: &p)   // v2.61
         return p
     }
@@ -987,7 +991,7 @@ final class SlimeController: ObservableObject {
         // v2.60: a slot carries the feel, never the look. Slots saved on build 158 or older hold shine 1, opaque 0 (the glossy body): going to one would bring that back,
         // and two slots that look different are no blind test (how soft it feels follows how it looks)
         let now = current
-        p.shine = now.shine; p.opaque = now.opaque; p.clear = now.clear
+        p.shine = now.shine; p.opaque = now.opaque; p.clear = now.clear; p.coreSoft = now.coreSoft; p.edgeClean = now.edgeClean
         params[material] = p
         pushParams()
         activeSlot = n

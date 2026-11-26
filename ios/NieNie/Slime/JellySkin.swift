@@ -516,7 +516,7 @@ final class JellySkin {
     /// One frame. `path` is the body in screen points; `rpx` the body radius in points on screen; colours already tinted by mood and impression.
     /// v2.47 `round`: the outline is cut from the small blur instead of the mask (sharp corners round off, concave ones join); it scales that blur. 0 = the mask's own edge.
     func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin, round: Double = 0, water: Double = 0, refr: Double = 0.3, absorb: Double = 0.68,
-                shine: Double = 1, opaque: Double = 0, extra: [CGPath] = [],   // v2.51: highlights × shine; the thick part hides the room; extra shapes (the strand, the small blob) join the mask
+                shine: Double = 1, opaque: Double = 0, edgeClean: Double = 0, extra: [CGPath] = [],   // v2.51: highlights × shine; the thick part hides the room; extra shapes (the strand, the small blob) join the mask
                 hiOff: Bool = false, rimOff: Bool = false,                      // v2.52 C4: the highlights, or the second highlight and the rim of light, left out (to read each layer's cost)
                 mesh: SkinMesh? = nil) {                                        // v2.61 A1 skinU: the mask from the body's triangles; nil = from `path` and `extra`, as up to v2.60
         guard let mask, let h1, let h2, let q1, let q2, let ctx = maskCtx, let data = ctx.data else { return }
@@ -580,7 +580,7 @@ final class JellySkin {
         u.append(SIMD4<Float>(skin.glow, skin.line, skin.nk, skin.shin))
         let sh = Float(max(0, min(1, shine))), hi: Float = hiOff ? 0 : sh
         u.append(SIMD4<Float>(skin.s0, skin.s1, skin.spec * hi, skin.sheen * hi))
-        u.append(SIMD4<Float>(skin.arc * hi, round > 0 ? 0.46 : 0, rimOff ? 0 : skin.wet * sh, 0))
+        u.append(SIMD4<Float>(skin.arc * hi, round > 0 ? 0.46 : 0, rimOff ? 0 : skin.wet * sh, Float(edgeClean)))   // w: v2.61b edgeClean
         let wv: Float = room != nil ? Float(max(0, min(1, water))) * min(1, skin.wet) : 0   // v2.49: no baked room, no water skin
         u.append(SIMD4<Float>(wv, Float(refr), Float(absorb), Float(max(0, min(1, opaque)))))
         let rp = MTLRenderPassDescriptor()

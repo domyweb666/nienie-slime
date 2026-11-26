@@ -97,7 +97,7 @@ final class SlimeRig {
     // v2.57 the six new slimes' signatures (web fxStep, drawFx): set by the controller with the chosen slime
     var fx = SlimeFx() { didSet { fxReset() } }
     private var fxStains: [(i: Int, k: Double, r: Double, hot: Bool)] = []   // 蝶豆: rubbed spots turning purple (particle, how purple, how wide ×R, rubbed this frame)
-    private var fxCoreN = 0, fxCore: [Int] = []                               // 湯圓: the sesame core hangs on these inner particles
+    private var fxCoreN = 0, fxCore: [Int] = [], fxCoreSoftN = 0, fxCoreSoft: [Int] = []   // 湯圓: the sesame core hangs on these inner particles (v2.61b coreSoft: a smaller set)
     private var fxPearlN = 0, fxPearls: [(i: Int, x: Double, y: Double)] = [], fxPearlSink = 0.0   // 珍奶: each pearl trails one inner particle; sink after a shake
     private(set) var fxCapFlow = 0.0                                          // 布丁: 0...1, the caramel runs down while it is held
     private(set) var remeshCount = 0, remeshMs = 0.0
@@ -6877,13 +6877,14 @@ extension SlimeRig {
     struct FxView {
         var stains: [(x: Double, y: Double, r: Double, k: Double)]   // world points, r already × R
         var core: [(x: Double, y: Double)]
+        var coreSoft: [(x: Double, y: Double)] = []   // v2.61b: filled instead of core when params.coreSoft is on
         var pearls: [(x: Double, y: Double)]
         var capFlow: Double
     }
     /// How clouded a shaken slime is, for 汽水's fog (the glitter's haze is 0 while no glitter is drawn)
     var fogCloud: Double { params.shake >= 0.5 ? snwCloud : 0 }
 
-    func fxReset() { fxStains = []; fxCoreN = 0; fxCore = []; fxCapFlow = 0; fxPearlN = 0; fxPearls = []; fxPearlSink = 0 }
+    func fxReset() { fxStains = []; fxCoreN = 0; fxCore = []; fxCoreSoftN = 0; fxCoreSoft = []; fxCapFlow = 0; fxPearlN = 0; fxPearls = []; fxPearlSink = 0 }
 
     /// Inner body particles within rad·R of (0, cy·R) in the rest shape, evenly picked, at most `max` (by index, no random draws)
     private func fxInner(_ cyK: Double, _ rad: Double, _ maxN: Int) -> [Int] {
@@ -6945,8 +6946,11 @@ extension SlimeRig {
     var fxView: FxView? {
         guard N > 0, !fx.isEmpty else { return nil }
         if fx.core != nil && fxCoreN != N { fxCoreN = N; fxCore = fxInner(0.4, 0.44, 22) }   // twenty-odd faint ones make an even lump; fewer, stronger ones looked like dirt
+        let soft = fx.core != nil && params.coreSoft >= 0.5   // v2.61b (web coreSoft: fxInner(.42,.3,14))
+        if soft && fxCoreSoftN != N { fxCoreSoftN = N; fxCoreSoft = fxInner(0.42, 0.3, 14) }
         return FxView(stains: fx.purple == nil ? [] : fxStains.filter { $0.i < N }.map { (x: X[$0.i], y: Y[$0.i], r: R * $0.r, k: $0.k) },
-                      core: fx.core == nil ? [] : fxCore.filter { $0 < N }.map { (x: X[$0], y: Y[$0]) },
+                      core: fx.core == nil || soft ? [] : fxCore.filter { $0 < N }.map { (x: X[$0], y: Y[$0]) },
+                      coreSoft: soft ? fxCoreSoft.filter { $0 < N }.map { (x: X[$0], y: Y[$0]) } : [],
                       pearls: fxPearls.map { (x: $0.x, y: $0.y) },
                       capFlow: fxCapFlow)
     }
