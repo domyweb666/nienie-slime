@@ -26,7 +26,7 @@
 - [x] 1. 合併後的起點驗一次：網頁整份自測 3 次全過（也補 v2.62 少跑的 2 次）。完成標準：3 次都 74／74。
 - [x] 2. C4 手機（`2859c85`，CI run 45748592614 BUILD SUCCEEDED）：打開、從背景或鎖屏切回來，牠先轉過來看你、眨一下，睡著就慢慢醒（照網頁 `greetLook`）。完成標準：Swift 接上 `greetLook`、逐行對過網頁、CI 編過。
 - [x] 3. 手機大腦第一片（`dadb9c5`，CI run 45750291812 BUILD SUCCEEDED）「需求和自己醒」：五個需求、放著自己走探睡醒、作息有亂數（照網頁 brain、brJit）。開關 `brain`，預設開。完成標準：Swift 逐行對網頁、Linux 替身能編的檔只用 Foundation、CI 編過；手機的「40 秒沒碰就睡、不會自己醒」在 brain 開時不再發生（讀程式確認），brain 0 跟現在一樣。
-- [x] 4. 手機大腦第二片（`50ee659`）「心情」：心情值、心情影響姿勢和反應（照網頁 mood、moodHalf）。開關 `mood`，預設開。完成標準：同上，CI 編過。
+- [x] 4. 手機大腦第二片（`50ee659`，CI run 45751373861 BUILD SUCCEEDED）「心情」：心情值、心情影響姿勢和反應（照網頁 mood、moodHalf）。開關 `mood`，預設開。完成標準：同上，CI 編過。
 - [ ] 5. C9 網頁：揉夠了放手，牠在你最後摸的地方趴下睡著（呼嚕累計 60 秒、手指離開 6 秒），不走回布墊；輕碰慢慢醒。開關 `nap`，預設開。完成標準：新 selftest 項目驗三件事（一般捏 30 秒不睡；揉夠那次 10 秒內睡、離最後摸的地方 0.5R 內；輕碰不嚇醒），相關舊項目不退。
 - [ ] 6. C9 搬手機。完成標準：逐行對網頁、CI 編過。
 - [ ] 7. D3 從手裡跑掉的前兩條改掉（推薦：怕的不再滑走，改抗議聲、眼睛、放手後走開；搔癢不放手，改扭和咯咯黏液聲），兩指 621 點撕開留著。各一顆開關，預設是新行為。兩邊都做。完成標準：連拉 10 次脫手 0、搔癢 20 秒還在手裡、兩指照舊撕開；搔癢的 selftest 項目和標準清單 41 跟著改。
@@ -58,3 +58,4 @@
 - 12:05 第 3 項做完（`dadb9c5`）：新檔 `ios/NieNie/Slime/SlimeBrain.swift`（只用 Foundation，check.sh 兩個清單都加了），`SlimeRig` 約 6750 行起接 brainStep／Rest／Go／GoHome、sleepOK、e4OK、brainJit、brainBack；`brain brPre brAwakeT brSleepT` 登記，`brJit` 生效。心情、記地方、擺飾在手機一律當關。brain 0 讀程式確認跟 `2859c85` 一樣（rng 抽的次數順序不變）。網頁只改 KEYS63 一行，T71、T72、T75 各 3 次跟改前逐筆同。可疑編譯處：`SlimeBrain.swift:78` 泛型 jit、`SlimeRig.swift:6859` 同時借 brain 和 &rng、`5195` 條件裡呼叫 mutating、`e4Step` guard 三元式。推上去跑 CI，開始第 4 項。
 - 12:20 CI run 45750291812（`e19b575`，含第 3 項）BUILD SUCCEEDED，沒有新警告。那幾處可疑寫法都編得過。
 - 12:45 第 4 項做完（`50ee659`）：SlimeBrain 加心情 m／mS／ev 和 mood()，SlimeRig 加 mdOn／brainM／brainMS／brainFlinch／brainEv／brainSync，`mood`（1）、`moodHalf`（300）登記進調節台 v2.63，換隻時 brainSync。接上需求漲落、挑事情、心情差 8 秒走回布墊、姿勢、縮的大小、步子、被戳退開或搖、眼睛、張望 +0.005、嚇醒 −0.1。心情不存檔。mood 0 逐位元同 `dadb9c5`。網頁只改 KEYS63，T71／T72／T75 各 3 次逐筆同。可疑：SlimeRig 6850 `pick(...brm:)`、6770 `MoodIn` 參數順序、6468 `g == nil`、3183 `max(0, ms)`。推上去跑 CI，開始第 5 項。
+- 13:01 CI run 45751373861（`e20a90d`，含第 4 項）BUILD SUCCEEDED，沒有新警告。
