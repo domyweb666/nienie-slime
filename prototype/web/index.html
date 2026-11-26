@@ -2168,6 +2168,7 @@ function brainRest(canGo){const B=BRAIN,pre=B.pre;B.pre=null;
     else if(tel){B.pre={k:'sleep',t0:t};LIFE.until=t+2;cutSniffs();if(BRX.sighCyc<0)BRX.sighNext=t}   // 前兆：瞇眼、嘆一口氣，2 秒後才睡
     else{B.naps++;SLP.on=true;LIFE.st='sleep';cutSniffs()}}
   else if(w==='greet'){if(tel){B.want='';B.pre={k:'greet',t0:t};EYE.user=t+1.2;LIFE.until=t+.9}else LIFE.until=t+.3}   // 前兆：先看你一眼；之後 e4Step 接手
+  else if(w==='look'&&away&&t-B.homeAt>20&&sgHomeFav()&&brainGoHome())B.why+='（離開喜歡的位置太久，先走回去）';   // v2.64 C8（BATCH3 第 5b 項）：好奇一直贏的那幾隻（湯圓慢、愛睡：想動漲得慢，休息久好奇照漲）永遠輪不到下面「五個都不高、離家 20 秒走回去」那條，走開就不回喜歡那格；家是牠天生喜歡的那格時，想張望也先走回去。signature 0 時 sgHomeFav 一直是 false，不多走、不抽亂數
   else if(w==='look')Object.assign(LIFE,{st:'look',looks:1+(B.q>.7?1:0),noGo:false,until:t});
   else if(w==='go')brainGo(null);
   else if(w==='offer')memOffer();
@@ -2389,6 +2390,7 @@ function sgDef(){return SGDEF[SLIMES[SLIME].id]||null}
 function sgGap(first){const d=sgDef();return d?(d.lo+(d.hi-d.lo)*sgRnd())*(first?.5:1):9e9}
 function sgCut(){SG.on=null;SG.q.length=0;SG.eye=null}
 function sgFavX(){if(!(mat.signature>=.5)||!SILL.on||!SILL.g)return null;const d=sgDef();return d&&d.fav!==2?memCellX(d.fav):null}   // 喜歡布墊的回 null：照原本那條路走
+function sgHomeFav(){const x=sgFavX();return x!=null&&memHomeX()===x}   // 家就是牠天生喜歡的那格（不是你摸出來的、不是夜晚蠟燭、那格沒被嚇過）
 function sgLid(){const e=SG.eye;if(!e)return null;const u=t-e.t0;if(u<0||u>e.T){SG.eye=null;return null}if(e.k==='half')return .45;
   const sm=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};return u<e.c?1-sm(u/e.c):0}   // doze：c 秒慢慢閉上，閉著到 T 秒
 function sgPod(a,L,T1,T2,T3){LIFE.sns.push({a,L,t0:t,T1,T2,T3,cut:0,eCut:0,ph:0})}   // 疊上去的偽足：不收掉正在探的那條、不抽 Math.random
