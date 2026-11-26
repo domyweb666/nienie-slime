@@ -8,3 +8,4 @@
 - 放手後的抖動（亂拉 60 組）：`cat lib.js p4.js > q4.js`，再 `--tests "" --pre q4.js --reps 60 --procs 10`；`sumr.py`、`walls.py`（黏側邊的分開看）
 - 亂捏新舊比較：`python fz.py <web 資料夾>`
 - 不同版本比較：`git archive <commit> prototype/web | tar -x -C <暫存資料夾>`，把 web 資料夾指過去
+- 十隻猜隻代理量（v2.64 C8）：`--tests "" --pre sig.js --reps 4 --procs 4 --arms '[{},{"signature":0}]' --out sig.json`，再 `python sig.py sig.json`

@@ -1,5 +1,7 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.64（11-27）：加 T89（C8 十隻招牌動作、喜歡的位置：十隻各放著 5 分鐘，自己的招牌 2 次以上、別隻的 0 次、喜歡那格待最久；signature 0 不做、家在布墊；你摸出來的喜歡和夜晚蠟燭優先；在 T88 後面、T74 前面跑，約 5 分鐘）。
+     舊項目一律 signature 0；T72、T73、T78、T79、T82、T84、T87 也釘 0（整份比對過預設 1 和改之前，這七項的數字會變；T42、T70、T74、T81 本來每次都不同）。
    v2.64（11-27）：加 T88（D8 點一下傾完 0.4 秒頂回來、看你 1.5 秒、不碰時戒熟交情不動、1.5 秒內再碰沒有另外的獎勵；揉 30 秒有慢眨、只用睜眼和閉眼那條線；兩顆開著但沒點沒呼嚕時跟 0 逐點一樣；在 T87 後面、T74 前面跑）。
      舊項目一律 tapBack 0、slowBlink 0；T79、T82、T87 也釘 0（整份比對過預設 1 和全關，這三項的數字會變）。兩顆全關時整份跟第 3 項之後只差本來每次都不同的 T42、T65 到 T67、T70、T81，和接在 T88 後面的 T74（合回面積 1.002 變 0.996，見 BATCH3 卡住的項目）
    v2.64（11-26）：T78、T84 釘 lookTarget 0（整份比對過 lookTarget 0 和 1，這兩項的數字會變；舊項目一律 0；lookTarget 全關時整份跟 v2.63 只差 T42、T70、T73 的毫秒秒數和 T81 音檔載入順序）。
@@ -81,7 +83,7 @@
   // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
   const PRE62 = {}; for (const k in PRESETS) PRE62[k] = { ...PRESETS[k] };   // v2.62 真正的預設（扯斷開著）：T74 用，跑完用它還回去
   const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k], split: 0 };   // v2.62：T65 到 T73 量的是扯斷之前的行為，亂拉時不准斷   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
-  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], rubVary: 0, lookTarget: 0, tapBack: 0, slowBlink: 0, endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）   // v2.63 C6：舊項目一律 rubVary 0（整份比對過，T33、T39、T41 會變；T33 量的就是放手小跳）   // v2.64 C5：舊項目一律 lookTarget 0（量的是 v2.63 的張望）   // v2.64 D8：舊項目一律 tapBack 0、slowBlink 0
+  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], rubVary: 0, lookTarget: 0, tapBack: 0, slowBlink: 0, signature: 0, endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）   // v2.63 C6：舊項目一律 rubVary 0（整份比對過，T33、T39、T41 會變；T33 量的就是放手小跳）   // v2.64 C5：舊項目一律 lookTarget 0（量的是 v2.63 的張望）   // v2.64 D8：舊項目一律 tapBack 0、slowBlink 0
   const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
@@ -1845,7 +1847,7 @@
   // d brJit：只跑大腦那條算式，睡醒的間隔開著散、關著幾乎一樣。e bumpSoft：牠自己（沒有手指）帶過去的罐子不倒、歪的慢慢收回來不跳；關掉會倒；手指推照舊倒。f snd61：抓著時雨 0.3，關掉 0.6。
   // g wakeSoft：從外面推進來碰熟睡的熟牠，每秒 3、3.5R 慢慢醒不嚇，每秒 5R 照舊嚇醒；很熟的睡著被按著不往手指推、不蹭、不出聲。h 重建時往回拔（tugS）歸零。
   // i ?pull= 鎖住時存 1 到存 3、匯入、盲比紀錄都不帶網址的值（用 srcdoc 開一頁、假的 localStorage，不碰使用者存的）；沒鎖住時照舊
-  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, T0 = performance.now(), M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, E0 = { count: E4.count, lastT: E4.lastT }, B0 = { ...BRAIN }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, sndB5: 0 };   // v2.63 B5：sndB5 1 時嚇到那一聲排到縮的那一格（晚 0.05 秒），g 推醒那條一醒就查有沒有 startle，會查不到；這一項量的是改之前的規格，釘 0
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, T0 = performance.now(), M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, E0 = { count: E4.count, lastT: E4.lastT }, B0 = { ...BRAIN }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, signature: 0, shake: 0, sndB5: 0 };   // v2.63 B5：sndB5 1 時嚇到那一聲排到縮的那一格（晚 0.05 秒），g 推醒那條一醒就查有沒有 startle，會查不到；這一項量的是改之前的規格，釘 0   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const fresh = (over, tr) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(72); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = tr || 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.leanT = -9; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; Object.assign(BRAIN, { seed: 72 }); brainReset(); log.splice(0); };
     const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; }, heard = k => log.some(x => x[0] === k), up = q => Math.abs(Math.atan2(Math.sin(q.a), Math.cos(q.a)));
     const taps = over => { fresh(over, .3); steps(300); IMP.w = 0; const amp = []; for (let k = 0; k < 6; k++) { const q = sc(globalC.xc, globalC.yc), t1 = t; FLN.H = 1; ev('pointerdown', 1, q[0], q[1]); steps(6); ev('pointerup', 1, q[0], q[1]); steps(66); amp.push(FLN.t0 > t1 ? +FLN.amp.toFixed(4) : 0); } return { amp, w: +IMP.w.toFixed(3) }; };
@@ -1897,7 +1899,7 @@
   // 擋：按住末的跟手跟 rough 0 一樣、家被帶走的距離每顆種子差 0.1R 內；修之前那種四顆合計至少多 1R（量到每顆 0.84 對 0.46，證明量得到）；放手後洞 0；洞讀數合計不超過 rough 0 的 1.6 倍加 8；慢拉照樣 strain 0、不逃。身長只記錄。
   { const clock = saveClock(), view0 = { ...VIEW }, sl0 = SLIME, I0 = { tr: IMP.tr, w: IMP.w }, df0 = dragFollow, r = { err: '' }, T0 = performance.now();
     Object.assign(VIEW, { skin: 'A', body: 'round', face: 1, bg: 'day', win: '' });
-    const si = SLIMES.findIndex(q => q.id === 'taro'), s = SLIMES[si], SP = { ...PRE54[s.mat], seed: s.seed, ...s.p, shakeMode: 0, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0 };
+    const si = SLIMES.findIndex(q => q.id === 'taro'), s = SLIMES[si], SP = { ...PRE54[s.mat], seed: s.seed, ...s.p, shakeMode: 0, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, signature: 0 };   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
     const holes = () => { draw(); const gl = JEL.gl; if (!gl || gl.isContextLost() || !JEL.float) throw new Error('T73：WebGL 沒開，畫不出果凍皮'); const w = JEL.h2.w, hh = JEL.h2.h, b = new Float32Array(w * hh * 4), m = new Uint8Array(w * hh), st = [], a1 = (W / w) * (H / hh) / (R * R); gl.bindFramebuffer(gl.FRAMEBUFFER, JEL.h2.f); gl.readPixels(0, 0, w, hh, gl.RGBA, gl.FLOAT, b); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       let skin = 0, n = 0; for (let i = 0; i < w * hh; i++) if (b[i * 4] > .46) { m[i] = 1; skin++; } if (skin * a1 < 1) throw new Error('T73：畫不出身體');
@@ -1918,7 +1920,7 @@
   // T75 v2.63 C4 切回來也先看你（greetLook；OVERNIGHT 第 2 項，手機照這條搬）。T71 只量了打開那條；這項發真的事件（document.hidden 先蓋掉）：分頁藏起來再回來（visibilitychange）、視窗切走再切回來（blur、focus，分頁沒藏）。窗台、芋圓、真正的預設，熟 .6。
   // 擋：醒著回來 0.6 秒內看你（EYE.user 排上）、眨一下、眼睛朝前；睡著回來當下就醒、走慢慢醒（SLP.slow）、不嚇（沒有 startle、不縮、不睜大）、不出「嗯？」，0.6 秒內看你；blur／focus 那條一樣 0.6 秒內看你。
   // 對照：greetLook 0 醒著 1 秒內不看、睡著的照睡（證明量得到）。
-  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w, at: IMP.hiddenAt }, blur0 = GREET.blurT, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w, at: IMP.hiddenAt }, blur0 = GREET.blurT, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, signature: 0, shake: 0 };   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     let hid = false; Object.defineProperty(document, 'hidden', { configurable: true, get: () => hid });
     const fresh = (over, tr) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(75); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = tr || 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; GREET.blurT = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; Object.assign(BRAIN, { seed: 75 }); brainReset(); };
     const back = (over, sleep, how) => { fresh(over, .6); steps(240); if (sleep) { SLP.on = true; LIFE.st = 'sleep'; BRAIN.z = .9; steps(300); } const k0 = +SLP.k.toFixed(2); log.splice(0); EYE.user = -9; const f0 = FLN.t0;
@@ -2011,7 +2013,7 @@
   //     b 戒 0.9、最後摸在身體頂上（戒的往反方向探，就是朝下）：抽 255 次，1 朝下 0 次；0 朝下 30% 以上；兩邊下一個亂數一樣
   //     c 放著不碰 6 分鐘（大腦、心情照常，休息、睡、張望自己來），真的伸出去的張望偽足：1 朝下 0 次、張望 8 次以上；0 張望 8 次以上時朝下至少 1 次；1 跟 0 都零自交
   //     d 懸空（窗台關）時不折：lookNoDown 1 抽 255 次照樣有朝下（25% 以上）
-  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, pd0 = pickDir, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, lookTarget: 0 };   // v2.64：T78 量的是 v2.63 的張望方向，釘 lookTarget 0
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, pd0 = pickDir, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, signature: 0, shake: 0, lookTarget: 0 };   // v2.64：T78 量的是 v2.63 的張望方向，釘 lookTarget 0   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const base = Math.floor(seeded(78)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(78) 的種子，每一輪不同
     const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd + base); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = 0; IMPD.tr = 0; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; PAIR.tearT = -9; PAIR.over = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: sd }); brainReset(); steps(60); };
     const down = a => Math.sin(a) > .3;
@@ -2040,7 +2042,7 @@
   // 擋：a rubVary 1：揉 30 次以上、放手開心（rubHappy）20 次以上；最常見那一串 40% 以內；小跳（rubHappy 的）兩兩間隔都 ≥ 40 秒；四種都出現過；零自交
   //     b 叫聲洗牌袋：vbagPick 對 4 個檔抽 400 次，每 4 個一輪剛好各一次、前後兩個都不同（輪與輪交界也不同）；揉的那 10 分鐘傳給音效的檔號，同一種前後兩個同一顆 0 次（音效檔有載到才量）
   //     c 對照 rubVary 0：最常見那一串 60% 以上（改之前 5 分鐘 21 次 20 次同一串）、放手開心 20 次以上，九成以上開心那一聲和小跳一起（小跳在窗台半空、走路線時不跳）；不傳檔號（照舊亂抽）
-  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, sp0 = sfxPlay, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, tapBack: 0, slowBlink: 0 };   // v2.64 D8：頂回來、慢眨預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, sp0 = sfxPlay, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, signature: 0, shake: 0, tapBack: 0, slowBlink: 0 };   // v2.64 D8：頂回來、慢眨預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const base = Math.floor(seeded(79)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(79) 的種子，每一輪不同
     const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd + base); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; PAIR.tearT = -9; PAIR.over = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: sd }); brainReset(); RUBV.s = (sd + base) >>> 0; RUBV.n = {}; for (const k in VBAG) delete VBAG[k]; steps(60); };
     const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
@@ -2185,7 +2187,7 @@
   // c 連點 12 下、每下隔 4 秒（每下按到縮了再 0.1 秒放）：每一下縮多大、有沒有聲、有沒有震。縮變小、事件跟著少或停
   // d flinchFx 0：沒有 flinch 聲、沒有震，放手的 release 照舊
   // 擋：a 開：同格、放手 0 聲 release、0.5 秒放有 release；b 開：噗 ≤ 1、縮那格有震；c 開：後 4 下的事件數 ≤ 前 4 下、後 4 下縮的平均比前 4 下小、最後一下的事件 ≤ 第一下；d：flinch 聲 0、震 0、release 有
-  { const clock = saveClock(), r = {}, P82 = { ...PRE54.clay, intro: 0, introSwim: 0, brain: 0, tapBack: 0, slowBlink: 0 }, I0 = { tr: IMP.tr, w: IMP.w };   // v2.64 D8：頂回來、慢眨預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
+  { const clock = saveClock(), r = {}, P82 = { ...PRE54.clay, intro: 0, introSwim: 0, signature: 0, brain: 0, tapBack: 0, slowBlink: 0 }, I0 = { tr: IMP.tr, w: IMP.w };   // v2.64 D8：頂回來、慢眨預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
     const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P82, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; FLN.say = null; GREET.st = ''; GREET.until = -9; EYE.user = -9; steps(60); };
     let FN = 0, li = 0, hi = 0; const EVS = [];
@@ -2254,7 +2256,7 @@
   // f 交情 0.5：連點三下（戒漲、熟扣）、快扯一下放手：交情一點都沒少
   // g 存檔：bond 1 交情 0.42 存進 nienie.imp 的 bd；bond 0（沒有交情）存的 JSON 沒有 bd、跟改之前一樣。量完原樣還回去
   // h 畫面文字（document.body.innerText）沒有交情、天數、等級、第幾天、Lv、幾級
-  { const clock = saveClock(), r = {}, P84 = { ...PRE54.clay, intro: 0, introSwim: 0, brain: 0, sleep: 0, nap: 0, e4: 0, lookTarget: 0 }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = BOND.v;
+  { const clock = saveClock(), r = {}, P84 = { ...PRE54.clay, intro: 0, introSwim: 0, signature: 0, brain: 0, sleep: 0, nap: 0, e4: 0, lookTarget: 0 }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = BOND.v;   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
     const fresh = (over, sd, tr, w, bd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P84, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; impReset(); IMP.tr = tr; IMP.w = w; BOND.v = bd; IMPD.tr = IMP.tr; IMPD.w = w; ESC.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; FLN.say = null; GREET.st = ''; GREET.until = -9; EYE.user = -9; steps(60); log.splice(0); };
     // 按著不動 sec 秒：每格記 PURR、舒服；聲音事件記在第幾秒
@@ -2353,7 +2355,7 @@
   //       每一次反應那一格真的有動作（碰過的地方：E2 那一傾；其他：多一條點一下的偽足）；零自交
   //     b lookTarget 0 同樣 30 分鐘：一次都沒挑對象、沒有反應（ltPick、ltReact 沒跑）；零自交
   //     c 沒有對象時照舊：懸空（窗台關）和窗台上沒有擺飾、沒有窗景、沒摸過，各抽 255 次張望方向，1 跟 0 每一個方向都一樣、抽完後下一個亂數也一樣
-  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, wf0 = WIN.fixed, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, tapBack: 0, slowBlink: 0 };   // v2.64 D8：頂回來、慢眨預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, wf0 = WIN.fixed, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, signature: 0, shake: 0, tapBack: 0, slowBlink: 0 };   // v2.64 D8：頂回來、慢眨預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0   // v2.64 C8：十隻招牌預設 1 之後這一項的數字會變（整份比對過），量的是舊規格，釘 0
     const base = Math.floor(seeded(87)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(87) 的種子，每一輪不同
     const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd + base); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; PAIR.tearT = -9; PAIR.over = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: sd }); brainReset(); LT.s = (sd + base) >>> 0; LT.n = { ask: 0, pick: 0, react: 0, drop: 0 }; LT.log.length = 0; steps(60); };
     const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
@@ -2444,6 +2446,41 @@
     const okD = !r.err && r.d.same && r.d.arm === 0 && r.d.sb === 0;
     r.part = { a: okA, b: okB, c: okC, d: okD }; r.ok = okA && okB && okC && okD;
     res.T88_tapBack = r; res.PASS.tapBack = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T89 v2.64 C8 十隻各一個招牌動作、一個喜歡的位置（signature；BATCH3 第 5 項，表在 .uiux/04-手感/十隻招牌-暫定.md，全是 Agent 取的）。窗台、白天、擺飾、沒有窗景、真正的預設（PRE54，大腦、心情、記地方照常），熟 0.3，記地方從零開始。
+  // 每隻照 app 換隻的方式設材質和個性（PRE54[材質] 加那隻的 p），放著 5 分鐘不碰（整理-寵物感.md 新 13：看 5 分鐘猜是哪隻），每 0.5 秒記牠在窗台哪一格、睡沒睡、有沒有自交。
+  // 擋：a signature 1：每隻自己的招牌 2 次以上、別隻的招牌 0 次（SG.log 記的種類）；牠喜歡那格（SGDEF.fav）待的時間比例比其他每一格都高；零自交
+  //     b signature 0（薄荷：喜歡的格子不在中間、招牌會走路）同樣 5 分鐘：一次都沒排、家在布墊（窗台正中間）；零自交
+  //     c 你摸出來的記憶優先（湯圓，天生喜歡第 2 格）：記地方第 4 格 0.8 → 家在第 4 格；第 2 格被嚇過 −0.5、沒有喜歡的 → 家回布墊；什麼都沒記 → 第 2 格（signature 0 → 布墊）；
+  //       夜晚蠟燭亮著（drCandleX 換成固定值）、沒有喜歡的 → 家在蠟燭旁邊，跟 signature 0 一樣
+  //   另外記（不擋）：每隻每格的比例、睡的比例、做了幾次、做到一半被收掉幾次。猜隻代理量（多個種子、只用看得到的量分十隻）在 tools/web-bench/sig.js
+  { const clock = saveClock(), sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, cdl0 = drCandleX;
+    const base = Math.floor(seeded(89)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(89) 的種子，每一輪不同
+    const fresh = (k, over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); const S = SLIMES[k]; Math.random = seeded(sd + base); SLIME = k;
+      mat = { ...PRE54[S.mat], seed: S.seed, ...S.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, ...over }; setup();
+      t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99;
+      GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; PAIR.tearT = -9; PAIR.over = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: sd }); brainReset();
+      LT.s = (sd + base) >>> 0; SG.s = (sd + base + 89) >>> 0; SG.gap = -1; SG.acc = 0; SG.n = { fire: 0, drop: 0 }; SG.log.length = 0; steps(60); };
+    const watch = (k, over, sd) => { fresh(k, over, sd); const o = { cell: [0, 0, 0, 0, 0], slp: 0, n: 0, xs: 0 };
+      for (let f = 0; f < 60 * 300; f++) { steps(1); if (f % 30 === 0) { o.n++; o.cell[memCellAt(globalC.xc)]++; if (SLP.on) o.slp++; if (selfX()) o.xs++; } }
+      o.cell = o.cell.map(v => +(v / o.n).toFixed(3)); o.slp = +(o.slp / o.n).toFixed(3); o.kinds = {}; for (const q of SG.log) o.kinds[q.k] = (o.kinds[q.k] || 0) + 1;
+      o.fire = SG.n.fire; o.drop = SG.n.drop; o.home = +((memHomeX() - SILL.g.bx) / R).toFixed(3); o.at = SG.log.map(q => Math.round(q.t)); return o; };
+    try {
+      VIEW.bg = 'day'; VIEW.win = '';
+      r.a = []; for (let k = 0; k < SLIMES.length; k++) { const S = SLIMES[k], d = SGDEF[S.id], o = watch(k, {}, 8900 + k); o.id = S.id; o.k = d.k; o.fav = d.fav;
+        o.own = o.kinds[d.k] || 0; o.other = 0; for (const q in o.kinds) if (q !== d.k) o.other += o.kinds[q]; o.favTop = o.cell.every((v, j) => j === d.fav || v < o.cell[d.fav]); r.a.push(o); }
+      { const o = watch(1, { signature: 0 }, 8901); r.b = { fire: o.fire, log: SG.log.length, home: o.home, cell: o.cell, xs: o.xs }; }
+      { fresh(5, {}, 8905); const g = SILL.g, at = () => +((memHomeX() - g.bx) / R).toFixed(3), cx = k => +((memCellX(k) - g.bx) / R).toFixed(3), c = { mmon: MMon(), c1: cx(1), c3: cx(3) };
+        BMEM.cell = [0, 0, 0, .8, 0]; c.fav3 = at(); BMEM.cell = [0, -.5, 0, 0, 0]; c.bad1 = at(); BMEM.cell = [0, 0, 0, 0, 0]; c.none = at();
+        const cdx = g.bx - R * .5; drCandleX = () => cdx; c.night = at(); mat.signature = 0; c.night0 = at(); drCandleX = cdl0; c.none0 = at(); mat.signature = 1; c.cdl = +((cdx - g.bx) / R).toFixed(3); r.c = c; }
+      r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    drCandleX = cdl0;
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0);
+    Object.assign(VIEW, view0); SLIME = sl0; BMEM.cell = M0.cell; BMEM.side = M0.side; BMEM.dirty = false; IMP.tr = I0.tr; IMP.w = I0.w; impReset(); Object.assign(E4, E0); Object.assign(BRAIN, B0); GREET.st = ''; GREET.until = -9; PAIR.tearT = -9; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    const okA = !r.err && r.a.length === 10 && r.a.every(o => o.own >= 2 && o.other === 0 && o.favTop && o.xs === 0);
+    const okB = !r.err && r.b.fire === 0 && r.b.log === 0 && Math.abs(r.b.home) < .01 && r.b.xs === 0;
+    const okC = !r.err && r.c.mmon && r.c.fav3 === r.c.c3 && Math.abs(r.c.bad1) < .01 && r.c.none === r.c.c1 && Math.abs(r.c.none0) < .01 && r.c.night === r.c.cdl && r.c.night0 === r.c.cdl;
+    r.part = { a: okA, b: okB, c: okC }; r.ok = okA && okB && okC;
+    res.T89_signature = r; res.PASS.signature = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
