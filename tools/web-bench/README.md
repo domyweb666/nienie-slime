@@ -9,3 +9,4 @@
 - 亂捏新舊比較：`python fz.py <web 資料夾>`
 - 不同版本比較：`git archive <commit> prototype/web | tar -x -C <暫存資料夾>`，把 web 資料夾指過去
 - 十隻猜隻代理量（v2.64 C8）：`--tests "" --pre sig.js --reps 4 --procs 4 --arms '[{},{"signature":0}]' --out sig.json`，再 `python sig.py sig.json`
+- 揉的痕跡截圖（v2.64 B9 rubTrail）：`python rubshot.py <web 資料夾> <輸出資料夾> --slimes taro,honey,mint,peach`，每隻開關各截揉 3 秒、放手 0.25 秒、0.6 秒三張

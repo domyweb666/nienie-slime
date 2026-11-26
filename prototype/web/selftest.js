@@ -83,7 +83,7 @@
   // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
   const PRE62 = {}; for (const k in PRESETS) PRE62[k] = { ...PRESETS[k] };   // v2.62 真正的預設（扯斷開著）：T74 用，跑完用它還回去
   const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k], split: 0 };   // v2.62：T65 到 T73 量的是扯斷之前的行為，亂拉時不准斷   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
-  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], rubVary: 0, lookTarget: 0, tapBack: 0, slowBlink: 0, signature: 0, endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）   // v2.63 C6：舊項目一律 rubVary 0（整份比對過，T33、T39、T41 會變；T33 量的就是放手小跳）   // v2.64 C5：舊項目一律 lookTarget 0（量的是 v2.63 的張望）   // v2.64 D8：舊項目一律 tapBack 0、slowBlink 0
+  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], rubVary: 0, lookTarget: 0, tapBack: 0, slowBlink: 0, signature: 0, sndWall: 0, rubTrail: 0, endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）   // v2.63 C6：舊項目一律 rubVary 0（整份比對過，T33、T39、T41 會變；T33 量的就是放手小跳）   // v2.64 C5：舊項目一律 lookTarget 0（量的是 v2.63 的張望）   // v2.64 D8：舊項目一律 tapBack 0、slowBlink 0
   const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
@@ -2481,6 +2481,61 @@
     const okC = !r.err && r.c.mmon && r.c.fav3 === r.c.c3 && Math.abs(r.c.bad1) < .01 && r.c.none === r.c.c1 && Math.abs(r.c.none0) < .01 && r.c.night === r.c.cdl && r.c.night0 === r.c.cdl;
     r.part = { a: okA, b: okB, c: okC }; r.ok = okA && okB && okC;
     res.T89_signature = r; res.PASS.signature = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T90 v2.64 B9 撞側牆出聲、揉的時候看得到手指走過的痕跡（sndWall、rubTrail；BATCH3 第 6 項，手機照這條搬）。窗台、白天、沒有窗景、芋圓、真正的預設（PRE54；大腦、招牌、張望有對象、頂回來關：量的幾秒裡不准自己走開），熟 0.3。
+  // 撞牆：抓身體中間往右拉 3R（手指每秒 vR），按住 0.5 秒放手，再放 1.5 秒；撞了幾次看 WALL.log（響的那一格）和 sfxPlay 的 fx.land。
+  //   a 每秒 12R、5R 各一次：都響 1 次、右邊那面、音量照撞的速度（12R 的比 5R 大）、fx.land 同一格同樣大
+  //   b 輕碰：每秒 0.5R 拉 3R（約 6 秒）推到右牆：外框真的碰到右牆（離牆不到 near），放手之前右邊 0 次
+  //   c 冷卻：每秒 12R 往右拉 2R 撞右牆，馬上往左拉 3.5R 撞左牆（兩下相隔約 0.3 秒）：只響 1 次（右），左牆那下碰到、夠快但在冷卻裡（WALL.sup 記 1 次以上）；
+  //     同樣的動作中間停 1 秒：冷卻過了，碰到、夠快的每一下都響（sup 0，響的次數＝碰到時夠快的次數，至少右邊那 1 次；左牆那下停 1 秒後有時撞得不夠快，記在 fast）
+  //   d sndWall 0 同 a（12R）：0 次、沒有 fx.land；先跑一次 0、再跑 0 和 1 各一次（後兩次都接在一次 0 後面，前面留的狀態一樣）：其他聲音逐筆一樣、每一點位置和下一個亂數一樣（只讀、不改物理、不抽亂數）
+  // 痕跡：真正的畫面（VIEW0：皮 A、身體裡那一層），抓著身體中間畫半徑 0.3R 的圈，每秒 1.5R，揉 3 秒，放手。rubTrail 1、0 同一個種子同一格比畫面（整張畫布每一格 RGB 差 > 12 的像素數，換算成 CSS 點）。
+  //   同一格畫兩次（rubTrail 1、0）比，物理只跑一次（兩次的狀態一模一樣，差的只有痕跡）；0 畫兩次當基準（要是 0：畫面本身沒有雜訊）。
+  //   e 揉 3 秒那格：痕跡點（TRAIL）有、畫了（RTRL.n 多了）、跟 0 差 150 點以上；放手 0.25 秒：還有、比揉的時候少（照退法淡）；放手 0.6 秒（dentTrail 0.5 秒過了）：TRAIL 空、跟 0 一模一樣、不再畫；rubTrail 0 那次一段都沒畫
+  //   另外記（不擋）：每次撞的速度、音量
+  { const clock = saveClock(), sl0 = SLIME, view0 = { ...VIEW }, r = {}, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT };
+    const base = Math.floor(seeded(90)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(90) 的種子，每一輪不同
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); const k = 2, S = SLIMES[k]; Math.random = seeded(sd + base); SLIME = k;
+      mat = { ...PRE54[S.mat], seed: S.seed, ...S.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0, brain: 0, signature: 0, lookTarget: 0, tapBack: 0, ...over }; setup();
+      t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99;
+      E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; voice.last = -9; FLN.say = null; PAIR.tearT = -9; PAIR.over = 0; steps(120); log.splice(0); WALL.log.length = 0; WALL.edge.length = 0; WALL.n = 0; WALL.sup = 0; };
+    // 往右拉：segs 是 [往右幾 R, 每秒幾 R] 一段一段（負的往左），每段之間停 gap 秒；最後按住 0.5 秒放手、再放 1.5 秒
+    const slam = (over, sd, segs, gap) => { fresh(over, sd); const [x0, y0] = sc(globalC.xc, globalC.yc), u = R * CAM.z, EV = [], minR = [9]; let x = x0, rel = -1;
+      const tick = () => { steps(1); for (const e of log.splice(0)) EV.push([+t.toFixed(3), e[0], e[1]]); const sd2 = wallSides(); if (sd2 && fingers.size) { let d = 1e9; for (const i of bnd) d = Math.min(d, sd2[1] - X[i]); minR[0] = Math.min(minR[0], d / R); } };
+      ev('pointerdown', 1, x, y0); tick(); tick();
+      segs.forEach(([dx, v], k) => { if (k && gap) for (let f = 0; f < gap * 60; f++) tick(); const n = Math.max(1, Math.round(Math.abs(dx) / v * 60)), xa = x; for (let f = 1; f <= n; f++) { x = xa + dx * u * f / n; ev('pointermove', 1, x, y0); tick(); } });
+      for (let f = 0; f < 30; f++) tick(); rel = +t.toFixed(3); ev('pointerup', 1, x, y0); for (let f = 0; f < 90; f++) tick();
+      return { hits: WALL.log.map(e => e.slice()), fast: WALL.edge.filter(e => e[2] >= WALLK.v0 && !e[3]).length, land: EV.filter(e => e[1] === 'fx.land'), other: EV.filter(e => e[1] !== 'fx.land').map(e => e.join(':')), sup: WALL.sup || 0, rel, minR: +minR[0].toFixed(3),
+        pos: bnd.map(i => X[i].toFixed(4) + ',' + Y[i].toFixed(4)).join(' '), next: Math.random() }; };
+    const strip = o => { const q = { ...o }; delete q.pos; delete q.other; return q; };
+    // 揉，回三個時間點的畫面（每格 RGB）和痕跡
+    const shot = rt => { const m0 = mat.rubTrail, n0 = RTRL.n; mat.rubTrail = rt; draw(); mat.rubTrail = m0; return [ctx.getImageData(0, 0, cv.width, cv.height).data.slice(), RTRL.n - n0]; };
+    const rub = (over, sd) => { fresh(over, sd); const [x0, y0] = sc(globalC.xc, globalC.yc), u = R * CAM.z, rr = .3, v = 1.5, o = { d: [], base: [], tr: [], n: [], n0: [] }; let x = x0, y = y0; ev('pointerdown', 1, x0, y0);
+      for (let k = 1; k <= 180; k++) { const a = v * (k / 60) / rr; x = x0 + rr * u * Math.sin(a); y = y0 + rr * u * (1 - Math.cos(a)); ev('pointermove', 1, x, y); steps(1); }
+      const snap = () => { const [i1, n1] = shot(1), [i0, n0] = shot(0), [i0b] = shot(0); o.d.push(diff(i1, i0)); o.base.push(diff(i0, i0b)); o.n.push(n1); o.n0.push(n0); o.tr.push(TRAIL.length); };
+      snap(); ev('pointerup', 1, x, y); steps(15); snap(); steps(21); snap(); return o; };
+    const diff = (a, b) => { let n = 0; for (let k = 0; k < a.length; k += 4) if (Math.abs(a[k] - b[k]) + Math.abs(a[k + 1] - b[k + 1]) + Math.abs(a[k + 2] - b[k + 2]) > 12) n++; return Math.round(n / (DPR * DPR)); };
+    try {
+      Object.assign(VIEW, { bg: 'day', win: '' });
+      r.a12 = slam({}, 9001, [[3, 12]]); r.a5 = slam({}, 9001, [[3, 5]]);
+      r.b = slam({}, 9002, [[3, .5]]); r.b.before = r.b.hits.filter(e => e[0] < r.b.rel && e[1] === 1).length;
+      r.c = slam({}, 9003, [[2, 12], [-3.5, 12]], 0); r.c2 = slam({}, 9003, [[2, 12], [-3.5, 12]], 1);
+      r.d = slam({ sndWall: 0 }, 9001, [[3, 12]]); r.d0 = slam({ sndWall: 0 }, 9001, [[3, 12]]); r.d1 = slam({}, 9001, [[3, 12]]);
+      r.dSame = r.d0.pos === r.d1.pos && r.d0.next === r.d1.next && JSON.stringify(r.d0.other) === JSON.stringify(r.d1.other);
+      for (const k of ['a12', 'a5', 'b', 'c', 'c2', 'd', 'd0', 'd1']) r[k] = strip(r[k]);
+      Object.assign(VIEW, view0, VIEW0, { bg: 'day', win: '' }); const e = rub({}, 9004);
+      r.e = { skin: VIEW.skin, used: !!SKIN.used, tr: e.tr, n: e.n, n0: e.n0, diff: e.d, base: e.base };
+      r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); FLN.say = null; log.splice(0);
+    Object.assign(VIEW, view0); SLIME = sl0; IMP.tr = I0.tr; IMP.w = I0.w; impReset(); Object.assign(BRAIN, B0); E4.count = E0.count; E4.lastT = E0.lastT; restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    const one = o => o.hits.length === 1 && o.hits[0][1] === 1 && o.land.length === 1 && o.land[0][2] === o.hits[0][3];
+    const okA = !r.err && one(r.a12) && one(r.a5) && r.a12.hits[0][3] > r.a5.hits[0][3];
+    const okB = !r.err && r.b.minR < .05 && r.b.before === 0;
+    const okC = !r.err && r.c.hits.length === 1 && r.c.sup >= 1 && r.c2.sup === 0 && r.c2.hits.length >= 1 && r.c2.hits.length === r.c2.fast;
+    const okD = !r.err && r.d.hits.length === 0 && r.d.land.length === 0 && r.dSame && r.d1.hits.length === 1;
+    const okE = !r.err && r.e.used && r.e.base.every(v => v === 0) && r.e.tr[0] > 0 && r.e.n[0] > 0 && r.e.diff[0] >= 150 && r.e.tr[1] > 0 && r.e.diff[1] > 0 && r.e.diff[1] < r.e.diff[0] && r.e.tr[2] === 0 && r.e.diff[2] === 0 && r.e.n[2] === 0 && r.e.n0.every(v => v === 0);
+    r.part = { a: okA, b: okB, c: okC, d: okD, e: okE }; r.ok = okA && okB && okC && okD && okE;
+    res.T90_wallTrail = r; res.PASS.wallTrail = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
