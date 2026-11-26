@@ -1,32 +1,53 @@
 # Handoff: 扯斷成兩隻、碰到合回（v2.62，分支 `split-merge-v1`，2026-11-26，先看這段）
 
 > 工作樹 `E:/捏捏史萊姆/_wt-分裂`，從 `feel-3x-panel-v1` 的 `33e3b3f` 開。**沒推、沒發 TestFlight。** 預覽伺服器 launch 名 `split-web`（8797，網址 `http://127.0.0.1:8797/index.html`）。
-> 另一個對話同時在 `_wt`（feel-3x-panel-v1）改湯圓餡（`drawFx`、`CORE`）和不透明皮的邊緣（著色器、`JellySkin`）；這條沒碰那幾處，合併時 `draw()` 裡 `inBody` 那一行可能小衝突（這條在那行加了 `twinFace(col,false)`）。
+> 另一個對話同時在 `_wt`（feel-3x-panel-v1）改湯圓餡和不透明皮的邊緣；這條沒碰那幾處。
 
 ## ✅ 完成
-- 設計稿（四版合併動畫，可播放、可慢放比較）：https://claude.ai/artifact/LgGRtiXohwX6By5wq3oTDq 。Design 類型不能寫腳本動畫，做成 HTML 頁。另外 quickstart 建了一個沒用到的空 Design 畫布 https://claude.ai/artifact/NJbPkKLRgHKgaoyZnSBmAq ，要不要刪問多米。
-- 網頁（`dd31c82`）：`index.html` 搜 `v2.62`。舊的 v2.51 小團 `B2` 升級成第二隻真的軟體（`twinBuild`、`twinSub`、`twinMem`），畫進 A 的同一張遮罩（`extraMask`），臉另外畫（`twinFace`）。A 不換粒子：參考形狀和目標面積一起縮（`SPLIT.k`、`SPLIT.mx` 乘進 substep 的 m00..m11、`A0p×SPLIT.det`、互不穿透 `×SPLIT.dmin`）。合併鼓包、波紋借偽足 `POD.E`（`twinPods`）。參數、秒數、做法在 `.uiux/04-手感/參數表-暫定.md` 最後一節。
-- 扯斷條件 `splitCheck`：手指從抓下去的地方拉開 > `splitAt` 1.8R、往外、螢幕速度 > `splitV` 10R/s、連 0.05 秒。原本從中心量 3.4R，手機橫向只有約 3.7R 寬，橫著拉不到，所以改量拉開距離。
-- 自測 T74（`splittest.js`，selftest 最後 fetch 它；也能單獨在 console 跑）：四版都會斷、斷了再猛扯兩隻都不斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%（擠扁那版量到 0.977 到 0.981，最接近門檻）、A 回到原本大小；放著自己爬回去也合；splitAgain 1 能再斷、0 不能；split 0 不斷。單獨跑過三次都過。
-- 舊項目 T65 到 T73 釘 `split 0`（`PRE54`），T74 和跑完還原用真正的預設（`PRE62`）。
+- 設計稿（四版合併動畫，可播放、可慢放比較）：https://claude.ai/artifact/LgGRtiXohwX6By5wq3oTDq 。另外 quickstart 建了一個沒用到的空 Design 畫布 https://claude.ai/artifact/NJbPkKLRgHKgaoyZnSBmAq ，要不要刪問多米。
+- 四版合併動畫怎麼切：
+  - 網頁：長按左上標題「捏捏」1.2 秒打開隱藏面板，找「合併動畫 v2.62」（`mergeFx`）：0 黏絲搭橋、1 擠扁彈回、2 水滴加波紋、3 吞下去。
+  - 手機：長按左上標題「捏捏」1.2 秒打開調手感面板（`TunePanel`），在第一區「手感」裡往下找同名的「合併動畫 v2.62」，滑桿 0 到 3。旁邊有「貼著多久才合 v2.62」。
+- 網頁 `index.html` 搜 `v2.62`。第二隻是完整的小軟體 `B2`（`twinBuild`、`twinSub`、`twinMem`），畫進 A 的同一張遮罩（`extraMask`），臉另外畫（`twinFace`）。A 的參考形狀和目標面積一起縮（`SPLIT.k`、`SPLIT.mx`、`SPLIT.det`、`SPLIT.dmin`）。參數表在 `.uiux/04-手感/參數表-暫定.md` 最後一節。
+- 扯斷條件 `splitCheck`：手指從抓下去的地方拉開 > `splitAt` 1.8R、往外、螢幕速度 > `splitV` 10R/s、連 0.05 秒。
+- 11-26 多米定的三題（網頁和 Swift 都改了）：
+  - 預設合併動畫 `mergeFx` 1 擠扁彈回。0、2、3 留在面板當對照。
+  - 合回之後可以再斷（`splitAgain` 1）。0 留在面板當對照。
+  - 兩隻貼著晚一點再合：新參數 `mergeWait` 1.5 秒（0 到 5），碰到之後要一直貼著這麼久才開始合，中間分開就重算；0 回到一碰就合。放手 0.6 秒、分開 0.8 秒那兩個條件沒改。
+- 這次修的三個錯（網頁和 Swift 同樣改）：
+  - 黏條開著時收腰斷開原本也讀 `splitAt`。v2.62 把它改成 1.8，黏條拉 1.8R 撐 0.4 秒就斷（T63 g 量到外框尖角 120 度）。改成固定 3.4R 從中心量（網頁 `STRAND_SPLIT_AT`、Swift `strandSplitAt`），跟 v2.61 一樣。
+  - `splitKStep` 沒斷的時候算出來的矩陣差 1e-16，substep 每幀乘一個幾乎是 1 的矩陣，亂玩時放大：T42 亂玩黏土抖 19.9（門檻 12，v2.61 是 8.2）。沒作用時直接給單位矩陣，T42 的數字回到跟 v2.61 一模一樣。
+  - T62 用真正的預設，往上猛扯會斷成兩隻，記住的形狀只有 1.81R 高（門檻 2.3）。T62 的 SP 釘 `split: 0`，跟 T65 到 T73 同一個做法。
+- 自測 T74（`splittest.js`）加了 `mergeWait` 的檢查：四版都要貼滿 1.5 秒才合（量到 1.517）；貼 0.85 到 0.92 秒就拖開 2.5R，不准合；`mergeWait` 0 碰到那一幀就合（0.017 秒）。拖過去的迴圈從 240 幀改 420 幀。
+
+## 🧪 自測結果（`tools/web-bench`，`python st.py ../../prototype/web --full 1`）
+- 第 1 次（修之前，含 `mergeFx` 改 1）：74 項 71 過，1191 秒。不過的是 T42 `v227`、T62 `limits`、T63 `v252`，三個都是 v2.62 造成的（原因和修法見上面「這次修的三個錯」）。證據：同一時間用 `git archive 33e3b3f` 的 v2.61 跑整份，73／73 全過、1058 秒；T62、T63 單獨跑時把 `PRE47` 的 `split` 關掉就過，記錄 `twinSpawn` 看到這兩項裡真的扯斷了。
+- 第 2 次（修黏條距離、T62 釘 split 0）：74 項 73 過，1068 秒，剩 T42。T42 跟第 1 次數字一模一樣（固定亂數），黏土第二組抖 19.9，v2.61 是 8.2。
+- 第 3 次（修 `splitKStep` 單位矩陣）：74／74 全過，1147 秒，T42 數字回到跟 v2.61 一樣。
+- 第 4 次（最終版，加 `mergeWait`、T74 新檢查）：**74／74 全過，1182 秒**。T74 25 秒：四版都斷、都合，等了 1.517 秒才合，面積 0.98 到 0.998；貼 0.85 秒就拖開沒有合；`mergeWait` 0 等 0.017 秒就合；放著自己爬回去 3.4 秒合。T62 記形高 2.99R，T63 g 外框最尖 77、66 度。
+- 只跑了 1 次最終版，CLAUDE.md 要求的 3 次還差 2 次。
+
+## 🔍 Swift 逐行對網頁複查（沒有 swiftc，只能讀）
+- 對過的函式：`splitCheck`、`twinSpawn`、`twinBuild`、`twinHit`、`twinGrab`、`twinRelease`、`twinSub`、`twinMem`、`twinMove`、`twinCenter`、`twinContact`、`twinStep`、`mergeStart`、`mergeStep`（四版的秒數、公式）、`mergeEnd`、`twinDrop`、`splitKStep`、`splitKTarget`、`twinPods`、`gooView`，substep 的 `splitMx` 乘法順序、`A0p × splitDet`、`collide` 的 `splitDmin`、觸控三個入口、`SlimeView.drawTwin` 和遮罩、`JellySkin.SkinMesh.polygon`、`FeelParams` 的欄位和面板條目。
+- 公式和數字跟網頁對得上，沒找到索引越界、除以零、會出 NaN 的地方。
+- 上次標的「可能編不過」逐條看過，都應該編得過：`if let g, g.str > 0 || ...`（舊檔已經用過 `if let x` 簡寫）；`twBnd.map` 有寫明回傳的帶標籤 tuple；`TwinMerge` 是 private，只在 private 屬性和函式裡用，對外的 `gooView` 回傳的 `TwinView`、`TwinEyes` 是 internal；`drawTwin` 的 `sides` 型別寫明了；`twinBuild` 的區域函式只抓區域變數和 self 的陣列；`splitMx` 是帶標籤 tuple，存取寫法一致。
+- 改了：上面兩個錯的 Swift 版（`strandSplitAt`、`splitKStep` 單位矩陣）、`mergeWait`（`twTouchT`）、`mergeFx` 預設 1、`splitAgain` 和 `splitAt` 的面板說明。
+- 沒改、留著的差異：網格皮上第二隻用扇形三角形（很凹時會蓋出外框一點）；搭橋線切 8 段；腮紅只在果凍皮畫（跟 A 在 Swift 一樣）；手指剛好在 A 中心時方向用 (1,0)。
 
 ## 🚧 沒做完
-1. **整份 selftest 還沒全過一次**：第一次跑在 T68（亂拉）撞到 NaN：扯斷那一刻換回原本網格，`remeshHome 0` 時 HB 是空的。已修（`dd31c82`），也把舊項目釘 split 0，**修完還沒重跑**。跑法：起 `split-web`，然後
-   `node E:/捏捏史萊姆/nienie-slime/.vibe/run-selftest.mjs selftest.js http://127.0.0.1:8797/index.html <結果.json>`（腳本在主資料夾的 `.vibe`，這個工作樹沒有；約 15 到 20 分鐘，背景跑，後面不要接別的指令）。要跑 3 次。
-2. **Swift 寫完了，沒編譯過**（本機沒有 swiftc）：`SlimeRig.swift` 5351 行起（`tw` 開頭是第二隻、`split` 開頭是 SPLIT 狀態），`FeelParams.swift` 284–291、790–797，`SlimeView.swift` 的 `drawTwin`（約 1155）和遮罩 740、837，`JellySkin.swift` 新加 `SkinMesh.polygon`（約 199，皮的演算法和著色器沒動）。
-   跟網頁不同：網格皮上第二隻用扇形三角形（很凹時會蓋出外框一點）；搭橋線切 8 段；腮紅條件跟 A 在 Swift 一樣（果凍皮、眼睛開著）；手指剛好在 A 中心時方向用 (1,0)。
-   子代理自己標的最可能編不過：`gooView`（約 5972）的 `if let g, g.str > 0 || ...` 那行、`twBnd.map` 指定給帶標籤 tuple 陣列、internal 屬性用到 private 的 `TwinMerge`；`drawTwin` 的 `sides` tuple；`twinBuild` 裡的區域函式；substep 約 3281 的 `splitMx`。
-3. Swift 寫完要逐行對網頁複查一次（另開子代理，給它程式碼不要給結論）。
+1. Swift 沒編譯過。推上去讓 CI 編，或在有 swiftc 的機器跑 `tools/swift-linux-check/check.sh`。
+2. 合回 `feel-3x-panel-v1` 之前，先 rebase 或 merge 它的 `aa3b7c3`（v2.61b：湯圓餡 `coreSoft`、邊緣 `edgeClean`）。它改到 `index.html` 的 `drawFx`、片段著色器、`JellySkin.metal`、`SlimeView.drawFx`、`TunePanel`。衝突兩邊都保留。這條分支在 `draw()` 裡 `inBody` 那一行後面加了 `twinFace(col,false)`，最可能撞在那裡；`FeelParams.swift` 兩邊都加了參數，也可能撞。
 
 ## ❓ 等多米決定
-1. 合回之後還能不能再斷：先照「合回後重新算一次」（`splitAgain` 1）；0 是這次打開只斷一次。
-2. 四版合併動畫（`mergeFx` 0 到 3）哪版當預設，現在是 0 黏絲搭橋。隱藏面板「合併動畫 v2.62」切換。
-3. 扯斷門檻 `splitAt` 1.8、`splitV` 10 是猜的，要真機試：太容易斷就調高 `splitV`。
-4. 斷下來掉在牠頭上（窗台有重力）會直接合回去；窄畫面上兩隻常常貼著，第二隻放手 0.6 秒後碰著就合。要不要讓兩隻多玩一下再合。
-5. 要不要推、發 TestFlight。
+1. 扯斷門檻 `splitAt` 1.8、`splitV` 10 是猜的，要真機試：太容易斷就調高 `splitV`。
+2. 要不要推、發 TestFlight。
+
+已定（多米 11-26）：預設合併動畫用擠扁彈回（`mergeFx` 1，其他三版留在面板當對照）；合回之後可以再斷（`splitAgain` 1，0 留在面板當對照）；貼著晚一點再合（`mergeWait` 1.5 秒，0 回一碰就合）。
 
 ## 📌 已查清、下次別再查
 - 遮罩是模糊再切邊，兩隻一碰就是一個輪廓，所以搭橋、水滴兩版要在還沒碰到時就開始（`MERGE_REACH` .5、.25R）。
+- 窄畫面上抓著第二隻很難拉開 0.6R，T74 四版多半是放手 0.6 秒後貼滿 1.5 秒才合。
+- 這份 selftest 有亂數沒釘的項目（T65 每次數字不同），T42 是固定的，換版本數字變了就是程式行為變了。
 - 手機版沒有大腦；網頁的扯斷不碰大腦。
 - 測試用內建瀏覽器時一律帶 `tabId`，別的子代理可能也開著分頁。
 
