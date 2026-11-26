@@ -762,7 +762,7 @@ function twinSpawn(f){const c=globalC,fx=f.fx!=null?f.fx:f.x,fy=f.fy!=null?f.fy:
   const frac=SPLIT.frac=Math.max(.2,Math.min(.6,mat.splitFrac>0?mat.splitFrac:.45)),rb=Math.sqrt(frac*A0/Math.PI),id=f.id,x=f.x,y=f.y,sx=f.sx,sy=f.sy;
   twinBuild(fx+ux*rb*.3,fy+uy*rb*.3,rb,ux,uy);
   tearFinger(f);relaxUntil=Math.max(relaxUntil,t+.5);CAPG=1;   // A：放開，拉出去的那段記憶半秒退掉
-  if(REM.n>0&&remesh(true)){REM.n=0;REM.calm=t+(mat.remeshCalm||0);REM.last=t}   // 補過點的話換回建身體時的網格（有第二隻時不補點），合回去點數才對得上
+  if(REM.n>0&&mat.remeshHome>=.5&&HB.length===bnd.length&&remesh(true)){REM.n=0;REM.calm=t+(mat.remeshCalm||0);REM.last=t}   // 補過點的話換回建身體時的網格（有第二隻時不補點），合回去點數才對得上
   twinGrab(id,x,y,sx,sy);SPLIT.n++;SPLIT.t0=t;SPLIT.used=true;SPLIT.apart=false}
 function twinArea(PX,PY){const b=B2.bnd,n=b.length;let A=0;for(let k=0;k<n;k++){const i=b[k],j=b[(k+1)%n];A+=PX[i]*PY[j]-PX[j]*PY[i]}return Math.abs(A)/2}
 function twinBuild(cx,cy,rb,ux,uy){const b=B2,hh=h,p0=Math.random()*6.283,p1=Math.random()*6.283,rr=a=>rb*(1+.045*Math.sin(2*a+p0)+.03*Math.sin(3*a+p1));

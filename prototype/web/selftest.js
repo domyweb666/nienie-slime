@@ -61,7 +61,8 @@
   // v2.51（不規則外形、黏條、捏邊緣算拉、分裂、黏螢幕四周）推上去時沒跑過這份測試；11-22 補跑，63 項有 11 項不過（pressReal、pullForce、v227、v225、v224、sill、knot、walk、extreme、deco、pullCalm）。
   //   照 v2.47、v2.48 的做法：舊項目一律關掉這五樣（量的是原本的行為），關掉之後剩 pullCalm（T61）不過，T61 的 SP 也一起關。v2.51 自己的行為還沒有專門的項目，只有 T63 g 量了捏邊緣往外拉
   // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
-  const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k] };   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
+  const PRE62 = {}; for (const k in PRESETS) PRE62[k] = { ...PRESETS[k] };   // v2.62 真正的預設（扯斷開著）：T74 用，跑完用它還回去
+  const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k], split: 0 };   // v2.62：T65 到 T73 量的是扯斷之前的行為，亂拉時不准斷   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
   for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）
   const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
@@ -1856,7 +1857,7 @@
       const fake = "<script>{const m={'nienie.feel':" + JSON.stringify(JSON.stringify(feel)).replace(/</g, '\\u003c') + "};Object.defineProperty(window,'localStorage',{value:{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}});window.__ls=m;window.requestAnimationFrame=()=>0}</" + 'script>';
       h = h.replace(/<meta charset[^>]*>/i, m => m + fake); if (!h.includes(fake)) throw new Error('T72：假的 localStorage 沒放進去');
       const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;left:-2000px;top:0;width:393px;height:852px;visibility:hidden'; fr.srcdoc = h; const ld = new Promise((a, b) => { fr.onload = a; setTimeout(() => b(new Error('T72：15 秒沒開起來')), 15000); }); document.body.appendChild(fr); await ld; return fr; };
-    try { const P0 = { ...PRESETS }; Object.assign(PRESETS, PRE54); const ps = deskStamp(), k = deskPick(); Object.assign(PRESETS, P0);
+    try { const P0 = { ...PRESETS }; Object.assign(PRESETS, PRE62); const ps = deskStamp(), k = deskPick(); Object.assign(PRESETS, P0);
       const K3 = (a, b, c) => ({ ...k, pullHold: a, pullWhole: b, pullSoft: c }), slot = (...a) => ({ base: 'clay', pv: FEELVER, ps, k: K3(...a) }), feel = { v: 2, pv: FEELVER, ps, base: 'clay', k: K3(1, 0, 0), s: [slot(1, 1, 0), slot(0, 0, 1), null], log: [] };
       const act = async pull => { const fr = await deskPage(pull, feel), E = fr.contentWindow.eval, S3 = "DESK.slots.map(s=>s?PULL3.map(k=>+s.k[k]>=.5?1:0).join(''):'-').join(',')", o = {};
         o.mat = E("PULL3.map(k=>mat[k]).join('')"); o.s0 = E(S3); o.diff = E('deskDiff(DESK.slots[0],DESK.slots[1]).join()'); E("document.querySelector('[data-save=\"2\"]').click()"); o.save = E(S3);
@@ -1896,14 +1897,14 @@
     res.T73_slowPull = r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
     res.PASS.slowPull = r.err === '' && r.on.held && r.on.strain === 0 && !r.on.esc && r.off.strain > .5 && r.on.home.every((v, i) => Math.abs(v - r.off.home[i]) <= .1) && r.on.follow.every((v, i) => Math.abs(v - r.off.follow[i]) <= .03) && r.old.home.reduce((p, q, i) => p + q - r.on.home[i], 0) >= 1 && r.on.rel === 0 && r.on.hold <= r.off.hold * 1.6 + 8;
     res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
-  // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE54）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
+  // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
-    try { window.__SPLIT_PRE = PRE54; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
+    try { window.__SPLIT_PRE = PRE62; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
     o.r.sec = Math.round((performance.now() - T0) / 1000); res.T74_split = o.r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     res.PASS.split = !!o.pass; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   draw();
   Object.assign(VIEW, VIEW0); viewSync();
-  Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); Object.assign(PRESETS, PRE54); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去
+  Object.assign(PRESETS, P27R); Object.assign(PRESETS, PRE47); Object.assign(PRESETS, PRE62); SLP.lastAny = -99; chooseSlime(SLIME, false, false);   // v2.23：回到原本那隻（材質、個性、顏色）；v2.47：真正的預設值還回去
   for (const k in IMPS) delete IMPS[k]; Object.assign(IMPS, JSON.parse(IMPS0)); IMP.tr = IMP0.tr; IMP.w = IMP0.w; IMPD.tr = IMP.tr; IMPD.w = IMP.w; IMPSV.noSave = false;   // v2.34：熟還回去
   if (SFX) SFX.frame = sfxFrame0;
   WALK.noSave = false; walkLoad();
