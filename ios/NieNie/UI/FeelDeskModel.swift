@@ -107,6 +107,8 @@ struct FeelBatch: Equatable {
         Key(id: "brain", key: \FeelParams.brain),   // v2.63 (not in the web's KEYS61: the web's tiers leave it, the phone's 「build 158」 turns it off, as build 158 had no brain)
         Key(id: "mood", key: \FeelParams.mood),   // v2.63 slice 2, the same (build 158 had no mood)
         Key(id: "nap", key: \FeelParams.nap),   // v2.63 C9, the same (build 158 had no nap at your hand)
+        Key(id: "holdScared", key: \FeelParams.holdScared),   // v2.63 D3, the same (build 158 slipped from the hand)
+        Key(id: "holdTickle", key: \FeelParams.holdTickle),   // v2.63 D3, the same (build 158 broke free of a tickle)
     ]
     static let pull: [String] = ["pullHold", "pullWhole", "pullSoft"]
     static func pullName(_ id: String) -> String {
@@ -140,6 +142,8 @@ struct FeelBatch: Equatable {
         Item(id: "brain", name: "大腦：自己走、睡、醒"),
         Item(id: "mood", name: "心情：幾分鐘慢慢變好變差"),
         Item(id: "nap", name: "揉夠了放手，在你手邊睡著"),
+        Item(id: "holdScared", name: "怕的不從手裡滑走"),
+        Item(id: "holdTickle", name: "搔癢不掙脫"),
     ]
     enum Tier: String, CaseIterable, Identifiable {
         case b158, fix, pull

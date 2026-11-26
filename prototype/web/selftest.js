@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T77（D3 怕的不滑走、搔癢不掙脫、兩指照舊撕開；兩顆 0 對照；在 T76 後面、T74 前面跑）
    v2.63（11-26）：加 T76（C9 揉夠了放手，在你手邊睡著；nap 0 對照；在 T75 後面、T74 前面跑）
    v2.63（11-26）：加 T75（切回來也先看你：visibilitychange、blur／focus，睡著的慢慢醒不嚇；在 T74 前面跑，幾秒）
    v2.62（11-26）：加 T74（扯斷成兩隻、碰到合回，測試在 splittest.js，最後跑）；T62 也釘 split 0（真正的預設往上猛扯會斷）
@@ -628,7 +629,7 @@
   { const clock = saveClock(); Math.random = seeded(20261104); const r37 = {}; let worst = 0;
     const cen = () => { let mx = 0, my = 0; for (let i = 0; i < N; i++) { mx += X[i]; my += Y[i]; } return [mx / N, my / N]; };
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const L5 = o => { resetAligned(1e9, { ...P0, emo: 0, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; LIFE.st = 'rest'; LIFE.until = 1e9; log.splice(0); };
+    const L5 = o => { resetAligned(1e9, { ...P0, emo: 0, holdTickle: 0, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; LIFE.st = 'rest'; LIFE.until = 1e9; log.splice(0); };   // v2.63 D3：搔癢不掙脫（holdTickle）預設 1 之後，這一項量的是舊規格（撥久了先抗議再掙脫），釘 0
     const voices = () => log.filter(x => String(x[0]).startsWith('voice.')).map(x => x[0].slice(6));
     { L5({}); IMP.tr = 0.6; const cx = globalC.xc, cy = globalC.yc; ev('pointerdown', 1, cx, cy); steps(7); const t0 = t; ev('pointerup', 1, cx, cy); steps(40);
       r37.tap = { leanAfter: +(E2.leanT - t0).toFixed(2), voices: voices() }; }
@@ -653,7 +654,7 @@
   //   e 游過來：從家右邊 2R 以外開始，4.5 秒內到家 0.6R 內、打招呼，鏡頭不動（5 點內）；f 收集：四隻輪流換，材質、種子、顏色對，放 3 秒零自交、面積 0.97 到 1.03；換回來印象還在。全程零自交
   { const clock = saveClock(); Math.random = seeded(20261105); const r38 = {}; let worst = 0;
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const L6 = o => { resetAligned(1e9, { ...P1, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; log.splice(0); };
+    const L6 = o => { resetAligned(1e9, { ...P1, holdTickle: 0, ...o }); impReset(); voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; log.splice(0); };   // v2.63 D3：搔癢不掙脫（holdTickle）預設 1 之後，這一項量的是舊規格（撥久了先抗議再掙脫），釘 0
     const voices = () => log.filter(x => String(x[0]).startsWith('voice.')).map(x => x[0].slice(6));
     { L6({}); const q = sc(globalC.xc + R * 2.2, globalC.yc); ev('pointerdown', 2, q[0], q[1]); steps(60); const gx = +EYE.gx.toFixed(2); ev('pointerup', 2, q[0], q[1]); steps(30);
       let bl = 0, lastB = EYE.blinkT; for (let k = 0; k < 600; k++) { steps(1); if (EYE.blinkT !== lastB) { bl++; lastB = EYE.blinkT; } }
@@ -690,7 +691,7 @@
   //   f 留形不動：拉 1.5R 放手 2 秒還留七成五；g 三種材質暴力玩法（拉、甩、兩指擠、兩指拉、揉）零交叉、面積回來
   { const clock = saveClock(); Math.random = seeded(20261104); const r39 = {};
     const v = viewV(), sc = (x, y) => [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y];
-    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], ...OFF25, seed: 7, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };
+    const L7 = (name, o) => { resetAligned(1e9, { ...PSAVE[name], ...OFF25, seed: 7, holdTickle: 0, ...o }); impReset(); IMPD.tr = 0; IMPD.w = 0; voice.last = -9; E4.count = 3; E4.lastT = -99; E4.wait = -1; SLP.lastAny = -99; LIFE.st = 'rest'; LIFE.until = 1e9; Object.assign(MOOD, { c: 0, a: 0, strain: 0, strainMax: 0, scare: 0, taps: [], happyT: -9, wagT: -9, cowerUntil: -9 }); ESC.on = false; PURR = 0; FLN.H = 1; FLN.at = -9; FLN.t0 = -9; FLN.amp = 0; E2.leanT = -9; E2.tk.length = 0; E2.tkT = 0; CAM.x = v.x; CAM.y = v.y; CAM.z = 1; FOL.x = v.x; FOL.y = v.y; steps(20); log.splice(0); };   // v2.63 D3：搔癢不掙脫（holdTickle）預設 1 之後，這一項量的是舊規格（撥久了先抗議再掙脫），釘 0
     const box = () => { let a = 1e9, b = -1e9, c = 1e9, d = -1e9; for (const i of bnd) { a = Math.min(a, X[i]); b = Math.max(b, X[i]); c = Math.min(c, Y[i]); d = Math.max(d, Y[i]); } return [a, b, c, d]; };
     const kink = () => { const n = bnd.length; let m = 0; for (let k = 0; k < n; k++) { const a = bnd[(k + n - 1) % n], b = bnd[k], c = bnd[(k + 1) % n], u = Math.atan2(Y[b] - Y[a], X[b] - X[a]), w = Math.atan2(Y[c] - Y[b], X[c] - X[b]); m = Math.max(m, Math.abs(Math.atan2(Math.sin(w - u), Math.cos(w - u)))); } return m * 180 / Math.PI; };
     const hidden = (p, fx, fy) => { const qx = p[0] - fx, qy = p[1] - fy, u = qx * .5 + qy * .866, uc = Math.max(0, Math.min(160, u)), rr = 30 + 18 * uc / 160; return Math.hypot(qx - .5 * uc, qy - .866 * uc) < rr; };   // 手指：接觸面半徑 30 點、從右下伸過來、往後變寬到 48 點
@@ -1950,6 +1951,45 @@
     r.ok = !r.err && r.a.napAt < 0 && r.a.cum < SP.napPurr && r.b.cum >= SP.napPurr && r.b.napAt > 0 && r.b.napAt <= 10 && r.b.d <= .5 && !r.b.route && r.b.mv < .3 && r.b.cushion > .5 && r.b.cumAfter < .5
       && r.c.asleep0 && r.c.taps.length > 0 && r.c.taps.every(x => !x.startle && !x.flinch) && r.c.woke && r.c.slow && !(r.off.napAt > 0 && r.off.d <= .5);
     res.T76_nap = r; res.PASS.nap = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T77 v2.63 D3 怕的不從手裡滑走、搔癢不掙脫（holdScared、holdTickle；OVERNIGHT 第 7 項，手機照這條搬）。窗台、芋圓、真正的預設。
+  // 擋：a 戒 0.65 以上（每次拉之前補回）連拉 10 次（先按住 0.2 秒；拉不開 1.2R 或沒抓到的那次不算、重抓，最多 25 次）：抓頂端往上拉到身體被拉開 1.2R（SB，不夠就再往上移，每秒 4.8R，比快扯慢；窗台上往右只拉得開 0.7R 就到畫面邊）、撐 2 秒：脫手 0 次、有抗議聲、放手後走開（ESC）5 次以上；
+  //     b 撥（半徑 20 點、每秒 4 趟的來回，T39 搔癢同一個撥法）20 秒：手指一直抓著、沒有掙脫，搔癢佔一半以上、扭（SHK）和咯咯各 10 次以上，搔癢這邊不換成抗議聲；
+  //     c 兩指往上下拉到畫面頂和底（T54 twoVert 同一個拉法，拉開超過 621 點）：照舊撕開；
+  //     d 對照：holdScared 0 同樣拉 10 次會滑走（5 次以上）；holdTickle 0 同樣撥會掙脫（4 到 9 秒，先抗議）；兩顆都 0 兩指照樣撕開
+  { const clock = saveClock(), TARO = SLIMES[2], sl0 = SLIME, view0 = { ...VIEW }, r = {}, M0 = { cell: BMEM.cell.slice(), side: BMEM.side }, I0 = { tr: IMP.tr, w: IMP.w }, B0 = { ...BRAIN }, E0 = { count: E4.count, lastT: E4.lastT }, SP = { ...PRE54[TARO.mat], seed: TARO.seed, ...TARO.p, limbs: 0, tentSlip: 0, tentBump: 0, tentAxis: .85, eyes: 1, sill: 1, bodySize: .27, intro: 0, introSwim: 0, shake: 0 };
+    const base = Math.floor(seeded(77)() * 1e6);   // 只跑幾項時 st.py 換掉 seeded(77) 的種子，每一輪不同
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd + base); SLIME = 2; mat = { ...SP, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; DR.lookT = -9; voice.last = -9; PAIR.tearT = -9; PAIR.over = 0; BMEM.cell = [0, 0, 0, 0, 0]; BMEM.side = 0; Object.assign(BRAIN, { seed: sd }); brainReset(); steps(60); };
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const pulls = over => { fresh(over, 77); const o = { n: 0, slip: 0, never: 0, miss: 0, protest: 0, flee: 0, sbMin: 9, sbMax: 0, eyeSq: 0, w: 0, why: [] };
+      for (let a = 0; a < 25 && o.n < 10; a++) { IMP.w = Math.max(IMP.w, .65); IMPD.w = IMP.w; let b = -1; for (const i of bnd) if (b < 0 || Y[i] < Y[b]) b = i; const ax = X[b], ay = Y[b] + R * .15; let q = sc(ax, ay); log.splice(0); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); steps(12);   // 先按住 0.2 秒不動：一按就以每秒 4.8R 移，會被判成摸（stroke），不是抓
+        if (!f || fingers.get(1) !== f || f.mode !== 'grab') { o.miss++; ev('pointerup', 1, q[0], q[1]); steps(180); continue; }
+        let ty = ay, hold = -1, slipped = false, sq = false;
+        for (let k = 0; k < 600; k++) { const s0 = SB(f); if (hold < 0 && s0 >= 1.2) hold = k; if (hold >= 0 && k - hold >= 120) break; if (s0 < 1.2) ty -= R * .08;
+          q = [q[0] + (ax - f.x) * CAM.z, Math.max(4, q[1] + (ty - f.y) * CAM.z)]; ev('pointermove', 1, q[0], q[1]); steps(1);
+          if (fingers.get(1) !== f || f.mode !== 'grab') { slipped = true; o.why.push((fingers.get(1) === f ? f.mode : 'gone') + '@' + (k - Math.max(0, hold)) + (hold < 0 ? 'pre' : '')); break; }
+          if (hold >= 0) { o.sbMin = Math.min(o.sbMin, SB(f)); if (EYE.mode === 'squeeze') sq = true; } o.sbMax = Math.max(o.sbMax, SB(f)); }
+        if (hold < 0 && !slipped) { o.never++; ev('pointerup', 1, q[0], q[1]); steps(180); continue; }   // 10 秒內拉不開 1.2R（手指到畫面頂了）：這次不算，再抓一次
+        o.n++; if (slipped) o.slip++; if (sq) o.eyeSq++; o.protest += log.filter(x => x[0] === 'voice.protest').length; o.w = +IMP.w.toFixed(2);
+        ev('pointerup', 1, q[0], q[1]); let fl = ESC.on && !slipped; for (let j = 0; j < 180; j++) { steps(1); if (ESC.on && !slipped) fl = true; } if (fl) o.flee++; }
+      o.sbMin = +o.sbMin.toFixed(2); o.sbMax = +o.sbMax.toFixed(2); return o; };
+    const tickle = over => { fresh(over, 7701); log.splice(0); const q = sc(globalC.xc, globalC.yc); ev('pointerdown', 1, q[0], q[1]); const f = fingers.get(1); steps(6); let th = 0, tk = 0, n = 0, sh = 0, sh0 = SHK.t0, free = -1, first = -1, sq = 0;
+      for (let k = 0; k < 20 * 60; k++) { th += 2 * Math.PI * 4 * DT; ev('pointermove', 1, q[0] + 20 * Math.sin(th), q[1]); steps(1); const g = fingers.get(1); if (g !== f || f.mode !== 'grab') { free = +(k * DT).toFixed(2); break; } n++; if (tickOn()) { tk++; if (first < 0) first = +(k * DT).toFixed(2); } if (SHK.t0 !== sh0) { sh++; sh0 = SHK.t0; } if (EYE.mode === 'squeeze') sq++; }
+      const vs = log.filter(x => String(x[0]).startsWith('voice.')).map(x => x[0].slice(6)), cnt = k => vs.filter(x => x === k).length;
+      const o = { free, held: free < 0, first, tickFrac: +(tk / Math.max(1, n)).toFixed(2), shakes: sh, giggle: cnt('giggle'), protest: cnt('protest'), eyeSqFrac: +(sq / Math.max(1, n)).toFixed(2) }; ev('pointerup', 1, q[0], q[1]); steps(60); return o; };
+    const tear = over => { fresh(over, 7702); steps(180); lastTouch = t; const cx = globalC.xc, cy = globalC.yc, t0 = t; let dMax = 0;
+      const at = k => { const d = Math.min(1, k / 60); return [[1, cx, cy - R * .5 - (cy - R * .5 - 4) * d], [2, cx, cy + R * .3 + (H - 4 - cy - R * .3) * d]]; };
+      let p = at(0); for (const d of p) ev('pointerdown', d[0], d[1], d[2]);
+      for (let k = 1; k <= 150; k++) { p = at(k); for (const d of p) ev('pointermove', d[0], d[1], d[2]); steps(1); const a = fingers.get(1), b = fingers.get(2); if (a && b && a.mode === 'grab' && b.mode === 'grab') dMax = Math.max(dMax, Math.hypot(a.x - b.x, a.y - b.y)); }
+      const torn = PAIR.tearT >= t0; for (const d of p) ev('pointerup', d[0], d[1], d[2]); steps(60); return { torn, dMax: Math.round(dMax), lim: Math.round(mat.pairMax * R * mat.tearK) }; };
+    try { r.pull = pulls({}); r.tickle = tickle({}); r.tear = tear({});
+      r.pullOff = pulls({ holdScared: 0 }); r.tickleOff = tickle({ holdTickle: 0 }); r.tearOff = tear({ holdScared: 0, holdTickle: 0 }); r.err = ''; } catch (e) { r.err = String(e); }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0);
+    Object.assign(VIEW, view0); SLIME = sl0; BMEM.cell = M0.cell; BMEM.side = M0.side; BMEM.dirty = false; IMP.tr = I0.tr; IMP.w = I0.w; Object.assign(E4, E0); Object.assign(BRAIN, B0); GREET.st = ''; GREET.until = -9; PAIR.tearT = -9; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); LIFE.st = 'rest'; LIFE.until = -1; LIFE.att = null; SLP.on = false; SLP.k = 0; drReset();
+    r.ok = !r.err && r.pull.n === 10 && r.pull.slip === 0 && r.pull.protest >= 1 && r.pull.flee >= 5
+      && r.tickle.held && r.tickle.first >= 0 && r.tickle.tickFrac >= .5 && r.tickle.shakes >= 10 && r.tickle.giggle >= 10 && r.tickle.protest === 0
+      && r.tear.torn && r.tear.dMax > 621
+      && r.pullOff.slip >= 5 && r.tickleOff.free >= 4 && r.tickleOff.free <= 9 && r.tickleOff.protest >= 1 && r.tearOff.torn;
+    res.T77_hold = r; res.PASS.hold = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     try { window.__SPLIT_PRE = PRE62; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }

@@ -350,6 +350,9 @@ struct FeelParams: Equatable, Codable {
     var nap: Double = 1               // 揉夠了在你手邊睡著: 1 = purred napPurr s in all this opening, then no finger for napWait s, it falls asleep where you last touched it (not back to the mat, no 前兆, no words); 0 = as before
     var napPurr: Double = 60          // 揉多久會睡在手邊 (s): purr over 0.3 counted this opening (a slime switch, a rebuild, a rotation start it again). The number is mine, to be tried on a phone
     var napWait: Double = 6           // 放手幾秒睡著 (s): once enough, how long after the last finger leaves. The number is mine, to be tried on a phone
+    // v2.63 D3 (web holdScared, holdTickle; dragStep's C3, releaseFinger, e2Step; the same keys and defaults for all three materials). SlimeRig MARK v2.63 D3
+    var holdScared: Double = 1        // 怕的不滑走: 1 = very wary and held open 1R for 1.5 s, it no longer slips from the finger: it protests, squeezes its eyes, again every 1.5 s still held, and walks off when let go; 0 = as before (it slips and slinks off)
+    var holdTickle: Double = 1        // 搔癢不掙脫: 1 = tickled it keeps squirming and giggling as long as you go on, it never breaks free nor turns to protesting; 0 = as before (free after tickFree s, protesting the last 2)
     var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
     var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
@@ -678,7 +681,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.rubSpeed, name: "揉的速度上限（公分／秒）", hint: "手指每秒幾公分以內都算舒服的揉（v2.24 12）；0 回 v2.23（約 2.9 公分，一般手速的揉沒反應）", range: 0...30, step: 1, section: "活物感"),
         TuneField(key: \.tickRev, name: "搔癢要幾次折返", hint: "1 秒內手指折返幾次算搔癢；v2.24 6（一秒 3 趟），v2.23 4", range: 2...12, step: 1, section: "活物感"),
         TuneField(key: \.tickSeg, name: "搔癢的幅度上限（點）", hint: "手指每一段超過這麼長就算揉、不算搔癢；v2.24 48（約 8 毫米）；0 不看幅度（v2.23）", range: 0...120, step: 1, section: "活物感"),
-        TuneField(key: \.tickFree, name: "撥多久掙脫（秒）", hint: "搔癢撥多久它掙脫，最後 2 秒先抗議；v2.24 6，v2.23 3", range: 1...15, step: 0.5, section: "活物感"),
+        TuneField(key: \.tickFree, name: "撥多久掙脫（秒）", hint: "搔癢撥多久它掙脫，最後 2 秒先抗議；v2.24 6，v2.23 3。v2.63「搔癢不掙脫」開著時不看這個", range: 1...15, step: 0.5, section: "活物感"),
         TuneField(key: \.introSwim, name: "開場游過來", hint: "1：開場從畫面右邊外面一縮一衝游進來，到家看著你、揮一下偽足、打招呼（換史萊姆時也是）；0：v2.17 從遠處跳過來", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
@@ -935,6 +938,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.nap, name: "揉夠了在你手邊睡著 v2.63", hint: "1（C9）：這次打開累計呼嚕滿「揉多久」秒，手指離開「放手幾秒」，牠就在你最後摸的地方睡著，不走回布墊；輕碰照「輕碰慢慢醒」。睡了這一覺累計歸零。0 回改之前（40 秒沒人碰才睡，大腦開著先走回布墊）", range: 0...1, step: 1, section: "這一批 v2.63"),
         TuneField(key: \.napPurr, name: "揉多久會睡在手邊（秒）", hint: "這次打開累計呼嚕幾秒才會在你手邊睡著。60 是我取的，數字待測", range: 10...300, step: 5, section: "這一批 v2.63"),
         TuneField(key: \.napWait, name: "放手幾秒睡著（秒）", hint: "累計夠了以後，手指離開幾秒睡著。6 是我取的，數字待測", range: 2...20, step: 0.5, section: "這一批 v2.63"),
+        // v2.63 D3 (the web's words for holdScared, holdTickle)
+        TuneField(key: \.holdScared, name: "怕的不滑走 v2.63", hint: "1（D3）：戒很高時被拉開 1R 撐 1.5 秒，不再從手指滑掉；改成抗議一聲、眼睛 > <，還撐著每 1.5 秒再抗議，放手後往反方向走開。0 回改之前（撐到就滑走、往反方向溜）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.holdTickle, name: "搔癢不掙脫 v2.63", hint: "1（D3）：一直撥一直扭、一直咯咯，不會掙脫躲開，也不換成抗議聲。0 回改之前（撥「撥多久掙脫」秒就掙脫，最後 2 秒先抗議）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
 

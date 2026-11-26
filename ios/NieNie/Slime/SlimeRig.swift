@@ -785,6 +785,7 @@ final class SlimeRig {
         var grainI = 0, grR = 0.0, grT = -9.0        // v2.25 F5: press grains played, contact size at the last grain, its time
         var tkP = 0.0, far = false, reachN: Int?     // v2.24: travel since the last turn (tickle or rub); moved off its spot (0.15R, it is no longer just a press); mem count before the reach strip
         var saidProt = false, saidPurr = false       // v2.22 E1: protested / hummed once this grab
+        var scared = false                           // v2.63 D3 (holdScared; web f.scared): held open while very wary, it protested this grab; it walks off when let go
         var dragMax = 0.0                            // v2.22: how far this grab dragged it (E3)
         var tickAt = 0.0, tickNext = 0.0             // texture ticks: travel at the last tick, spacing to the next (提案第 13 條)
         var step = 0
@@ -2526,6 +2527,7 @@ final class SlimeRig {
         if f.mode == .grab { dragRelease(glide: !quiet) }
         if f.mode == .grab && !quiet { impRelease(f) }
         if f.mode == .grab && !quiet { moodRelease(f) }
+        if f.mode == .grab && !quiet && f.scared && params.holdScared >= 0.5 && params.emo >= 0.5 && !escOn { flee(-pullDX, -pullDY, W * 0.22 * params.flee) }   // v2.63 D3: held open while scared, it protested; let go, it walks off the other way (as far as the old slip)
         if f.mode == .grab && !quiet && params.life2 >= 0.5 { lifeRelease(f) }
         if f.mode == .grab && !quiet { impAsk(f) }
         if f.mode == .grab && !quiet { e2Release(f) }   // v2.22
@@ -6116,12 +6118,18 @@ final class SlimeRig {
         for f in fingers.values where f.mode == .grab { f.dragMax = max(f.dragMax, hypot(dragOX - dragBX, dragOY - dragBY)) }   // v2.22 E3: how far this grab led it
         for f in fingers.values where f.mode == .grab { f.sb = params.slide > 0 ? f.stretch : hypot(f.ex - (dragOX - dragBX), f.ey - (dragOY - dragBY)) / R }   // v2.21: the stretch already counts from where it followed to
         // C3: very wary, pulled open 1R or more for 1.5 s, the patch slips from the finger and it slinks off a little
+        // (v2.63 D3 holdScared 1: it no longer slips; it protests and squeezes its eyes instead, and walks off when let go, in release)
         if iv2(params.impC3) && impWary > 0.5 {
             var st = 0.0
             var g: Finger?
             for f in fingers.values where f.mode == .grab && bodyStretch(f) > st { st = bodyStretch(f); g = f }
             dragSlipT = st > 1 ? dragSlipT + dt : 0
-            if let g, dragSlipT > 1.5 {
+            if let g, dragSlipT > 1.5, params.holdScared >= 0.5 {   // v2.63 D3 (web: the same line): not slipping; a protest, the eyes > < (very wary they are wide already); again every 1.5 s still held; the wariness only the first time this grab
+                dragSlipT = 0
+                if !g.scared { g.scared = true; impWary = min(1, impWary + 0.05) }
+                eyeSqU = max(eyeSqU, t + 0.6)
+                voiceLast = -9; voice("protest")
+            } else if let g, dragSlipT > 1.5 {
                 inertiaCatch()
                 for m in g.mem { GRAB[m.i] = false }
                 g.mem = []; g.mode = .none; lastTouch = t; lastReleaseStrength = 0.8
@@ -6321,7 +6329,8 @@ final class SlimeRig {
         let bm = brainM   // v2.63 心情: in a bad mood it leans away, in a good one it wags too (a poke is play)
         leanT = t + 0.3; leanA = atan2(f.fy - clusters[gi].yc, f.fx - clusters[gi].xc); leanS = impWary > 0.4 || bm < -0.35 ? -1 : 1; if bm > 0.35 { wagT = t + 0.35 }; voice("poke", 0.7)
     }
-    /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free.
+    /// E2 every frame: held still 0.35 s it pushes back once (a soft tap); still 0.8 s it nuzzles; tickled it squirms, past 3 s it slips free
+    /// (v2.63 D3 holdTickle 1: it never breaks free, it squirms and giggles as long as you go on).
     private func e2Step(_ dt: Double) {
         guard iv3(params.e2), !clusters.isEmpty else { nuzT0 = -1; return }
         guard let g = firstGrab(), !slpOn else { nuzT0 = -1; nuzSaid = false; tkTimes.removeAll(); tkT = 0; return }   // v2.61 C1: asleep it does not push, nuzzle or say anything
@@ -6345,9 +6354,10 @@ final class SlimeRig {
         let tickling = tickOn
         if tickling {
             tkT += dt
-            let warn: Bool = params.tickFree > 3 && tkT > params.tickFree - 2   // v2.24: the last 2 s it protests and squirms harder before it breaks free
+            let hold = params.holdTickle >= 0.5   // v2.63 D3 (web: the same line): it does not break free nor turn to protesting; it squirms and giggles on
+            let warn: Bool = !hold && params.tickFree > 3 && tkT > params.tickFree - 2   // v2.24: the last 2 s it protests and squirms harder before it breaks free
             if t >= gigNext { gigNext = t + 0.7; shkAt = -9; shkT0 = t; shkAmp = warn ? 0.8 : 0.45; voice(warn ? "protest" : "giggle") }
-            if tkT > params.tickFree {
+            if !hold && tkT > params.tickFree {
                 tkT = 0; tkTimes.removeAll()
                 inertiaCatch()
                 for m in g.mem { GRAB[m.i] = false }
