@@ -1,6 +1,7 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
-   v2.63（11-26）：T77、T74 釘 bond 0（整份比對兩版找出，其他項目逐筆同；T42 毫秒、T65 到 T67、T81 載入順序本來每次都不同）
+   v2.63（11-26）：加 T85（B9 動一點一顆：手指每走一小段一顆顆粒、手停就停、兩倍速約兩倍顆、每秒最多 20 顆、循環聲一半；sndGrain 0 沒有顆粒、其他聲音逐筆一樣；在 T84 後面、T74 前面跑）
+   v2.63（11-26）：T77 釘 bond 0（整份比對兩版找出，其他項目逐筆同；T42 毫秒、T65 到 T67、T81 載入順序本來每次都不同）。T74 第一組合回面積 0.996 變 1.003：在 T74 裡釘 bond 0 也一樣，是前面多跑了 T84、T85 留下的狀態，沒釘
    v2.63（11-26）：加 T84（D6 戒高溫柔摸先 3 秒嘆氣才呼嚕、三分鐘後照常；交情只升不降、每分鐘 0.01、高的第一下不縮朝手指靠；存檔 bd；畫面沒有天數等級；bond 0 對照；在 T83 後面、T74 前面跑）
    v2.63（11-26）：加 T83（B1 拉、B3 慢慢拉 0.4 秒內就有拉絲聲和手機的連續震動；快拉照舊；揉只記錄；pullFx 0 對照；震動讀 hapContStep 記的 HAP.log；在 T82 後面、T74 前面跑）
    v2.63（11-26）：加 T82（D4 牠縮那一下有一小聲和一下輕震、0.3 秒內放手的「噗」不重複、連點越點越小到不出聲不震；flinchFx 0 對照；震動讀 HAP.log；在 T81 後面、T74 前面跑）
@@ -2291,9 +2292,34 @@
     const okG = !r.err && r.gOn === .42 && r.gOff === 'v,tr' && r.gLoad === .37, okH = !r.err && r.hHits.length === 0 && r.hLen > 0;
     r.part = { a: okA, b: okB, c: okC, d: okD, e: okE, f: okF, g: okG, h: okH }; r.ok = okA && okB && okC && okD && okE && okF && okG && okH;
     res.T84_bond = r; res.PASS.bond = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T85 v2.63 B9 聲音跟著手走：動一點一顆（sndGrain；OVERNIGHT 第 15 項，手機照這條搬）。藍底、黏土真正的預設（PRE54，大腦關）。顆粒看 sfxPlay('grain') 的紀錄，每一格編號。
+  // a 抓著身體中間畫半徑 0.3R 的圈，每秒 0.5R 揉 4 秒、停住按著 1 秒：揉的時候每秒幾顆、停了之後第幾格還有顆粒；每秒 1R 同樣（顆粒數約兩倍、平均音量大一點）；每秒 8R（每秒不超過 20 顆；60 格一秒時實際 15 顆）
+  // b sndGrain 0 同樣每秒 0.5R：沒有顆粒；接著 0、1 各再揉一次，其他聲音逐筆一樣（顆粒不碰別的聲音、不抽 Math.random）
+  // c 循環聲：開著時頁面給引擎 0.5（揉、拉循環聲一半），關著 1
+  // 擋：a 0.5R 有顆粒、停手 0.1 秒（6 格）之後 0 顆；1R 對 0.5R 的顆粒數比 1.6 到 2.4、平均音量 2R 比較大；8R 每秒 ≤ 20；b 0 顆、其他聲音逐筆一樣；c 0.5 和 1
+  { const clock = saveClock(), r = {}, P85 = { ...PRE54.clay, intro: 0, introSwim: 0, brain: 0, sndGrain: 1 }, I0 = { tr: IMP.tr, w: IMP.w };
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P85, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; SLP.lastAny = -99; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = IMP.tr; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; FLN.say = null; GREET.st = ''; GREET.until = -9; EYE.user = -9; GR.s = 20261126; steps(60); log.splice(0); };
+    const rub = (over, v, sd) => { fresh(over, sd); const [x0, y0] = sc(globalC.xc, globalC.yc), u = R * CAM.z, rr = .3, EV = []; let x = x0, y = y0; ev('pointerdown', 1, x0, y0);
+      const n1 = 240, n2 = 60; let gr = null;
+      for (let k = 1; k <= n1 + n2; k++) { if (k <= n1) { const a = v * (k / 60) / rr; x = x0 + rr * u * Math.sin(a); y = y0 + rr * u * (1 - Math.cos(a)); ev('pointermove', 1, x, y); } steps(1); if (k === 2) gr = SFX ? SFX.gr : null; for (const e of log.splice(0)) EV.push([k, e[0], e[1]]); }
+      ev('pointerup', 1, x, y); steps(30); for (const e of log.splice(0)) EV.push([n1 + n2 + 1, e[0], e[1]]);
+      const G = EV.filter(e => e[1] === 'grain'), moving = G.filter(e => e[0] <= n1), after = G.filter(e => e[0] > n1 + 6 && e[0] <= n1 + n2);
+      return { n: moving.length, perS: +(moving.length / 4).toFixed(2), gMean: moving.length ? +(moving.reduce((s, e) => s + e[2], 0) / moving.length).toFixed(3) : 0, stop6: G.filter(e => e[0] > n1 && e[0] <= n1 + 6).length, after: after.length, gr, other: EV.filter(e => e[1] !== 'grain' && e[0] <= n1 + n2).map(e => e.join(':')) }; };   // 放手那格之後不比：揉完開心那一下輪流（rubVary 的洗牌袋跨次留著），每次本來就不同
+    try {
+      r.v1 = rub({}, .5, 85); r.v2 = rub({}, 1, 85); r.v8 = rub({}, 8, 85); r.off = rub({ sndGrain: 0 }, .5, 85); r.off2 = rub({ sndGrain: 0 }, .5, 85); r.on2 = rub({}, .5, 85);
+      r.ratio = r.v1.n ? +(r.v2.n / r.v1.n).toFixed(2) : 0; r.sameOther = JSON.stringify(r.off2.other) === JSON.stringify(r.on2.other); r.nOther = r.on2.other.length;   // 第一次揉接在前一項後面，前面留的狀態不同；比 off2、on2（同樣接在一次 off 後面）
+      if (!r.sameOther) r.otherDiff = [r.off2.other.join(' '), r.on2.other.join(' ')];
+      for (const k of ['v1', 'v2', 'v8', 'off', 'off2', 'on2']) delete r[k].other;
+      r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); FLN.say = null;
+    log.splice(0); IMP.tr = I0.tr; IMP.w = I0.w; impReset(); restoreClock(clock); mat = { ...PRESETS.clay }; setup(); SLP.on = false; LIFE.st = 'rest';
+    r.ok = !r.err && r.v1.n > 0 && r.v1.after === 0 && r.v2.after === 0 && r.ratio >= 1.6 && r.ratio <= 2.4 && r.v2.gMean > r.v1.gMean && r.v8.perS <= 20
+      && r.off.n === 0 && r.sameOther && (r.v1.gr == null || (r.v1.gr === .5 && r.off.gr === 1));
+    res.T85_sndGrain = r; res.PASS.sndGrain = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
-    const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0, bond: 0 };   // v2.63 D6：整份比對 bond 1 時合回後面積差一點，釘 0   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
+    const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
     try { window.__SPLIT_PRE = P74; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
     o.r.sec = Math.round((performance.now() - T0) / 1000); res.T74_split = o.r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     res.PASS.split = !!o.pass; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }

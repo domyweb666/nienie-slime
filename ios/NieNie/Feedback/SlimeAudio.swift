@@ -20,6 +20,8 @@ protocol SlimeSoundSource: AnyObject {
     var sndB5: Bool { get set }
     /// v2.63 B1 pull (FeelParams.pullFx; web SFX.frame st.open): how fast a grabbing finger opens new ground (radii a second), set before each frame; 0 = off
     var pullOpen: Double { get set }
+    /// v2.63 B9 (FeelParams.sndGrain; web SFX.gr): the rub and strand loops' share while grains play (0.5), 1 = as before
+    var grainLoop: Double { get set }
     /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
     var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
@@ -34,6 +36,8 @@ protocol SlimeSoundSource: AnyObject {
     func release(gain: Double)
     /// v2.63 D4 (FeelParams.flinchFx): the small sound when it flinches from your touch: the release pop's air layer, quiet, a little higher. No tail
     func flinch(gain: Double)
+    /// v2.63 B9 (FeelParams.sndGrain): one fine slime grain for a texture tick; `gain` 0...1 is the tick's (how fast the hand is)
+    func grain(gain: Double)
     /// Every frame. `rub` 0...1 (already × rubMax), `stretch` in radii of the most-stretched grabbing finger.
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool)
     /// App going to the background: loops off, nothing pending.
@@ -63,6 +67,7 @@ final class SlimeAudio: SlimeSoundSource {
     var sndB6 = true   // v2.63 B6
     var sndB5 = true   // v2.63 B5
     var pullOpen = 0.0   // v2.63 B1 pull
+    var grainLoop = 1.0   // v2.63 B9
     var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
@@ -412,6 +417,14 @@ final class SlimeAudio: SlimeSoundSource {
         one("release.air", Play(gain: Self.clamp(gain, 0, 1), rate: Self.rnd(1.08, 1.16), lowpass: 7000))
     }
 
+    /// v2.63 B9 (web SFX.grain: the same numbers): the shortest, finest slime file (settle.bubble, 0.11 s), louder, higher and brighter the faster
+    func grain(gain: Double) {
+        let k = Self.clamp(gain, 0, 1)
+        var p = Play(gain: 0.08 + 0.2 * k, rate: 0.95 + 0.3 * k, lowpass: 2500 + 5500 * k)
+        p.deco = true
+        one("settle.bubble", p)
+    }
+
     func release(gain: Double) {
         let s = Self.clamp((gain - 0.35) / 0.65, 0, 1)
         layered("release", s, releaseLayers)
@@ -463,14 +476,14 @@ final class SlimeAudio: SlimeSoundSource {
         let open: Double = grabbing ? max(0, pullOpen) : 0
         let pFloor: Double = open > 0 ? pullMax * PullFxSet.g * min(1, open / PullFxSet.v) : 0
         let pulling = grabbing && (stretch > pullOn || pFloor > 0.005) && !muted
-        let pullTarget = pulling ? max(stretch > pullOn ? pullMax * Self.clamp(pullGain(stretch, stV), 0, 1) : 0, pFloor) : 0
+        let pullTarget = (pulling ? max(stretch > pullOn ? pullMax * Self.clamp(pullGain(stretch, stV), 0, 1) : 0, pFloor) : 0) * grainLoop   // v2.63 B9: half while grains play
         driveLoop(pullVoice, key: "pull.loop", target: pullTarget, dt: dt, attack: 0.05, decay: 0.12,
                   rate: pulling ? pullRate(stretch) : nil, lowpass: pulling ? pullLowpass(stretch) : nil)
         if pulling, stretch > pullOn, Double.random(in: 0..<1) < strandRate(stretch, stV) * dt { one("pull.strand", strandPlay(stretch)) }
 
         // rub loop, giving way to the strand loop once pulled far
-        let level = muted ? 0 : Self.clamp(rub, 0, 1) * rubDuck(stretch)
-        let n = rubMax > 0 ? Self.clamp(level / rubMax, 0, 1) : 0
+        let level = muted ? 0 : Self.clamp(rub, 0, 1) * rubDuck(stretch) * grainLoop   // v2.63 B9: half while grains play; the pitch and brightness as before (n below)
+        let n = rubMax > 0 && grainLoop > 0 ? Self.clamp(level / grainLoop / rubMax, 0, 1) : 0
         // v2.61 B1: the new loop; without its files the old one. A loop already sounding keeps its file, the next rub picks again
         let rubKey = snd61 && !(bank["rub.loop61"] ?? []).isEmpty ? "rub.loop61" : "rub.loop"
         driveLoop(rubVoice, key: rubKey, target: level, dt: dt, attack: 0.06, decay: 0.06,

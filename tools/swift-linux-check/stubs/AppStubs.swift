@@ -12,6 +12,7 @@ protocol SlimeSoundSource: AnyObject {
     var sndB6: Bool { get set }
     var sndB5: Bool { get set }
     var pullOpen: Double { get set }
+    var grainLoop: Double { get set }
     var engineLatency: Double { get }
     var settleAmt: Double { get set }
     var music: Double { get set }
@@ -20,6 +21,7 @@ protocol SlimeSoundSource: AnyObject {
     func strand(gain: Double)
     func release(gain: Double)
     func flinch(gain: Double)
+    func grain(gain: Double)
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool)
     func stopAll()
     func voice(_ kind: String, gain: Double, rate: Double)
@@ -34,12 +36,14 @@ final class SlimeAudio: SlimeSoundSource {
     var sndB6 = true
     var sndB5 = true
     var pullOpen = 0.0
+    var grainLoop = 1.0
     var engineLatency: Double { 0 }
     func setAmbience(_ name: String) {}
     func press(intensity: Double) {}
     func strand(gain: Double) {}
     func release(gain: Double) {}
     func flinch(gain: Double) {}
+    func grain(gain: Double) {}
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool) {}
     func stopAll() {}
     func voice(_ kind: String, gain: Double, rate: Double) {}

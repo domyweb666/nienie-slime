@@ -59,6 +59,7 @@
     // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
     snd61: 1,   // v2.61 B1：揉的新循環（rub.loop61）和抓著時雨降到 0.3；0 回 rub.loop、0.6
     b5: 1, bufB5: {},   // v2.63 B5（sndB5）：嚇到、開心、不要啦、按的濕聲用跳過前奏的那一份（bufB5，載入時從同一個檔做的，leadTrim）；0 回原本的
+    gr: 1,      // v2.63 B9（sndGrain）：揉、拉循環聲乘多少（頁面給，開著時 0.5，顆粒浮在上面）；1 照舊
     b6: 1,      // v2.63 B6（sndB6）：按下去只清上次放手的餘韻（排程裡 tail 的那幾顆），別的照放；0 回改之前（按下去整排清掉）
     amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
   };
@@ -245,6 +246,8 @@
   };
   // v2.63 D4（flinchFx）：牠縮那一下的小聲：放手「噗」的 air 層，小聲、高一點點（g 由頁面給，0.3 × 縮的大小）。不排餘韻、不動 lastStretch。Swift SlimeAudio.flinch 同一套
   S.flinch = function (g) { one('release.air', { g: clamp(g, 0, 1), r: rnd(1.08, 1.16), lp: 7000 }); };
+  // v2.63 B9（sndGrain）：動一點一顆。k 0..1 手速（頁面給，每秒 3R 最亮）：最短最細的黏液顆粒（settle.bubble 0.11 秒），越快越大、越高、越亮。Swift SlimeAudio.grain 同一套
+  S.grain = function (k) { k = clamp(k, 0, 1); one('settle.bubble', { g: 0.08 + 0.2 * k, r: 0.95 + 0.3 * k, lp: 2500 + 5500 * k, deco: true }); };
   S.drip = function (g) { one('settle.bubble', { g: clamp(g, 0, 1) * 0.6, r: rnd(0.8, 1.1), lp: 3000, deco: true }); };
   S.strand = function (gain) { const p = MAP.pull.strand(S.st); p.g = clamp(p.g * (0.6 + 0.8 * gain), 0, 1); p.deco = false; one('pull.strand', p); };
 
@@ -280,7 +283,7 @@
     // 有在拉開就給一個底 pullMax × PF.g × min(1, open ÷ PF.v)，跟原本的取大。Swift SlimeAudio pullOpen 同一套
     const P = MAP.pull, PF = { g: 0.3, v: 0.5 }, open = grabbing ? Math.max(0, st.open || 0) : 0, floor = open > 0 ? S.pullMax * PF.g * Math.min(1, open / PF.v) : 0;
     const pulling = grabbing && (stretch > P.on || floor > 0.005);
-    const target = pulling ? Math.max(stretch > P.on ? S.pullMax * clamp(P.gain(stretch, S.v), 0, 1) : 0, floor) : 0;
+    const target = (pulling ? Math.max(stretch > P.on ? S.pullMax * clamp(P.gain(stretch, S.v), 0, 1) : 0, floor) : 0) * S.gr;   // v2.63 B9：顆粒開著時一半
     S.pullT = target;   // v2.63：這一格拉絲 loop 要多大（selftest 讀；音效沒載到也有）
     if (target > 0.005 && !S.pullV) S.pullV = loopVoice('pull.loop');
     if (S.pullV) {
@@ -292,7 +295,7 @@
     }
     if (pulling && stretch > P.on) { const lam = P.strandRate(stretch, S.v); if (Math.random() < lam * dt) one('pull.strand', P.strand(stretch)); }
     // 揉 loop
-    const R = MAP.rub, L = clamp(st.rub || 0, 0, 1) * R.duck(stretch), n = S.rubMax > 0 ? clamp(L / S.rubMax, 0, 1) : 0;
+    const R = MAP.rub, L = clamp(st.rub || 0, 0, 1) * R.duck(stretch) * S.gr, n = S.rubMax > 0 ? clamp(L / S.rubMax / S.gr, 0, 1) : 0;   // v2.63 B9：音量一半，音高、亮度照原本
     if (L > 0.005 && !S.rubV) S.rubV = loopVoice(S.snd61 && S.buf['rub.loop61'] && S.buf['rub.loop61'].length ? 'rub.loop61' : 'rub.loop');
     if (S.rubV) {
       const V = S.rubV;

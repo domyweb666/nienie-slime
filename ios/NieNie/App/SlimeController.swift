@@ -191,6 +191,7 @@ final class SlimeController: ObservableObject {
                         sharpness: p.popSharp, minIntensity: p.popMin, maxIntensity: p.popMax, audioVolume: viaHaptics ? g : nil)
         case .tick(let gain):
             haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp + p.hapSharpStretch * rig.stretchLevel)
+            if p.sndGrain >= 0.5 { sound.grain(gain: gain) }   // v2.63 B9 (web grainStep, the same spacing): one grain of sound with each tick
         case .grain(let gain):
             haptics.tick(intensity: p.grainMin + (p.grainMax - p.grainMin) * gain, sharpness: p.grainSharp)   // v2.25 F5
         case .tap:
@@ -230,6 +231,7 @@ final class SlimeController: ObservableObject {
         let p = current
         // v2 layered sound: the strand loop, strands, rub loop and the after-release tail all follow the physics here
         sound.pullOpen = p.pullFx >= 0.5 ? rig.pullOpen : 0   // v2.63 B1 pull (web SFX.frame st.open)
+        sound.grainLoop = p.sndGrain >= 0.5 ? 0.5 : 1   // v2.63 B9 (web SFX.gr = GRK.loop)
         sound.frame(dt: dt, rub: rig.rubLevel() * p.rubMax, stretch: rig.pullStretch, grabbing: rig.isGrabbing)
         // continuous haptic from the deformation and/or its rate of change (提案第 12 條); with the default
         // weights (static 1, rate 0) this is the old intensity = deformation^1.5 × hapMax
