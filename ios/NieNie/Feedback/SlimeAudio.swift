@@ -47,11 +47,16 @@ protocol SlimeSoundSource: AnyObject {
     /// v2.31 搖晃沉澱: the ding when it has settled clear (three sines, baked to a file)
     func ding(gain: Double)
     /// v2.50 場景聲 (`fx.<kind>` in the manifest, AI samples): crawl, climb, land, swimin, cling, unstick, drip, snore, sigh. Silent without the files.
-    func fx(_ kind: String, gain: Double, delay: Double)
+    /// v2.64 B9：`rate` 是音高（撞側牆越大力越低，網頁 S.fx 的 r）；其他場景聲走下面 extension 那個，rate 1
+    func fx(_ kind: String, gain: Double, delay: Double, rate: Double)
     /// v2.64 擺飾變真 (`prop.<kind>` in the manifest: glass, candle, book, bell; web S.knock): a thing knocked; far = fallen out of sight (quieter, duller). Silent without the files.
     func knock(_ kind: String, gain: Double, far: Bool)
     /// 候選 17: one release "pop" file, for Core Haptics to register (nil until there is one).
     var releaseSampleURL: URL? { get }
+}
+extension SlimeSoundSource {
+    /// v2.50 場景聲，音高照舊（rate 1），跟 v2.64 之前一樣
+    func fx(_ kind: String, gain: Double, delay: Double) { fx(kind, gain: gain, delay: delay, rate: 1) }
 }
 
 /// Sample bank + layered playback. Reads `manifest.json` from the bundle:
@@ -396,11 +401,12 @@ final class SlimeAudio: SlimeSoundSource {
         return k
     }
 
-    func fx(_ kind: String, gain: Double, delay: Double) {
+    /// `rate`（v2.64 B9 撞側牆，網頁 S.fx 的 r）：音高再乘上這個，其他呼叫照舊是 1
+    func fx(_ kind: String, gain: Double, delay: Double, rate: Double) {
         let key = "fx.\(kind)", t = now
         if t - (lastKind[key] ?? -9) < 0.25 { return }   // the same kind at most every 0.25 s (web S.fx)
         lastKind[key] = t
-        one(key, Play(gain: Self.clamp(gain, 0, 1), rate: Self.rnd(0.96, 1.04), lowpass: 9000, delay: delay))
+        one(key, Play(gain: Self.clamp(gain, 0, 1), rate: (rate > 0 && rate.isFinite ? rate : 1) * Self.rnd(0.96, 1.04), lowpass: 9000, delay: delay))
     }
 
     /// v2.64 (web S.knock, the same numbers): near 0.9 × gain, pitch ±6 %, low-pass 5 kHz; far half as loud, 0.9 × the pitch, 1.2 kHz

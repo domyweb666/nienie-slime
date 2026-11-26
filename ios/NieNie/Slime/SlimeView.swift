@@ -107,6 +107,9 @@ final class SlimeView: UIView {
     private let dentLitLayer = CAShapeLayer()    // ...covered by the base colour shifted down-right, leaving a crescent upper-left
     private var dentLayers: [CALayer] = []       // v2.16 dents: a soft pit image each, stretched with the skin
     private var trailLayers: [CAShapeLayer] = []  // v2.26 F7 the trail: five ages, each a wide faint and a narrow darker band, in the shade colour up-left and the light colour down-right
+    // v2.64 B9 果凍皮上的揉的痕跡（rubTrail；網頁 drawRubTrail）：每幀把痕跡那一塊畫成一張圖，放在 litGroup 裡（跟招牌、腮紅、眼睛同一組，用皮的遮罩剪）
+    private let rubTrailLayer = CALayer()
+    private var rubTrailShown = false
     private var dentImage: CGImage?
     private let dentUnit: CGFloat = 40           // the pit image is drawn for this radius (points)
     private let highlightLayer = CAShapeLayer()
@@ -179,6 +182,7 @@ final class SlimeView: UIView {
         bubbleDot.fillColor = UIColor(white: 1, alpha: 0.9).cgColor; bubbleDot.strokeColor = nil
         for l in [bubbleRing, bubbleDot] { l.zPosition = -0.4; l.isHidden = true; layer.addSublayer(l) }
         litGroup.addSublayer(fxGroup); fxGroup.isHidden = true   // v2.57, under the blush
+        rubTrailLayer.isHidden = true; rubTrailLayer.contentsGravity = .resize; litGroup.addSublayer(rubTrailLayer)   // v2.64 B9：在招牌上面、腮紅和眼睛下面（網頁 inBody：drawFx 之後、drawBlush 之前）
         for l in fxStainLayers + fxCoreLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; fxGroup.addSublayer(l) }
         fxCoreSoftGroup.opacity = 0.3; fxCoreSoftGroup.allowsGroupOpacity = true; fxCoreSoftGroup.isHidden = true; fxGroup.addSublayer(fxCoreSoftGroup)
         for l in fxCoreSoftLayers { l.type = .radial; l.startPoint = CGPoint(x: 0.5, y: 0.5); l.endPoint = CGPoint(x: 1, y: 1); l.isHidden = true; fxCoreSoftGroup.addSublayer(l) }
@@ -831,6 +835,7 @@ final class SlimeView: UIView {
         guard on, let j = jelly else {
             jelly?.layer.isHidden = true
             fxGroup.isHidden = true
+            hideRubTrail()   // v2.64 B9：平塗皮照舊畫自己那條一暗一亮的溝（trailLayers）
             for l in blushLayers { l.isHidden = true }
             for l in [bubbleRing, bubbleDot, causticShade, causticLight] as [CALayer] { l.isHidden = true }
             return
@@ -895,6 +900,7 @@ final class SlimeView: UIView {
         }
         drawWater(body: body, z: z)
         drawFx(body: body, z: z)
+        if p.rubTrail >= 0.5 { drawRubTrail(z: z) } else { hideRubTrail() }   // v2.64 B9（網頁 inBody：if(mat.rubTrail>=.5)drawRubTrail）
         // the blush: two soft pink spots below and beside the eyes (web: drawBlush)
         if let e = rig.eyeView {
             let S = e.size * z, l = rig.toScreen(e.lx, e.ly), r = rig.toScreen(e.rx, e.ry), a = atan2(r.y - l.y, r.x - l.x)
@@ -1056,6 +1062,72 @@ final class SlimeView: UIView {
             p.addLine(to: CGPoint(x: s.x + ox, y: s.y + oy))
         }
         return p
+    }
+
+    /* v2.64 B9 揉的時候看得到手指走過的痕跡（rubTrail；未做 13，BATCH3 第 6 項、第 8 項之 6；網頁 RTK、drawRubTrail，6ef0791）。
+       痕跡 v2.26 就有在算（SlimeRig trail：揉、摸時手指每走 0.05R 記一點，dentTrail 秒後丟掉），也一直有畫，但只畫在平塗那條路（trailLayers）；
+       果凍皮那條路（drawJelly）一開頭就把 trailLayers 藏起來，所以算了沒畫，跟網頁同一個原因。這裡在果凍皮那條路補畫，照角色的畫風：
+       角色的陰影色一條實心的帶子，寬 w R、往左上偏 off R，不加亮邊、不加漸層。越舊越淡，分五段（同一段一條路徑，疊的地方不變深；
+       新的那段先挖掉底下舊的再畫，接頭和繞回來的地方不疊深，網頁 destination-out 那一步，這裡是 CGBlendMode.destinationOut）。
+       Core Animation 的圖層沒有「挖掉」，所以每幀把痕跡那一塊用 CGContext 畫成一張圖（只畫框住痕跡那一塊），放在 litGroup 裡，用皮的遮罩剪。
+       沒動 Metal 著色器。只畫、不碰物理和亂數；rubTrail 0 不畫，跟改之前一樣 */
+    private enum RTK { static let w = 0.13, a = 0.3, off = 0.05 }   // w 帶子寬（R）、a 最新那段的不透明度（乘段中間的新鮮度，最新那段 0.27）、off 往左上偏多少（R）
+    private func hideRubTrail() {
+        guard rubTrailShown else { return }
+        rubTrailLayer.isHidden = true; rubTrailLayer.contents = nil; rubTrailShown = false
+    }
+    private func drawRubTrail(z: Double) {
+        let tr = rig.trailView   // 網頁 if(!(mat.dentTrail>0)||TRAIL.length<2)return：trailView 在 dentTrail 0 或不到兩點時是空的
+        guard tr.count > 1, z > 0, z.isFinite else { hideRubTrail(); return }
+        let Rz: Double = rig.R * z, hw: Double = Rz * RTK.w, ox: Double = -0.64 * Rz * RTK.off, oy: Double = -0.77 * Rz * RTK.off
+        let pts: [CGPoint] = tr.map { q in
+            let s = rig.toScreen(q.x, q.y)
+            return CGPoint(x: Double(s.x) + ox, y: Double(s.y) + oy)
+        }
+        var x0 = Double.infinity, y0 = Double.infinity, x1 = -Double.infinity, y1 = -Double.infinity
+        for c in pts {
+            let x = Double(c.x), y = Double(c.y)
+            guard x.isFinite, y.isFinite else { continue }
+            x0 = min(x0, x); x1 = max(x1, x); y0 = min(y0, y); y1 = max(y1, y)
+        }
+        let pad: Double = hw + 4, bw = Double(bounds.width), bh = Double(bounds.height)
+        x0 = max(0, floor(x0 - pad)); y0 = max(0, floor(y0 - pad)); x1 = min(bw, ceil(x1 + pad)); y1 = min(bh, ceil(y1 + pad))
+        guard x0.isFinite, y0.isFinite, x1.isFinite, y1.isFinite, x1 > x0, y1 > y0 else { hideRubTrail(); return }
+        let box = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
+        let fmt = UIGraphicsImageRendererFormat()
+        fmt.scale = window?.screen.scale ?? UIScreen.main.scale
+        fmt.opaque = false
+        fmt.preferredRange = .standard
+        let shade = (labGrey ? Self.greyColors : colors).shade
+        var drew = false
+        let img = UIGraphicsImageRenderer(size: box.size, format: fmt).image { rc in
+            let c = rc.cgContext
+            c.translateBy(x: -box.minX, y: -box.minY)
+            c.setLineCap(.round); c.setLineJoin(.round); c.setLineWidth(CGFloat(hw))
+            for b in 0..<5 {
+                let k0: Double = Double(b) / 5, k1: Double = Double(b + 1) / 5, kk: Double = (Double(b) + 0.5) / 5
+                let path = CGMutablePath()
+                var open = false, any = false
+                for j in 1..<tr.count {
+                    let q = tr[j], p = tr[j - 1]
+                    let ok: Bool = pts[j].x.isFinite && pts[j].y.isFinite && pts[j - 1].x.isFinite && pts[j - 1].y.isFinite
+                    if !ok || q.n != p.n || q.k < k0 || (q.k >= k1 && b < 4) { open = false; continue }
+                    any = true
+                    if !open { path.move(to: pts[j - 1]); open = true }
+                    path.addLine(to: pts[j])
+                }
+                guard any else { continue }
+                c.setBlendMode(.destinationOut); c.setStrokeColor(UIColor.black.cgColor); c.addPath(path); c.strokePath()   // 新的那段先挖掉底下舊的
+                c.setBlendMode(.normal); c.setStrokeColor(shade.withAlphaComponent(CGFloat(RTK.a * kk)).cgColor); c.addPath(path); c.strokePath()
+                drew = true
+            }
+        }
+        guard drew, let cg = img.cgImage else { hideRubTrail(); return }
+        rubTrailLayer.frame = box
+        rubTrailLayer.contentsScale = fmt.scale
+        rubTrailLayer.contents = cg
+        rubTrailLayer.isHidden = false
+        rubTrailShown = true
     }
 
     private func redraw() {

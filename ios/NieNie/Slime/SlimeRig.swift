@@ -18,6 +18,7 @@ enum SlimeEvent {
     case ding(gain: Double)                  // v2.31 搖晃沉澱: the glitter has settled, it is clear again
     case flinch(gain: Double, hap: Double)   // v2.63 D4 (flinchFx): it flinched from your touch: a small sound (gain 0 = tap only) and a light tap
     case knock(kind: String, gain: Double)   // v2.64 擺飾變真: a thing knocked (manifest prop.<kind>: glass, candle, book, bell; the web's sfxPlay('knock.'+kind))
+    case wall(gain: Double, rate: Double)    // v2.64 B9 撞側牆出聲（sndWall）：落地那個音檔 fx.land，rate 是音高；網頁沒有震動，所以不走 .fx（.fx 的 land 會輕震）
 }
 
 /// v2.63 B1 pull, B3 (FeelParams.pullFx; web PFX, the same numbers, Agent's picks for 多米 to hear and feel): d0 the farthest the real finger got from where it
@@ -794,6 +795,73 @@ final class SlimeRig {
         let v = viewV, zm = camMin, ax = (W - 16) / 2 / zm, ay = (H - 210) / 2 / zm
         return (v.x - ax, v.x + ax, v.y - ay, v.y + ay)
     }
+
+    // MARK: v2.64 B9 撞側牆出一聲（sndWall；網頁 WALLK、WALL、wallSides、wallStep，6ef0791；BATCH3 第 6 項、第 8 項之 6）
+    // 原本身體撞到牆沒有聲音。側牆照現有的牆：窗台層是 worldWalls 的左右（窗台兩端，軟牆），在窗框上是左右窗框（sillHit 的 g.gx、g.jr），窗外沒有側牆；
+    // 沒有窗台時是 worldWalls 的左右（鏡頭最遠的邊，zoomMin 0 時沒有牆）。
+    // 每幀（物理小步跑完）看外框點：離某一面牆不到 near R 就算碰著，從沒碰著變碰著那一格出一聲；同一面要先離開超過 off R 才算下一次（貼著牆蠕動、呼吸不會一直響）。
+    // 撞多快看整團（整團那一群的中心 clusters[gi]，網頁 globalC）往那面牆的速度，這一格和上一格取大（碰到那一格已經被牆擋掉一部分），單位每秒幾個 R。
+    // v0 以下不響；v0 到 v1 之間音量 g0 到 g1、音高 r0 到 r1（越大力越低）。冷卻 cool 秒內不管哪面牆都不再響。
+    // 音檔用現有的落地聲 fx.land（四個版本輪流抽，SlimeAudio.fx 同一種 0.25 秒只響一次，跟落地共用）。網頁沒有震動，所以走自己的事件 .wall，不走 .fx（.fx 的 land 會輕震）。
+    // 冷卻用倒數，不存絕對時間；重建、補點、扯斷或合回、換層、重心一格跳超過 jump R、中間有幀沒跑（剛打開開關、時鐘倒回）都只重記，之後 settle 秒不響。
+    // 只讀位置、不改物理、不抽亂數；0 不呼叫，跟改之前一樣。網頁的計數（WALL.n、sup、edge、log，給 T90 用）沒搬
+    private enum WALLK { static let near = 0.05, off = 0.15, v0 = 2.0, v1 = 10.0, g0 = 0.15, g1 = 0.6, r0 = 1.04, r1 = 0.94, cool = 0.6, jump = 0.8, settle = 0.3 }
+    // wallCX 上一格重心 x；wallN0 上一格的點數；wallB2 上一格有沒有扯斷的第二團；wallQT 還有幾秒不響；wallTL 上一格的時間；wallPL 上一格在哪一層；wallIn 左右碰著沒；wallV 上一格往左、往右多快（R/秒）；wallCD 冷卻倒數
+    private var wallCX = 0.0, wallN0 = -1, wallB2 = false, wallQT = 0.0, wallTL = -9.0, wallPL = -2, wallIn = [true, true], wallV = [0.0, 0.0], wallCD = 0.0
+    /// 網頁 wallSides：左右兩面側牆的 x（世界座標），nil = 沒有側牆
+    private func wallSides() -> (l: Double, r: Double)? {
+        if sillOn, let g = sillG {
+            switch sillPlane {
+            case .frame: return (g.gx, g.jr)
+            case .out: return nil
+            case .room: break
+            }
+        }
+        let w = worldWalls
+        return w.l.isFinite && w.r.isFinite && w.l > -1e4 ? (w.l, w.r) : nil
+    }
+    /// 網頁 wallStep：一幀一次，在物理小步、擺飾、推東西之後
+    private func wallStep(_ dt: Double) {
+        guard dt > 0, R > 0, !clusters.isEmpty, gi < clusters.count else { return }
+        var pl = -1   // 網頁 SILL.on ? SILL.plane : '-'
+        if sillOn {
+            switch sillPlane {
+            case .room: pl = 0
+            case .frame: pl = 1
+            case .out: pl = 2
+            }
+        }
+        let sd = wallSides(), cx: Double = clusters[gi].xc, vc: Double = (cx - wallCX) / dt / R
+        wallCD = max(0, wallCD - dt); wallQT = max(0, wallQT - dt)
+        let fresh: Bool = wallN0 != N || abs(t - dt - wallTL) > 1e-6 || wallPL != pl || wallB2 != b2On || abs(cx - wallCX) > R * WALLK.jump
+        wallTL = t; wallPL = pl; wallN0 = N; wallB2 = b2On; wallCX = cx
+        if fresh { wallQT = WALLK.settle }
+        guard let s = sd else { wallIn = [true, true]; wallV = [0, 0]; return }
+        var dl = 1e9, dr = 1e9
+        for i in bnd where i >= 0 && i < X.count {
+            let x = X[i]
+            if x - s.l < dl { dl = x - s.l }
+            if s.r - x < dr { dr = s.r - x }
+        }
+        let quiet: Bool = wallQT > 0 || introOn || swimOn || clingOn
+        let d: [Double] = [dl, dr], v: [Double] = fresh ? [0, 0] : [max(0, -vc), max(0, vc)]
+        for k in 0..<2 {
+            if wallIn[k] {
+                if d[k] > R * WALLK.off { wallIn[k] = false }
+            } else if d[k] < R * WALLK.near {
+                wallIn[k] = true
+                let sp: Double = max(v[k], wallV[k])
+                if !quiet && wallCD <= 0 && sp >= WALLK.v0 {
+                    let q: Double = min(1, (sp - WALLK.v0) / (WALLK.v1 - WALLK.v0))
+                    let g: Double = WALLK.g0 + (WALLK.g1 - WALLK.g0) * q, r: Double = WALLK.r0 + (WALLK.r1 - WALLK.r0) * q
+                    onEvent?(.wall(gain: g, rate: r))
+                    wallCD = WALLK.cool
+                }
+            }
+        }
+        wallV = v
+    }
+
     private var camRSt = 0.0, camRUntil = -9.0   // v2.24 camGrip: how far this grab pulled; until when a release may move the shape back in
     private func updateCam(_ dt: Double) {
         if sillOn {   // v2.28 窗台: the room does not move; v2.30 outside the view zooms out to 0.8 about the ledge's height, so the floor stays put on screen
@@ -1235,7 +1303,7 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         slpWakeT = -9; voiceLast = -9; e4LastT = -99; impAskUntil = -9   // v2.61: the same clock; left in the old one the next slime kept its eyes wide, said nothing and did not come for as long as the last one had been out
         slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
-        sgAcc = 0; sgGap = -1; sgOn = nil; sgQ = []; sgEye = nil; sgS = brain.seed ^ 0x1b87_3593; sgWk = slpWakeT   // v2.64 C8（網頁 setup：Object.assign(SG,…)）：排好的招牌跟著重建清掉；間隔第一次用到時才抽（自己那串亂數，從大腦的種子接）；放在 slpWakeT 歸零後面
+        sgAcc = 0; sgGap = -1; sgOn = nil; sgQ = []; sgEye = nil; sgS = brain.seed ^ 0x1b87_3593; sgWk = slpWakeT; wallN0 = -1; wallCD = 0   // v2.64 B9（網頁 setup：WALL.n0=-1;WALL.cd=0）：重建後撞牆先重記、冷卻清掉。v2.64 C8（網頁 setup：Object.assign(SG,…)）：排好的招牌跟著重建清掉；間隔第一次用到時才抽（自己那串亂數，從大腦的種子接）；放在 slpWakeT 歸零後面
         napCum = 0; napOn = false; napN = 0   // v2.63 C9 (web setup, with SLP: Object.assign(NAP,{cum:0,on:false,n:0})): a slime switch, a rebuild, a rotation start this opening's count again
         greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
@@ -3325,6 +3393,7 @@ final class SlimeRig {
         for _ in 0..<n { substep(sdt, L, Lamp, tl) }
         if sillOn && sillG != nil && !props.isEmpty { decoBody(sdt * Double(n)) } else { dbOK = false }   // v2.64 擺飾變真 v2.45: once a frame (a walk's shift is added once a frame)
         drStep(sdt * Double(n))   // v2.64 擺飾變真 v2.46: 推東西
+        if mat.sndWall >= 0.5 { wallStep(dt) }   // v2.64 B9 撞側牆出聲（網頁同一個位置；sndWall 0 不呼叫）
         rateStep(dt)   // v2.54 快扯變硬
         capGrowStep(dt)   // v2.54 無限拉
         remeshCheck(dt)   // v2.54 補點

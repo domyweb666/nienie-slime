@@ -228,6 +228,9 @@ final class SlimeController: ObservableObject {
         case .knock(let kind, let gain):
             // v2.64 擺飾變真: a thing knocked (the web's SFX.knock; no haptic, as on the web)
             sound.knock(kind, gain: gain, far: false)
+        case .wall(let gain, let rate):
+            // v2.64 B9 撞側牆出聲（網頁 sfxPlay('fx.land', g, r)）：只有聲音，不震（網頁沒有震動；要不要輕震等多米說）
+            sound.fx("land", gain: gain, delay: 0, rate: rate)
         case .nudge:
             // v2.20 C1: it swam over and touched your resting finger: one soft, round tap (lighter than a press)
             sound.press(intensity: 0.2)

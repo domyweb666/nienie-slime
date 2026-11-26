@@ -372,6 +372,9 @@ struct FeelParams: Equatable, Codable {
     var slowBlink: Double = 1         // 呼嚕時慢眨眼：1 = 呼嚕累計 6 到 12 秒慢眨一次（∩ 換回半睜、慢慢閉上、停一下、慢慢睜開，再回 ∩，約 2.8 秒），只用既有的眼睛形狀；0 = 跟改之前一樣（呼嚕時一直 ∩，自己那串亂數不影響別的）
     // v2.64 C8 十隻招牌動作、喜歡的位置（網頁 signature；SG、SGDEF、sgFire、sgStep、sgFavX、sgHomeFav；三個材質同名同預設）。SlimeRig MARK v2.64 C8，哪一隻由 SlimeController 設 rig.sgId
     var signature: Double = 1         // 十隻招牌：1 = 醒著沒人碰時每隻隔自己的時間（20 到 60 秒）做一次自己的招牌動作，窗台上家放在牠天生喜歡的那格（你摸出來的喜歡、夜晚蠟燭照舊優先；離開那格超過 20 秒，想張望也先走回去）；0 = 跟改之前一樣（十隻只差幾個數字，家都在布墊，自己那串亂數不抽）
+    // v2.64 B9 撞側牆出聲、揉的痕跡（網頁 sndWall、rubTrail；WALL、WALLK、wallSides、wallStep、RTK、drawRubTrail；三個材質同名同預設）。SlimeRig MARK v2.64 B9，痕跡畫在 SlimeView drawRubTrail
+    var sndWall: Double = 1           // 撞側牆出聲：1 = 身體撞到側牆（窗台兩端、在窗框上時左右窗框、藍底時鏡頭最遠的左右邊）出一聲落地聲（fx.land），整團往牆每秒 2R 以下不響、2 到 10R 音量 0.15 到 0.6、越大力越低一點，0.6 秒內不連發；只有聲音不震；0 = 跟改之前一樣（不呼叫）
+    var rubTrail: Double = 1          // 揉的痕跡：1 = 果凍皮上也畫手指走過的痕跡（v2.26 就有在算，以前只畫在平塗皮）：角色陰影色一條實心帶子，越舊越淡，dentTrail 秒淡完；0 = 跟改之前一樣（果凍皮上不畫）
     // v2.63 C6 (web rubVary; rubHappy, the voice shuffle bag; the same key and default for all three materials). SlimeRig MARK v2.63 C6, SlimeAudio voiceBag
     var rubVary: Double = 1           // 揉完的反應輪流: 1 = done rubbing or stroking, the hop, melting 2 s more, leaning to your finger and a sigh take turns from a shuffled bag, the hop at most once in 40 s; each kind of its sounds plays all its files before a new shuffle; 0 = as before (tall, a wag, the hop and the happy sound every time; a random file each time)
     // v2.63 B6 (web sndB6; the pull step re-arms, the press keeps what is queued except the last release's tail; the same key and default for all three materials). SlimeRig MARK v2.63 B6, SlimeAudio sndB6
@@ -1012,6 +1015,9 @@ struct TuneField: Identifiable {
         TuneField(key: \.slowBlink, name: "呼嚕時慢眨眼 v2.64", hint: "1（D8）：呼嚕時累計 6 到 12 秒慢眨一次眼（像貓的慢眨）：∩ 換回半睜、看一下、慢慢閉上、閉著停一下、慢慢睜開，再回 ∩，約 2.8 秒。只用既有的眼睛形狀。0 回改之前（呼嚕時一直 ∩）", range: 0...1, step: 1, section: "這一批 v2.64"),
         // v2.64 C8（網頁 signature 的字，第三批第 5 項）
         TuneField(key: \.signature, name: "十隻招牌 v2.64", hint: "1（C8）：十隻各一個招牌動作、一個喜歡的位置（表在 .uiux/04-手感/十隻招牌-暫定.md，Agent 取的，等多米看）。醒著沒人碰、在休息的空檔，每隻隔自己的時間做一次自己的招牌（蜜蜜伸懶腰、薄荷衝過去又衝回來、芋圓偷看你一眼就躲、桃桃撒嬌扭兩下、仙草單邊撐著發呆、湯圓打瞌睡抖一下醒來、蝶豆兩條偽足像翅膀開合、汽水冒泡、布丁左右張望再抖一下、珍奶伸去拿罐子再嚼嚼），只用現成的動作；窗台上家放在牠喜歡的那格（你摸出來的喜歡、夜晚蠟燭照舊優先）。0 回改之前（十隻只差幾個數字，家都在布墊）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 B9（網頁 sndWall、rubTrail 的字，第三批第 6 項；「先離開」照網頁程式寫 0.15R，網頁面板字寫 0.1R）
+        TuneField(key: \.sndWall, name: "撞側牆出聲 v2.64", hint: "1（B9）：身體撞到側牆（窗台兩邊的牆、在窗框上時左右窗框、藍底時鏡頭最遠的左右邊）出一聲，用落地那個音檔（fx.land），撞得越快越大聲、低一點；每秒 2R 以下（慢慢靠過去、偽足碰到）不響，同一面牆要先離開 0.15R 才算下一次，0.6 秒內不連發。只有聲音，手機不震（網頁沒有震動）。0 回改之前（撞牆沒聲音）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.rubTrail, name: "揉的痕跡 v2.64", hint: "1（B9，未做 13）：揉、摸的時候看得到手指走過的痕跡：一條角色陰影色的實心帶子，越舊越淡，0.5 秒（「手指走過的痕跡（秒）」）淡完。痕跡原本就有在算，只是果凍皮那條路沒畫。0 回改之前（果凍皮上看不到；平塗皮照舊畫一暗一亮的溝）", range: 0...1, step: 1, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
