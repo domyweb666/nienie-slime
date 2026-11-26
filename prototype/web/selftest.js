@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.63（11-26）：加 T80（B6 拉回去再拉有絲聲、按下去只清上次放手的餘韻；sndB6 0 對照；音效接真的引擎；在 T79 後面、T74 前面跑）
    v2.63（11-26）：加 T79（C6 揉牠反應輪流、小跳 40 秒一次、叫聲洗牌袋；rubVary 0 對照；在 T78 後面、T74 前面跑）；舊項目一律 rubVary 0，T66、T67、T76 也釘 0（整份比對過，這幾項的數字會變；T65 也變，但它只跑這一項時兩版本來每次都不一樣，不是 rubVary 造成的，沒釘）
    v2.63（11-26）：加 T78（C5 張望不朝窗台下面；lookNoDown 0 對照；在 T77 後面、T74 前面跑）；T44、T45、T46、T48、T55、T74 釘 lookNoDown 0（整份比對過，這六項的數字會變）
    v2.63（11-26）：加 T77（D3 怕的不滑走、搔癢不掙脫、兩指照舊撕開；兩顆 0 對照；在 T76 後面、T74 前面跑）
@@ -2071,6 +2072,55 @@
       && (!r.bufN || (r.on.takes > 0 && r.on.takeRep === 0))
       && r.off.rubs >= 30 && r.off.topFrac >= .6 && r.off.happyV >= 20 && r.off.happyHop >= r.off.happyV * .9 &&r.off.takes === 0;
     res.T79_rubVary = r; res.PASS.rubVary = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T80 v2.63 B6 拉回去再拉要有絲聲、按下去不蓋掉別的聲音（sndB6；OVERNIGHT 第 10 項，手機照這條搬）。藍底、黏土真正的預設（PRE54），音效接真的引擎（引擎抽的亂數用真的，不動測試的種子）。
+  // a 同一抓：右邊緣往內 0.15R 抓、往右拉 2R（0.5 秒）、停、縮回 1R、停、再拉到 2R、停、放。每一段數細絲斷的聲音（sfxPlay pull）和音量，拉絲 loop（SFX.pullV.level）每段最大
+  // b 一指拉到 2R 一直小幅來回（loop 在響），另一指按身體：按下前 10 格平均、按下後 30 格最小；揉也一樣（一指在身體上畫圈、另一指按）
+  // c 引擎：排一顆放手的餘韻（tail）、一顆別的（像手機撕開的滴），按下去：開 tail 清掉、別的留著；關兩顆都清
+  // 擋：a 開：第二次往外拉有絲斷聲、音量都 > 0、loop 那段 > 0（音效有載到才量 loop）；關：第二次往外拉 0 根（改之前）
+  //     b 開：按下後拉絲、揉的 loop 最小值 > 0（音效有載到才量）；c 開 tail 0、別的 1，關 0、0
+  { const clock = saveClock(), r = {}, sp0 = sfxPlay, P80 = { ...PRE54.clay, emo: 0, life2: 0, intro: 0, introSwim: 0, brain: 0 };
+    let loaded = false;
+    try { if (SFX && SFX.manifest) { SFX.init(); for (let i = 0; i < 120 && !loaded; i++) { loaded = ['pull.loop', 'rub.loop61', 'rub.loop'].every(k => SFX.buf[k] && SFX.buf[k].length > 0); if (!loaded) await new Promise(q => setTimeout(q, 50)); } } } catch (_) {}
+    const eng = (k, g, rr, tk) => { log.push([k, +(+g).toFixed(3), +(+(rr || 1)).toFixed(3)]); if (!SFX || !SFX.ctx) return; const m = Math.random; Math.random = realRandom0; try { origPlay(k, g, rr, tk); } finally { Math.random = m; } };
+    const sc = (x, y) => { const v = viewV(); return [(x - CAM.x) * CAM.z + v.x, (y - CAM.y) * CAM.z + v.y]; };
+    const fresh = (over, sd) => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); Math.random = seeded(sd); mat = { ...P80, ...over }; setup(); t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.on = false; WANDER.moving = false; WANDER.next = 99; voice.last = -9; steps(60); if (SFX) SFX.pending = []; };
+    const lv = () => [SFX && SFX.pullV ? SFX.pullV.level : 0, SFX && SFX.rubV ? SFX.rubV.level : 0];
+    const edgeR = () => { let b = -1; for (const i of bnd) if (b < 0 || X[i] > X[b]) b = i; return sc(X[b] - R * .15, Y[b]); };
+    const repull = over => { fresh(over, 80); const [sx, sy] = edgeR(), u = R * CAM.z, ph = []; let x = sx, li = log.length;
+      ev('pointerdown', 1, sx, sy);
+      const seg = (name, to, n) => { const o = { name, pulls: 0, g: [], loop: 0, stMax: 0, stMin: 9 }, x0 = x;
+        for (let k = 1; k <= n; k++) { if (to != null) { x = x0 + (to - x0) * k / n; ev('pointermove', 1, x, sy); } steps(1);
+          for (; li < log.length; li++) if (log[li][0] === 'pull') { o.pulls++; o.g.push(log[li][1]); }
+          const f = fingers.get(1); if (f) { o.stMax = Math.max(o.stMax, +(f.stretch || 0).toFixed(2)); o.stMin = Math.min(o.stMin, +(f.stretch || 0).toFixed(2)); }
+          o.loop = Math.max(o.loop, +lv()[0].toFixed(3)); }
+        ph.push(o); };
+      seg('out1', sx + 2 * u, 30); seg('hold1', null, 20); seg('back', sx + u, 30); seg('hold2', null, 20); seg('out2', sx + 2 * u, 30); seg('hold3', null, 20);
+      ev('pointerup', 1, x, sy); steps(30); return ph; };
+    // b：按下前 10 格、按下後 30 格
+    const pressOver = (over, kind) => { fresh(over, 81); const u = R * CAM.z, o = { kind }; let x, y, k = 0;
+      const move = () => { k++; if (kind === 'pull') { ev('pointermove', 1, x + Math.sin(k / 60 * 2 * Math.PI * 2) * .15 * u, y); } else { const a = k / 60 * 2 * Math.PI / 1.2; ev('pointermove', 1, x + Math.sin(a) * .3 * u, y + (1 - Math.cos(a)) * .3 * u); } steps(1); };
+      if (kind === 'pull') { [x, y] = edgeR(); ev('pointerdown', 1, x, y); const x0 = x; for (let i = 1; i <= 30; i++) { ev('pointermove', 1, x0 + 2 * u * i / 30, y); steps(1); } x = x0 + 2 * u; }
+      else { [x, y] = sc(globalC.xc, globalC.yc - R * .15); ev('pointerdown', 1, x, y); }
+      for (let i = 0; i < 30; i++) move();
+      const before = []; for (let i = 0; i < 10; i++) { move(); before.push(lv()[kind === 'pull' ? 0 : 1]); }
+      const [px, py] = sc(globalC.xc - R * .35, globalC.yc + R * .2); ev('pointerdown', 2, px, py); o.press2 = fingers.get(2) ? fingers.get(2).mode : 'none';
+      const after = []; for (let i = 0; i < 30; i++) { move(); after.push(lv()[kind === 'pull' ? 0 : 1]); }
+      ev('pointerup', 2, px, py); ev('pointerup', 1, x, y); steps(30);
+      o.before = +(before.reduce((a, b) => a + b, 0) / before.length).toFixed(3); o.afterMin = +Math.min(...after).toFixed(3); o.afterMean = +(after.reduce((a, b) => a + b, 0) / after.length).toFixed(3);
+      return o; };
+    const queue = b6 => { if (!SFX || !SFX.ctx) return null; SFX.pending = [{ at: 1e9, key: 'settle.bubble', p: { g: .1 }, tail: true }, { at: 1e9, key: 'fx.drip', p: { g: .1 } }]; const b0 = SFX.b6; SFX.b6 = b6; eng('press', .5); SFX.b6 = b0;
+      const o = { tail: SFX.pending.filter(e => e.tail).length, other: SFX.pending.filter(e => !e.tail).length }; SFX.pending = []; return o; };
+    try { sfxPlay = eng; r.loaded = loaded;
+      r.on = repull({}); r.off = repull({ sndB6: 0 });
+      r.bPull = pressOver({}, 'pull'); r.bRub = pressOver({}, 'rub'); r.bPullOff = pressOver({ sndB6: 0 }, 'pull'); r.bRubOff = pressOver({ sndB6: 0 }, 'rub');
+      r.qOn = queue(1); r.qOff = queue(0); r.err = ''; } catch (e) { r.err = String(e) + ' ' + (e.stack || '').split('\n')[1]; }
+    sfxPlay = sp0; for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); if (SFX) SFX.pending = [];
+    log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
+    const seg = (a, n) => a ? a.find(o => o.name === n) : null, o2 = seg(r.on, 'out2'), f2 = seg(r.off, 'out2');
+    r.ok = !r.err && !!o2 && o2.pulls >= 1 && o2.g.every(g => g > 0) && (!r.loaded || o2.loop > 0) && seg(r.on, 'out1').pulls >= 1 && !!f2 && f2.pulls === 0
+      && (!r.loaded || (r.bPull.afterMin > 0 && r.bRub.afterMin > 0))
+      && (!r.qOn || (r.qOn.tail === 0 && r.qOn.other === 1 && r.qOff.tail === 0 && r.qOff.other === 0));
+    res.T80_sndB6 = r; res.PASS.sndB6 = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0

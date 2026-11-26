@@ -14,6 +14,8 @@ protocol SlimeSoundSource: AnyObject {
     var snd61: Bool { get set }
     /// v2.63 C6 (FeelParams.rubVary): each kind of voice plays all its files, shuffled, before a new shuffle (a new round never starts with the last one). false = a random file each time
     var voiceBag: Bool { get set }
+    /// v2.63 B6 (FeelParams.sndB6): a press clears only the last release's tail (the settle bubbles), not the drip after a tear or other delayed sounds. false = a press clears everything queued
+    var sndB6: Bool { get set }
     /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
     var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
@@ -52,6 +54,7 @@ final class SlimeAudio: SlimeSoundSource {
     var rubMax = 0.7
     var snd61 = true   // v2.61 B1
     var voiceBag = true   // v2.63 C6
+    var sndB6 = true   // v2.63 B6
     var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
@@ -136,7 +139,7 @@ final class SlimeAudio: SlimeSoundSource {
     private let rubVoice = Voice()
 
     private var lastKind: [String: Double] = [:]
-    private var pending: [(at: Double, key: String, play: Play)] = []
+    private var pending: [(at: Double, key: String, play: Play, tail: Bool)] = []   // tail: a release's settle bubble (v2.63 B6: the only thing a press clears)
     private var st = 0.0, stV = 0.0
     private var wasGrabbing = false
     private var lastStretch = 0.0, heldFor = 0.0
@@ -280,7 +283,7 @@ final class SlimeAudio: SlimeSoundSource {
         if p.delay > 0 {
             var q = p
             q.delay = 0
-            pending.append((at: now + p.delay, key: key, play: q))
+            pending.append((at: now + p.delay, key: key, play: q, tail: false))
             return
         }
         let t = now
@@ -319,7 +322,7 @@ final class SlimeAudio: SlimeSoundSource {
     }
 
     func press(intensity: Double) {
-        pending.removeAll()   // touching again cuts the last release's tail
+        if sndB6 { pending.removeAll { $0.tail } } else { pending.removeAll() }   // touching again cuts the last release's tail (v2.63 B6: only that; before, the drip after a tear went too)
         layered("press", Self.clamp(intensity, 0, 1), pressLayers)
     }
 
@@ -369,7 +372,7 @@ final class SlimeAudio: SlimeSoundSource {
             // pulled: 1–3 small bubbles between 0.12 and 0.7 s later
             for _ in 0..<Int((1 + 2 * s).rounded()) where Double.random(in: 0..<1) < 0.7 {
                 let p = Play(gain: (Self.rnd(0.12, 0.22) + 0.15 * s) * settleAmt, rate: Self.rnd(0.85, 1.35), lowpass: 6000, deco: true)
-                pending.append((at: now + Self.rnd(0.12, 0.7), key: "settle.bubble", play: p))
+                pending.append((at: now + Self.rnd(0.12, 0.7), key: "settle.bubble", play: p, tail: true))
             }
         } else if heldFor >= 0.5 && Double.random(in: 0..<1) < 0.6 {
             // pressed a while without pulling: air refilling, a very small hiss

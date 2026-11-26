@@ -2776,6 +2776,7 @@ final class SlimeRig {
                     onEvent?(.pull(gain: min(1, 0.4 + st / 2), rate: 1 - 0.08 * min(1, st / 1.5)))
                 }
                 f.step = max(f.step, step)
+                if mat.sndB6 >= 0.5 { while f.step > 0 && st * 2.5 < Double(f.step) - 1.5 { f.step -= 1 } }   // v2.63 B6 (web: the same line): pulled back 1.5 steps, one step down, so pulling out again snaps again
                 // press (接觸點先凹): the grabbed patch spreads away from the finger. The first frame jumps to
                 // `pressFirst` of the target (the first frame must move), the rest follows with `pressRise`;
                 // holding still (slower than one radius per second) sinks it deeper over `pressHoldTime`.

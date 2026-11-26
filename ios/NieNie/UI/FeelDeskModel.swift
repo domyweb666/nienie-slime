@@ -111,6 +111,7 @@ struct FeelBatch: Equatable {
         Key(id: "holdTickle", key: \FeelParams.holdTickle),   // v2.63 D3, the same (build 158 broke free of a tickle)
         Key(id: "lookNoDown", key: \FeelParams.lookNoDown),   // v2.63 C5, the same (build 158 sniffed down into the sill)
         Key(id: "rubVary", key: \FeelParams.rubVary),   // v2.63 C6, the same (build 158 hopped every time, a random sound file each time)
+        Key(id: "sndB6", key: \FeelParams.sndB6),   // v2.63 B6, the same (build 158 snapped no strand on a second pull, and a press cleared every queued sound)
     ]
     static let pull: [String] = ["pullHold", "pullWhole", "pullSoft"]
     static func pullName(_ id: String) -> String {
@@ -148,6 +149,7 @@ struct FeelBatch: Equatable {
         Item(id: "holdTickle", name: "搔癢不掙脫"),
         Item(id: "lookNoDown", name: "張望不朝窗台下面"),
         Item(id: "rubVary", name: "揉完的反應輪流、小跳 40 秒一次"),
+        Item(id: "sndB6", name: "拉回去再拉有絲聲、按不蓋掉別的聲音"),
     ]
     enum Tier: String, CaseIterable, Identifiable {
         case b158, fix, pull

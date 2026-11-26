@@ -58,6 +58,7 @@
     // 底是兩分鐘無縫循環，事件照 amb.json 的頻率隨機冒出來（大小、左右、音高每次不同），聽不出循環。lofi 照舊
     // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
     snd61: 1,   // v2.61 B1：揉的新循環（rub.loop61）和抓著時雨降到 0.3；0 回 rub.loop、0.6
+    b6: 1,      // v2.63 B6（sndB6）：按下去只清上次放手的餘韻（排程裡 tail 的那幾顆），別的照放；0 回改之前（按下去整排清掉）
     amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
   };
   // 一首可以無縫循環的 lofi（prototype/sfx-design/design_lofi.py，40 小節、76 BPM）。自己一條 gain 直接接輸出，不經過音效的 master；
@@ -196,7 +197,7 @@
     }
   }
 
-  S.press = function (i) { S.pending = []; layered('press', clamp(i, 0, 1)); };
+  S.press = function (i) { S.pending = S.b6 ? S.pending.filter(e => !e.tail) : []; layered('press', clamp(i, 0, 1)); };   // 再按就切掉上次放手的尾巴
 
   S.release = function (gain) {
     const s = clamp((gain - 0.35) / 0.65, 0, 1);
@@ -205,7 +206,7 @@
     if (amt <= 0) return;
     if (S.lastStretch >= 0.4) {
       for (let k = 0; k < T.bubbles(s); k++) if (Math.random() < T.bubbleProb) {
-        const p = T.bubble(s); p.g *= amt; S.pending.push({ at: now + rnd(T.from, T.to), key: 'settle.bubble', p });
+        const p = T.bubble(s); p.g *= amt; S.pending.push({ at: now + rnd(T.from, T.to), key: 'settle.bubble', p, tail: true });
       }
     } else if (S.heldFor >= T.hissHold && Math.random() < T.hissProb) {
       const p = T.hiss(s); p.g *= amt; one('settle.hiss', p);

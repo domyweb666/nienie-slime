@@ -357,6 +357,8 @@ struct FeelParams: Equatable, Codable {
     var lookNoDown: Double = 1        // 張望不朝下: 1 = on the sill a sniff no longer points down into the ledge (the lower half is mirrored over the horizon, so only up and the sides; no extra draws from the rng); floating it is left alone; 0 = as before (0 to 360 degrees, about four in ten down)
     // v2.63 C6 (web rubVary; rubHappy, the voice shuffle bag; the same key and default for all three materials). SlimeRig MARK v2.63 C6, SlimeAudio voiceBag
     var rubVary: Double = 1           // 揉完的反應輪流: 1 = done rubbing or stroking, the hop, melting 2 s more, leaning to your finger and a sigh take turns from a shuffled bag, the hop at most once in 40 s; each kind of its sounds plays all its files before a new shuffle; 0 = as before (tall, a wag, the hop and the happy sound every time; a random file each time)
+    // v2.63 B6 (web sndB6; the pull step re-arms, the press keeps what is queued except the last release's tail; the same key and default for all three materials). SlimeRig MARK v2.63 B6, SlimeAudio sndB6
+    var sndB6: Double = 1             // 拉回去再拉有絲聲、按不蓋掉別的聲音: 1 = pulled back 1.5 steps (a step is 0.4R) the strand step comes down one, so pulling out again snaps strands again; a press clears only the last release's tail (the settle bubbles), not the drip after a tear, a delayed hiss or the press's own air; 0 = as before (only a pull longer than any before in this grab snaps; a press clears everything queued)
     var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
     var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
@@ -948,6 +950,8 @@ struct TuneField: Identifiable {
         // v2.63 C5 (the web's words for lookNoDown)
         TuneField(key: \.lookNoDown, name: "張望不朝下 v2.63", hint: "1（C5）：坐在窗台上時，張望伸偽足探的方向不再朝下（朝下那條會被窗台板擋住，什麼都看不到）；朝下的那一半照水平線鏡射到上面，所以只探上面和左右。懸空時不管。0 回改之前（0 到 360 度亂抽，約四成朝下）", range: 0...1, step: 1, section: "這一批 v2.63"),
         // v2.63 C6 (the web's words for rubVary)
+        // v2.63 B6 (the web's words for sndB6)
+        TuneField(key: \.sndB6, name: "拉回去再拉有絲聲 v2.63", hint: "1（B6）：同一抓拉長、縮回去、再拉，每次往外拉都有細絲一根根斷的聲音（縮回 1.5 格就退一格，一格 0.4R）；按下去只清掉上次放手的餘韻（冒小泡），不清別的聲音。0 回改之前（同一抓只有拉得比之前都長才有絲斷聲；按下去清掉所有排著的聲音）", range: 0...1, step: 1, section: "這一批 v2.63"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }

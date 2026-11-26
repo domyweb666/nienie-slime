@@ -331,6 +331,7 @@ final class SlimeController: ObservableObject {
         sound.rubMax = current.rubMax
         sound.snd61 = current.snd61 >= 0.5   // v2.61 B1
         sound.voiceBag = current.rubVary >= 0.5   // v2.63 C6
+        sound.sndB6 = current.sndB6 >= 0.5   // v2.63 B6
         sound.settleAmt = current.sndSettle
         sound.music = soundMode == 0 && !labGrey ? current.volMusic : 0
     }
