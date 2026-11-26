@@ -1,3 +1,29 @@
+# Handoff: 熬夜分支做完第二批（v2.63，分支 `overnight-20261126-1110`，2026-11-26，先看這段）
+
+> 工作樹 `E:/捏捏史萊姆/nienie-slime/.claude/worktrees/overnight-20261126`。起點是 `split-merge-v1`（v2.62）合進 `feel-3x-panel-v1`（v2.61b，build 164）。**已推到 GitHub（只跑編譯），沒發 TestFlight，沒合回 `feel-3x-panel-v1`。** 細節、每項 commit、Agent 取的數字全在根目錄 `OVERNIGHT.md`。
+
+## ✅ 完成（21 項）
+- 第二批最前面：手機打開先看你（C4）、手機大腦兩片（需求和自己醒、心情）、揉夠了在手邊睡著（C9，網頁＋手機）。
+- 第二批中段：D3 不從手裡溜走、C5 張望不朝下、C6 揉的反應輪流、B6、B2、B5、D4、B1 拉、B3。
+- 第二批後半：D6 交情、B9 顆粒聲（預設關）。
+- 雜項：關掉的感測不再讀、換材質不彈、隱私清單檔、步數權限文字、ElevenLabs／Higgsfield 條款查證、參數表、未做清單、規劃第二批狀態。
+- 網頁自測 T75 到 T86 新增 12 項。最終 `5034a11` 整份 3 次都 86／86。Swift 每批 CI 編過（8 次）。
+
+## 🚧 沒做（第二批剩下的）
+- A3 到 A5 等多米真機捏；D5、D7 排在 A3 到 A5 定案後；B8 盲比；推倒、甩倒東西的聲音上限。
+- 手機大腦的記地方（`BMEM`）、擺飾反應：第三批。
+
+## ❓ 等多米決定
+- 合不合回 `feel-3x-panel-v1`、要不要發 TestFlight。
+- ElevenLabs 11-21 生成那天是不是付費方案（截圖存證）；GitHub Pages 上公開的原始音檔要不要拿掉。
+- `OVERNIGHT.md`「待確認」裡每項取的數字、搖晃關著時風鈴不晃、步數權限兩句選哪句。
+
+## 📌 已查清
+- 隱私清單檔有沒有被打包進 app，CI 紀錄看不到，下一版 TestFlight 時在 App Store Connect 確認。
+- selftest 的 T65、T42 毫秒、T66、T67、T81 本來每次跑都不一樣，不要拿單次差異當結論。
+
+---
+
 # Handoff: 扯斷成兩隻、碰到合回（v2.62，分支 `split-merge-v1`，2026-11-26，先看這段）
 
 > 工作樹 `E:/捏捏史萊姆/_wt-分裂`，從 `feel-3x-panel-v1` 的 `33e3b3f` 開。**沒推、沒發 TestFlight。** 預覽伺服器 launch 名 `split-web`（8797，網址 `http://127.0.0.1:8797/index.html`）。
