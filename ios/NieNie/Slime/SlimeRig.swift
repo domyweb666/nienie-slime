@@ -392,6 +392,9 @@ final class SlimeRig {
     // then, done, held on), since tapT0; tapN = light touches this nap; roll = the turn over (since when, which side, how far it has moved for it)
     private var slpOpenT = -99.0, slpSlow = false, slpTapN = 0, slpTapT0 = -9.0, slpTapDone = false, slpRollT = -9.0, slpRollD = 1.0, slpRollO = 0.0
     private var slpTapX = 0.0, slpTapY = 0.0, slpTapOut = false   // where it met the body, and whether it came in from outside
+    // v2.63 C9 (nap; web NAP): cum = seconds purred this opening; on = waiting to fall asleep; x, y = where it was last touched (world; nothing reads it but a readout);
+    // n = naps at your hand this opening. The web's armN is the selftest's count only, not here
+    private var napCum = 0.0, napOn = false, napX = 0.0, napY = 0.0, napN = 0
     private var slpTap: Finger?
     // C6 echo: st 0 idle, 1 listening, 2 answering; beats = offsets from t0; prev = the rhythm it answered last (you repeating it = happy)
     private var echoTaps: [Double] = [], echoSt = 0, echoX = 0.0, echoY = 0.0, echoBeats: [Double] = [], echoI = 0, echoT0 = 0.0
@@ -1086,6 +1089,7 @@ final class SlimeRig {
         eyeSetup(); slpOn = false; slpK = 0; slpLastAny = -99; slpAskAt = -9; slpNearT = 0; flBoost = 1   // v2.23 (setup restarts the clock)
         slpWakeT = -9; voiceLast = -9; e4LastT = -99; impAskUntil = -9   // v2.61: the same clock; left in the old one the next slime kept its eyes wide, said nothing and did not come for as long as the last one had been out
         slpOpenT = t; slpSlow = false; slpTap = nil; slpTapN = 0; slpTapT0 = -9; slpTapDone = false; slpRollT = -9; slpRollD = 1; slpRollO = 0   // v2.61 C1 (the clock restarts here, so openT does too: 40 s from now)
+        napCum = 0; napOn = false; napN = 0   // v2.63 C9 (web setup, with SLP: Object.assign(NAP,{cum:0,on:false,n:0})): a slime switch, a rebuild, a rotation start this opening's count again
         greetWait = false; greetAt = -9; greetT0 = -9; greetUntil = -9   // v2.63 C4: the same clock (the web's setup keeps its clock, so it needs none of this); startIntro arms it again
         echoSt = 0; echoTaps = []; echoJoyUntil = -9; echoPrevT = -99; echoBeatT = -9; swimOn = false
         brain.reset(t, ev: brainEv())   // v2.63 大腦 (web setup: brainReset()); startIntro draws the opening's needs (brainJit). After echoJoyUntil: the clock restarts here, an old one would hide the next 回你的節奏 from the mood
@@ -3005,7 +3009,7 @@ final class SlimeRig {
         moodColorStep(dt)
         impStep(dt)   // v2.20
         e1Step(); e2Step(dt)   // v2.22
-        sleepStep(dt); echoStep(dt)   // v2.23 B2, C6
+        sleepStep(dt); napStep(dt); echoStep(dt)   // v2.23 B2, C6; v2.63 C9 nap at your hand (web: the same place)
         greetStep()   // v2.63 C4 (web: right after sleepStep, echoStep)
         if brOn {   // v2.63 大腦 (web: if(SILL.on)sillStepPre(); brainStep(dt,engaged); before lifeStep). sillStepPre again before the substeps, as before: it only reads the fingers
             if sillOn { sillStepPre() }
@@ -5186,7 +5190,7 @@ final class SlimeRig {
             if d > R * 1.6 { gaitTo(askX - dx / d * R * 1.1, askY - dy / d * R * 1.1, dash: false) }
             else { lifeSt = .look; lifeLooks = 0; lifeNoGo = true; lastDir = ang; lifeUntil = t + 2.8 }
         }
-        if !lured && !e4 {
+        if !lured && !e4 && !napOn {   // v2.63 C9: the few seconds it waits to fall asleep at your hand, it does not change what it is doing (no walking, not back to the mat); nap 0: napOn is always false
             if lifeSt == .rest && t >= lifeUntil {
                 if brOn { brainRest(canGo) }   // v2.63 大腦
                 else if restOn && (Double.random(in: 0..<1, using: &rng) < 0.85 || !canGo) { lifeSt = .look; lifeLooks = Double.random(in: 0..<1, using: &rng) < 0.45 + 0.35 * exLevel() ? 2 : 1; lifeNoGo = false; lifeUntil = t }
@@ -6669,6 +6673,37 @@ final class SlimeRig {
             else if t >= slpSnoreAt { slpSnoreAt = t + 4 + Double.random(in: 0..<3, using: &rng); onEvent?(.fx(kind: "snore", gain: 0.5, delay: 0)) }
         } else { slpSnoreAt = 0 }
         if slpAskAt > 0 && t >= slpAskAt { slpAskAt = -9; voiceLast = -9; voice("ask", 0.6); eyeUser = t + 1.2 }
+    }
+    // MARK: v2.63 C9 (nap; .uiux/04-手感/極致優化規劃-暫定.md C9, .vibe/C9-移植說明.md; web NAP, NAPK, napReady, napStep, line by line)
+    /// Purred (purr > 0.3, the line the memory and the mood use) napPurr s in all this opening (setup clears it: a slime switch, a rebuild, a rotation), then no finger
+    /// for napWait s (from lastTouch): it falls asleep where it is. Not back to the mat, not the brain's 睏, no 前兆; eyes, melting, slow breath, snoring as SLP, no words.
+    /// While it waits it does not change what it does (lifeStep reads napOn; the happy hop, the sniff, the begging after a release go on). Not able to sleep at the time
+    /// (fleeing, in the air, walking): grace s more, then not this time, the count stays. Asleep, all as before: a light touch goes through wakeSoft, slept off it wakes by itself.
+    /// The nap clears the count. Not the brain's "wants to be stroked" (that is back to 0 after 4 to 10 s of rubbing). nap 0: it still counts, changes nothing else, draws no random number
+    private enum NapSet {
+        static let grace: Double = 2   // the web's NAPK.grace: a constant, not a knob
+    }
+    /// Could it fall asleep right now (sleepOK's kind of rule, but looking about or just arrived will do; not the brain's 睏). SNW.loose: the phone's glitter has nothing loose
+    private func napReady() -> Bool {
+        let awake: Bool = !slpOn && fingers.isEmpty && !escOn && !introOn && !e4On && !swimOn && echoSt == 0
+        let still: Bool = !gaitOn && !wanderMoving && !(snwCloud > 0.03)
+        let sill: Bool = sillOn && (sillRoute != nil || sillAir || sillHop != nil || sillGrab)
+        let st: Bool = lifeSt == .rest || lifeSt == .look || lifeSt == .arrive
+        return awake && still && !sill && st
+    }
+    private func napStep(_ dt: Double) {
+        if purr > 0.3 { napCum += dt }
+        for f in fingers.values where f.mode == .grab || t - f.hitT < 0.05 { napX = f.rawX; napY = f.rawY }   // the web's f.x, f.y (the real finger in the world, as softTouch)
+        napOn = false
+        guard params.nap >= 0.5, iv3(params.sleep), !slpOn, fingers.isEmpty, napCum >= params.napPurr else { return }
+        let u: Double = t - lastTouch
+        if u < 0 || u >= params.napWait + NapSet.grace { return }   // let go too long ago (no nap this time): as usual
+        napOn = true
+        if u >= params.napWait && napReady() {
+            napOn = false; napCum = 0; napN += 1
+            if brOn { brain.naps += 1; brain.pre = nil; brain.why = "揉夠了，在你手邊睡著" }
+            slpOn = true; lifeSt = .sleep; attOn = false; askOn = false; cutSniffs()
+        }
     }
     /// C6: 2 to 8 taps on empty space, each 0.12–1.2 s apart; when you stop (1.4× the longest gap, at least 0.8 s) it looks where you
     /// tapped for 0.35 s, then answers with the same count and gaps (a squeeze, "pu" and a soft tap each). The same rhythm back within

@@ -346,6 +346,10 @@ struct FeelParams: Equatable, Codable {
     // v2.63 大腦第二片 (web mood, moodHalf v2.42; the same keys and defaults for all three materials). SlimeBrain.mood, SlimeRig mdOn / brainM / brainMS
     var mood: Double = 1              // 心情: 1 = a mood that changes over minutes (purr, happy, its rhythm answered: better; pulled, scared, woken: worse) and leans the needs, posture, eyes, strides, the flinch, a poke; only this opening. 0 = as before. Needs brain
     var moodHalf: Double = 300        // 心情多久退一半 (s): with nothing happening the mood goes back to 0.1 (a mild liking), half the way in this many seconds
+    // v2.63 C9 (web nap, napPurr, napWait; NAP, napStep, napReady; the same keys and defaults for all three materials). SlimeRig MARK v2.63 C9
+    var nap: Double = 1               // 揉夠了在你手邊睡著: 1 = purred napPurr s in all this opening, then no finger for napWait s, it falls asleep where you last touched it (not back to the mat, no 前兆, no words); 0 = as before
+    var napPurr: Double = 60          // 揉多久會睡在手邊 (s): purr over 0.3 counted this opening (a slime switch, a rebuild, a rotation start it again). The number is mine, to be tried on a phone
+    var napWait: Double = 6           // 放手幾秒睡著 (s): once enough, how long after the last finger leaves. The number is mine, to be tried on a phone
     var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
     var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
@@ -927,6 +931,10 @@ struct TuneField: Identifiable {
         TuneField(key: \.brSleepT, name: "睡多久睡飽（秒）", hint: "睏從滿退到 0 要睡幾秒；睡飽牠自己醒", range: 20...300, step: 5, section: "這一批 v2.63"),
         TuneField(key: \.mood, name: "心情 v2.63", hint: "1：牠有一個幾分鐘才慢慢變的心情。被揉到呼嚕、探到東西、你照牠的節奏回牠會變好；被扯、被嚇、睡著被吵醒會變差。心情好：好奇和想動漲得快、身體挺一點、看你的時候眼睛笑、步子大、被戳會朝你傾過來搖偽足。心情差：容易怕、身體扁一點、眼睛睜大、少走動、被戳會退開縮得更大。只活在這一次打開。0 回改之前（手機要大腦開著才有作用）", range: 0...1, step: 1, section: "這一批 v2.63"),
         TuneField(key: \.moodHalf, name: "心情多久退一半（秒）", hint: "沒事的時候心情慢慢回到普通偏好，這是退一半要的秒數", range: 30...900, step: 10, section: "這一批 v2.63"),
+        // v2.63 C9 (the web's words for nap, napPurr, napWait)
+        TuneField(key: \.nap, name: "揉夠了在你手邊睡著 v2.63", hint: "1（C9）：這次打開累計呼嚕滿「揉多久」秒，手指離開「放手幾秒」，牠就在你最後摸的地方睡著，不走回布墊；輕碰照「輕碰慢慢醒」。睡了這一覺累計歸零。0 回改之前（40 秒沒人碰才睡，大腦開著先走回布墊）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.napPurr, name: "揉多久會睡在手邊（秒）", hint: "這次打開累計呼嚕幾秒才會在你手邊睡著。60 是我取的，數字待測", range: 10...300, step: 5, section: "這一批 v2.63"),
+        TuneField(key: \.napWait, name: "放手幾秒睡著（秒）", hint: "累計夠了以後，手指離開幾秒睡著。6 是我取的，數字待測", range: 2...20, step: 0.5, section: "這一批 v2.63"),
     ]
 }
 
