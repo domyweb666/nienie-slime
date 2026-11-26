@@ -751,7 +751,7 @@ function splitNow(q,f){const m=q.n[STRN>>1];q.free=true;q.pinch=0;q.over=0;q.tx=
    合回：兩隻拉開過 0.6R（或第二隻放手 0.6 秒）以後，外框靠到 mergeGap R 以內（黏絲搭橋多 0.5R、水滴多 0.25R、吞下去多 0.1R，絲和頸要有地方長）就播合併動畫 mergeFx：0 黏絲搭橋、1 擠扁彈回、2 水滴加波紋、3 吞下去。播完第二隻消失、A 回到原本大小。
    第二隻沒人碰 rejoin 秒，自己一縮一衝爬回 A（v2.51 就有）。畫法：第二隻的外框畫進 A 的同一張遮罩，遮罩模糊再切邊，所以靠近時中間自己長出圓滑的頸。 */
 const SPLIT={n:0,merged:0,t0:-9,k:1,frac:.45,used:false,apart:false,mx:[1,0,0,1],det:1,dmin:1,sq:null,wob:-9,happy:-9,pods:[]};
-const MERGE_T=[1.1,1,1.15,1.25],MERGE_REACH=[.5,0,.25,.1],MERGE_NAME=['黏絲搭橋','擠扁彈回','水滴加波紋','吞下去'];
+const MERGE_T=[1.1,.85,1.1,1],MERGE_REACH=[.5,0,.25,.1],MERGE_NAME=['黏絲搭橋','擠扁彈回','水滴加波紋','吞下去'];
 const sstep=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)},sbump=x=>x<=0||x>=1?0:Math.sin(Math.PI*x);
 function splitCheck(dt){if(!(mat.split>=.5)||mat.strand>=.5||B2.on||SPLIT.used||INTRO.on)return;   // 黏條開著走 strandStep 那條
   const c=globalC;for(const f of [...fingers.values()]){if(f.mode!=='grab'||f.fx==null)continue;
@@ -844,17 +844,17 @@ function mergeStep(dt){const b=B2,g=b.mg,tau=t-g.t0,gc=globalC,ga=Math.atan2(gc.
   if(g.fx===0){   // 黏絲搭橋：各伸一條絲（0.2 秒）→ 搭成橋變粗（0.25）→ 小的沿橋滑進去（0.35）→ 大的那側鼓一下（0.4）
     D.str=sstep(tau/.2);D.bridge=sstep((tau-.2)/.25);const v=sstep((tau-.45)/.35);mass=v;qa=1+.1*D.str*(1-v);qp=1/qa;
     tx=g.bx0+(inA[0]-g.bx0)*v;ty=g.by0+(inA[1]-g.by0)*v;SPLIT.pods.push({a:aAng,amp:R*.2*sbump((tau-.6)/.5),sig:.45})}
-  else if(g.fx===1){   // 擠扁彈回：壓過去兩隻都被擠扁（0.18）→ 停一拍（0.12）→ 啵，小的併進去（0.08），大的彈高、晃兩三下（0.6）
-    const q=sstep(tau/.18)*(1-sstep((tau-.3)/.06)),push=Math.min(1,tau/.18)*(g.gap0+rb*.25);tx=g.bx0+g.ux*push;ty=g.by0+g.uy*push;qa=1-.28*q;qp=1+.22*q;
-    SPLIT.sq={ux:g.ux,uy:g.uy,a:1-.14*q,p:1+.1*q};mass=sstep((tau-.3)/.08);if(mass>0){tx=tx+(inA[0]-tx)*mass;ty=ty+(inA[1]-ty)*mass}
-    if(tau>=.3&&!g.pop){g.pop=true;SPLIT.wob=t;sfxPlay('release',.6,1.2);voice('gulp',.5)}}
-  else if(g.fx===2){   // 水滴加波紋：中間長出圓的頸（0.3）→ 小的流進去（0.3）→ 一圈波紋沿外框往兩邊跑、身上一圈同心圓（0.6）
+  else if(g.fx===1){   // 擠扁彈回：壓過去兩隻都被擠扁（0.15）→ 停一拍（0.1）→ 啵，小的併進去（0.08），大的彈高、晃兩三下（0.6）。秒數照設計稿
+    const q=sstep(tau/.15)*(1-sstep((tau-.25)/.06)),push=Math.min(1,tau/.15)*(g.gap0+rb*.25);tx=g.bx0+g.ux*push;ty=g.by0+g.uy*push;qa=1-.28*q;qp=1+.22*q;
+    SPLIT.sq={ux:g.ux,uy:g.uy,a:1-.14*q,p:1+.1*q};mass=sstep((tau-.25)/.08);if(mass>0){tx=tx+(inA[0]-tx)*mass;ty=ty+(inA[1]-ty)*mass}
+    if(tau>=.25&&!g.pop){g.pop=true;SPLIT.wob=t;sfxPlay('release',.6,1.2);voice('gulp',.5)}}
+  else if(g.fx===2){   // 水滴加波紋：中間長出圓的頸（0.3）→ 小的流進去（0.3）→ 波紋沿外框往兩邊跑、身上兩圈同心圓（0.5）。秒數照設計稿
     const nk=sstep(tau/.3),push=nk*(g.gap0+rb*.3),v=sstep((tau-.3)/.3);mass=v;tx=g.bx0+g.ux*push;ty=g.by0+g.uy*push;tx+=(inA[0]-tx)*v;ty+=(inA[1]-ty)*v;
-    const p=(tau-.55)/.6;if(p>0&&p<1){const th=Math.PI*sstep(p),am=R*.1*(1-p)*Math.min(1,p*6);SPLIT.pods.push({a:aAng+th,amp:am,sig:.3},{a:aAng-th,amp:am,sig:.3});D.ring=p}}
-  else{   // 吞下去：大的朝小的張開包過去（0.3）→ 小的變成肚子裡的鼓包往中間走、眼睛閉起來（0.45）→ 大的開心眨眼（0.5）
-    const r=sstep(tau/.3),v=sstep((tau-.3)/.45);SPLIT.pods.push({a:aAng,amp:R*.34*r*(1-v),sig:.55});const near=Math.min(1,tau/.3)*Math.max(0,g.gap0-rb*.05);
-    tx=g.bx0+g.ux*near;ty=g.by0+g.uy*near;tx+=(gc.xc-tx)*v;ty+=(gc.yc-ty)*v;mass=sstep((tau-.45)/.3);D.bulge=tau>.25&&mass<.98?1-mass:0;D.shut=sstep((tau-.3)/.25);
-    if(tau>.75&&SPLIT.happy<g.t0)SPLIT.happy=t+.6}
+    const p=(tau-.6)/.5;if(p>0&&p<1){const th=Math.PI*sstep(p),am=R*.1*(1-p)*Math.min(1,p*6);SPLIT.pods.push({a:aAng+th,amp:am,sig:.3},{a:aAng-th,amp:am,sig:.3});D.ring=p}}
+  else{   // 吞下去：大的朝小的張開包過去（0.3）→ 小的變成肚子裡的鼓包往中間走、眼睛閉起來（0.4）→ 大的開心眨眼（0.3）。秒數照設計稿
+    const r=sstep(tau/.3),v=sstep((tau-.3)/.4);SPLIT.pods.push({a:aAng,amp:R*.34*r*(1-v),sig:.55});const near=Math.min(1,tau/.3)*Math.max(0,g.gap0-rb*.05);
+    tx=g.bx0+g.ux*near;ty=g.by0+g.uy*near;tx+=(gc.xc-tx)*v;ty+=(gc.yc-ty)*v;mass=sstep((tau-.4)/.3);D.bulge=tau>.25&&mass<.98?1-mass:0;D.shut=sstep((tau-.3)/.25);
+    if(tau>.76&&SPLIT.happy<g.t0)SPLIT.happy=t+.18}
   g.mass=Math.max(g.mass,mass);b.sc=Math.sqrt(Math.max(0,1-g.mass));b.qa=qa;b.qp=qp;b.ax=g.ux;b.ay=g.uy;
   if(!b.hide){const k=1-Math.exp(-dt/.05);twinMove((tx-bx)*k,(ty-by)*k)}
   if(g.mass>.5&&!g.gul){g.gul=true;if(g.fx!==1)voice('gulp',.55);sfxPlay('press',.3)}
@@ -884,7 +884,7 @@ function extraMask(m,grow,col){m.strokeStyle=col||'#fff';m.lineCap='round';m.lin
     grow(mx,my,R*.5)}}
 // 第二隻的臉（眼睛、腮紅）、平塗皮時的身體、吞下去的鼓包、波紋。畫在世界座標，A 的臉之後
 function twinFace(col,flat){const b=B2;if(!b.on)return;const g=b.mg,D=g?g.draw:{},P=b.bnd.map(i=>[b.X[i],b.Y[i]]);
-  if(D.ring>0){const gc=globalC,cx=gc.xc+g.rx,cy=gc.yc+g.ry,p=D.ring;ctx.save();bodyPath(boundaryPts());ctx.clip();ctx.strokeStyle=hexA(col('--hi')||'#ffffff',.55*(1-p));ctx.lineWidth=R*.05*(1-.5*p);ctx.beginPath();ctx.arc(cx,cy,R*(.15+1.5*p),0,Math.PI*2);ctx.stroke();ctx.restore()}
+  if(D.ring>0){const gc=globalC,cx=gc.xc+g.rx,cy=gc.yc+g.ry,p=D.ring;ctx.save();bodyPath(boundaryPts());ctx.clip();ctx.strokeStyle=hexA(col('--hi')||'#ffffff',.55*(1-p));ctx.lineWidth=R*.05*(1-.5*p);ctx.beginPath();ctx.arc(cx,cy,R*(.15+1.5*p),0,Math.PI*2);ctx.stroke();const p2=p-.25;if(p2>0){ctx.strokeStyle=hexA(col('--hi')||'#ffffff',.45*(1-p2/.75));ctx.beginPath();ctx.arc(cx,cy,R*(.15+1.5*p2),0,Math.PI*2);ctx.stroke()}ctx.restore()}
   if(b.hide)return;
   if(flat){ctx.save();jelPath(ctx,P);ctx.fillStyle=tint(col('--shade'),true);ctx.fill();jelPath(ctx,P);ctx.clip();ctx.translate(-R*.05,-R*.06);jelPath(ctx,P);ctx.fillStyle=tint(col('--body'));ctx.fill();ctx.restore()}
   if(D.bulge>0){ctx.save();jelPath(ctx,P);ctx.strokeStyle=hexA(col('--shade')||'#888888',.7*D.bulge);ctx.lineWidth=R*.04;ctx.stroke();ctx.restore()}
