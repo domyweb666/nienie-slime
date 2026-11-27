@@ -1121,6 +1121,9 @@ function twinPose(dt){const b=B2,E=b.ey,av=a=>{let x=0,y=0;for(const i of a){x+=
   for(const e of [el,er]){if(sdRing(P,e[0],e[1])>=M*.6)continue;let bx=e[0],by=e[1],bd=-1e9;for(let i=0;i<b.n;i++){const d=sdRing(P,b.X[i],b.Y[i]),sc=Math.min(d,M)-.03*Math.hypot(b.X[i]-e[0],b.Y[i]-e[1]);if(sc>bd){bd=sc;bx=b.X[i];by=b.Y[i]}}
     let lo=0,hi=1;for(let k=0;k<6;k++){const u=(lo+hi)/2;if(sdRing(P,e[0]+(bx-e[0])*u,e[1]+(by-e[1])*u)>=M*.6)hi=u;else lo=u}e[0]+=(bx-e[0])*hi;e[1]+=(by-e[1])*hi}
   {const d=Math.hypot(er[0]-el[0],er[1]-el[1]),mx=b.d0*1.3;if(d>mx){const k=(1-mx/d)/2,dx=er[0]-el[0],dy=er[1]-el[1];el[0]+=dx*k;el[1]+=dy*k;er[0]-=dx*k;er[1]-=dy*k}}   // 夾回外框之後兩顆各自挪過，眼距可能又超過（量過 1.45 倍），再收一次（主體沒有這行）
+  {const mx=(el[0]+er[0])/2,my=(el[1]+er[1])/2,dx=er[0]-el[0],dy=er[1]-el[1],d=Math.hypot(dx,dy),a=Math.atan2(dy,dx),ac=Math.max(-.85,Math.min(.85,a));
+    if(d>1e-6&&ac!==a){const cu=Math.cos(ac),su=Math.sin(ac);let h=d/2;for(let k=0;k<4;k++){if(sdRing(P,mx-cu*h,my-su*h)>=M*.6&&sdRing(P,mx+cu*h,my+su*h)>=M*.6)break;h*=.8}
+      el[0]=mx-cu*h;el[1]=my-su*h;er[0]=mx+cu*h;er[1]=my+su*h}}   // v2.65 T92：各自拉回身體後兩眼連線可能歪過頭（壓牆拉量過 64 度），繞中點轉回最多 0.85（約 49 度，跟上面 th 的上限一樣）；轉完出界就往中點收，最多四次
   b.pose=[el[0],el[1],er[0],er[1]]}
 // 照 drawEyes 畫（∩、∪、> <、睜開帶眨眼和亮點）；合併時照 v2.62 閉起來
 function twinEyesDraw(col,lx,ly,rx,ry,S,g,D){const b=B2,E=b.ey,sx=Math.max(.8,Math.min(1.3,Math.hypot(rx-lx,ry-ly)/b.d0)),js=VIEW.skin==='flat'?1:.68,ew=S*.082*js*Math.sqrt(sx),eh=S*.118*js,ink=col('--eye')||col('--line'),
