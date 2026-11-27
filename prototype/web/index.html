@@ -4009,7 +4009,7 @@ const GRP61=[['皮',['skinU']],['牠怎麼記你',['rough','tapSoft','petSlow']]
     else if(a('data-61p')){const k=a('data-61p'),was=pullNow();mat[k]=on(mat[k])?0:1;pressed(was);done(PULLN[k]+'：'+word(mat[k])+'。')}
     else if(a('data-61g')!==null){const [n,ks]=GRP61[+a('data-61g')],v=ks.every(k=>on(mat[k]))?0:1;for(const k of ks)mat[k]=v;done(n+'：'+word(v)+'。')}});
   document.getElementById('feel').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.id==='feel-def'&&!PULLQ){for(const k of PULL3)mat[k]=0;DESK.base0=deskSnap();done()}});   // 回到預設：存檔裡有的都回預設，拉的三顆也算
-  {const v=document.querySelector('#feel .feel-ver');if(v)v.textContent='v2.63'}DESK.build='網頁 v2.63';
+  {const v=document.querySelector('#feel .feel-ver');if(v)v.textContent='v2.64'}DESK.build='網頁 v2.64';
   if(!DESK.stale&&!PULLQ)for(const k of PULL3)mat[k]=on(saved[k]);   // 上次留在台上的三顆
   DESK.base0=deskSnap();syncSliders();deskSync();deskSave()})();
 /* v2.63 調節台「這一批（v2.63）」：KEYS63 每顆一個按鈕，按一下關、再按開；0 就是改之前的行為。不進存檔、不寫進複製的字（v2.61 那一行已經寫了關著的 greetLook）。
