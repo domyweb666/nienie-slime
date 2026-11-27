@@ -2,6 +2,8 @@
 
 > 工作樹 `E:/捏捏史萊姆/_wt-第三批`，分支 `batch3-v2.64`，起點是 `feel-3x-panel-v1` 的 `c53919f`（v2.63，build 179）。**已推到 GitHub（只跑編譯），沒發 TestFlight，手機沒在 iPhone 上跑過。** 細節、每項 commit、Agent 取的數字全在根目錄 `BATCH3.md`（最上面有摘要，待確認照項目分組）。
 
+> **11-27 多米說「合回主線，但先不發 TestFlight」：已快轉合進 `feel-3x-panel-v1`（`8e56551`）並推上去。沒跑 ios.yml testflight。** 要發時手動跑 ios.yml、勾 testflight。另外 GitHub 上有一條別的對話開的 `mini-slime-v2.65`（也從 `c53919f` 開，132 個檔，自測裡有 T92），還沒合；合它的時候會跟這批撞，selftest 編號和 `KEYS64` 那塊要對一下。
+
 ## ✅ 完成（10 項）
 - 手機：大腦第三片記地方（`brMem`，`44fd418`）；擺飾變真（`decoReal` 等六個，`512cae6`、`2b54bac`，`bumpSoft` 接上）。
 - 網頁先做、再搬手機：C5 張望有對象（`lookTarget`，`86d8288`／`4084a39`）；D8 頂回來、慢眨眼（`tapBack`、`slowBlink`，`44da314`／`394e60f`）；C8 十隻招牌、喜歡的位置（`signature`，`4407606`、`ba899b3`／`2eadf5c`）；B9 撞側牆出聲、揉的痕跡（`sndWall`、`rubTrail`，`6ef0791`／`faa9f65`）；B8 起步跟手和甲乙盲比（`startFollow`，`1505203`／`1c6ea05`）。
