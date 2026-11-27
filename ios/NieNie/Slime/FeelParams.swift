@@ -291,6 +291,11 @@ struct FeelParams: Equatable, Codable {
     var mergeGap: Double = 0.08       // v2.62: the two outlines this close (radii) count as touching, the merge starts
     var mergeWait: Double = 1.5       // v2.62 (多米 11-26: touching, they merge a little later): touching this long (seconds, unbroken) before the merge starts; parted, it starts again. 0 = at once
     var rejoin: Double = 6            // seconds left alone before the second one crawls back (in pulses); touching, the merge plays
+    // v2.65（多米 11-27 build 179：太容易撕開；小史萊姆的臉被拆成兩半、沒有主體的聲音觸感。網頁 splitHold、splitEdge、twinEye、twinFb；三個材質同名同預設）。SlimeRig MARK v2.65
+    var splitHold: Double = 12        // 撕開要撐幾秒：身體被拉到極限（splitEdge）要撐這麼久才撕開成兩隻；掉到極限以下 0.3 秒內不算，再久每秒退 2 秒，放手歸零。0 = 跟 v2.62 一樣（拉開 splitAt、手指快過 splitV 就斷）
+    var splitEdge: Double = 0.9       // 撕開的極限（比例）：身體真的被拉開多少（扣掉跟過去的那份，bodyStretch）÷ 這個材質拉得到的上限（拉力 slide 的長度，最多 2.3R）到這個比例才算在極限
+    var twinEye: Double = 1           // 小史萊姆的臉照主體：1 = 眼距最多 1.3 倍、臉最多歪 50 度、離外框留一顆眼睛（照 eyePose），表情照主體（眨眼、抓著瞇、被扯 > <、揉 ∩、睡著 ∪、戒的睜大）；0 = 跟 v2.62 一樣
+    var twinFb: Double = 1            // 小史萊姆的聲音和觸感照主體：1 = 按、拉、拉絲、揉、兩指捏、質地微震、放手、點一下、被扯、被揉，強度照主體同一張表、乘面積比的 1/4 次方；0 = 跟 v2.62 一樣（按 0.3、放手 0.4 兩聲）
     var endless: Double = 1           // v2.54 無限拉 (多米 11-22: pulled 5 cm it grew 3 cm and stopped; it should stretch without end and stay under the finger): the finger never gives way, the soft limits (maxPull, memMax) are off, and each edge's hard limit widens by `capG` while the held patch cannot keep up; 0 = v2.53
     var growK: Double = 1.5           // how fast the edge limits widen while the held patch lags the finger (e to this power a second)
     var growMax: Double = 12          // the most the edge limits widen
@@ -684,7 +689,7 @@ struct TuneField: Identifiable {
     var section = "手感"
     var id: String { name }
 
-    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61", "這一批 v2.63", "這一批 v2.64"]
+    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61", "這一批 v2.63", "這一批 v2.64", "這一批 v2.65"]
 
     static let all: [TuneField] = [
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
@@ -1027,6 +1032,11 @@ struct TuneField: Identifiable {
         // v2.64 未做 18（只有手機）
         TuneField(key: \.hapDelay, name: "震動晚畫面（毫秒）v2.64", hint: "未做 18：所有震動（拉、揉的連續震動和按、放手、顆粒這些單下）比畫面晚這麼多毫秒才發，聲音和畫面照舊。交給震動引擎排時間，不卡畫面。研究說晚一點可能摸起來更軟（Han 2024、敲擊研究），Apple 說要同步，所以要盲比 0、20、40。正在震動早晚盲比時三選一那組蓋過這條。0 回改之前（全部立刻發）", range: 0...60, step: 5, section: "這一批 v2.64"),
         TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.65（網頁 splitHold、splitEdge、twinEye、twinFb 的字；網頁調節台「這一批（v2.65）」那三顆）
+        TuneField(key: \.splitHold, name: "撕開要撐幾秒 v2.65", hint: "（多米 11-27 build 179：太容易撕開）身體被拉到極限（下面那條「撕開的極限」）要撐這麼久才撕開成兩隻；掉到極限以下 0.3 秒內不算，再久每秒退 2 秒，放手歸零。快撐不住時越撐越細、發抖、拉絲聲越來越緊、細絲一根根斷、震動越來越密。0 回 v2.62：拉開「分裂距離」、手指快過「扯斷速度」就斷", range: 0...30, step: 1, section: "這一批 v2.65"),
+        TuneField(key: \.splitEdge, name: "撕開的極限（比例）v2.65", hint: "身體真的被拉開多少（扣掉整隻跟過去的那份）÷ 這個材質拉得到的上限（拉力的長度，最多 2.3 個半徑＝手機畫面擋住的地方），到這個比例才算在極限。黏土要往上拉到快到畫面頂；果凍、麻糬拉到整隻被拖著走就算", range: 0.5...1, step: 0.02, section: "這一批 v2.65"),
+        TuneField(key: \.twinEye, name: "小史萊姆的臉照主體 v2.65", hint: "1：撕下來那隻的眼睛照主體那套：眼距最多 1.3 倍、臉最多歪 50 度、離外框留一顆眼睛，兩指往兩邊拉臉也不會被拆開；表情跟主體一樣（眨眼、抓著瞇、被扯 > <、揉 ∩、睡著 ∪、戒的時候睜大）。0 回 v2.62", range: 0...1, step: 1, section: "這一批 v2.65"),
+        TuneField(key: \.twinFb, name: "小史萊姆的聲音觸感照主體 v2.65", hint: "1：撕下來那隻按、拉、拉絲、揉、兩指捏、質地微震、放手、點一下、被扯、被揉都跟主體同一套聲音和震動，強度照主體的表、乘面積比的 1/4 次方（約 0.82）。0 回 v2.62（只有按 0.3、放手 0.4 兩聲）", range: 0...1, step: 1, section: "這一批 v2.65"),
     ]
 }
 

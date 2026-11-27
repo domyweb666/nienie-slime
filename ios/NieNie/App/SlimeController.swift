@@ -237,6 +237,11 @@ final class SlimeController: ObservableObject {
         case .knock(let kind, let gain):
             // v2.64 擺飾變真: a thing knocked (the web's SFX.knock; no haptic, as on the web)
             sound.knock(kind, gain: gain, far: false)
+        case .splitTick(let gain, let rate):
+            // v2.65 #3 快撐不住了（網頁 splitCue：sfxPlay('pull') ＋ hapEv('tick')）：一根細絲斷的聲音，加一下質地微震（照 .tick 的表；不管 tickSpacing，.pull 在 tickSpacing 開著時不震）
+            _ = rate
+            sound.strand(gain: gain)
+            haptics.tick(intensity: p.tickMin + (p.tickMax - p.tickMin) * gain, sharpness: p.tickSharp + p.hapSharpStretch * rig.stretchLevel)
         case .wall(let gain, let rate):
             // v2.64 B9 撞側牆出聲（網頁 sfxPlay('fx.land', g, r)）：只有聲音，不震（網頁沒有震動；要不要輕震等多米說）
             sound.fx("land", gain: gain, delay: 0, rate: rate)
@@ -285,6 +290,13 @@ final class SlimeController: ObservableObject {
         } else {
             pullFloor = 0
         }
+        // v2.65 #3 快撐不住了（網頁 hapContStep 同一行）：連續震動越來越強（0.15 到 0.7）、起伏越來越密（每秒 2 到 12 下）
+        let spP = rig.splitP
+        if spP > 0 && p.splitHold > 0 && rig.isGrabbing {
+            let e: Double = spP * spP
+            splitPhase = (splitPhase + dt * (2 + 10 * e)).truncatingRemainder(dividingBy: 1)
+            contLevel = max(contLevel, min(1, (0.15 + 0.55 * e) * (0.6 + 0.4 * sin(2 * Double.pi * splitPhase))))
+        } else { splitPhase = 0 }
         let pk = rig.purr * p.purr
         // v2.25 F5: the purr is the one thing left on the continuous channel: a low rumble swelling 3 times a second
         if p.purrRoll >= 0.5 && pk > 0.05 {
@@ -396,6 +408,7 @@ final class SlimeController: ObservableObject {
     }
 
     private var purrClock = 0.5, purrSecond = 0.0, lastBreathBeat = 0, purrPhase = 0.0
+    private var splitPhase = 0.0   // v2.65 #3 快撐不住了：連續震動起伏的相位（網頁 HPC.sp）
     private var backgroundAt: Date?
     private var resignedActive = false   // v2.63 C4: left active (background, lock screen, Control Center, a system alert); the next didBecomeActive is a coming back
 

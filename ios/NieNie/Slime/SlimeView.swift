@@ -1364,7 +1364,36 @@ final class SlimeView: UIView {
             }
             let js: Double = jellyOn ? 0.68 : 1, ew: Double = S * 0.082 * js, eh: Double = S * 0.118 * js, ox: Double = e.ox * z, oy: Double = e.oy * z
             twinEyeLine.lineWidth = CGFloat(max(2, S * 0.034))
-            for sd in sides {
+            if let md = e.mode {   // v2.65 #1（網頁 twinEyesDraw）：照主體眼睛那套畫（∩、∪、> <、睜開帶亮點、閉起來一條線）；看哪已經在姿勢裡
+                let ew2: Double = ew * e.spread.squareRoot()
+                for sd in sides {
+                    let x: Double = sd.0.x, y: Double = sd.0.y
+                    switch md {
+                    case .happy:
+                        let ar: Double = ew2 * 1.15, cy0: Double = y + eh * 0.45
+                        el.move(to: CGPoint(x: x + ar * cos(Double.pi * 1.15), y: cy0 + ar * sin(Double.pi * 1.15)))
+                        el.addArc(center: CGPoint(x: x, y: cy0), radius: CGFloat(ar), startAngle: CGFloat(Double.pi * 1.15), endAngle: CGFloat(Double.pi * 1.85), clockwise: false)
+                    case .sleep:
+                        let ar: Double = ew2 * 1.15, cy0: Double = y - eh * 0.35
+                        el.move(to: CGPoint(x: x + ar * cos(Double.pi * 0.15), y: cy0 + ar * sin(Double.pi * 0.15)))
+                        el.addArc(center: CGPoint(x: x, y: cy0), radius: CGFloat(ar), startAngle: CGFloat(Double.pi * 0.15), endAngle: CGFloat(Double.pi * 0.85), clockwise: false)
+                    case .squeeze:
+                        let q: Double = -sd.1
+                        el.move(to: CGPoint(x: x + q * ew2 * 0.9, y: y - eh * 0.55))
+                        el.addLine(to: CGPoint(x: x - q * ew2 * 0.8, y: y))
+                        el.addLine(to: CGPoint(x: x + q * ew2 * 0.9, y: y + eh * 0.55))
+                    case .open:
+                        let h: Double = eh * e.open * e.wide, w: Double = ew2 * e.wide
+                        if h < w * 0.35 {
+                            el.move(to: CGPoint(x: x - w, y: y)); el.addLine(to: CGPoint(x: x + w, y: y))
+                        } else {
+                            ef.addEllipse(in: CGRect(x: x - w, y: y - h, width: 2 * w, height: 2 * h))
+                            if h > w * 0.7 { let lr: Double = w * 0.34; eli.addEllipse(in: CGRect(x: x - w * 0.32 - lr, y: y - h * 0.4 - lr, width: 2 * lr, height: 2 * lr)) }
+                        }
+                    }
+                }
+            }
+            for sd in sides where e.mode == nil {
                 let x: Double = sd.0.x + ox, y: Double = sd.0.y + oy
                 if e.squeeze {   // pulled open: > <
                     let q: Double = -sd.1

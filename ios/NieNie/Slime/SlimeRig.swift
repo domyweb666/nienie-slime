@@ -18,6 +18,7 @@ enum SlimeEvent {
     case ding(gain: Double)                  // v2.31 搖晃沉澱: the glitter has settled, it is clear again
     case flinch(gain: Double, hap: Double)   // v2.63 D4 (flinchFx): it flinched from your touch: a small sound (gain 0 = tap only) and a light tap
     case knock(kind: String, gain: Double)   // v2.64 擺飾變真: a thing knocked (manifest prop.<kind>: glass, candle, book, bell; the web's sfxPlay('knock.'+kind))
+    case splitTick(gain: Double, rate: Double)   // v2.65 #3 快撐不住了：一根細絲斷（網頁 splitCue 的 sfxPlay('pull') ＋ hapEv('tick')）：拉絲那一聲加一下質地微震（照 .tick 的表），不管 tickSpacing
     case wall(gain: Double, rate: Double)    // v2.64 B9 撞側牆出聲（sndWall）：落地那個音檔 fx.land，rate 是音高；網頁沒有震動，所以不走 .fx（.fx 的 land 會輕震）
 }
 
@@ -964,6 +965,7 @@ final class SlimeRig {
 
     final class Finger {
         var splitT = 0.0          // v2.62: how long it has been pulled far and fast enough to tear
+        var spT = 0.0, spLo = 0.0, spQ = 0.0   // v2.65 splitHold（網頁 f.spT、f.spLo、f.spQ）：在極限撐了幾秒、掉到極限以下多久、這一格拉開多少（÷ 上限）
         var tug: Bool? = nil      // v2.51: grabbed near the outline: it pulls a strand out, the body is not carried (nil = not judged yet)
         var r0x: Double? = nil, r0y = 0.0   // v2.61 A4: where it took hold, from the body's centre (r0x, r0y on the web; not the contact radius r0)
         var clD0: Double? = nil   // v2.36 黏牆: the finger's distance from the wall when it took hold; the pull is measured from there
@@ -2354,7 +2356,12 @@ final class SlimeRig {
         slpLastAny = t   // v2.23 B2: a tap anywhere counts as someone there
         if allowed && b2On && twMg == nil && twinHit(x, y) {   // v2.62: this touch takes the second slime (several fingers can)
             twinGrab(id, x, y, sx, sy, effParams)
-            onEvent?(.press(gain: 0.3))
+            if params.twinFb >= 0.5 {   // v2.65 #2（網頁 b2Listen）：按聲照 sndB2 的力道、震動照主體的 0.7，都乘面積比
+                let k: Double = twinGk()
+                pressSnd = (params.sndB2 >= 0.5 ? pressForce(force: force, radius: radius) : 0.7) * k
+                onEvent?(.press(gain: 0.7 * k))
+                pressSnd = -1
+            } else { onEvent?(.press(gain: 0.3)) }
             return
         }
         if let old = fingers[id], old.sticking { release(id, quiet: true) }   // 候選 26: the same touch object came back while stuck
@@ -2441,7 +2448,7 @@ final class SlimeRig {
     /// only on frames that received a fresh move event (Apple: predicted touches are temporary and must be
     /// replaced as real touches arrive). `distance` is the true travelled distance from coalesced touches.
     func touchMoved(_ id: ObjectIdentifier, x: Double, y: Double, predictedX: Double?, predictedY: Double?, distance: Double, radius: Double = 0) {
-        if let tf = twFg[id] { tf.x += (x - tf.sx) / camZ; tf.y += (y - tf.sy) / camZ; tf.sx = x; tf.sy = y; return }   // v2.62: a touch holding the second slime, in the world only its real movement
+        if let tf = twFg[id] { tf.x += (x - tf.sx) / camZ; tf.y += (y - tf.sy) / camZ; tf.sx = x; tf.sy = y; tf.travel += distance; return }   // v2.65 travel：質地微震   // v2.62: a touch holding the second slime, in the world only its real movement
         guard let f = fingers[id] else { return }
         // in the world the finger only follows its real movement: screen travel ÷ the current zoom (v2.15). From v2.12 the screen point was
         // mapped back every frame, so as the view backed off a resting finger ran outward in the world, the shape stretched, the view
@@ -3083,6 +3090,7 @@ final class SlimeRig {
         for f in fingers.values { f.fx += (f.tgx - f.fx) * f.lagK; f.fy += (f.tgy - f.fy) * f.lagK }
         strokeStep(dt)   // v2.26 F6
         gooStep(dt); splitCheck(dt); twinStep(dt)   // v2.51 the strand; v2.62 the tear, the second slime
+        if sphP > 0 && params.splitHold > 0 { splitCue() }   // v2.65 #3（網頁 update 聲音那段：SPH.p > 0 時 splitCue；拉絲 loop 的拉伸量乘 1＋p² 在 pullStretch）
         dragStep(dt)   // v2.20 D1: home follows `drag` of the fingers' travel; how far the body itself is pulled open (sb); C3 slipping free
 
         // press flat: as far as the finger went down (relative to the height when it began) the remembered shape squashes,
@@ -3499,6 +3507,7 @@ final class SlimeRig {
             posX *= 1 + 0.05 * e; posY *= 1 - 0.06 * e
         }
         if shkT0 > 0 && t >= shkT0 && t < shkT0 + 0.6 { trm += R * 0.025 * shkAmp * exp(-(t - shkT0) / 0.2) * (reduceMotion ? 0.5 : 1) }   // v2.19 shaking off: the outline trembles too
+        if sphP > 0 { trm += R * SplitK.trm * sphP * sphP * (reduceMotion ? 0.5 : 1) }   // v2.65 #3 快撐不住了：發抖（跟 tremble 開關無關，這是警告；減少動態減半）
         if iv3(mat.e3) { posX *= 1 - 0.02 * impShownTrust + 0.04 * impShownWary; posY *= 1 + 0.05 * impShownTrust - 0.06 * impShownWary }   // v2.22 E3: trusting rounder, taller; wary flatter
         if slpK > 0 { posX *= 1 + 0.05 * slpK; posY *= 1 - 0.07 * slpK }   // v2.23 B2: asleep, a little melted
         let sp = mat.press2 >= 0.5 ? sqrt(max(0.5, 1 + mat.pressArea * pressSum)) : 1
@@ -5802,6 +5811,7 @@ final class SlimeRig {
         var free = false
         var n: [(x: Double, y: Double)]
         var k = 0.0, pinch = 0.0, over = 0.0, want = 0.0, L = 0.0
+        var spT = 0.0, spLo = 0.0, fin = 0.0   // v2.65 splitHold（網頁 q.spT、q.spLo、q.fin）：在極限撐了幾秒、掉到極限以下多久、撐滿之後收腰收了幾秒
         var ai = -1
         var rx = 0.0, ry = 0.0, tx = 0.0, ty = 0.0
     }
@@ -5818,8 +5828,16 @@ final class SlimeRig {
         var sx, sy: Double
         let mem: [(i: Int, ox: Double, oy: Double, w: Double)]
         var dead = false   // the merge took it away; nothing until it lifts
-        init(x: Double, y: Double, sx: Double, sy: Double, mem: [(i: Int, ox: Double, oy: Double, w: Double)]) {
+        // v2.65（網頁 twinGrab 多存的那些，twinFingerStep 每格算）：上一格位置、30 毫秒平滑的速度、80 毫秒衰減的峰值、拉開多少（自己的半徑）、拉的第幾格、
+        // 被扯撐了多久和 strain、揉了多久、按下去的時間、離抓下去的地方最遠多少和出新距離的速度、這一抓抗議過／哼過；質地微震走了多遠（螢幕點）、上一下在哪、下一下多遠
+        var lx: Double, ly: Double
+        var vxS = 0.0, vyS = 0.0, peak = 0.0, st = 0.0, step = 0, strainT = 0.0, strain = 0.0, gentleT = 0.0
+        let tDown: Double
+        var om = 0.0, ov = 0.0, saidProt = false, saidPurr = false
+        var travel = 0.0, tickAt = 0.0, tickNext = 0.0
+        init(x: Double, y: Double, sx: Double, sy: Double, mem: [(i: Int, ox: Double, oy: Double, w: Double)], t: Double) {
             self.x = x; self.y = y; fx = x; fy = y; ax = x; ay = y; self.sx = sx; self.sy = sy; self.mem = mem
+            lx = x; ly = y; tDown = t
         }
     }
     /// The merge playing (web B2.mg): which one, when, how long; how much has flowed in; the direction to A; where the second one started; the gap then; the touching pair (B, A);
@@ -5855,6 +5873,19 @@ final class SlimeRig {
     private var splitDet = 1.0, splitDmin = 1.0, splitWob = -9.0, splitHappy = -9.0
     private var splitSq: (ux: Double, uy: Double, a: Double, p: Double)?
     private var splitPods: [(a: Double, amp: Double, sig: Double)] = []
+    // v2.65 #3 撕開要撐（網頁 SPLK、SPH）：上限最多 2.3R、掉到極限以下容忍 0.3 秒、再久每秒退 2 秒、越撐越細 0.16、發抖 0.022R。
+    // sphP＝撐了幾成（0 到 1，給越撐越細、發抖、拉絲聲、細絲斷、連續震動用；控制器讀 splitP）、拉的方向、撕開幾次、下一聲細絲斷的時間、斷了幾聲
+    private enum SplitK { static let cap = 2.3, grace = 0.3, back = 2.0, thin = 0.16, trm = 0.022 }
+    private var sphP = 0.0, sphUx = 0.0, sphUy = -1.0, sphN = 0, sphNext = 0.0, sphTicks = 0
+    /// v2.65 #3 快撐不住了：撐了幾成（0 到 1），控制器拿來加拉絲聲的拉伸量和連續震動（網頁 SPH.p）
+    var splitP: Double { params.splitHold > 0 ? sphP : 0 }
+    // v2.65 #1 小史萊姆的臉（網頁 b.d0、b.pose、b.ey）：兩眼錨點在 Q0 的距離、這一格畫在哪（nil＝還沒算）、表情狀態（看哪、睜開、睜大、眨眼、模式、姿勢修正、開心到、> < 到）
+    private var twD0 = 1.0
+    private var twPose: (lx: Double, ly: Double, rx: Double, ry: Double)?
+    private var twEyGX = 0.0, twEyGY = 0.0, twEyOpenD = 1.0, twEyWideD = 1.0, twEyBlink = 1.0, twEyBlinkT = -9.0, twEyNextBlink = 0.0
+    private var twEyMode = EyeMode.open, twEyCX = 0.0, twEyCY = 0.0, twEyCK = 1.0, twEyHappyU = -9.0, twEySqU = -9.0
+    // v2.65 #2 小史萊姆兩指捏（網頁 b.pin）：哪兩根、開始時的距離、下一聲在幾成
+    private var twPinA: ObjectIdentifier?, twPinB: ObjectIdentifier?, twPinD0 = 1.0, twPinNext = 0.6
 
     private func gooW(_ q: Goo, _ u: Double) -> Double {
         let wr: Double = R * 0.26, wm: Double = R * max(0.12, 0.26 / (1 + q.L / (R * 1.4))), wt: Double = R * 0.2
@@ -5866,6 +5897,7 @@ final class SlimeRig {
 
     private func gooStep(_ dt: Double) {
         guard params.strand >= 0.5, !clusters.isEmpty else { goo.removeAll(); return }
+        sphP = 0   // v2.65 #3（網頁 strandStep 開頭 SPH.p=0）：每條取大
         let gc = clusters[gi]
         for (id, f) in Array(fingers) where f.mode == .grab {
             if f.tug == nil {   // held within tugEdge×R of the outline: a strand is pulled out; nearer the middle: picked up whole
@@ -5886,6 +5918,22 @@ final class SlimeRig {
             for i in bnd { let e = (X[i] - f.fx) * (X[i] - f.fx) + (Y[i] - f.fy) * (Y[i] - f.fy); if e < bd { bd = e; goo[q].ai = i } }   // let go, the root rides this boundary particle
             // the split: the finger far enough from the centre, long enough
             let far: Bool = hypot(f.x - gc.xc, f.y - gc.yc) > Self.strandSplitAt * R   // v2.62 fix: the strand keeps v2.51's 3.4R from the centre; splitAt is the tear's now (1.8 from where it took hold), shared it parted at 1.8R (web T63 g)
+            if params.splitHold > 0 {   // v2.65 #3（網頁 strandStep 同一段）：黏條也照新規則：「極限」是黏條自己那把尺（離中心 3.4R），撐 splitHold 秒，收腰跟著撐的時間慢慢收（到七成），撐滿再 0.25 秒收到斷
+                if !(params.split >= 0.5) || b2On || splitUsed { goo[q].over = 0; goo[q].pinch = 0; continue }
+                let acc = Self.splitHoldAcc(goo[q].spT, goo[q].spLo, dt, far && goo[q].k > 0.9)
+                goo[q].spT = acc.spT; goo[q].spLo = acc.spLo
+                let T: Double = acc.spT, p: Double = min(1, T / params.splitHold)
+                goo[q].over = T
+                if p > sphP {
+                    sphP = p
+                    let ox: Double = f.x - gc.xc, oy: Double = f.y - gc.yc, ol: Double = hypot(ox, oy), l: Double = ol > 0 ? ol : 1
+                    sphUx = ox / l; sphUy = oy / l
+                }
+                if T >= params.splitHold { goo[q].fin += dt } else { goo[q].fin = 0 }
+                goo[q].pinch = goo[q].fin > 0 ? min(1, 0.7 + 0.3 * goo[q].fin / 0.25) : 0.7 * p * p
+                if goo[q].pinch >= 1 { sphP = 0; splitNow(q, f) }
+                continue
+            }
             if params.split >= 0.5 && !b2On && !splitUsed && far && goo[q].k > 0.9 { goo[q].over += dt } else { goo[q].over = max(0, goo[q].over - dt * 2) }
             goo[q].pinch = max(0, min(1, (goo[q].over - 0.4) / 0.25))
             if goo[q].pinch >= 1 { splitNow(q, f) }
@@ -5946,14 +5994,53 @@ final class SlimeRig {
 
     private func splitCheck(_ dt: Double) {
         let mat = effParams
-        guard mat.split >= 0.5, !(mat.strand >= 0.5), !b2On, !splitUsed, !introOn, !clusters.isEmpty else { return }   // the strand on: gooStep's way
+        guard mat.split >= 0.5, !(mat.strand >= 0.5), !b2On, !splitUsed, !introOn, !clusters.isEmpty else { if !(mat.strand >= 0.5) { sphP = 0 }; return }   // the strand on: gooStep's way (it sets sphP itself)
         let gc = clusters[gi]
+        if mat.splitHold > 0 {   // v2.65 #3（網頁 splitCheck splitHold 那段）：每根抓的手指拉開多少 ÷ 上限，到 splitEdge 算在極限，撐 splitHold 秒才撕開
+            let L: Double = splitLim(mat), E: Double = max(0.05, min(1, mat.splitEdge > 0 ? mat.splitEdge : 0.9))
+            var bp = 0.0
+            var bf: Finger?
+            for f in Array(fingers.values) where f.mode == .grab {
+                f.spQ = bodyStretch(f) / L
+                let acc = Self.splitHoldAcc(f.spT, f.spLo, dt, f.spQ >= E)
+                f.spT = acc.spT; f.spLo = acc.spLo
+                if acc.spT >= mat.splitHold { sphP = 0; sphN += 1; twinSpawn(f); return }
+                if acc.spT / mat.splitHold > bp { bp = acc.spT / mat.splitHold; bf = f }
+            }
+            sphP = bp
+            if let bf {
+                let ox: Double = bf.x - gc.xc, oy: Double = bf.y - gc.yc, ol: Double = hypot(ox, oy), l: Double = ol > 0 ? ol : 1
+                sphUx = ox / l; sphUy = oy / l
+            }
+            return
+        }
         for f in Array(fingers.values) where f.mode == .grab {
             let ox: Double = f.x - gc.xc, oy: Double = f.y - gc.yc, d: Double = hypot(f.x - f.ax, f.y - f.ay) / R
             let vx: Double = f.vxS, vy: Double = f.vyS, v: Double = hypot(vx, vy) * camZ / R
             if d > mat.splitAt && v > mat.splitV && ox * vx + oy * vy > 0 { f.splitT += dt } else { f.splitT = max(0, f.splitT - dt) }
             if f.splitT >= 0.05 { twinSpawn(f); return }
         }
+    }
+
+    /// v2.65 #3（網頁 splitLim）：這個材質拉得到的上限（R）：拉力開著是 slide 的長度（再拉就整隻跟著走、拉不開了；熟、戒會改它），拉力關著是拉伸上限，都最多 2.3R（手機畫面擋住的地方）
+    private func splitLim(_ mat: FeelParams) -> Double {
+        max(0.05, mat.slide > 0 ? min(slideLen() / R, SplitK.cap) : min(mat.maxPull, SplitK.cap))
+    }
+    /// v2.65 #3（網頁 splitHoldAcc）：在極限時加 dt；掉到極限以下 grace 秒內照留，再久每秒退 back 秒。不看手指快慢
+    private static func splitHoldAcc(_ spT: Double, _ spLo: Double, _ dt: Double, _ ok: Bool) -> (spT: Double, spLo: Double) {
+        if ok { return (spT + dt, 0) }
+        let lo: Double = spLo + dt
+        return (lo > SplitK.grace ? max(0, spT - SplitK.back * dt) : spT, lo)
+    }
+    /// v2.65 #3（網頁 splitCue）快撐不住了的聲音：細絲一根根斷（pull），間隔從 1.2 秒縮到 0.15 秒、越來越大聲；每一聲手機輕震一下（.splitTick）。e＝撐了幾成的平方，最後幾秒最明顯
+    private func splitCue() {
+        let e: Double = sphP * sphP
+        if sphP < 0.15 { sphNext = 0; return }
+        if !(sphNext > 0) || sphNext - t > 2 { sphNext = t }
+        if t < sphNext { return }
+        let g: Double = 0.3 + 0.55 * e
+        onEvent?(.splitTick(gain: g, rate: 1 + 0.15 * e))
+        sphTicks += 1; sphNext = t + 1.2 - 1.05 * e
     }
 
     private func twinSpawn(_ f: Finger) {
@@ -6048,6 +6135,7 @@ final class SlimeRig {
         }
         twEL = near3(-rb * 0.34, -rb * 0.12); twER = near3(rb * 0.34, -rb * 0.12)
         twBlinkT = -9; twNextBlink = t + 1.5 + Double.random(in: 0..<1, using: &rng) * 3
+        twinEyeInit()   // v2.65 #1
         twCellNext = [Int32](repeating: -1, count: n)
         b2On = true; twFg.removeAll(); twMg = nil; twHide = false; twTouchT = 0; twIdle = t; twSc = 1; twQa = 1; twQp = 1; twAx = ux; twAy = uy; twStretch = 0
     }
@@ -6084,7 +6172,7 @@ final class SlimeRig {
             o.sort { $0.d < $1.d }
             for q in o.prefix(4) { mem.append((i: q.i, ox: twX[q.i] - x, oy: twY[q.i] - y, w: 0.6)) }
         }
-        twFg[id] = TwinFinger(x: x, y: y, sx: sx, sy: sy, mem: mem)
+        twFg[id] = TwinFinger(x: x, y: y, sx: sx, sy: sy, mem: mem, t: t)
         twIdle = t
     }
 
@@ -6097,7 +6185,7 @@ final class SlimeRig {
             let vx: Double = twX[i] - twPX[i], vy: Double = twY[i] - twPY[i], v: Double = hypot(vx, vy)
             if v > cap { twPX[i] = twX[i] - vx * cap / v; twPY[i] = twY[i] - vy * cap / v }
         }
-        onEvent?(.release(gain: 0.4, rate: 1.1, special: false))
+        if params.twinFb >= 0.5 { twinReleaseFb(f) } else { onEvent?(.release(gain: 0.4, rate: 1.1, special: false)) }   // v2.65 #2
     }
 
     private func twinSub(_ dt: Double, _ mat: FeelParams) {
@@ -6294,6 +6382,7 @@ final class SlimeRig {
         var st = 0.0
         for f in twFg.values where !f.dead { st = max(st, hypot(f.x - f.ax, f.y - f.ay) / R) }
         twStretch = st
+        if mat.twinEye >= 0.5 || mat.twinFb >= 0.5 { twinFingerStep(dt, mat) }   // v2.65 小史萊姆的手指：速度、真的被拉開多少、揉、撐
         if !twFg.isEmpty { twIdle = t; slpLastAny = t }
         if twMg == nil {
             var ta = 1.0, tp = 1.0
@@ -6311,7 +6400,8 @@ final class SlimeRig {
             for _ in 0..<ns { twinSub(sdt, mat) }
             twinMem(dt, mat)
         }
-        if t > twNextBlink { twBlinkT = t; twNextBlink = t + 2 + 4 * Double.random(in: 0..<1, using: &rng) }
+        if mat.twinEye >= 0.5 { twinEyeStep(dt) }   // v2.65 #1
+        else if t > twNextBlink { twBlinkT = t; twNextBlink = t + 2 + 4 * Double.random(in: 0..<1, using: &rng) }
         if twMg == nil && !twHide && t - splitT0 > 0.35 {
             let c = twinContact(), gap: Double = c.d / R
             if gap > 0.6 { splitApart = true }
@@ -6324,6 +6414,178 @@ final class SlimeRig {
         }
         if twMg != nil { mergeStep(dt) }
         splitKStep(dt)
+    }
+
+    // MARK: - v2.65 小史萊姆的臉、聲音、觸感（多米 11-27 build 179）。網頁 twinGk、twinEyeInit、twinOpen、twinFingerStep、twinReleaseFb、twinEyeStep、twinPose 逐行搬。
+    // #1 twinEye：第二隻的兩顆眼睛各綁在最近的 3 顆粒子上、沒有限制，兩指往兩邊拉眼距變 6.5 倍、壓牆往外拉兩眼一上一下。照主體 eyePose：眼距最多 1.3 倍、臉最多歪 30＋20 度、
+    //    離外框留一顆眼睛，不夠滑到最厚的地方、再不夠縮眼距；表情照 eyeStep（眨眼、抓著瞇、被扯 > <、猛扯 > <、揉 ∩、睡著 ∪、戒的睜大）。主體有、小的沒有：躲手指、受驚閉眼、慢眨、招牌半閉。
+    // #2 twinFb：主體每一種摸得到的回饋，小的照同一張表算，拉開多少用自己的半徑量；音量、震動乘 twinGk()＝面積比的 1/4 次方（0.45 → 0.82）。
+    //    網頁沒有震動只記 hapEv；這裡送主體同一種事件（.press、.pull、.tick、.squish、.release、.voice），控制器照主體那張表打真的震動、出真的聲音。
+    private func twinGk() -> Double { pow(max(0.05, splitFracNow * (twSc > 0 ? twSc : 1)), 0.25) }
+    /// 兩顆眼睛錨點的平均（q0：用參考形狀 Q0；不然用現在的位置）
+    private func twAvg(_ a: [Int], q0: Bool) -> (x: Double, y: Double) {
+        var x = 0.0, y = 0.0, n = 0
+        for i in a where i >= 0 && i < twN { x += q0 ? twQ0X[i] : twX[i]; y += q0 ? twQ0Y[i] : twY[i]; n += 1 }
+        return n > 0 ? (x / Double(n), y / Double(n)) : (0, 0)
+    }
+    private func twinEyeInit() {
+        if !twEL.isEmpty && !twER.isEmpty { let l = twAvg(twEL, q0: true), r = twAvg(twER, q0: true); twD0 = max(1, hypot(r.x - l.x, r.y - l.y)) } else { twD0 = 1 }
+        twPose = nil
+        twEyGX = 0; twEyGY = 0; twEyOpenD = 1; twEyWideD = 1; twEyBlink = 1; twEyBlinkT = -9; twEyNextBlink = twNextBlink; twEyMode = .open
+        twEyCX = 0; twEyCY = 0; twEyCK = 1; twEyHappyU = -9; twEySqU = -9
+        twPinA = nil; twPinB = nil; twPinD0 = 1; twPinNext = 0.6
+    }
+    /// 這根手指把小史萊姆拉開多少（自己的半徑）：手指（慢一拍那個）離整隻的中心多遠，減掉抓到的那幾顆靜止時離中心多遠。整隻被拖著走、中心跟過去，不算拉開
+    private func twinOpen(_ f: TwinFinger) -> Double {
+        var qx = 0.0, qy = 0.0, n = 0
+        for m in f.mem where m.i >= 0 && m.i < twN { qx += twQ0X[m.i]; qy += twQ0Y[m.i]; n += 1 }
+        guard n > 0 else { return 0 }
+        let sc: Double = twSc > 0 ? twSc : 1
+        return max(0, (hypot(f.fx - twGXC, f.fy - twGYC) - hypot(qx / Double(n), qy / Double(n)) * sc) / max(1, twR))
+    }
+    /// 小史萊姆的手指按落下的先後排（網頁 Map 照放進去的順序）
+    private func twFingersInOrder() -> [(id: ObjectIdentifier, f: TwinFinger)] {
+        twFg.filter { !$0.value.dead }.map { (id: $0.key, f: $0.value) }.sorted { $0.f.tDown < $1.f.tDown }
+    }
+    private func twinFingerStep(_ dt: Double, _ mat: FeelParams) {
+        guard dt > 0 else { return }
+        let fb: Bool = mat.twinFb >= 0.5 && twMg == nil, k: Double = twinGk()
+        for f in twFg.values where !f.dead {
+            let vx: Double = (f.x - f.lx) / dt, vy: Double = (f.y - f.ly) / dt
+            f.lx = f.x; f.ly = f.y
+            let kv: Double = 1 - exp(-dt / 0.03)
+            f.vxS += (vx - f.vxS) * kv; f.vyS += (vy - f.vyS) * kv; f.peak = max(hypot(vx, vy), f.peak * exp(-dt / 0.08))
+            let st: Double = twinOpen(f)
+            f.st = st
+            do {
+                let op: Double = hypot(f.x - f.ax, f.y - f.ay) / R, d: Double = max(0, op - f.om)
+                f.om = max(f.om, op); f.ov += (d / dt - f.ov) * (1 - exp(-dt / PullFxSet.tv))
+            }
+            let sp: Double = hypot(f.vxS, f.vyS), v24: Bool = mat.rubSpeed > 0
+            if st < 0.6 && (v24 ? sp < mat.rubSpeed * 60 : sp / R < 2) { f.gentleT += dt * (v24 && sp > R * 0.3 ? 2 : 1) } else { f.gentleT = max(0, f.gentleT - 2 * dt) }   // 跟 moodStep 同一條：拉不到 0.6、手慢
+            f.strainT = st > 1.5 ? f.strainT + dt : max(0, f.strainT - dt)
+            f.strain += (max(0, min(1, (f.strainT - 0.5) / 1)) - f.strain) * (1 - exp(-dt / 0.15))
+            if f.gentleT > 1 { twEyHappyU = t + 1.6 }
+            if !fb { continue }
+            let step = Int(floor(st * 2.5))
+            if step > f.step && st > 0.35 { onEvent?(.pull(gain: min(1, 0.4 + st / 2) * k, rate: 1 - 0.08 * min(1, st / 1.5))) }
+            f.step = max(f.step, step)
+            if mat.sndB6 >= 0.5 { while f.step > 0 && st * 2.5 < Double(f.step) - 1.5 { f.step -= 1 } }
+            if f.strain > 0.5 && !f.saidProt { f.saidProt = true; voice("protest", 0.8 * k) }
+            if f.gentleT > 1 && !f.saidPurr { f.saidPurr = true; voice("mmm", 0.6 * k) }
+            // 質地微震：網頁沒有震動，記的是 sndGrain 開著時的 grain；手機主體是每走 tickSpacing 點一下 .tick（控制器在 sndGrain 開著時另外出一顆聲音），小的照同一條
+            if mat.tickSpacing > 0 {
+                let pullK: Double = min(1, st / 2), tense: Double = 1 - mat.tickTense * pullK, spPt: Double = sp * camZ
+                if f.tickNext <= 0 { f.tickNext = mat.tickSpacing * tense; f.tickAt = f.travel }
+                if f.travel - f.tickAt >= f.tickNext && spPt > R * 0.1 && t - tickLastT >= 1 / max(1, mat.tickRate) {
+                    f.tickAt = f.travel
+                    f.tickNext = mat.tickSpacing * tense * (0.7 + 0.6 * Double.random(in: 0..<1, using: &rng))
+                    tickLastT = t
+                    onEvent?(.tick(gain: min(1, max(spPt / (R * 3), 0.5 * pullK)) * k))
+                }
+            }
+        }
+        if fb && mat.pinchSquish >= 0.5 {   // 兩指捏：照第 24 條（縮到 60% 一聲、再縮 15% 一聲）
+            let gs = twFingersInOrder()
+            if gs.count >= 2 {
+                let a = gs[0], b = gs[1], d: Double = hypot(a.f.x - b.f.x, a.f.y - b.f.y)
+                if twPinA != a.id || twPinB != b.id { twPinA = a.id; twPinB = b.id; twPinD0 = max(1, d); twPinNext = 0.6 }
+                let r: Double = d / twPinD0
+                if r <= twPinNext { onEvent?(.squish(gain: (0.6 + 0.3 * (1 - r)) * k)); twPinNext -= 0.15 }
+            } else { twPinA = nil; twPinB = nil }
+        }
+    }
+    /// 放手啵：甩多快、拉多開取大（主體 release 同一條公式），乘面積比；點一下（不到 0.25 秒、沒拉開）跟 E2 點主體那聲同一個
+    private func twinReleaseFb(_ f: TwinFinger) {
+        let k: Double = twinGk(), sv: Double = min(1, f.peak / R / 6), ss: Double = pow(min(1, f.st / 2), 1.5), s: Double = max(sv, ss), g: Double = (0.35 + 0.65 * s) * k
+        onEvent?(.release(gain: g, rate: 1 + 0.1 * s, special: false))
+        if t - f.tDown < 0.25 && f.st < 0.2 && hypot(f.x - f.ax, f.y - f.ay) < R * 0.15 { voice("poke", 0.7 * k) }
+    }
+    private func twinEyeStep(_ dt: Double) {
+        guard twN > 0, !twEL.isEmpty, !twER.isEmpty else { return }
+        if twEyNextBlink - t > 8 { twEyNextBlink = t + 2 }; if twEySqU - t > 1 { twEySqU = -9 }; if twEyHappyU - t > 2 { twEyHappyU = -9 }   // 時鐘被倒回去
+        let g: TwinFinger? = twFingersInOrder().first?.f
+        let c = twinCenter()
+        func tow(_ x: Double, _ y: Double) -> (Double, Double) {
+            let dx: Double = x - c.x, dy: Double = y - c.y, dh: Double = hypot(dx, dy), d: Double = dh > 0 ? dh : 1, k: Double = min(1, d / (R * 1.2))
+            return (dx / d * k, dy / d * k)
+        }
+        var o: (Double, Double) = (0, 0)
+        if let m = twMg { o = (m.ux, m.uy) }
+        else if let g { o = tow(g.x, g.y) }
+        else if slpK > 0.65 || t < eyeUser { o = (0, 0) }
+        else if !clusters.isEmpty { o = tow(clusters[gi].xc, clusters[gi].yc) }
+        do { let k: Double = 1 - exp(-dt / 0.06); twEyGX += (o.0 - twEyGX) * k; twEyGY += (o.1 - twEyGY) * k }
+        var strain = 0.0
+        for f in twFg.values where !f.dead { strain = max(strain, f.strain) }
+        if let g, g.peak / R > 5 && g.st > 0.8 { twEySqU = t + 0.45 }   // 猛扯那一下
+        let happy: Bool = t < twEyHappyU && !(strain > 0.4), squeeze: Bool = strain > 0.4 || t < twEySqU
+        let mode: EyeMode = slpK > 0.65 ? .sleep : (squeeze ? .squeeze : (happy ? .happy : .open))
+        if mode != twEyMode { twEyMode = mode; if mode == .open { twEyBlinkT = t - 0.08 } }
+        var open = 1.0
+        if slpK > 0.02 { open = max(0, 1 - slpK * 1.5) }
+        if let g { open = min(open, t - g.tDown < 0.3 ? 0.55 : 0.8) }
+        if mode == .open && t >= twEyNextBlink {
+            twEyBlinkT = t
+            twEyNextBlink = t + (Double.random(in: 0..<1, using: &rng) < 0.2 ? 0.32 : 2 + 4 * Double.random(in: 0..<1, using: &rng))
+        }
+        let u: Double = t - twEyBlinkT
+        twEyBlink = u < 0 ? 1 : (u < 0.07 ? 1 - u / 0.07 : (u < 0.11 ? 0 : (u < 0.21 ? (u - 0.11) / 0.1 : 1)))
+        do { let k: Double = 1 - exp(-dt / 0.05); twEyOpenD += (open - twEyOpenD) * k; twEyWideD += (eyeWideD - twEyWideD) * k }
+        twinPose(dt)
+    }
+    /// 照 eyePoseStep（主體只在 noFlip 開著時套；第二隻沒有觸手，一律套）：眼距最多靜止的 1.3 倍、臉最多歪 30 度加局部 20 度、兩顆眼睛離外框留一顆眼睛，
+    /// 不夠就往最厚的地方滑、再不夠縮眼距；0.05 秒跟上，真的出界那一幀直接夾回來。最後多一行主體沒有的：夾回外框後眼距再收回 1.3 倍（量過會到 1.45 倍）
+    private func twinPose(_ dt: Double) {
+        guard twBnd.count >= 3, twN > 0, !twEL.isEmpty, !twER.isEmpty else { twPose = nil; return }
+        let l = twAvg(twEL, q0: false), r = twAvg(twER, q0: false)
+        let S: Double = R * params.eyeSize * splitFracNow.squareRoot() * twSc, ga: Double = params.gazeAmp != 0 ? params.gazeAmp : 0.06
+        let ox: Double = twEyGX * ga * S, oy: Double = twEyGY * ga * 0.75 * S
+        let P: [(x: Double, y: Double)] = twBnd.map { (x: twX[$0], y: twY[$0]) }
+        let js: Double = params.skin >= 0.5 ? 0.68 : 1, M: Double = S * 0.118 * js + R * 0.02, g0: Double = twGAng
+        let cx: Double = (l.x + r.x) / 2 + ox, cy: Double = (l.y + r.y) / 2 + oy, ax: Double = r.x - l.x, ay: Double = r.y - l.y
+        let sp: Double = min(hypot(ax, ay), twD0 * 1.3), th0: Double = atan2(ay, ax), dth: Double = atan2(sin(th0 - g0), cos(th0 - g0))
+        let th: Double = max(-0.5, min(0.5, atan2(sin(g0), cos(g0)))) + max(-0.35, min(0.35, dth))
+        let ux: Double = cos(th), uy: Double = sin(th)
+        func fits(_ x: Double, _ y: Double, _ s: Double) -> Bool {
+            sdRing(P, x - ux * s / 2, y - uy * s / 2) >= M && sdRing(P, x + ux * s / 2, y + uy * s / 2) >= M
+        }
+        var tx = 0.0, ty = 0.0, tk = 1.0
+        if !fits(cx, cy, sp) {
+            var sx: Double = cx, sy: Double = cy, best = -1e9
+            for i in 0..<twN {
+                let d: Double = sdRing(P, twX[i], twY[i]), sc: Double = min(d, M * 1.8) - 0.04 * hypot(twX[i] - cx, twY[i] - cy)
+                if sc > best { best = sc; sx = twX[i]; sy = twY[i] }
+            }
+            var s2: Double = sp, k = 0
+            while k < 3 && !fits(sx, sy, s2) { s2 *= 0.72; k += 1 }
+            tk = sp > 0 ? s2 / sp : 1
+            var lo = 0.0, hi = 1.0
+            if fits(sx, sy, s2) {
+                for _ in 0..<6 { let m: Double = (lo + hi) / 2; if fits(cx + (sx - cx) * m, cy + (sy - cy) * m, s2) { hi = m } else { lo = m } }
+            }
+            tx = (sx - cx) * hi; ty = (sy - cy) * hi
+        }
+        let q: Double = 1 - exp(-dt / 0.05)
+        twEyCX += (tx - twEyCX) * q; twEyCY += (ty - twEyCY) * q; twEyCK += (tk - twEyCK) * q
+        let s3: Double = sp * twEyCK
+        var ex: [Double] = [cx + twEyCX - ux * s3 / 2, cx + twEyCX + ux * s3 / 2], ey: [Double] = [cy + twEyCY - uy * s3 / 2, cy + twEyCY + uy * s3 / 2]
+        for e in 0..<2 {
+            if sdRing(P, ex[e], ey[e]) >= M * 0.6 { continue }
+            var bx: Double = ex[e], by: Double = ey[e], bd = -1e9
+            for i in 0..<twN {
+                let d: Double = sdRing(P, twX[i], twY[i]), sc: Double = min(d, M) - 0.03 * hypot(twX[i] - ex[e], twY[i] - ey[e])
+                if sc > bd { bd = sc; bx = twX[i]; by = twY[i] }
+            }
+            var lo = 0.0, hi = 1.0
+            for _ in 0..<6 { let u: Double = (lo + hi) / 2; if sdRing(P, ex[e] + (bx - ex[e]) * u, ey[e] + (by - ey[e]) * u) >= M * 0.6 { hi = u } else { lo = u } }
+            ex[e] += (bx - ex[e]) * hi; ey[e] += (by - ey[e]) * hi
+        }
+        do {   // 夾回外框之後兩顆各自挪過，眼距可能又超過，再收一次（主體沒有這行）
+            let dx: Double = ex[1] - ex[0], dy: Double = ey[1] - ey[0], d: Double = hypot(dx, dy), mx: Double = twD0 * 1.3
+            if d > mx { let k: Double = (1 - mx / d) / 2; ex[0] += dx * k; ey[0] += dy * k; ex[1] -= dx * k; ey[1] -= dy * k }
+        }
+        twPose = (lx: ex[0], ly: ey[0], rx: ex[1], ry: ey[1])
     }
 
     // The merges (mergeFx). All of them: mass is how much of it has flowed into A (0 to 1), A's size k = √(1 − frac·(1 − mass)), its own sc = √(1 − mass), so the area is
@@ -6399,6 +6661,7 @@ final class SlimeRig {
 
     /// A rebuilt body starts as one again
     private func twinDrop() {
+        sphP = 0; sphNext = 0   // v2.65 #3
         b2On = false; twMg = nil; twHide = false; twTouchT = 0; twFg.removeAll(); splitPods.removeAll(); splitSq = nil
         splitK = 1; splitWob = -9; splitUsed = false; splitMx = (1, 0, 0, 1); splitDet = 1; splitDmin = 1
     }
@@ -6409,7 +6672,13 @@ final class SlimeRig {
         splitK += (tg - splitK) * (1 - exp(-dt / 0.12))
         if abs(splitK - 1) < 1e-4 && tg == 1 { splitK = 1 }
         var a00: Double = splitK, a01 = 0.0, a10 = 0.0, a11: Double = splitK
-        if let q = splitSq {
+        // v2.65 #3 快撐不住了：越撐越細（沿拉的方向拉長、橫的變細，面積不變；借合併動畫擠扁那個矩陣，記形會扣掉）。網頁 splitKStep 那行三元式
+        var sq = splitSq
+        if sq == nil && sphP > 0 && !b2On && !(params.strand >= 0.5) {
+            let e: Double = sphP * sphP, a: Double = 1 + SplitK.thin * e
+            sq = (ux: sphUx, uy: sphUy, a: a, p: 1 / a)
+        }
+        if let q = sq {
             let ax: Double = q.ux, ay: Double = q.uy
             let m00: Double = q.a * ax * ax + q.p * ay * ay, m01: Double = (q.a - q.p) * ax * ay, m11: Double = q.a * ay * ay + q.p * ax * ax
             a00 *= m00; a01 = splitK * m01; a10 = a01; a11 *= m11
@@ -6425,7 +6694,7 @@ final class SlimeRig {
         let n00: Double = c * b00 + s * b10, n01: Double = c * b01 + s * b11, n10: Double = -s * b00 + c * b10, n11: Double = -s * b01 + c * b11
         splitMx = (n00, n01, n10, n11)
         splitDet = n00 * n11 - n01 * n10
-        let sqMin: Double = splitSq.map { min($0.a, $0.p) } ?? 1
+        let sqMin: Double = sq.map { min($0.a, $0.p) } ?? 1
         splitDmin = min(1, splitK * sqMin)
     }
     private func splitKTarget() -> Double {
@@ -6443,7 +6712,8 @@ final class SlimeRig {
     }
 
     /// v2.62 the second slime as drawn (world points): its outline (empty once it has flowed in), its eyes (nil when too small or the eyes are off), the ripple inside A, the lump while swallowed
-    struct TwinEyes { let lx, ly, rx, ry, ox, oy, size, open: Double; let squeeze: Bool }
+    /// v2.65 #1：mode 不是 nil 時照主體的畫法（∩、∪、> <、睜開帶亮點、閉起來一條線）；open 是睜開×眨眼×（1−合併閉眼），wide 睜大，spread 眼距比（0.8 到 1.3）
+    struct TwinEyes { let lx, ly, rx, ry, ox, oy, size, open: Double; let squeeze: Bool; var mode: EyeMode? = nil; var wide = 1.0; var spread = 1.0 }
     struct TwinView {
         var outline: [(x: Double, y: Double)] = []
         var eyes: TwinEyes? = nil
@@ -6502,7 +6772,15 @@ final class SlimeRig {
                 let c = twinCenter(), dx: Double = clusters[gi].xc - c.x, dy: Double = clusters[gi].yc - c.y, dl: Double = hypot(dx, dy), l: Double = dl > 0 ? dl : 1
                 lkx = dx / l; lky = dy / l
             }
-            v.eyes = TwinEyes(lx: lx, ly: ly, rx: rx, ry: ry, ox: lkx * S * 0.03, oy: lky * S * 0.02, size: S, open: bk * (1 - shut), squeeze: twStretch > 1.2 && g == nil)
+            if params.twinEye >= 0.5, let pz = twPose {   // v2.65 #1（網頁 twinEyesDraw）：照主體的畫法；看哪已經在姿勢裡
+                let hp: Bool = shut < 0.5 && (twEyMode == .happy || t < splitHappy)
+                let md: EyeMode = hp ? .happy : (shut < 0.5 && twEyMode == .sleep ? .sleep : (shut < 0.5 && twEyMode == .squeeze ? .squeeze : .open))
+                let spread: Double = max(0.8, min(1.3, hypot(pz.rx - pz.lx, pz.ry - pz.ly) / twD0))
+                v.eyes = TwinEyes(lx: pz.lx, ly: pz.ly, rx: pz.rx, ry: pz.ry, ox: 0, oy: 0, size: S, open: twEyOpenD * twEyBlink * (1 - shut), squeeze: md == .squeeze,
+                                  mode: md, wide: twEyWideD, spread: spread)
+            } else {
+                v.eyes = TwinEyes(lx: lx, ly: ly, rx: rx, ry: ry, ox: lkx * S * 0.03, oy: lky * S * 0.02, size: S, open: bk * (1 - shut), squeeze: twStretch > 1.2 && g == nil)
+            }
         }
         v.bulge = g?.bulge ?? 0
         return (segs, v)
@@ -7901,21 +8179,33 @@ final class SlimeRig {
         var sp = 0.0
         // smoothed travel rate from coalesced touches (a per-frame difference flickers at 120 Hz)
         for f in fingers.values where f.mode == .grab || (f.mode == .stroke && f.on) { sp = max(sp, f.speedC / R) }
-        return fingers.isEmpty ? 0 : min(1, sp / 5)   // the controller scales this by `rubMax`
+        let tw: Bool = params.twinFb >= 0.5 && !twFg.isEmpty   // v2.65 #2（網頁 update 揉那段）：揉小史萊姆也有揉的聲音
+        if tw && b2On && twMg == nil { let k = twinGk(); for f in twFg.values where !f.dead { sp = max(sp, hypot(f.vxS, f.vyS) / R * k) } }
+        return fingers.isEmpty && !tw ? 0 : min(1, sp / 5)   // the controller scales this by `rubMax`
     }
 
+    /// v2.65 #2：小史萊姆被抓著、聲音觸感照主體（twinFb 開、沒在合）
+    private var twinFbLive: Bool { params.twinFb >= 0.5 && b2On && twMg == nil && twFg.values.contains { !$0.dead } }
+
     /// Stretch (radii, tanh-limited) of the most-stretched grabbing finger: drives the strand loop's pitch, brightness and loudness.
-    var pullStretch: Double { max(fingers.values.filter { $0.mode == .grab }.map(\.stretch).max() ?? 0, pairStretch * effParams.pairMax / 2) }   // v2.38: two fingers pulling apart count as a pull too (web PAIR.stR)
+    /// v2.65：小史萊姆被拉也算（自己的半徑 × 面積比）；快撐不住時乘 1＋p²（拉絲聲越來越緊、拉力震動跟著上去；網頁 update 的 stMax）
+    var pullStretch: Double {
+        var s: Double = max(fingers.values.filter { $0.mode == .grab }.map(\.stretch).max() ?? 0, pairStretch * effParams.pairMax / 2)   // v2.38: two fingers pulling apart count as a pull too (web PAIR.stR)
+        if twinFbLive { let k = twinGk(); for f in twFg.values where !f.dead { s = max(s, f.st * k) } }
+        if sphP > 0 && params.splitHold > 0 { s *= 1 + sphP * sphP }
+        return s
+    }
 
     /// v2.63 B1 B3 (pullFx; web pullO): the fastest a grabbing finger opens new ground (radii a second), once it is past PullFxSet.d0 from where it took hold; 0 = none
     var pullOpen: Double {
         var m = 0.0
         for f in fingers.values where f.mode == .grab && f.om >= PullFxSet.d0 { m = max(m, f.ov) }
+        if twinFbLive { let k = twinGk(); for f in twFg.values where !f.dead && f.om >= PullFxSet.d0 { m = max(m, f.ov * k) } }   // v2.65 #2
         return m
     }
 
-    /// Any finger holding the body (not pushing from outside).
-    var isGrabbing: Bool { fingers.values.contains { $0.mode == .grab } }
+    /// Any finger holding the body (not pushing from outside). v2.65：小史萊姆被抓著也算（twinFb 開時；網頁 update 的 grabbing）
+    var isGrabbing: Bool { fingers.values.contains { $0.mode == .grab } || twinFbLive }
 
     /// Largest UITouch.majorRadius among the fingers down (for the panel readout).
     var maxTouchRadius: Double { fingers.values.map { $0.radius }.max() ?? 0 }
