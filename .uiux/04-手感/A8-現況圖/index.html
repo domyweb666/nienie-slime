@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A8 現況圖</title>
+<style>
+:root{--bg:#f7f3ec;--card:#fffdf9;--ink:#2e2a26;--soft:#6b635b;--line:#e2d9cc;--mark:#b8323a;--chip:#efe7da}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d1b19;--card:#262320;--ink:#ece6de;--soft:#b3aaa0;--line:#3a3530;--mark:#f07a80;--chip:#332f2b}}
+:root[data-theme="dark"]{--bg:#1d1b19;--card:#262320;--ink:#ece6de;--soft:#b3aaa0;--line:#3a3530;--mark:#f07a80;--chip:#332f2b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:1.5rem;margin:0 0 4px}
+h2{font-size:1.2rem;margin:40px 0 8px;padding-top:8px;border-top:2px solid var(--line)}
+h3{font-size:1.05rem;margin:28px 0 6px}
+p,li{max-width:62em}
+.sub{color:var(--soft);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+.tbl{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;font-size:.92rem;min-width:640px}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:10px 0}
+figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+figure img{display:block;width:100%;height:auto}
+figcaption{font-size:.82rem;padding:5px 7px;color:var(--soft);line-height:1.45}
+figcaption b{color:var(--ink)}
+figure.hit{border:2px solid var(--mark)}
+figure.hit figcaption b{color:var(--mark)}
+dl{margin:6px 0}
+dt{font-weight:600;margin-top:8px}
+dd{margin:2px 0 0 0}
+.k{display:inline-block;background:var(--chip);border-radius:4px;padding:0 6px;font-size:.85rem;margin-right:4px}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--chip);padding:0 4px;border-radius:3px;word-break:break-all}
+footer{margin-top:48px;font-size:.9rem;color:var(--soft)}
+footer li{margin:4px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>A8 現況圖：兩指 45 度、三指拉</h1>
+<p class="sub">網頁原型、現在的預設（v2.63 加第三批已提交的部分，換皮開著，A2 到 A5 關著），芋圓。電腦模擬手勢，iPhone 沒跑。2026-11-27。</p>
+
+<div class="card">
+<p><b>先講看到的。</b>120 組裡，皮自己裂開 0 組。圖上看得到「斷一截」的，全部是 v2.62 的「扯斷成兩隻」：快拉時第二隻帶著自己的眼睛斷出去，兩隻都能捏，過幾秒合回一隻。合回那一刻常抽一下（三指 3R 快拉 10 組全有），外框跳 0.2 到 0.6R。慢拉的 60 組什麼都沒破，右下那支手指停在窗台下面，身體下不去，手指離看得到的身體 1 到 1.6R。洞只有 1 組出現過一次（只在一次讀畫面裡），位置在第二隻剛斷開、還貼著本體的交界。</p>
+<p>規劃檔 A8 寫的「兩指 45 度 18／24、三指 12／12」是 v2.60 量的，那時還是舊皮，也還沒有扯斷成兩隻，跟這頁不能直接比。</p>
+</div>
+
+<h2>120 組總表</h2>
+<p>每種 10 個種子。兩指那四列每列 20 組：「各拉 3R」和「拉到螢幕邊」在 393 點寬的畫面上都先碰到螢幕邊，每支實際只走 1.4 到 2.7R，兩種幾乎一樣，等於 10 個種子各跑兩次。</p>
+<div class="tbl"><table>
+<tr><th>手勢</th><th>組</th><th>扯斷成兩隻</th><th>扯斷或合回那一下抽</th><th>皮裂（沒扯斷）</th><th>洞</th><th>其他的抽一下</th><th>放手換回原本網格</th><th>按住時手指離身體最遠（平均）</th></tr>
+<tr><td>兩指 45 度，慢，中間起</td><td class="n">20</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">1.13R</td></tr>
+<tr><td>兩指 45 度，慢，邊緣起</td><td class="n">20</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">6</td><td class="n">1.36R</td></tr>
+<tr><td>兩指 45 度，快，中間起</td><td class="n">20</td><td class="n">20</td><td class="n">2</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">1.37R</td></tr>
+<tr><td>兩指 45 度，快，邊緣起</td><td class="n">20</td><td class="n">3</td><td class="n">3</td><td class="n">0</td><td class="n">0</td><td class="n">2（按住時補點，0.12R）</td><td class="n">16</td><td class="n">1.57R</td></tr>
+<tr><td>三指各 2R，慢</td><td class="n">10</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0.55R</td></tr>
+<tr><td>三指各 2R，快</td><td class="n">10</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0.95R</td></tr>
+<tr><td>三指各 3R，慢</td><td class="n">10</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">1.05R</td></tr>
+<tr><td>三指各 3R，快</td><td class="n">10</td><td class="n">10</td><td class="n">10</td><td class="n">0</td><td class="n">1（第二隻剛斷開那一刻）</td><td class="n">0</td><td class="n">0</td><td class="n">1.57R</td></tr>
+</table></div>
+<p>「放手換回原本網格」那 22 組，外框在那一格的跳動都沒超過判定門檻 0.12R。「其他的抽一下」那 2 組是按住時補點那一下（規劃檔 A6 管的），剛好 0.12R。</p>
+
+<h2>填洞、淡接在整理檔裡指什麼</h2>
+<dl>
+<dt>填洞</dt>
+<dd>皮的遮罩裡面積很小的洞填起來（F2 提的，沒做過）。整理檔寫的對象是「抓對側往右下、右上拉 4.5R 或到邊，身體捲一圈碰到自己」留下的洞，圖上像耳朵捲起來。估每格多 0.1 毫秒。這頁的手勢沒有捲一圈的拉法。</dd>
+<dt>淡接</dt>
+<dd>放手後換回原本那張網格的時候，加 0.2 秒從舊外框淡到新外框（F1 沒試過）。整理檔寫的對象是「抓對側往右上，細的那截自交後突然冒出一個小環」那種突變。扯斷成兩隻是 v2.62 才有，整理檔寫在那之前，合回那一下要不要也淡接，整理檔沒寫。</dd>
+</dl>
+
+<h2>兩指 45 度</h2>
+<p>兩指從身體同一條 45 度斜線上往反方向拉：一支往右下，拉到窗台下面；一支往左上。按住 3 秒，先放右下那支，0.1 秒後放另一支。黑圈是手指。</p>
+
+<h3>1　快拉，從中間起（破得最明顯）　<span class="k">種子 283</span></h3>
+<p><b>怎麼拉：</b>兩指各離中心 0.35R，每秒 20R，右下那支走 1.77R 到螢幕右邊、停在窗台下，左上那支走 2.66R 到螢幕左邊。<br>
+<b>看到：</b>拉的第 8 格（0.13 秒）就扯斷成兩隻，兩隻疊在一起，所以按住時看起來是一隻身上兩對眼睛；整隻紅（想逃）。皮沒有裂、沒有洞。手指離看得到的身體最遠 1.28R。放手後 2.43 秒兩隻開始合回，左邊那塊在 2 格（0.03 秒）內縮掉，外框跳 0.63R（抽一下，最後一張紅點是前一次讀到的外框），2.97 秒合完。<br>
+<b>填洞會改到：</b>這組沒有洞，改不到。<br>
+<b>淡接會改到：</b>這組放手沒有換網格。合回那一下抽，整理檔沒寫淡接管不管。</p>
+<div class="grid">
+<figure><a href="g1-far.png"><img src="g1-far.png" alt="兩指快拉中間起，拉到最遠" loading="lazy"></a><figcaption><b>拉到最遠</b>，0.13 秒，剛扯斷</figcaption></figure>
+<figure><a href="g1-hold1.png"><img src="g1-hold1.png" alt="按住 1 秒" loading="lazy"></a><figcaption><b>按住 1 秒</b>，兩對眼睛</figcaption></figure>
+<figure><a href="g1-hold3.png"><img src="g1-hold3.png" alt="按住 3 秒" loading="lazy"></a><figcaption><b>按住 3 秒</b></figcaption></figure>
+<figure><a href="g1-rel01.png"><img src="g1-rel01.png" alt="放手後 0.1 秒" loading="lazy"></a><figcaption><b>放手後 0.1 秒</b></figcaption></figure>
+<figure><a href="g1-rel1.png"><img src="g1-rel1.png" alt="放手後 1 秒" loading="lazy"></a><figcaption><b>放手後 1 秒</b>，兩隻並排</figcaption></figure>
+<figure class="hit"><a href="g1-worst_pop.png"><img src="g1-worst_pop.png" alt="合回時抽一下" loading="lazy"></a><figcaption><b>放手後 2.43 秒，抽 0.63R</b>，合回那一刻；紅點是 2 格前的外框</figcaption></figure>
+</div>
+
+<h3>2　慢拉，從中間起（腳貼著窗台攤平，沒破）　<span class="k">種子 406</span></h3>
+<p><b>怎麼拉：</b>兩指各離中心 0.35R，每秒 3R，右下那支走 2.18R 到螢幕右邊、停在窗台下，左上那支走 2.25R。<br>
+<b>看到：</b>沒有斷、沒有洞、沒有抽。右下那截身體被壓在窗台面上，貼著窗台攤平到螢幕右邊，手指在窗台下面，離看得到的身體 1.05R。物理外框最細的地方量到 0.01R，圖上看不到細脖子或斷開（位置沒有標出來）。放手後縮回一團。<br>
+<b>填洞會改到：</b>沒有洞，改不到。<br>
+<b>淡接會改到：</b>這組放手沒有換網格，改不到。</p>
+<div class="grid">
+<figure><a href="g2-far.png"><img src="g2-far.png" alt="兩指慢拉中間起，拉到最遠" loading="lazy"></a><figcaption><b>拉到最遠</b>，0.77 秒</figcaption></figure>
+<figure><a href="g2-hold1.png"><img src="g2-hold1.png" alt="按住 1 秒" loading="lazy"></a><figcaption><b>按住 1 秒</b></figcaption></figure>
+<figure><a href="g2-hold3.png"><img src="g2-hold3.png" alt="按住 3 秒" loading="lazy"></a><figcaption><b>按住 3 秒</b>，右下貼窗台攤平</figcaption></figure>
+<figure><a href="g2-rel01.png"><img src="g2-rel01.png" alt="放手後 0.1 秒" loading="lazy"></a><figcaption><b>放手後 0.1 秒</b></figcaption></figure>
+<figure><a href="g2-rel1.png"><img src="g2-rel1.png" alt="放手後 1 秒" loading="lazy"></a><figcaption><b>放手後 1 秒</b></figcaption></figure>
+</div>
+
+<h3>3　快拉，從邊緣起（沒破，對照；放手有換網格）　<span class="k">種子 447</span></h3>
+<p><b>怎麼拉：</b>兩指各離中心 0.75R，每秒 20R，右下那支走 1.93R 到螢幕右邊、停在窗台下，左上那支走 1.70R。<br>
+<b>看到：</b>沒有扯斷、沒有洞、沒有抽。拉完那一格身體還沒跟上；按住時拉成一個 L，手指離看得到的身體 1.69R。按住 0.23 秒時補了 3 個點（517 變 520），放手 0.03 秒後換回原本的網格（520 變 517），那一格外框跟著身體在動，沒有量到跳（紅點是 2 格前的外框，差的是這 2 格身體移動的量）。<br>
+<b>填洞會改到：</b>沒有洞，改不到。<br>
+<b>淡接會改到：</b>就是「換網格這一格」那一張：前一格到這一格會改成 0.2 秒淡過去。這組量到的跳在門檻以下，圖上看不出差別。</p>
+<div class="grid">
+<figure><a href="g3-far.png"><img src="g3-far.png" alt="兩指快拉邊緣起，拉到最遠" loading="lazy"></a><figcaption><b>拉到最遠</b>，0.1 秒，身體還沒跟上</figcaption></figure>
+<figure><a href="g3-hold1.png"><img src="g3-hold1.png" alt="按住 1 秒" loading="lazy"></a><figcaption><b>按住 1 秒</b></figcaption></figure>
+<figure><a href="g3-hold3.png"><img src="g3-hold3.png" alt="按住 3 秒" loading="lazy"></a><figcaption><b>按住 3 秒</b></figcaption></figure>
+<figure><a href="g3-swapA.png"><img src="g3-swapA.png" alt="換網格前一格" loading="lazy"></a><figcaption><b>換網格前一格</b></figcaption></figure>
+<figure class="hit"><a href="g3-swapB.png"><img src="g3-swapB.png" alt="換網格這一格" loading="lazy"></a><figcaption><b>換網格這一格</b>，淡接作用的地方；紅點是 2 格前的外框</figcaption></figure>
+<figure><a href="g3-rel01.png"><img src="g3-rel01.png" alt="放手後 0.1 秒" loading="lazy"></a><figcaption><b>放手後 0.1 秒</b></figcaption></figure>
+<figure><a href="g3-rel1.png"><img src="g3-rel1.png" alt="放手後 1 秒" loading="lazy"></a><figcaption><b>放手後 1 秒</b></figcaption></figure>
+</div>
+
+<h2>三指</h2>
+<p>三指從中心旁 0.4R 往上、右下、左下（各差 120 度）同時拉開。下面兩支會到窗台下面。按住 3 秒，每隔 0.08 秒放一支。</p>
+
+<h3>4　各拉 3R，快（破得最明顯）　<span class="k">種子 447</span></h3>
+<p><b>怎麼拉：</b>每秒 20R，0.15 秒拉完。上面那支停在窗框上緣，下面兩支停在窗台下的螢幕兩邊。<br>
+<b>看到：</b>拉的第 8 格（0.13 秒）上面那截扯斷成第二隻，帶著自己的眼睛。按住 0.15 秒時第二隻還貼著本體，交界有一個小白點（洞，0.009R²，只出現一次讀畫面）；0.48 秒時整個分開，中間看得到窗外（斷一截，第二隻 1.27R²）；按住 3 秒時第二隻又疊回本體上面。下面兩支手指在窗台下面，身體兩條腿拱起來沒碰到窗台；手指離看得到的身體最遠 1.60R。放手後 2.25 秒合回，外框跳 0.32R（抽一下），2.8 秒合完。<br>
+<b>填洞會改到：</b>「洞」那一張交界的小白點會被補起來。總表那次跑，洞出現在種子 201 的同一種拉法、同一個時間點（0.011R²）；這組是挑圖重跑時才出現。<br>
+<b>淡接會改到：</b>這組放手沒有換網格。合回那一下抽，整理檔沒寫淡接管不管。</p>
+<div class="grid">
+<figure><a href="g4-far.png"><img src="g4-far.png" alt="三指 3R 快拉，拉到最遠" loading="lazy"></a><figcaption><b>拉到最遠</b>，0.15 秒，剛扯斷</figcaption></figure>
+<figure class="hit"><a href="g4-worst_hole.png"><img src="g4-worst_hole.png" alt="交界的小洞" loading="lazy"></a><figcaption><b>按住 0.15 秒，洞</b>：兩隻交界的小白點</figcaption></figure>
+<figure class="hit"><a href="g4-worst_split.png"><img src="g4-worst_split.png" alt="斷一截" loading="lazy"></a><figcaption><b>按住 0.48 秒，斷一截</b>：第二隻整個分開</figcaption></figure>
+<figure><a href="g4-hold1.png"><img src="g4-hold1.png" alt="按住 1 秒" loading="lazy"></a><figcaption><b>按住 1 秒</b></figcaption></figure>
+<figure><a href="g4-hold3.png"><img src="g4-hold3.png" alt="按住 3 秒" loading="lazy"></a><figcaption><b>按住 3 秒</b>，第二隻疊在上面</figcaption></figure>
+<figure><a href="g4-rel01.png"><img src="g4-rel01.png" alt="放手後 0.1 秒" loading="lazy"></a><figcaption><b>放手後 0.1 秒</b></figcaption></figure>
+<figure><a href="g4-rel1.png"><img src="g4-rel1.png" alt="放手後 1 秒" loading="lazy"></a><figcaption><b>放手後 1 秒</b>，兩隻並排</figcaption></figure>
+<figure class="hit"><a href="g4-worst_pop.png"><img src="g4-worst_pop.png" alt="合回時抽一下" loading="lazy"></a><figcaption><b>放手後 2.25 秒，抽 0.32R</b>，合回那一刻；紅點是 2 格前的外框</figcaption></figure>
+</div>
+
+<h3>5　各拉 3R，慢（沒破）　<span class="k">種子 201</span></h3>
+<p><b>怎麼拉：</b>每秒 3R，1 秒拉完，手指停的位置跟第 4 組一樣。<br>
+<b>看到：</b>沒有斷、沒有洞、沒有抽。上面拉成一根長柱，下面兩條腳貼著窗台攤到螢幕兩邊，手指在窗台下面，離看得到的身體最遠 1.12R。物理外框最細量到 0.001R，圖上看不到細脖子或斷開（位置沒有標出來）。放手後縮成一個尖頂。<br>
+<b>填洞會改到：</b>沒有洞，改不到。<br>
+<b>淡接會改到：</b>這組放手沒有換網格，改不到。</p>
+<div class="grid">
+<figure><a href="g5-far.png"><img src="g5-far.png" alt="三指 3R 慢拉，拉到最遠" loading="lazy"></a><figcaption><b>拉到最遠</b>，1 秒</figcaption></figure>
+<figure><a href="g5-hold1.png"><img src="g5-hold1.png" alt="按住 1 秒" loading="lazy"></a><figcaption><b>按住 1 秒</b></figcaption></figure>
+<figure><a href="g5-hold3.png"><img src="g5-hold3.png" alt="按住 3 秒" loading="lazy"></a><figcaption><b>按住 3 秒</b></figcaption></figure>
+<figure><a href="g5-rel01.png"><img src="g5-rel01.png" alt="放手後 0.1 秒" loading="lazy"></a><figcaption><b>放手後 0.1 秒</b></figcaption></figure>
+<figure><a href="g5-rel1.png"><img src="g5-rel1.png" alt="放手後 1 秒" loading="lazy"></a><figcaption><b>放手後 1 秒</b></figcaption></figure>
+</div>
+
+<h3>6　各拉 2R，慢（沒破，對照）　<span class="k">種子 283</span></h3>
+<p><b>怎麼拉：</b>每秒 3R，0.67 秒拉完。下面兩支停在窗台木板下緣再下面一點。<br>
+<b>看到：</b>沒有斷、沒有洞、沒有抽。手指離看得到的身體最遠 0.66R。物理外框最細量到 0.013R（同一組第一次跑是 0.18R，頁面有不吃種子的亂數），圖上看不到細脖子。<br>
+<b>填洞會改到：</b>沒有洞，改不到。<br>
+<b>淡接會改到：</b>這組放手沒有換網格，改不到。</p>
+<div class="grid">
+<figure><a href="g6-far.png"><img src="g6-far.png" alt="三指 2R 慢拉，拉到最遠" loading="lazy"></a><figcaption><b>拉到最遠</b>，0.67 秒</figcaption></figure>
+<figure><a href="g6-hold1.png"><img src="g6-hold1.png" alt="按住 1 秒" loading="lazy"></a><figcaption><b>按住 1 秒</b></figcaption></figure>
+<figure><a href="g6-hold3.png"><img src="g6-hold3.png" alt="按住 3 秒" loading="lazy"></a><figcaption><b>按住 3 秒</b></figcaption></figure>
+<figure><a href="g6-rel01.png"><img src="g6-rel01.png" alt="放手後 0.1 秒" loading="lazy"></a><figcaption><b>放手後 0.1 秒</b></figcaption></figure>
+<figure><a href="g6-rel1.png"><img src="g6-rel1.png" alt="放手後 1 秒" loading="lazy"></a><figcaption><b>放手後 1 秒</b></figcaption></figure>
+</div>
+
+<footer>
+<h2>模擬參數</h2>
+<ul>
+<li><b>程式：</b>分支 <code>batch3-v2.64</code> 的 commit <code>9574641</code>，用 <code>git archive 9574641 prototype/web</code> 取出來跑，不含當時另外兩個代理還沒提交的改動。</li>
+<li><b>設定：</b>網頁預設，芋圓（黏土），白天窗景。換皮 <code>skinU 1</code>；拉的 A3、A4、A5 <code>pullHold 0</code>、<code>pullWhole 0</code>、<code>pullSoft 0</code>（A2 在 pullSoft 裡）；扯斷成兩隻 <code>split 1</code>（扯斷距離 1.8R、手指每秒快過 10R）、合併動畫 <code>mergeFx 1</code>。網頁的回家彈簧（沒換成手機的值）。</li>
+<li><b>瀏覽器：</b>無頭 Chrome，393×852 點、2 倍像素，關掉畫面自己的更新，腳本每格推 1/60 秒；開始前先放 2 秒（120 格）。</li>
+<li><b>兩指 45 度：</b>兩指在身體中心兩側 0.35R（中間起）或 0.75R（邊緣起），一支往右下 45 度、一支往左上；目標各 3R 或到螢幕邊，實際都被螢幕邊擋在 1.4 到 2.7R；慢每秒 3R、快每秒 20R；按住 3 秒；先放右下那支，0.1 秒後放另一支；放手後跑 4 秒。</li>
+<li><b>三指：</b>三指在中心旁 0.4R，往上、右下、左下各拉開 2R 或 3R；慢每秒 3R、快每秒 20R；按住 3 秒；每隔 0.083 秒放一支；放手後跑 4 秒。</li>
+<li><b>時間點：</b>「放手後」從最後一支手指放開算。「拉到最遠」是手指剛停的那一格。</li>
+<li><b>種子：</b>201、242、283、324、365、406、447、488、529、570（前三個跟 F1 的 <code>cells.py</code> 一樣）。每種手勢每個種子跑一次。</li>
+<li><b>判定：</b>F1 的 <code>probe.js</code>（<code>.vibe/audit-2026-11-24/patches/F1-量測工具/</code>）。每 2 格讀一次皮的遮罩（196×426，門檻 0.46）。裂：0.004R² 以上的塊超過一塊（碰到螢幕邊的算同一塊）；洞：0.002R² 以上；抽一下：兩次讀之間外框跳超過 0.12R（扣掉身體整體移動）。「扯斷成兩隻」看程式裡第二隻（<code>B2.on</code>）有沒有出現。「手指離身體」是手指到最近看得到的身體的距離。「物理外框最細」是 F1 的 neck 量法，量的是物理外框，跟畫出來的皮不一樣。</li>
+<li><b>重跑會差：</b>頁面有不吃種子的亂數。總表是第一次跑的 120 組；圖是挑出來的 6 組用 2 倍解析度再跑一次，文字的數字是第二次的。6 組兩次跑的扯斷、合回、抽在同一格；抽的大小會差（第 1 組 0.53R 對 0.63R）；第 4 組的洞第二次才出現；第 3 組按住時補點第一次兩次、第二次一次；第 6 組的「物理外框最細」差很多（0.18R 對 0.013R）。</li>
+<li><b>圖：</b>2 倍解析度截畫布，裁掉上下空白，縮成 590×990，256 色 PNG。黑圈是手指，紅點是 2 格前讀到的外框。</li>
+<li><b>腳本：</b><code>tools/web-bench/a8shots.py</code>、<code>tools/web-bench/a8.js</code>。總表：<code>python a8shots.py &lt;web&gt; &lt;輸出&gt; --procs 8 --seeds 10</code>；圖：再加 <code>--swap --scale 2 --only &lt;六組的 id&gt;</code>。</li>
+<li><b>沒做：</b>iPhone；手機的回家彈簧；身體捲一圈的拉法（填洞原本的對象）；A2 到 A5 打開；其他九隻。</li>
+</ul>
+</footer>
+</main>
+</body>
+</html>

@@ -16,6 +16,47 @@ vertex VOut jelVertex(uint vid [[vertex_id]]) {
     return o;
 }
 
+// v2.61 A1 網格聯集的皮 (web: JELX.mode 9, jelMeshInit's VM FM VC FC): the mask drawn from the body's own triangles instead of its outline. Every triangle writes 1,
+// the capsules (the keep-alive line where it is thin) their own soft edge, all blended with max, so neither the winding nor the order matters.
+// Points are screen points, y down; u.xy = 2 / the mask's size.
+struct MeshOut { float4 pos [[position]]; };
+
+vertex MeshOut jelMeshVertex(uint vid [[vertex_id]], const device float2* p [[buffer(0)]], constant float4& u [[buffer(1)]]) {
+    MeshOut o;
+    o.pos = float4(p[vid].x * u.x - 1.0, 1.0 - p[vid].y * u.y, 0.0, 1.0);
+    return o;
+}
+
+fragment float4 jelMeshFragment(MeshOut in [[stage_in]]) {
+    return float4(1.0);
+}
+
+struct CapIn { float4 ab; float4 r; };   // the two ends; the radius in r.x (Swift: SkinMesh.Cap)
+struct CapOut { float4 pos [[position]]; float2 q; float4 sg [[flat]]; float rd [[flat]]; };
+
+vertex CapOut jelCapVertex(uint vid [[vertex_id]], uint iid [[instance_id]], const device CapIn* c [[buffer(0)]], constant float4& u [[buffer(1)]]) {
+    float2 p = float2(float(vid & 1u), float(vid >> 1) * 2.0 - 1.0);   // a strip of four: (0,-1) (1,-1) (0,1) (1,1)
+    float4 ab = c[iid].ab;
+    float r = c[iid].r.x;
+    float2 a = ab.xy, b = ab.zw, d = b - a;
+    float L = length(d);
+    float2 along = L > 1e-5 ? d / L : float2(1.0, 0.0);
+    float2 n = float2(-along.y, along.x);
+    float2 q = mix(a, b, p.x) + along * (p.x * 2.0 - 1.0) * (r + 1.0) + n * p.y * (r + 1.0);
+    CapOut o;
+    o.pos = float4(q.x * u.x - 1.0, 1.0 - q.y * u.y, 0.0, 1.0);
+    o.q = q;
+    o.sg = ab;
+    o.rd = r;
+    return o;
+}
+
+fragment float4 jelCapFragment(CapOut in [[stage_in]]) {
+    float2 a = in.sg.xy, ba = in.sg.zw - a, pa = in.q - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    return float4(clamp(in.rd + 0.5 - length(pa - ba * h), 0.0, 1.0));
+}
+
 struct BlurU { float2 d; float s; float pad; };
 
 fragment float4 jelBlur(VOut in [[stage_in]], texture2d<float> t [[texture(0)]], sampler sm [[sampler(0)]], constant BlurU& u [[buffer(0)]]) {
@@ -58,9 +99,9 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     float rpx = u.resRpxN.z;
     float aEdge = u.k0.x, aCore = u.k0.y, amb = u.k0.z, dif = u.k0.w;
     float glow = u.k1.x, line = u.k1.y, nk = u.k1.z, shin = u.k1.w;
-    float s0 = u.k2.x, s1 = u.k2.y, spec = u.k2.z, sheen = u.k2.w, arc = u.k3.x, rnd = u.k3.y, wet = u.k3.z;
+    float s0 = u.k2.x, s1 = u.k2.y, spec = u.k2.z, sheen = u.k2.w, arc = u.k3.x, rnd = u.k3.y, wet = u.k3.z, ec = u.k3.w;   // v2.61b ec: edgeClean (opaque only)
     // v2.47 rnd: the outline from the blurred mask, so sharp corners and thin spikes round off and concave corners join like water
-    float m = M.sample(sm, v).r, cov = rnd > 0.0 ? smoothstep(rnd - 0.05, rnd + 0.05, B1.sample(sm, v).r) : smoothstep(0.18, 0.82, m);
+    float m = M.sample(sm, v).r, cov = rnd > 0.0 ? smoothstep(rnd - 0.05 * (1.0 - 0.6 * ec), rnd + 0.05 * (1.0 - 0.6 * ec), B1.sample(sm, v).r) : smoothstep(mix(0.18, 0.38, ec), mix(0.82, 0.62, ec), m);
     if (cov <= 0.0) return float4(0.0);
     float2 e = 2.0 / res, E = 8.0 / res;
     float gx = (H1(v + float2(e.x, 0.0), B1, sm, u) - H1(v - float2(e.x, 0.0), B1, sm, u)) / 4.0
@@ -85,12 +126,12 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
         float3 bg = BG.sample(sm, v + ro).rgb;
         float3 T = mix(float3(1.0), u.cCore.rgb, clamp(thick * u.k4.z + 0.05, 0.0, 1.0));
         float3 w = bg * T + u.cGlow.rgb * smoothstep(0.15, 0.8, tr) * (0.2 + 0.8 * fres) * glow * 0.5;
-        w = mix(w, col, clamp(smoothstep(0.03, 0.35, thick) * u.k4.w, 0.0, 1.0));   // v2.51: the thick part hides what is behind it
-        w *= 1.0 - 0.16 * smoothstep(0.2, 0.55, fres) * (1.0 - smoothstep(0.55, 0.9, fres));
+        w = mix(w, col, clamp(smoothstep(0.03 * (1.0 - ec), mix(0.35, 0.1, ec), thick) * u.k4.w, 0.0, 1.0));   // v2.51: the thick part hides what is behind it
+        w *= 1.0 - 0.16 * (1.0 - ec) * smoothstep(0.2, 0.55, fres) * (1.0 - smoothstep(0.55, 0.9, fres));
         w = mix(w, float3(0.95, 0.98, 1.0), fres * 0.3);
         c = mix(c, float4(w, 1.0), water);
     }
-    c = mix(c, float4(u.cLine.rgb, 1.0), (1.0 - smoothstep(0.5, 0.66, b1)) * line);
+    c = mix(c, float4(u.cLine.rgb, 1.0), (1.0 - smoothstep(0.5, 0.66, b1)) * line * (1.0 - 0.7 * ec));
     float nh = max(dot(n, Hv), 0.0);
     c.rgb += float3(pow(nh, shin * 0.22) * sheen * (1.0 - thick * 0.4)) * c.a;
     c = mix(c, float4(1.0), smoothstep(s0, s1, pow(nh, shin)) * spec);

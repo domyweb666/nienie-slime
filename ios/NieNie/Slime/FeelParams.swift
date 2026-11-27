@@ -248,6 +248,10 @@ struct FeelParams: Equatable, Codable {
     var introSwim: Double = 1         // the cold start (and a slime switch): it swims in from off the right edge, looks at you, waves, says hello. 0: the v2.17 hops
     // v2.23 personality (set by the chosen slime, see SlimeKind): rest length, voice pitch, eye size, how fast trust and wariness grow, how soon it visits
     var restMul: Double = 1, voicePitch: Double = 1, eyeSize: Double = 1, trRate: Double = 1, wRate: Double = 1, e4Mul: Double = 1
+    // v2.57 (the six new slimes, web v2.52): seconds alone before it falls asleep (湯圓 25), how fast wariness fades (× 260 s; 布丁 0.12, scared easily but forgets fast)
+    var sleepAfter: Double = 40, wFade: Double = 1
+    var coreSoft: Double = 0, edgeClean: Double = 0   // v2.61b (多米 11-26), the panel's two chips, every material: 1 = 湯圓's core smaller and lighter; 1 = the opaque body's edge clean (no grey see-through rim, the dark line 70% lighter)
+    var clear: Double = 0             // v2.60 (多米 11-24: back to the opaque body; v2.57's switch for the six new ones now covers all ten): 1 = all ten glossy and see-through as in v2.53b to v2.59 (shine 1, opaque 0); 0 = shine and opaque below. Set from the panel's chip, for every material
     // v2.47 (多米 11-16, phone video of build 127: pulled about, some places turn sharp; pulled too long it twitches; take the powder out; it should look full of water)
     var pressPull: Double = 1         // 1: the press spread fades once the finger has pulled away from where it landed (0.15R to 0.6R). Measured: pulled 3R and held still, the patch under the finger was still spread 0.3R (the grab radius), tearing it: 18 flipped triangles, the guard pushing 5 pt back every frame. 0 = v2.46
     var dragCalm: Double = 1          // 1: the spring the whole body follows the finger on is damped more from 1R of travel, no overshoot from 3R (pulled 3.5R it ran 60 pt past and came back, jumping for a second with the hand still). 0 = v2.46
@@ -273,16 +277,128 @@ struct FeelParams: Equatable, Codable {
     var absorb: Double = 0.68         // 0 the whole of it like clear water; 1 a strong colour in the middle
     var caustic: Double = 0           // v2.51: 0 (the ring under it read as a base). sitting, a patch of gathered light under it and a faint ring of shade; 0 off
     // v2.51 (多米 11-22). Web: the same keys in PRESETS
-    var shine: Double = 0             // 0: no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50
-    var opaque: Double = 0.9          // how much the thick part of the body hides what is behind it. 0 = v2.50 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
+    var shine: Double = 0             // 0 (v2.60, 多米 11-24: back to the look of v2.51 to v2.53): no highlights on the body (main spot, small spot, the arc, the sheen); 1 = v2.50, and v2.53b to v2.59
+    var opaque: Double = 0.9          // how much the thick part of the body hides what is behind it. 0.9 (v2.60): only the thin edge lets it through. 0 = v2.50, and v2.53b to v2.59 (all of it clear: the sill edge and the cloth seen through it were the "line" and the "base")
     var lump: Double = 1              // irregular outline (web shape.js): heavy below, a bump leaning to one side on top, a smaller one low on the other side; 0 = the near-round blob of v2.50. Rebuilds the body
-    var strand: Double = 1            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
-    var tugEdge: Double = 0.42        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
-    var split: Double = 1             // the finger farther than splitAt×R from the body's centre for 0.4 s: the strand pinches and parts, the finger's end becomes a second small blob (no face). At most two. 0 off
-    var splitAt: Double = 3.4
-    var rejoin: Double = 6            // seconds left alone before the small blob crawls back and merges; dropped on the body it merges at once
+    var strand: Double = 0            // the body itself stretches to a stable length (2.4R on the sill); farther than that a tapered strand runs from the held patch to the finger, drawn into the same mask. 0 = v2.50
+    var tugEdge: Double = 0        // a grab this close to the outline (×R) pulls a strand out and the body stays; nearer the middle it is carried whole as before. 0 = always carried
+    var split: Double = 1             // v2.62 (多米 11-26): held and pulled past splitAt×R from where it took hold, the finger fast (splitV), it tears into two pinchable slimes; touching, they merge back with mergeFx. At most two. With the strand on: v2.51 (the strand pinches and parts). 0 off
+    var splitAt: Double = 1.8         // v2.62: how far the finger is pulled from where it took hold (radii; 3.4 before, measured from the centre). The strand's pinch does not read it: a fixed 3.4 from the centre, as v2.51
+    var splitV: Double = 10           // v2.62: the finger faster than this on screen (radii a second) counts as a tear (v2.61's yank is 6)
+    var splitFrac: Double = 0.45      // v2.62: the share of the area the second one takes; the first shrinks to the rest, merged they add up to the whole again
+    var splitAgain: Double = 1        // v2.62: 1 = merged back, it can tear again (多米 11-26 chose this); 0 = once per opening
+    var mergeFx: Double = 1           // v2.62: the merge animation: 0 a bridge of goo, 1 squash and pop, 2 a drop and a ripple, 3 swallowed. 1 (多米 11-26 chose squash and pop); the other three stay as controls
+    var mergeGap: Double = 0.08       // v2.62: the two outlines this close (radii) count as touching, the merge starts
+    var mergeWait: Double = 1.5       // v2.62 (多米 11-26: touching, they merge a little later): touching this long (seconds, unbroken) before the merge starts; parted, it starts again. 0 = at once
+    var rejoin: Double = 6            // seconds left alone before the second one crawls back (in pulses); touching, the merge plays
+    var endless: Double = 1           // v2.54 無限拉 (多米 11-22: pulled 5 cm it grew 3 cm and stopped; it should stretch without end and stay under the finger): the finger never gives way, the soft limits (maxPull, memMax) are off, and each edge's hard limit widens by `capG` while the held patch cannot keep up; 0 = v2.53
+    var growK: Double = 1.5           // how fast the edge limits widen while the held patch lags the finger (e to this power a second)
+    var growMax: Double = 12          // the most the edge limits widen
+    var pullCreep: Double = 15        // pulled outward (0.6R on, fully at 1.8R) the remembered shape follows this fast instead of creep
+    var pullNearR: Double = 10        // and is measured in the whole body's frame this far around the finger (×R) instead of nearR
+    var homeFloor: Double = 1         // v2.55 (11-23): held on the sill, the home spring may not pull the body into the floor (home lowest where the bottom just touches the surface). Pulled up 2.5 to 3.5R and held, the remembered shape grew long while home stayed at the short body's centre, so the spring pushed the lower half into the sill: flattened to a line, a hundred flipped triangles. 0 = v2.54b
+    var remeshCalm: Double = 0.25     // v2.56 (11-23): for this long after a re-sample, each 1/60 s the body keeps remeshCalmK of its velocity relative to the whole (the new mesh settles instead of bouncing; held at 3R the 12 frames after a re-sample jerked 8 to 10). 0 = v2.55
+    var remeshCalmK: Double = 0.2     // how much of that relative velocity is kept per 1/60 s while settling; 1 = no effect
+    var remeshHome: Double = 1        // v2.58 (QC-0007 #46): let go, the body goes back to the mesh it was built with (its shape carried over); a re-sample no longer folds the return target. 0 = v2.57
+    var pullGive: Double = 0.3        // v2.58 (11-24): pulled outward (0.6R on, fully at 1.8R) the finger gives way at most this many radii instead of 2 (it piled up to 2R and the held patch trailed: a slanted 5.5R pull 1.6R behind, 3.3R at worst); rubbing, pressing and pinching as before. 0 = before
+    var memUntie: Double = 0.8        // v2.58 (11-24, QC-0007 #46): let go, the remembered outline crossed longer than this many seconds is undone fast, the memory's own limits left out until then; knotted over 0.6 s on a screen edge, it drops early. 0 = off
+    var walkShow: Double = 0          // v2.58 (QC-0007 #47): 0 = it does not go out and brings nothing back, nothing from walks lies on the sill, no gift stone (what is saved stays saved); 1 = v2.57
+    var remesh: Double = 1            // v2.54 拉長時自動補點: re-sample the body from the remembered shape when it is pulled long (see SlimeRig.remesh); 0 = only widen the limits
+    var remeshHi: Double = 2.6        // an outline edge of the remembered shape longer than this many point spacings
+    var remeshStr: Double = 2.8       // or an edge inside past this × its rest length
+    var remeshLo: Double = 0.55       // going back: an outline edge shorter than this many spacings (and more points than at build time)
+    var remeshMaxN: Double = 3        // at most this × the build-time point count
+    var rateK: Double = 0.8           // v2.54 快扯變硬、慢拉變軟: how much the finger's speed changes the stiffness while held (0 = off)
+    var rateLo: Double = 4            // radii a second, at or below: softest
+    var rateHi: Double = 14            // radii a second, at or above: stiffest
+    var hapPull: Double = 0.55        // v2.54 震動跟著拉力走: continuous rumble at full tension (0 = off)
+    var frameCling: Double = 0        // v2.54 (多米 11-22: only the phone's four edges, no more window ledge): 1 = v2.53, set down by the window jambs or under the top bar it sticks to the frame
     var edgeCling: Double = 1         // set down slowly by the left, right or top edge of the screen it sticks there, the same suckers as on the window jambs; 0 = jambs only
     var bubbles: Double = 0           // v2.51: 0 (多米: no drops inside). small air bubbles inside it, each riding a particle (squeezed aside with it); 0 none
+    // v2.52 (多米 11-22, 《虛擬手感》3-3 到 3-5 的決定；交辦 A、C 組). Web: the same keys in PRESETS
+    var flow: Double = 0              // A4 流: left alone on the sill, the remembered shape slumps under gravity and spreads sideways, this share of its height a second (0.05 ≈ half in 14 s); a finger stops it at once. 0 = off (v2.51). Per material once 多米 has filmed his reference
+    var strandAt: Double = 2.4        // A1: with the strand on, how far the body itself stretches on the sill (radii); the rest of the way is the strand. No effect with the strand off.
+                                      // v2.51 had 2.4 written in. Held by the edge (tugEdge: the body does not come along) the small grabbed patch had to stretch 2.4R by itself:
+                                      // the outline folded to 135-178°, dozens of triangles turned over while held and on release, and the fuzz test's jump-while-held went
+                                      // from 0.61 pt (v2.48) to 2.45. At 1.6 it is 0.61 again and the strand still reaches the finger (numbers in .vibe/代決清單.md)
+    var sillCap: Double = 0           // A1 control: 0 = the sill does not cap the stretch (clay pulls to its own 7 and remembers 5); 3.2 = v2.50 (stretch at most 3.2R, memory 2.6R). Only with the strand off
+    var thin: Double = 0              // C1 細絲: 1 = from 60% of the effective stretch limit the outline's rounding shrinks, down to 30% at the limit, so a thinning strand of body shows; 0 = v2.51 (fixed rounding)
+    var wbreath: Double = 0           // C2 水的呼吸: 1 = what is seen through the body bends ±12% with its breath (still, the refraction was static: glass, not water); 0 = v2.51
+    var decoThru: Double = 1          // C3: 1 = the wind bell, the teru bozu and what it brought back from walks show through the body too (the baked background gets them every frame); 0 = v2.49 (fixed background only), to measure the cost
+    // v2.61 第一批 (.vibe/第一批-合約.md, 2026-11-25). Web: the same keys in PRESETS, the same for all three materials. 0 = build 158 for every one of them
+    var skinU: Double = 1             // A1 網格聯集的皮: 1 = the mask is the union of the body's triangles with a line of 0.12R where it is thin, so a figure 8 or a thin neck does not part, and what is clipped to the body follows; 0 = the outline path (v2.60)
+    var pullHold: Double = 0          // A3 拉長停住就定住: 1 = pulled long and the finger still, the remembered shape all but stops; 0 = it keeps growing slowly by itself
+    var pullWhole: Double = 0         // A4 往裡拉先整隻走: 1 = pulled towards the body's middle, the whole body goes along first, then it stretches; 0 = only the held patch goes in
+    var pullSoft: Double = 0          // A5 + A2 放手是收回去: 1 = let go long it is drawn back (fl 1.35, up 3, vc 6, bl 1.35, cg 1, gv 1); 0 = it springs, flees and shakes as before
+    var rough: Double = 1             // D1 只有快扯算欺負: 1 = only a fast yank counts as rough (it no longer adds trust, and adds no wariness); 0 = pulled out 1.5R for 0.5 s counts
+    var tapSoft: Double = 1           // D2 慢點不算攻擊: 1 = slow light taps are no attack; 0 = as before, three pokes in a second are, however light
+    var petSlow: Double = 1           // C3 慢摸累積: 1 = slow strokes add up, feeding only the purr and the trust; 0 = as before
+    var wakeSoft: Double = 1          // C1 輕碰慢慢醒: 1 = a light touch wakes it slowly, and just opened it stays up 40 s; 0 = as before (startled awake by any touch, asleep at 30 s)
+    var nearFast: Double = 1          // C2 聽節奏時照樣靠過來: 1 = it comes to the finger beside it while it listens for a rhythm too; 0 = as before
+    var greetLook: Double = 1         // C4 打開先看你: 1 = opened, or back from the background / lock screen, it looks at you first (asleep: wakes slowly, no sound); 0 = as before. Wired in v2.63 (SlimeRig greetArm, greetStep)
+    var brJit: Double = 1             // C7 作息亂數: 1 = each waking and each sleep draws its own pace, an opening starts the needs at random; 0 = as before. Read since v2.63 (SlimeBrain)
+    var bumpSoft: Double = 1          // C7 自己撞到只晃不倒: 1 = on; 0 = as before. Read since v2.64 (擺飾變真, SlimeRig selfMove / softHold); decoReal 0 never reads it
+    // v2.64 擺飾變真 (未做 24; web decoReal v2.44, decoBody, decoPush v2.45, decoReact, decoCat, decoScare v2.46; the same keys and defaults for all three materials).
+    // SlimeRig MARK v2.64 擺飾變真. decoReal 0 = v2.63 exactly (the candle and the right end baked into the picture, nothing to push, no random drawn)
+    var decoReal: Double = 1          // 擺飾變真: 1 = the candle and the jar (deco 2: the books) have weight: a tap rocks them, a finger drags or knocks them over, off the sill they come back ~20 s later; the bell and the teru bozu are pendulums
+    var decoBody: Double = 1          // 牠碰得到擺飾: 1 = its body moving through a thing carries it (slow: a nudge, fast: knocked over); a pseudopod or the body rings the bell; 0 = only fingers reach them
+    var decoPush: Double = 1          // 牠帶動東西的力道 (Agent's pick on the web): larger, things are carried and knocked over more easily
+    var decoReact: Double = 1         // 牠對擺飾有反應: 1 = it looks at what moved or rang, curious enough it reaches over; a fall startles it (wakes it), less each time; at night the lit candle is home; 0 = it does not notice
+    var decoCat: Double = 1           // 像貓一樣推東西: 1 = very trusting, in a good mood and curious it walks to the candle or the jar, looks at you, pushes it slowly to the edge (at most twice an opening); 0 = off
+    var decoScare: Double = 1         // 東西倒下牠嚇多大 (Agent's pick on the web): larger, a fall scares it more; 0 = not at all
+    // v2.63 大腦第一片 (web brain v2.41, brPre v2.42, brAwakeT, brSleepT; the same keys and defaults for all three materials). SlimeBrain.swift, SlimeRig MARK v2.63 大腦
+    var brain: Double = 1             // 大腦: 1 = five needs rise and fall, it does what the strongest wants; tired after a run, wakes by itself, comes to you when it wants to be stroked; 0 = as before (dice, asleep 40 s untouched, never wakes by itself)
+    var brPre: Double = 1             // 換事情前的前兆: 1 = squints and sighs 2 s before sleeping, looks at you before coming; 0 = straight away
+    var brAwakeT: Double = 300        // 醒著多久會睏 (s): sleepiness from 0 to full untouched; twice as fast after 20 s untouched, 1.5× at night
+    var brSleepT: Double = 90         // 睡多久睡飽 (s): sleepiness from full to 0 asleep; slept off, it wakes by itself
+    // v2.63 大腦第二片 (web mood, moodHalf v2.42; the same keys and defaults for all three materials). SlimeBrain.mood, SlimeRig mdOn / brainM / brainMS
+    var mood: Double = 1              // 心情: 1 = a mood that changes over minutes (purr, happy, its rhythm answered: better; pulled, scared, woken: worse) and leans the needs, posture, eyes, strides, the flinch, a poke; only this opening. 0 = as before. Needs brain
+    var moodHalf: Double = 300        // 心情多久退一半 (s): with nothing happening the mood goes back to 0.1 (a mild liking), half the way in this many seconds
+    // v2.64 大腦第三片「記地方」(web brMem v2.43; the same key and default for all three materials). SlimeBrain.Mem, SlimeRig MARK v2.64 記地方, SlimeController brainMems ("nienie.brain")
+    var brMem: Double = 1             // 記性: 1 = it remembers on the sill where it was stroked well (goes back there to rest, to sleep) and where it was scared (walks round it), and which side you mostly touch (trusting, it offers you that side); the liked cells stay across days, the disliked fade in 3 days; 0 = as v2.63 (home always the middle of the sill, nothing written)
+    // v2.63 C9 (web nap, napPurr, napWait; NAP, napStep, napReady; the same keys and defaults for all three materials). SlimeRig MARK v2.63 C9
+    var nap: Double = 1               // 揉夠了在你手邊睡著: 1 = purred napPurr s in all this opening, then no finger for napWait s, it falls asleep where you last touched it (not back to the mat, no 前兆, no words); 0 = as before
+    var napPurr: Double = 60          // 揉多久會睡在手邊 (s): purr over 0.3 counted this opening (a slime switch, a rebuild, a rotation start it again). The number is mine, to be tried on a phone
+    var napWait: Double = 6           // 放手幾秒睡著 (s): once enough, how long after the last finger leaves. The number is mine, to be tried on a phone
+    // v2.63 D3 (web holdScared, holdTickle; dragStep's C3, releaseFinger, e2Step; the same keys and defaults for all three materials). SlimeRig MARK v2.63 D3
+    var holdScared: Double = 1        // 怕的不滑走: 1 = very wary and held open 1R for 1.5 s, it no longer slips from the finger: it protests, squeezes its eyes, again every 1.5 s still held, and walks off when let go; 0 = as before (it slips and slinks off)
+    var holdTickle: Double = 1        // 搔癢不掙脫: 1 = tickled it keeps squirming and giggling as long as you go on, it never breaks free nor turns to protesting; 0 = as before (free after tickFree s, protesting the last 2)
+    // v2.63 C5 (web lookNoDown; pickDir; the same key and default for all three materials). SlimeRig MARK v2.63 C5
+    var lookNoDown: Double = 1        // 張望不朝下: 1 = on the sill a sniff no longer points down into the ledge (the lower half is mirrored over the horizon, so only up and the sides; no extra draws from the rng); floating it is left alone; 0 = as before (0 to 360 degrees, about four in ten down)
+    // v2.64 C5 張望有對象（網頁 lookTarget；pickDir、ltPick、ltReact；三個材質同名同預設）。SlimeRig MARK v2.64 C5，窗景那一種在 SlimeView winMover
+    var lookTarget: Double = 1        // 張望有對象：1 = 張望時朝你碰過的地方、窗景裡在動的東西、在晃的風鈴、旁邊的擺飾探，看完一個小反應（靠一下、眨眼、偽足再點一下）；沒有對象照舊亂抽；0 = 跟 v2.63 一樣（只亂抽，看完沒有反應，自己那串亂數也不抽）
+    // v2.64 D8 點牠牠頂回來、呼嚕時慢眨眼（網頁 tapBack、slowBlink；TB、TBK、tbArm、tbStep、SBL、SBLK、sblStep；三個材質同名同預設）。SlimeRig MARK v2.64 D8
+    var tapBack: Double = 1           // 點牠牠頂回來：1 = 點一下，牠朝你的手指傾完再過 0.4 秒，朝你剛才點的地方頂一下（跟按著不動往手指推一下同一套，手機輕頂一下），看著你 1.5 秒；不改戒、熟、交情、心情；0 = 跟改之前一樣（傾一下就結束）
+    var slowBlink: Double = 1         // 呼嚕時慢眨眼：1 = 呼嚕累計 6 到 12 秒慢眨一次（∩ 換回半睜、慢慢閉上、停一下、慢慢睜開，再回 ∩，約 2.8 秒），只用既有的眼睛形狀；0 = 跟改之前一樣（呼嚕時一直 ∩，自己那串亂數不影響別的）
+    // v2.64 C8 十隻招牌動作、喜歡的位置（網頁 signature；SG、SGDEF、sgFire、sgStep、sgFavX、sgHomeFav；三個材質同名同預設）。SlimeRig MARK v2.64 C8，哪一隻由 SlimeController 設 rig.sgId
+    var signature: Double = 1         // 十隻招牌：1 = 醒著沒人碰時每隻隔自己的時間（20 到 60 秒）做一次自己的招牌動作，窗台上家放在牠天生喜歡的那格（你摸出來的喜歡、夜晚蠟燭照舊優先；離開那格超過 20 秒，想張望也先走回去）；0 = 跟改之前一樣（十隻只差幾個數字，家都在布墊，自己那串亂數不抽）
+    // v2.64 B9 撞側牆出聲、揉的痕跡（網頁 sndWall、rubTrail；WALL、WALLK、wallSides、wallStep、RTK、drawRubTrail；三個材質同名同預設）。SlimeRig MARK v2.64 B9，痕跡畫在 SlimeView drawRubTrail
+    var sndWall: Double = 1           // 撞側牆出聲：1 = 身體撞到側牆（窗台兩端、在窗框上時左右窗框、藍底時鏡頭最遠的左右邊）出一聲落地聲（fx.land），整團往牆每秒 2R 以下不響、2 到 10R 音量 0.15 到 0.6、越大力越低一點，0.6 秒內不連發；只有聲音不震；0 = 跟改之前一樣（不呼叫）
+    var rubTrail: Double = 1          // 揉的痕跡：1 = 果凍皮上也畫手指走過的痕跡（v2.26 就有在算，以前只畫在平塗皮）：角色陰影色一條實心帶子，越舊越淡，dentTrail 秒淡完；0 = 跟改之前一樣（果凍皮上不畫）
+    // v2.64 B8 起步跟手（網頁 startFollow、SFK、lagK，1505203；三個材質同名同預設）。SlimeRig SfSet、lagK；甲乙盲比在 SlimeController（B8Blind）
+    var startFollow: Double = 0       // 起步跟手：1 = 手一動，被抓那塊的慢一拍先用 20 毫秒，真手指走 0.6R 內照走的距離直線變回 lag，停 80 毫秒歸零（下一次起步又快）；0 = 跟改之前一樣（lagK 就是原本的 1 − exp(−dt／lag)）
+    // v2.64 未做 18 震動晚畫面（只有手機有，網頁沒有震動）。SlimeHaptics delay；三選一盲比在 SlimeController（HapDelayBlind）
+    var hapDelay: Double = 0          // 震動晚畫面幾毫秒：所有震動（連續型、事件型）交給震動引擎自己的時鐘晚這麼多才發，聲音和畫面不動；0 = 跟改之前一樣（全部立刻發）
+    // v2.63 C6 (web rubVary; rubHappy, the voice shuffle bag; the same key and default for all three materials). SlimeRig MARK v2.63 C6, SlimeAudio voiceBag
+    var rubVary: Double = 1           // 揉完的反應輪流: 1 = done rubbing or stroking, the hop, melting 2 s more, leaning to your finger and a sigh take turns from a shuffled bag, the hop at most once in 40 s; each kind of its sounds plays all its files before a new shuffle; 0 = as before (tall, a wag, the hop and the happy sound every time; a random file each time)
+    // v2.63 B6 (web sndB6; the pull step re-arms, the press keeps what is queued except the last release's tail; the same key and default for all three materials). SlimeRig MARK v2.63 B6, SlimeAudio sndB6
+    var sndB6: Double = 1             // 拉回去再拉有絲聲、按不蓋掉別的聲音: 1 = pulled back 1.5 steps (a step is 0.4R) the strand step comes down one, so pulling out again snaps strands again; a press clears only the last release's tail (the settle bubbles), not the drip after a tear, a delayed hiss or the press's own air; 0 = as before (only a pull longer than any before in this grab snaps; a press clears everything queued)
+    // v2.63 B2 (web sndB2; pressForce; the same key and default for all three materials). SlimeRig MARK v2.63 B2, SlimeView touchesBegan (UITouch.force)
+    var sndB2: Double = 1             // 按聲跟著力道: 1 = the grab's press sound follows how hard the finger landed: UITouch.force / maximumPossibleForce where there is 3D Touch, else majorRadius (18 pt a fingertip … 42 pt a flat pad), 0.35 light … 0.95 hard; neither → 0.7 as before (the haptic stays 0.7); 0 = as before (0.7 × the contact size, which read 0 because the press event came before the finger was stored)
+    // v2.63 B5 (web sndB5; SlimeAudio leadTrim, SlimeRig flSay; the same key and default for all three materials)
+    var sndB5: Double = 1             // 反應聲跟動作同一格: 1 = startle, happy, protest and the press's wet layer skip the quiet lead-in of their files (from 20 ms before the first −6 dB point when that is later than 30 ms, a 13 ms fade in; made at load, the files are untouched), and the startle sound waits for the flinch's frame (it came 0.05 s before it); 0 = as before
+    // v2.63 D4 (web flinchFx, FLX; the same key and default for all three materials). SlimeRig MARK v2.63 D4, SlimeController .flinch, SlimeAudio flinch
+    var flinchFx: Double = 1          // 縮那一下有聲有震: 1 = the flinch your touch sets off (2 to 5 mm) comes with a small sound (the release pop's air layer, 0.3) and a light tap (0.25, sharpness 0.2) on its own frame, both × the flinch's size (÷ flinchAmp, at most 1); a flinch under 0.7 × flinchAmp (tapped again and again, D2) gives neither. A release within 0.3 s after it skips its pop sound (the haptic pop stays); a flinch within 0.3 s after a release pop only taps; 0 = as before (the flinch only changes the size)
+    // v2.63 B1 pull, B3 (web pullFx, PFX, hapContStep; the same key and default for all three materials). SlimeRig PullFxSet, pullOpen; SlimeController frame (pullFloor); SlimeAudio pullOpen
+    // v2.63 D6 (web bond, BONDK, SOOK; the same key and default for all three materials). SlimeRig MARK v2.63 D6 (BondSet, SooSet, bondTouch, sooStep), SlimeController bonds ("bd" in nienie.imp)
+    var bond: Double = 1              // 怕的要哄、熟要有得長: 1 = trust splits in two: today's closeness (the old trust, full after 7 s of stroking) as before, and a bond that never goes down (trust full and still stroked or petted, +0.01 a minute; kept with the trust across days; a yank takes nothing; nothing on screen shows it). A high bond's first touch (2 s after the last hold) does not flinch, it leans to your finger. Very wary (a yank or three quick taps, wary > 0.5), a gentle hand has to add up 3 s first: no comfort, no purr, no nuzzle, then a sigh and as usual; 0 = as before (and no "bd" is written)
+    // v2.63 B9 (web sndGrain, GRK, SFX.grain; the same key and default for all three materials). SlimeController .tick, SlimeAudio grain, grainLoop
+    // v2.63 未做 83 (web deskSmooth, deskRebuild; the same key and default for all three materials). SlimeRig deskRebuild
+    var deskSmooth: Double = 1        // 調節台換材質不彈一下: 1 = a shape parameter changed (the desk's material switch, 回到預設, a slider, a slot): floppy alone (the only one the materials differ in) changes the tentacle softness in place, no rebuild; seed, size, density or limbs rebuild it and move the body back where it was (on the sill's floor its bottom, with no sill its centre), home and camera as they were. 0 = as before (rebuilt at home, on the sill dropped from above the bowl)
+    var sndGrain: Double = 0          // 聲音跟著手走：動一點一顆: 1 = every texture tick (F5: a grain every tickSpacing points of real travel, closer when stretched, at most tickRate a second, none when the finger is still) also plays one fine slime grain (settle.bubble, the shortest file), louder, higher and brighter the faster the hand (the tick's gain); the rub and strand loops stay at half volume. A new sound, off until 多米 has heard it; 0 = as before (loops only)
+    var pullFx: Double = 1            // 慢拉馬上有聲有震: 1 = a slow pull is heard and felt at once: once the real finger opens new ground from where it took hold (past 0.05R), the strand loop gets a floor (pullMax × 0.3 × min(1, the new-ground speed ÷ 0.5R a second)) and the continuous haptic a light floor (0.08, up in 40 ms at 0.15R a second or more, gone 0.2 s after it stops), both under the old formulas, which take over when bigger; holding still, going back or kneading in one circle adds nothing; 0 = as before (clay pulled slowly is dragged along, the loop needed 0.2R of stretch and the haptic 0.41R: about 3 s)
+    var eyeTrue: Double = 1           // B4 眼睛讀真手指: 1 = the eyes follow the real finger; 0 = as before (the smoothed one, about a quarter of a second late)
+    var snd61: Double = 1             // B1 揉的新循環音、抓著時雨 0.6→0.3: 1 = the new rub loop, the rain at 0.3 while held; 0 = the old files and 0.6
     var dens: Double = 12            // particles per radius (v2.12 and before: 9); at 8R the boundary was too sparse and the tail folded
                                       // across (measured: crossings on every hold at 9, 1 frame in 4 holds at 12); about 1.7× the particles
     // sound
@@ -293,6 +409,21 @@ struct FeelParams: Equatable, Codable {
     var volMusic: Double = 0.25       // v2.21 background lofi volume (the speaker button's first state); ducks to 0.6 while held
     var sndSettle: Double = 1         // after-release tail: bubbles after a pull, a small hiss after a long press; 0 = off
     var sndPressSize: Double = 0.5    // how much contact size (majorRadius) changes the press sound; 0 = off
+
+    /// v2.60 what the skin really draws with: `clear` makes all ten glossy and see-through, otherwise the two numbers as they are. Web: lookShine, lookOpaque
+    var lookShine: Double { clear >= 0.5 ? 1 : shine }
+    var lookOpaque: Double { clear >= 0.5 ? 0 : opaque }
+    var lookEdgeClean: Double { lookOpaque > 0 && edgeClean >= 0.5 ? 1 : 0 }   // v2.61b: nothing to clean when it is see-through
+}
+
+/// v2.57 a new slime's signature (web `fx`): purple where it is rubbed (蝶豆), fog when shaken (汽水), a sesame core (湯圓), a caramel cap (布丁), pearls (珍奶). RGB 0...255.
+struct SlimeFx {
+    var purple: (Double, Double, Double)? = nil
+    var fog: (Double, Double, Double)? = nil
+    var core: (Double, Double, Double)? = nil
+    var cap: (Double, Double, Double)? = nil
+    var pearls = 0
+    var isEmpty: Bool { purple == nil && fog == nil && core == nil && cap == nil && pearls == 0 }
 }
 
 struct SlimeColors {
@@ -348,6 +479,7 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
             // free sculpting (多米 2026-11-01: pull it long, spread it flat like dough)
             p.dwellLo = 0; p.dwellHi = 0.1; p.tentMem = 1; p.nearMem = 1; p.memMax = 5; p.grabHold = 0.85   // v2.15: pull 7R, remember 5R (past about 8.5R long it shook; v2.13 20 and 12, v2.12 8 and 4)
             p.grabK = 1.2; p.nearR = 3   // pressFlat off since v2.12 (多米: take it out)
+            p.slide = 4   // v2.54: 1.5 → 4 (stretched 1.5R the whole body was dragged along and it looked like it would not stretch any more)
             p.pressSink = 0.2   // 多米 11-16 (0.8 before)
         }
         return p
@@ -390,10 +522,34 @@ enum SlimeMaterial: String, CaseIterable, Identifiable {
 /// prototype's SLIMES. Each keeps its own impression for this run; the chosen one is remembered across launches.
 enum SlimeKind: String, CaseIterable, Identifiable {
     case honey, mint, taro, peach
+    // v2.57 the six new ones (多米 11-22, web v2.52 overnight; ids as on the web). Always after the first four, which keep their places
+    case xiancao, tangyuan, diedou, qishui, buding, zhennai
     var id: String { rawValue }
-    var name: String { ["蜜蜜", "薄荷", "芋圓", "桃桃"][index] }
-    var desc: String { ["黏土，慢吞吞，最愛睡", "果凍，好動，愛到處跑", "黏土，怕生，熟了很黏人", "黏土，愛撒嬌，常來找你"][index] }
-    var material: SlimeMaterial { [.clay, .jelly, .clay, .clay][index] }   // v2.33: 芋圓 mochi → clay (clay is the reference feel; her material is still undecided, 麻糬 stays in the panel)
+    var name: String { ["蜜蜜", "薄荷", "芋圓", "桃桃", "仙草", "湯圓", "蝶豆", "汽水", "布丁", "珍奶"][index] }
+    var desc: String { ["黏土，慢吞吞，最愛睡", "果凍，好動，愛到處跑", "黏土，怕生，熟了很黏人", "黏土，愛撒嬌，常來找你",
+                        "果凍偏硬，酷，慢熟", "麻糬，愛睡，肚子裡有芝麻餡", "果凍，怕生，揉過的地方會變紫", "最軟，停不下來，搖了會變霧", "最 Q，膽小，頭上有焦糖", "黏土，貪吃，肚子裡有珍珠"][index] }
+    var material: SlimeMaterial { [.clay, .jelly, .clay, .clay, .jelly, .mochi, .jelly, .jelly, .jelly, .clay][index] }
+    /// v2.57 one of the six new ones (v2.60: the look no longer tells them apart; nothing reads this now, kept as the mark)
+    var isNew: Bool { index >= 4 }
+    /// v2.57 each new one's signature, drawn on the body (web `fx`, `drawFx`)
+    var fx: SlimeFx {
+        switch self {
+        case .tangyuan: return SlimeFx(core: (58, 52, 54))
+        case .diedou: return SlimeFx(purple: (186, 104, 236))
+        case .qishui: return SlimeFx(fog: (240, 248, 252))
+        case .buding: return SlimeFx(cap: (168, 90, 30))
+        case .zhennai: return SlimeFx(pearls: 5)
+        default: return SlimeFx()
+        }
+    }
+    /// v2.57 its own jelly skin numbers on top of the default skin (web `sk`): 仙草's edge does not go white
+    var skin: (kEdge: Double?, kCore: Double?, glow: Double?)? {
+        switch self {
+        case .xiancao: return (0.16, 0.5, 0.5)
+        case .zhennai: return (0.3, nil, nil)
+        default: return nil
+        }
+    }   // v2.33: 芋圓 mochi → clay (clay is the reference feel; her material is still undecided, 麻糬 stays in the panel)
     private var index: Int { Self.allCases.firstIndex(of: self) ?? 0 }
     var colors: SlimeColors {
         switch self {
@@ -401,6 +557,12 @@ enum SlimeKind: String, CaseIterable, Identifiable {
         case .mint: return SlimeColors(base: UIColor(hex: 0x9BEBD0), shade: UIColor(hex: 0x5CCBA8), line: UIColor(hex: 0x1F6B55), light: UIColor(hex: 0xECFFF8), eye: UIColor(hex: 0x173F33))
         case .taro: return SlimeColors(base: UIColor(hex: 0xD2C2FF), shade: UIColor(hex: 0xA691EC), line: UIColor(hex: 0x4F3A8C), light: UIColor(hex: 0xF6F1FF), eye: UIColor(hex: 0x2E2350))
         case .peach: return SlimeColors(base: UIColor(hex: 0xFFC2CF), shade: UIColor(hex: 0xF28FA6), line: UIColor(hex: 0x8C3349), light: UIColor(hex: 0xFFF0F3), eye: UIColor(hex: 0x4A1C28))
+        case .xiancao: return SlimeColors(base: UIColor(hex: 0x4A3A32), shade: UIColor(hex: 0x2A201C), line: UIColor(hex: 0x120D0B), light: UIColor(hex: 0xF6EBD8), eye: UIColor(hex: 0xF6EBD8))
+        case .tangyuan: return SlimeColors(base: UIColor(hex: 0xFBF8F4), shade: UIColor(hex: 0xDDD4CA), line: UIColor(hex: 0x7A6F68), light: UIColor(hex: 0xFFFFFF), eye: UIColor(hex: 0x2A2422))
+        case .diedou: return SlimeColors(base: UIColor(hex: 0xA9BEFA), shade: UIColor(hex: 0x6C8EF0), line: UIColor(hex: 0x2A3C8F), light: UIColor(hex: 0xF2F6FF), eye: UIColor(hex: 0x1A2456))
+        case .qishui: return SlimeColors(base: UIColor(hex: 0xBFE9F8), shade: UIColor(hex: 0x7FCDEB), line: UIColor(hex: 0x1F6F99), light: UIColor(hex: 0xFFFFFF), eye: UIColor(hex: 0x123E57))
+        case .buding: return SlimeColors(base: UIColor(hex: 0xFFEFB0), shade: UIColor(hex: 0xF2CC5E), line: UIColor(hex: 0x7A4A14), light: UIColor(hex: 0xFFFBE6), eye: UIColor(hex: 0x4A2E12))
+        case .zhennai: return SlimeColors(base: UIColor(hex: 0xF3DCC0), shade: UIColor(hex: 0xD9B48A), line: UIColor(hex: 0x7A5230), light: UIColor(hex: 0xFFF6E8), eye: UIColor(hex: 0x3A2412))
         }
     }
     /// Shape seed and personality on top of the material's numbers.
@@ -410,6 +572,13 @@ enum SlimeKind: String, CaseIterable, Identifiable {
         case .mint: p.seed = 12; p.restMul = 0.6; p.voicePitch = 1.12; p.dash = 0.45; p.eyeSize = 0.95; p.trRate = 1; p.wRate = 0.8; p.e4Mul = 1
         case .taro: p.seed = 4; p.restMul = 1; p.voicePitch = 0.94; p.dash = 0.2; p.eyeSize = 0.88; p.trRate = 0.7; p.wRate = 1.6; p.e4Mul = 0.7
         case .peach: p.seed = 19; p.restMul = 0.9; p.voicePitch = 1.18; p.dash = 0.25; p.eyeSize = 1.1; p.trRate = 1.6; p.wRate = 0.8; p.e4Mul = 0.6
+        // v2.57 the six (web SLIMES `p`): the feel numbers are guesses from the design sheets, nobody has squeezed them yet
+        case .xiancao: p.seed = 9; p.alpha = 0.42; p.damp = 0.975; p.inertiaZ = 0.24; p.restMul = 1.2; p.voicePitch = 0.86; p.dash = 0.15; p.eyeSize = 0.8; p.trRate = 0.5; p.wRate = 1; p.e4Mul = 1.6
+        case .tangyuan: p.seed = 5; p.recover = 0.12; p.restMul = 1.35; p.voicePitch = 0.9; p.dash = 0.12; p.eyeSize = 1.15; p.trRate = 1.3; p.wRate = 0.6; p.e4Mul = 1; p.sleepAfter = 25
+        case .diedou: p.seed = 2; p.restMul = 1; p.voicePitch = 1.05; p.dash = 0.25; p.eyeSize = 0.9; p.trRate = 0.5; p.wRate = 1.8; p.e4Mul = 0.5
+        case .qishui: p.seed = 11; p.alpha = 0.22; p.damp = 0.988; p.inertiaHz = 2.4; p.inertiaZ = 0.12; p.shake = 1; p.glit = 0; p.settleT = 14; p.restMul = 0.5; p.voicePitch = 1.22; p.dash = 0.55; p.eyeSize = 1; p.trRate = 1.2; p.wRate = 0.8; p.e4Mul = 0.7   // no "water" material: a softened jelly; the shake clouds it but draws no glitter (多米 11-22: no bubbles, only the fog)
+        case .buding: p.seed = 8; p.damp = 0.992; p.inertiaHz = 3.6; p.inertiaZ = 0.09; p.restMul = 0.9; p.voicePitch = 1.15; p.dash = 0.2; p.eyeSize = 1.1; p.trRate = 1; p.wRate = 1.4; p.e4Mul = 0.9; p.wFade = 0.12
+        case .zhennai: p.seed = 6; p.restMul = 0.85; p.voicePitch = 0.96; p.dash = 0.3; p.eyeSize = 1; p.trRate = 1.1; p.wRate = 0.9; p.e4Mul = 0.8
         }
     }
 }
@@ -488,6 +657,17 @@ extension FeelParams {
         inertiaHz = 0; dragSpring = 0; hapStatic = 1; hapSharpStretch = 0; popCount = 1; popDecay = 0.5; popSharp = 0.45
         tickSpacing = 0; tickMin = 0.1; tickMax = 0.3; tickSharp = 0.4; pressGrain = 0; purrRoll = 0
     }
+    /// v2.52 灰盒 (《虛擬手感》3-2): the physics alone. Nothing it does by itself (breath, pods, walking, reactions, the impression, sleep),
+    /// no dents, no decoration, the camera fixed, the sill's props put away; the sill and the walls stay (context is part of the feel).
+    /// Laid over the numbers the physics uses while the measuring switch is on, and gone again when it is off. None of the material
+    /// knobs (軟、黏滯、留形、彈、韌…) is in this set, so what is tuned in the grey box is the real material. Web: LAB.GREY.
+    mutating func greyBox() {
+        life = 0; life2 = 0; emo = 0; flee = 0; purr = 0; imp = 0; e1 = 0; e2 = 0; e3 = 0; e4 = 0; eyes = 0; sleep = 0; echo = 0
+        pods = 0; jelly = 0; wriggle = 0; drift = 0; wander = 0; excite = 0; envRoam = 0
+        dent = 0; dentTrail = 0; moodColor = 0; specks = 0; caustic = 0; bubbles = 0; shine = 0; glit = 0; shake = 0
+        camFollow = 0; deco = 0; props = 0; intro = 0; introSwim = 0
+        skin = 0   // the flat skin, which the view paints one grey
+    }
     mutating func off24() {
         off25()
         bodySize = 0.22; followZone = 0.8; flinchAmp = 0.05; camFill = 0.7; camPad = 0.35; camGrip = 0; pressLocal = 0; leanMove = 0; leanAmp = 0.16; nuzAmp = 0.05
@@ -504,7 +684,7 @@ struct TuneField: Identifiable {
     var section = "手感"
     var id: String { name }
 
-    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形"]
+    static let sections = ["手感", "按壓與記形", "活物感", "觸覺", "聲音", "外形", "這一批 v2.61", "這一批 v2.63", "這一批 v2.64"]
 
     static let all: [TuneField] = [
         TuneField(key: \.alpha, name: "回彈硬度", hint: "越大越快回去、越硬", range: 0.05...0.8, step: 0.01),
@@ -545,12 +725,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.rubSpeed, name: "揉的速度上限（公分／秒）", hint: "手指每秒幾公分以內都算舒服的揉（v2.24 12）；0 回 v2.23（約 2.9 公分，一般手速的揉沒反應）", range: 0...30, step: 1, section: "活物感"),
         TuneField(key: \.tickRev, name: "搔癢要幾次折返", hint: "1 秒內手指折返幾次算搔癢；v2.24 6（一秒 3 趟），v2.23 4", range: 2...12, step: 1, section: "活物感"),
         TuneField(key: \.tickSeg, name: "搔癢的幅度上限（點）", hint: "手指每一段超過這麼長就算揉、不算搔癢；v2.24 48（約 8 毫米）；0 不看幅度（v2.23）", range: 0...120, step: 1, section: "活物感"),
-        TuneField(key: \.tickFree, name: "撥多久掙脫（秒）", hint: "搔癢撥多久它掙脫，最後 2 秒先抗議；v2.24 6，v2.23 3", range: 1...15, step: 0.5, section: "活物感"),
+        TuneField(key: \.tickFree, name: "撥多久掙脫（秒）", hint: "搔癢撥多久它掙脫，最後 2 秒先抗議；v2.24 6，v2.23 3。v2.63「搔癢不掙脫」開著時不看這個", range: 1...15, step: 0.5, section: "活物感"),
         TuneField(key: \.introSwim, name: "開場游過來", hint: "1：開場從畫面右邊外面一縮一衝游進來，到家看著你、揮一下偽足、打招呼（換史萊姆時也是）；0：v2.17 從遠處跳過來", range: 0...1, step: 1, section: "活物感"),
         TuneField(key: \.heldBreath, name: "碰著時的呼吸幅度", hint: "抓著、按著時呼吸是平常的幾成（手指壓住的中間會吃掉一點，0.75 看起來約六成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.restWrig, name: "休息時的蠕動", hint: "休息時蠕動是原本的幾成（v2.19 三成；張望六成、走路五成）", range: 0...1, step: 0.05, section: "活物感"),
         TuneField(key: \.flinchAmp, name: "縮一下的幅度", hint: "被碰時自己縮多少（休息時再乘 1.2、舒服時減半，連續碰每次乘 0.55，放著 7 秒恢復）；v2.24 0.1，v2.23 0.05", range: 0...0.25, step: 0.01, section: "活物感"),
-        TuneField(key: \.slide, name: "D1' 拉到多長開始整團走（×半徑）", hint: "v2.21 拉力：先被拉長，拉長到這附近再拉就整團被拖著走（果凍 0.6、麻糬 0.9、黏土 1.5）；兩指往兩邊拉不會被拖走、照樣拉很長；0 回 v2.20（整團只跟三成五）", range: 0...3, step: 0.1),
+        TuneField(key: \.slide, name: "D1' 拉到多長開始整團走（×半徑）", hint: "v2.21 拉力：先被拉長，拉長到這附近再拉就整團被拖著走（果凍 0.6、麻糬 0.9、黏土 1.5，v2.54 起 4）；兩指往兩邊拉不會被拖走、照樣拉很長；0 回 v2.20（整團只跟三成五）", range: 0...8, step: 0.1),
         TuneField(key: \.drag, name: "D1 拖著走", hint: "抓著時身體的原位跟著手指移幾成（v2.20 0.35，約 0.25 秒跟上；放手停在被拖到的地方，甩著放手再滑一小段）；0 是 v2.19（只變形不位移）", range: 0...1, step: 0.05),
         TuneField(key: \.dentFade, name: "D2 凹痕退的時間（秒）", hint: "點一下放手後凹痕多久退完（按越久越慢，按 1 秒以上 2.5 倍）；10 是 v2.19（跟回原形一起退，黏土 15 秒退一半）", range: 0.2...10, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.imp, name: "印象 v2.20", hint: "1：它記得你這一次怎麼對它（熟、戒），關掉 app 或背景 10 分鐘歸零；底下 C1 到 C5 只在這裡是 1、活物 v2.19 也是 1 時有用；0 回 v2.19", range: 0...1, step: 1, section: "活物感"),
@@ -596,12 +776,12 @@ struct TuneField: Identifiable {
         TuneField(key: \.pressFirst, name: "按壓第一幀比例", hint: "按下那一幀先到目標的幾成", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.pressRadiusGain, name: "接觸面積壓力", hint: "指腹壓扁（majorRadius 變大）再多攤多少；0 關，候選 9 是 1", range: 0...3, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.yield, name: "定型門檻（×半徑）", hint: "變形超過這個才開始留形", range: 0.02...1.5, step: 0.01, section: "按壓與記形"),
-        TuneField(key: \.creep, name: "定型速度", hint: "揉多快記住新形狀", range: 0...6, step: 0.1, section: "按壓與記形"),
+        TuneField(key: \.creep, name: "定型速度", hint: "揉多快記住新形狀（往外拉長時改用「拉長時定型速度」）", range: 0...40, step: 0.5, section: "按壓與記形"),
         TuneField(key: \.dwellLo, name: "定型停留起點", hint: "抓住幾秒後開始記形（秒）", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.dwellHi, name: "定型停留終點", hint: "抓住幾秒後全速記形（秒）", range: 0...2, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.recover, name: "回原形速度", hint: "放著多快變回原樣；黏土 0.05（v2.14，放手 2 秒退一成、15 秒退一半），v2.8 到 v2.13 是 0.3，v2.7 是 0.03", range: 0...1.5, step: 0.01, section: "按壓與記形"),
         TuneField(key: \.grabK, name: "抓住的力道", hint: "被抓那塊每小步往手指靠幾成（再乘距離權重）；以前 0.55，黏土 1.2 整塊跟手", range: 0.2...2, step: 0.05, section: "按壓與記形"),
-        TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住", range: 0.5...4, step: 0.1, section: "按壓與記形"),
+        TuneField(key: \.nearR, name: "記形範圍（×半徑）", hint: "手指附近多大範圍用整身座標記形；黏土 3＝整團，拉出來的整條都記住（v2.54 往外拉長時改用「拉長時記形範圍」）", range: 0.5...12, step: 0.1, section: "按壓與記形"),
         TuneField(key: \.pressFlat, name: "一壓就攤平", hint: "1：從上半部往下壓時下面有看不見的桌面，壓多少扁多少；v2.12 起預設關", range: 0...1, step: 1, section: "按壓與記形"),
         TuneField(key: \.zoomMin, name: "鏡頭最遠", hint: "形狀變大時畫面自動縮小，最小縮到幾倍；0 不限制、也沒有牆（多米：鏡頭無限拉遠），1 關，v2.12 是 0.45", range: 0...1, step: 0.05, section: "按壓與記形"),
         TuneField(key: \.inertiaHz, name: "回彈每秒幾下", hint: "放手、甩、拖到一半停時整團晃的快慢；3 約 0.17 秒彈完第一下；0 回 v2.24（33 毫秒彈完）", range: 0...6, step: 0.1),
@@ -664,15 +844,44 @@ struct TuneField: Identifiable {
         TuneField(key: \.refr, name: "水把後面的東西彎多少 v2.49", hint: "透過身體看到的背景偏移多少（×半徑），邊緣彎最多", range: 0...0.6, step: 0.02),
         TuneField(key: \.absorb, name: "厚的地方多有顏色 v2.49", hint: "0 整隻像清水；1 中間很濃", range: 0...1, step: 0.05),
         TuneField(key: \.caustic, name: "底下的聚光 v2.49", hint: "坐著時底下一塊聚起來的亮光和一圈淡影；0 關", range: 0...1.5, step: 0.1),
-        TuneField(key: \.shine, name: "身體上的亮點 v2.51", hint: "（多米 11-22：身體內不要有反光）0 沒有：主亮點、小亮點、左上白弧、柔光全關；1 回 v2.50", range: 0...1, step: 0.1),
-        TuneField(key: \.opaque, name: "身體多不透明 v2.51", hint: "（多米 11-22：下方有一條線或底座）厚的地方蓋掉多少後面的東西。0 回 v2.50：窗台邊和布墊透過身體看得到；0.9 只剩邊緣薄的地方透", range: 0...1, step: 0.05),
+        TuneField(key: \.shine, name: "身體上的亮點 v2.51", hint: "（多米 11-22：身體內不要有反光）0 沒有：主亮點、小亮點、左上白弧、柔光全關；1 回 v2.50。v2.60 預設回到不透明（多米 11-24）：這條回到 0。外觀切到亮面透明時這條不作用", range: 0...1, step: 0.1),
+        TuneField(key: \.opaque, name: "身體多不透明 v2.51", hint: "（多米 11-22：下方有一條線或底座）厚的地方蓋掉多少後面的東西。0 回 v2.50：窗台邊和布墊透過身體看得到；0.9 只剩邊緣薄的地方透。v2.60 預設回到不透明（多米 11-24）：這條回到 0.9。外觀切到亮面透明時這條不作用", range: 0...1, step: 0.05),
         TuneField(key: \.lump, name: "不規則外形 v2.51", hint: "（多米 11-22：預設形狀要不規則）1：下盤重、上面一個歪向一邊的鼓包；0 回 v2.50 接近圓的團塊", range: 0...1, step: 0.1),
         TuneField(key: \.strand, name: "黏條 v2.51", hint: "（多米 11-22：不能破皮；手指拉到哪就延長到哪）1：身體只拉到穩定的長度，再遠用一條黏條接到手指，不會斷；0 回 v2.50", range: 0...1, step: 1),
         TuneField(key: \.tugEdge, name: "捏邊緣算拉、捏中間算拿 v2.51", hint: "手指按下的地方離外框這麼近（×半徑）以內，就只把那塊拉出去；更靠中間照舊整隻被拖著走。0 一律整隻拖走", range: 0...1, step: 0.02),
-        TuneField(key: \.split, name: "拉到極限分成兩團 v2.51", hint: "手指離身體中心超過「分裂距離」再撐 0.4 秒，黏條中間收腰、斷開，手指那頭變成小的一團；最多兩團。0 關", range: 0...1, step: 1),
-        TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "手指離身體中心多遠才算拉到極限", range: 2...8, step: 0.2),
-        TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "小的那團自己爬回大的旁邊、黏合；丟到大的身上也會馬上黏合", range: 1...30, step: 1),
+        TuneField(key: \.split, name: "扯斷成兩隻 v2.62", hint: "（多米 11-26）1：抓著拉開超過「分裂距離」、手指又快（「扯斷速度」），就斷成兩隻，兩隻都能捏；碰到播合併動畫變回一隻。一次最多兩隻。0 關（黏條開著時照 v2.51 收腰斷開）", range: 0...1, step: 1),
+        TuneField(key: \.splitV, name: "扯斷速度（半徑／秒）v2.62", hint: "手指在螢幕上每秒快過幾個半徑才算太激烈（v2.61 的快扯是 6）", range: 4...30, step: 0.5),
+        TuneField(key: \.splitFrac, name: "斷下來那隻多大 v2.62", hint: "第二隻拿走幾成面積，原本那隻縮成剩下的；合回去兩邊加起來回到原本", range: 0.2...0.6, step: 0.05),
+        TuneField(key: \.splitAgain, name: "合回去之後還能再斷 v2.62", hint: "1：合回一隻之後重新算，可以再斷一次（多米 11-26 定）；0：這次打開只斷一次", range: 0...1, step: 1),
+        TuneField(key: \.mergeFx, name: "合併動畫 v2.62", hint: "0 黏絲搭橋、1 擠扁彈回、2 水滴加波紋、3 吞下去。預設 1（多米 11-26 選擠扁彈回），其他三版留著對照", range: 0...3, step: 1),
+        TuneField(key: \.mergeGap, name: "碰到的距離（×半徑）v2.62", hint: "兩隻外框靠到這麼近就算碰到，開始合", range: 0...0.4, step: 0.02),
+        TuneField(key: \.mergeWait, name: "貼著多久才合 v2.62", hint: "兩隻碰到之後要一直貼著這麼久才開始合；中間分開就重算。0 回到一碰就合", range: 0...5, step: 0.1),
+        TuneField(key: \.splitAt, name: "分裂距離（×半徑）v2.51", hint: "v2.62 扯斷：手指從抓下去的地方拉開多遠（預設 1.8）。黏條開著時收腰斷開不看這條，照 v2.51 固定 3.4（從中心量）", range: 2...8, step: 0.2),
+        TuneField(key: \.rejoin, name: "幾秒沒碰就黏回去 v2.51", hint: "第二隻沒人碰這麼久，自己一縮一衝爬回去；碰到就播合併動畫", range: 1...30, step: 1),
+        TuneField(key: \.endless, name: "無限拉 v2.54", hint: "（多米 11-22：拉五公分只長三公分，要能無限擴張、跟手）1：手指不讓、拉伸上限不作用，邊拉滿了上限自己放寬，整條一起變長；0 回 v2.53", range: 0...1, step: 1),
+        TuneField(key: \.pullCreep, name: "無限拉：拉長時定型速度", hint: "往外拉開 0.6R 起慢慢換成這個速度（1.8R 全換）：記形追得上手指，放手才不會縮回一截。揉、刷、兩指擠照舊用「定型速度」", range: 0...60, step: 1),
+        TuneField(key: \.homeFloor, name: "抓著時家不壓進窗台 v2.55", hint: "（11-23：抓頭頂往上拉 2.5 到 3.5R 按住一秒多，身體下半被壓進窗台、扁成一條、翻面上百個）1：抓著時家最低只到身體底部剛好碰到地面；0 回 v2.54b", range: 0...1, step: 0.05),
+        TuneField(key: \.pullNearR, name: "無限拉：拉長時記形範圍", hint: "往外拉長時整條都用整身座標記形（×半徑）", range: 0.5...12, step: 0.1),
+        TuneField(key: \.growK, name: "無限拉：上限放寬多快", hint: "被抓的那塊跟不上手指時，每條邊的上限每秒放寬幾倍（e 的幾次方）", range: 0.2...6, step: 0.1),
+        TuneField(key: \.remeshCalm, name: "補點後站穩幾秒 v2.56", hint: "（11-23）補點之後新的網格要重新站穩，這段時間每一幀把身體各處相對整團的速度留兩成，彈不起來、慢慢落定。量過拉 2.5 到 4.5R 按住：每幀跳動平均 3 到 9.5 → 1.8 到 2.7。0 回 v2.55", range: 0...1, step: 0.05),
+        TuneField(key: \.remeshCalmK, name: "站穩時速度留幾成 v2.56", hint: "每 1/60 秒身體各處相對整團的速度留多少；1 等於不作用", range: 0...1, step: 0.05),
+        TuneField(key: \.remeshHome, name: "放手就換回原本的網格 v2.58", hint: "（QC-0007 #46：拉一下放手就一直抽搐）1：拉著時照樣補點，手一離開就換回建身體時的網格，形狀照樣帶回去；0 回 v2.57", range: 0...1, step: 1),
+        TuneField(key: \.pullGive, name: "往外拉時手指最多讓多少 v2.58", hint: "（11-24）往外拉開時，防翻面每次推一下手指就往旁邊讓一點，一路累積到 2 個半徑，那塊就不跟手（斜拉 5.5R 差 1.6R，最差 3.3R）。往外拉開 0.6R 起、1.8R 全算，手指讓的上限縮到這麼多個半徑；揉、壓、兩指擠照舊。0 回以前", range: 0...2, step: 0.05),
+        TuneField(key: \.memUntie, name: "打結多久就解開（秒）v2.58", hint: "（QC-0007 #46）放手後記住的形狀外框交叉超過這麼久，暫時關掉記憶的上下限和防翻面、快退到不交叉為止（不關的話保險會把結卡住，一直抖）；黏在螢幕側邊、身體打結超過 0.6 秒就提早掉下來。0 關", range: 0...3, step: 0.1),
+        TuneField(key: \.walkShow, name: "走路帶東西回來 v2.58", hint: "（QC-0007 #47：石頭和花瓣去掉；走路回來那段一起關）0：不出門、不帶東西回來，窗台上不畫、不放送的石頭，存的東西和步數都還在；1 回 v2.57", range: 0...1, step: 1),
+        TuneField(key: \.remesh, name: "拉長時自動補點 v2.54", hint: "（多米 11-22）記住的形狀外框點距超過 2.6 個點距、或身體裡有邊拉到原形 2.8 倍，就照現在的形狀重新撒點（點距不變，最多原本 3 倍）；退回去點太密時再撒一次變少。0：只放寬上限不補點", range: 0...1, step: 1),
+        TuneField(key: \.rateK, name: "快扯變硬、慢拉變軟 v2.54", hint: "（多米 11-22）手指每秒移動不到 rateLo 個半徑最軟（硬度少三成五×這個值），超過 rateHi 最硬（硬度多兩倍×這個值、記形少九成五×這個值）：猛扯拉不太長、會彈回去，慢拉一路變長。0 關掉", range: 0...1, step: 0.05),
+        TuneField(key: \.rateLo, name: "快扯變硬：多慢算慢拉（半徑／秒）", hint: "一般慢慢拉大約每秒 3 到 6 個半徑；量過設 1 的話一般的拉也會變硬、跟不上手", range: 0.2...10, step: 0.1),
+        TuneField(key: \.rateHi, name: "快扯變硬：多快算猛扯（半徑／秒）", hint: "", range: 2...20, step: 0.5),
+        TuneField(key: \.hapPull, name: "震動跟著拉力走 v2.54", hint: "（多米 11-22）抓著拉時持續震動，拉越長越強越銳利（3R 約一半、8R 約八成），猛扯被身體頂住時馬上變強。這是最強時的強度，0 關掉", range: 0...1, step: 0.05),
+        TuneField(key: \.frameCling, name: "黏窗框 v2.54", hint: "（多米 11-22：只要能爬手機四邊，窗沿的取消）0：放在窗框旁邊不再黏上窗框，只有螢幕左、右、上邊會黏；1 回 v2.53", range: 0...1, step: 1),
         TuneField(key: \.edgeCling, name: "黏在螢幕四周 v2.51", hint: "（多米 11-22）1：慢慢放在螢幕左邊、右邊、上邊旁邊會黏住；0 只有窗框", range: 0...1, step: 1),
+        TuneField(key: \.flow, name: "流：放著會慢慢往下塌 v2.52", hint: "（多米 11-22：補「流」）沒有手指碰、坐在窗台上時，記住的形狀每秒往下塌掉高度的幾成、往兩邊攤開；手指一碰就停。0.05 大約 14 秒塌一半；回原形會同時把它拉回去。0 關（現在的行為）。三種材料的起點等主參照的錄影", range: 0...0.5, step: 0.01),
+        TuneField(key: \.strandAt, name: "黏條開著時身體拉到多長 v2.52", hint: "黏條開著，窗台上身體本身最多拉到幾個半徑，再遠的部分是黏條。v2.53 預設回到 2.4（多米 11-22：1.6 拉起來不像整隻被拉、形狀留不住）。1.6（v2.52 試過）：v2.51 的 2.4 捏著邊緣往外拉時，那一塊被拉到外框折起來（16 種拉法裡 7 種折超過 120 度；1.6 是 0 種）。2.4 回 v2.51。黏條關掉時這條不作用，身體照「拉伸上限」拉（黏土 7）", range: 1...8, step: 0.1),
+        TuneField(key: \.sillCap, name: "窗台上的拉伸上限（對照）v2.52", hint: "0：窗台不蓋掉拉伸上限（多米 11-22：黏土在窗台上也拉到 7）；3.2 回 v2.50（窗台上最多 3.2R、記形最多 2.6R）。只在黏條關著時作用，黏條開著看上面那條", range: 0...8, step: 0.1),
+        TuneField(key: \.thin, name: "細絲：快到上限時圓角變小 v2.52", hint: "（多米 11-22：中間做法）1：拉到拉伸上限的六成起，外框的圓角慢慢變小，到上限時剩三成，拉細的那條看得到；0 關（v2.51，圓角固定）", range: 0...1, step: 1),
+        TuneField(key: \.wbreath, name: "水的呼吸 v2.52", hint: "1：牠靜止時，透過身體看到的背景跟著呼吸輕輕變（彎的量 ±12%）；0 關（v2.51，靜止時折射是靜的）", range: 0...1, step: 1),
+        TuneField(key: \.decoThru, name: "會動的擺飾透過身體看得到 v2.52", hint: "（多米 11-22：做）1：風鈴、晴天娃娃、走路帶回來的東西隔著身體也看得到；0 只有固定的背景（v2.49 的做法，用來量成本：開和關各看一次「算」的毫秒）", range: 0...1, step: 1),
         TuneField(key: \.bubbles, name: "身體裡的氣泡幾顆 v2.49", hint: "黏在身體裡、跟著被擠開；0 沒有", range: 0...12, step: 1),
         TuneField(key: \.wet, name: "水潤 v2.47", hint: "1（多米 11-16：要很有水份的感覺）：更透、亮點更大更銳、多一顆小亮點、邊緣一圈反光；0 回 v2.46 的皮", range: 0...1, step: 1, section: "外形"),
         TuneField(key: \.skin, name: "皮", hint: "1 果凍 A 清透（多米 11-07 定）：看得到肚子裡的亮粉在沉；亮粉揚起來時往奶凍混。0 平塗（舊畫法，沒有 Metal 的手機也用這個）", range: 0...1, step: 1, section: "外形"),
@@ -746,6 +955,78 @@ struct TuneField: Identifiable {
         TuneField(key: \.moodColor, name: "心情變色", hint: "舒服偏粉橘、被扯偏紅、害怕或戒備偏藍灰、睡著偏深藍；數字是最多染幾成；0 不變色", range: 0...1, step: 0.05, section: "外形"),
         TuneField(key: \.homeFrac, name: "家的高度", hint: "身體的家在畫面高度的幾成；原本 0.40，候選 33 是 0.46", range: 0.3...0.55, step: 0.01, section: "外形"),
         TuneField(key: \.inkVar, name: "描邊粗細隨壓縮", hint: "1：被壓的邊描邊加粗到 1.3 倍、被拉的減到 0.8 倍；0 固定（候選 34）", range: 0...1, step: 0.1, section: "外形"),
+
+        // v2.61 第一批 (the same words as the web). bumpSoft is not here: the phone does not read it (greetLook and brJit are read since v2.63)
+        TuneField(key: \.skinU, name: "皮：不會斷的畫法 v2.61", hint: "1：先畫滿身體裡每一個小三角形，細的地方補一條保底線，拉遠、打結時皮比較不會斷開。0 回 v2.60（照外框畫）。只在果凍皮有作用", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.pullHold, name: "拉的 A3：拉長停住就定住 v2.61", hint: "1：拉開 0.6R 以上，手指停下來 0.25 秒，身體就不再自己變長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.pullWhole, name: "拉的 A4：往裡拉，整隻先走 v2.61", hint: "1：往身體裡面拉的那一段，整隻先跟著走，再拉長。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.pullSoft, name: "拉的 A5：拉很長放手，收回去 v2.61", hint: "1：身體拉得很長時放手，先不逃、轉正有限速、放手後 0.8 秒內每一點有限速；按住不動時上限不會自己變大。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.rough, name: "只有快扯算欺負 v2.61", hint: "1：慢慢拉很長不算欺負；快扯不會變熟，也不會變得怕你。0 回 v2.60（拉開 1.5R 撐半秒就算）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.tapSoft, name: "慢慢點不算攻擊 v2.61", hint: "1：慢慢點牠不會嚇到，還是會縮一下，越點縮越小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.petSlow, name: "慢慢摸也算摸 v2.61", hint: "1：摸得很慢也會呼嚕、變熟。0 回 v2.60（太慢會被當成抓）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.wakeSoft, name: "輕碰慢慢醒 v2.61", hint: "1：睡著時輕輕碰，慢慢醒；剛打開 40 秒才會睡。0 回 v2.60（一碰就嚇醒、30 秒就睡）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.greetLook, name: "打開先看你 v2.61", hint: "1：打開、切回來，先看你一眼。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.nearFast, name: "聽節奏時也會靠過來 v2.61", hint: "1：在聽你打節奏時，手指放旁邊照樣靠過來。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.eyeTrue, name: "眼睛看真的手指 v2.61", hint: "1：眼睛跟著手指現在的位置。0 回 v2.60（慢四分之一秒）", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.snd61, name: "新的揉聲 v2.61", hint: "1：揉的聲音換新的循環，抓著時雨聲變小。0 回 v2.60", range: 0...1, step: 1, section: "這一批 v2.61"),
+        TuneField(key: \.brJit, name: "作息每次不一樣 v2.61", hint: "1：醒多久、睡多久每次有點不同。0 回 v2.60（手機要大腦開著才有作用）", range: 0...1, step: 1, section: "這一批 v2.61"),
+
+        // v2.63 (the web's words for brain, brPre, brAwakeT, brSleepT; the phone has the brain from v2.63)
+        TuneField(key: \.brain, name: "大腦 v2.63", hint: "1：五個需求（睏、好奇、想被摸、怕、想動）一直在漲落，牠每做完一件事就做最強那個需求的事；跑完比較快睡、睡飽自己醒、想被摸了才來找你。0 回改之前（擲骰子決定、40 秒沒人碰就睡、睡了不會自己醒）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.brPre, name: "換事情前的前兆", hint: "1：要睡之前先瞇眼、嘆一口氣，約 2 秒後才睡；要來找你之前先看你一眼。0 決定了馬上做", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.brAwakeT, name: "醒著多久會睏（秒）", hint: "沒人碰、沒跑的情況下，睏從 0 漲到滿要幾秒；20 秒沒人碰以後漲兩倍快，夜晚背景 1.5 倍", range: 60...900, step: 10, section: "這一批 v2.63"),
+        TuneField(key: \.brSleepT, name: "睡多久睡飽（秒）", hint: "睏從滿退到 0 要睡幾秒；睡飽牠自己醒", range: 20...300, step: 5, section: "這一批 v2.63"),
+        TuneField(key: \.mood, name: "心情 v2.63", hint: "1：牠有一個幾分鐘才慢慢變的心情。被揉到呼嚕、探到東西、你照牠的節奏回牠會變好；被扯、被嚇、睡著被吵醒會變差。心情好：好奇和想動漲得快、身體挺一點、看你的時候眼睛笑、步子大、被戳會朝你傾過來搖偽足。心情差：容易怕、身體扁一點、眼睛睜大、少走動、被戳會退開縮得更大。只活在這一次打開。0 回改之前（手機要大腦開著才有作用）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.moodHalf, name: "心情多久退一半（秒）", hint: "沒事的時候心情慢慢回到普通偏好，這是退一半要的秒數", range: 30...900, step: 10, section: "這一批 v2.63"),
+        // v2.63 C9 (the web's words for nap, napPurr, napWait)
+        TuneField(key: \.nap, name: "揉夠了在你手邊睡著 v2.63", hint: "1（C9）：這次打開累計呼嚕滿「揉多久」秒，手指離開「放手幾秒」，牠就在你最後摸的地方睡著，不走回布墊；輕碰照「輕碰慢慢醒」。睡了這一覺累計歸零。0 回改之前（40 秒沒人碰才睡，大腦開著先走回布墊）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.napPurr, name: "揉多久會睡在手邊（秒）", hint: "這次打開累計呼嚕幾秒才會在你手邊睡著。60 是我取的，數字待測", range: 10...300, step: 5, section: "這一批 v2.63"),
+        TuneField(key: \.napWait, name: "放手幾秒睡著（秒）", hint: "累計夠了以後，手指離開幾秒睡著。6 是我取的，數字待測", range: 2...20, step: 0.5, section: "這一批 v2.63"),
+        // v2.63 D3 (the web's words for holdScared, holdTickle)
+        TuneField(key: \.holdScared, name: "怕的不滑走 v2.63", hint: "1（D3）：戒很高時被拉開 1R 撐 1.5 秒，不再從手指滑掉；改成抗議一聲、眼睛 > <，還撐著每 1.5 秒再抗議，放手後往反方向走開。0 回改之前（撐到就滑走、往反方向溜）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.holdTickle, name: "搔癢不掙脫 v2.63", hint: "1（D3）：一直撥一直扭、一直咯咯，不會掙脫躲開，也不換成抗議聲。0 回改之前（撥「撥多久掙脫」秒就掙脫，最後 2 秒先抗議）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 C5 (the web's words for lookNoDown)
+        TuneField(key: \.lookNoDown, name: "張望不朝下 v2.63", hint: "1（C5）：坐在窗台上時，張望伸偽足探的方向不再朝下（朝下那條會被窗台板擋住，什麼都看不到）；朝下的那一半照水平線鏡射到上面，所以只探上面和左右。懸空時不管。0 回改之前（0 到 360 度亂抽，約四成朝下）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 C6 (the web's words for rubVary)
+        // v2.63 B2, B5 (the web's words for sndB2, sndB5)
+        TuneField(key: \.sndB2, name: "按聲跟著力道 v2.63", hint: "1（B2）：抓下去那一聲的大小跟著按的力道：讀得到壓力（有壓力感應的螢幕）就用壓力，不然讀手指接觸面積（指尖輕點半徑約 18、指腹壓扁約 42），輕 0.35 到重 0.95；兩樣都讀不到照舊 0.7。手機讀 UITouch.force（有 3D Touch 的機型）或 majorRadius。0 回改之前（固定 0.7）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        TuneField(key: \.sndB5, name: "反應聲跟動作同一格 v2.63", hint: "1（B5）：嚇到、開心、不要啦、按的濕聲，音檔開頭那段很小聲的前奏播放時跳過（到 −6 dB 的地方超過 30 毫秒就從前 20 毫秒開始放，淡入 13 毫秒），不動音檔；嚇到那一聲改在牠縮的那一格放（原本先叫、0.05 到 0.12 秒後才縮）。0 回改之前", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 D4 (the web's words for flinchFx)
+        TuneField(key: \.flinchFx, name: "縮那一下有聲有震 v2.63", hint: "1（D4）：你碰牠、牠縮那一下（2 到 5 公釐），縮的那一格同時有一小聲（放手那個「噗」的 air 層，小聲版）和一下輕震（手機 0.25；網頁沒有震動）；縮得小（不到 flinchAmp 的七成，連點越點越小）就不出聲不震，大小跟著縮的大小。縮之後 0.3 秒內放手，放手的「噗」不重複；先放手才縮的，縮那一下只震。強度、音量等多米摸、聽。0 回改之前（縮只改大小，沒聲沒震）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 B1 pull, B3 (the web's words for pullFx)
+        TuneField(key: \.pullFx, name: "慢拉馬上有聲有震 v2.63", hint: "1（B1 拉、B3）：慢慢拉，手指一往外拉出新的距離（離抓下去的地方超過 0.05R），拉絲聲馬上起來（音量至少 0.6×0.3，拉每秒 0.5R 以上就是這麼大），手機的連續震動先給一個很輕的底（0.08，40 毫秒升上來），之後照原本的拉力公式往上；手指停了、縮回去、在同一圈裡揉就不加。音量、強度等多米聽、摸。0 回改之前（慢拉要拉長 0.2R 才有拉絲聲、0.4R 以上才震，黏土慢拉 3 秒左右）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 B9 (the web's words for sndGrain)
+        TuneField(key: \.sndGrain, name: "聲音跟著手走：動一點一顆 v2.63", hint: "1（B9）：手指在身上揉、拉、摸，每走一小段（約 12 點，跟手機的質地微震同一顆）放一顆細碎的黏液顆粒聲，手停就停，越快越密、越亮（每秒最多 20 顆）；揉、拉的循環聲保留、音量一半。新聲音，等多米聽。0 回改之前（只有循環聲）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 未做 83 (the web's words for deskSmooth)
+        TuneField(key: \.deskSmooth, name: "調節台換材質不彈一下 v2.63", hint: "1（未做 83）：調節台換材質、回到預設、套存檔時不再彈一下：材質之間只差觸手軟度（floppy），就地換、不重建；種子、身體大小、密度變了才重建，重建完整團搬回原本的位置（窗台上對齊最低點），家、窗台、鏡頭照舊。0 回改之前（一律重建，回到家，窗台上從碗口上方掉下來）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 D6 (the web's words for bond)
+        TuneField(key: \.bond, name: "怕的要哄、熟要有得長 v2.63", hint: "1（D6）：熟拆兩層：今天的親近（原本的熟，揉 7 秒就滿）照舊，另外一個只升不降的交情（熟滿了還在揉、摸，每分鐘 +0.01，存著跨天留；快扯不扣；畫面不顯示）。交情高時，隔 2 秒以上的第一下碰不縮、朝手指靠。戒高（快扯、連點三下之後）時溫柔摸要先 3 秒，嘆一口氣才開始舒服、呼嚕。數字等多米摸。0 回改之前（存檔不寫交情）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.63 B6 (the web's words for sndB6)
+        TuneField(key: \.sndB6, name: "拉回去再拉有絲聲 v2.63", hint: "1（B6）：同一抓拉長、縮回去、再拉，每次往外拉都有細絲一根根斷的聲音（縮回 1.5 格就退一格，一格 0.4R）；按下去只清掉上次放手的餘韻（冒小泡），不清別的聲音。0 回改之前（同一抓只有拉得比之前都長才有絲斷聲；按下去清掉所有排著的聲音）", range: 0...1, step: 1, section: "這一批 v2.63"),
+        // v2.64 大腦第三片 (the web's words for brMem, 記性 v2.43; the phone has it from v2.64)
+        TuneField(key: \.brMem, name: "記性 v2.64", hint: "1：牠記得窗台上哪裡被摸得舒服、哪裡被嚇過，也記得你常從哪一邊摸牠。喜歡的那格牠會回去休息、睡覺；被嚇過的那格牠繞開。熟了以後，牠沒事時會把你常摸的那邊靠過來。喜歡的留到明天，討厭的三天退完。0 回 v2.63（家固定在窗台正中間，什麼都不記）。要大腦開著才有作用", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 擺飾變真 (the web's words for decoReal, decoBody, decoPush, decoReact, decoCat, decoScare; the phone has them from v2.64)
+        TuneField(key: \.decoReal, name: "擺飾變真 v2.64", hint: "1（未做 24，網頁 v2.44）：窗台上的蠟燭、玻璃罐（擺飾 2 時是書堆）有重量，手指點一下會晃、拖得動、推得倒，掉下窗台大約 20 秒後回來；風鈴、晴天娃娃是擺錘，手指撥得動，風鈴會響。0 回 v2.63（畫上去的圖，右端沒有罐子）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoBody, name: "牠碰得到擺飾 v2.64", hint: "1（網頁 v2.45）：牠的身體經過東西時會帶到它。慢慢流過去，輕的東西被帶著挪一小段、晃一下；你把牠甩過去、牠衝過去，東西被撞倒、撞飛；偽足或身體碰到風鈴，風鈴會晃、會響。牠自己走路撞到的只晃不倒（bumpSoft）。0：只有手指碰得到", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoPush, name: "牠帶動東西的力道", hint: "1 是網頁取的。調大東西更容易被牠帶走、撞飛；調小要更快才帶得動。蠟燭比罐子重，書堆最重", range: 0...3, step: 0.1, section: "這一批 v2.64"),
+        TuneField(key: \.decoReact, name: "牠對擺飾有反應 v2.64", hint: "1（網頁 v2.46）：東西晃了、風鈴響了，牠看過去，好奇夠高就伸偽足探；東西倒下、掉下窗台那一聲牠會縮一下、睜大眼，睡著會被嚇醒，同一件東西倒過幾次就習慣；夜晚蠟燭亮著，牠愛待在蠟燭旁邊。0：牠不知道東西動了", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoCat, name: "像貓一樣推東西 v2.64", hint: "1（網頁 v2.46）：牠很熟、心情好、好奇又高的時候，走到蠟燭或罐子旁邊，看你一眼，伸偽足慢慢把它往窗台邊推。一次打開最多 2 次。0 關", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.decoScare, name: "東西倒下牠嚇多大", hint: "1 是網頁取的。調大牠被倒下、掉下去的聲音嚇得更厲害；0 完全不怕", range: 0...2, step: 0.1, section: "這一批 v2.64"),
+        // v2.64 C5（網頁 lookTarget 的字，第三批第 3 項）
+        TuneField(key: \.lookTarget, name: "張望有對象 v2.64", hint: "1（C5）：張望時探的方向有對象：你最近碰過的地方、窗景裡正在動的東西、在晃的風鈴、旁邊的擺飾，看完有一個小反應（碰過的地方朝那邊靠一下、被嚇過的往反方向縮一下；會動的東西和風鈴眨一下眼、偽足再點一下；擺飾偽足再點一下）。沒有對象時照舊亂抽。0 回 v2.63（方向只亂抽，看完沒有反應）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 D8（網頁 tapBack、slowBlink 的字，第三批第 4 項）
+        TuneField(key: \.tapBack, name: "點牠牠頂回來 v2.64", hint: "1（D8）：點牠一下，牠朝你的手指傾完再過 0.4 秒，朝你剛才點的地方頂一下（跟按著不動往手指推一下同一套），看著你 1.5 秒。你不接就算了，戒、熟、交情、心情都不動；你在那段時間又碰牠，照現有的回應走。戒的往反方向傾那種、在逃、睡著不頂。0 回改之前（傾一下就結束）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.slowBlink, name: "呼嚕時慢眨眼 v2.64", hint: "1（D8）：呼嚕時累計 6 到 12 秒慢眨一次眼（像貓的慢眨）：∩ 換回半睜、看一下、慢慢閉上、閉著停一下、慢慢睜開，再回 ∩，約 2.8 秒。只用既有的眼睛形狀。0 回改之前（呼嚕時一直 ∩）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 C8（網頁 signature 的字，第三批第 5 項）
+        TuneField(key: \.signature, name: "十隻招牌 v2.64", hint: "1（C8）：十隻各一個招牌動作、一個喜歡的位置（表在 .uiux/04-手感/十隻招牌-暫定.md，Agent 取的，等多米看）。醒著沒人碰、在休息的空檔，每隻隔自己的時間做一次自己的招牌（蜜蜜伸懶腰、薄荷衝過去又衝回來、芋圓偷看你一眼就躲、桃桃撒嬌扭兩下、仙草單邊撐著發呆、湯圓打瞌睡抖一下醒來、蝶豆兩條偽足像翅膀開合、汽水冒泡、布丁左右張望再抖一下、珍奶伸去拿罐子再嚼嚼），只用現成的動作；窗台上家放在牠喜歡的那格（你摸出來的喜歡、夜晚蠟燭照舊優先）。0 回改之前（十隻只差幾個數字，家都在布墊）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 B9（網頁 sndWall、rubTrail 的字，第三批第 6 項；「先離開」照網頁程式寫 0.15R，網頁面板字寫 0.1R）
+        TuneField(key: \.sndWall, name: "撞側牆出聲 v2.64", hint: "1（B9）：身體撞到側牆（窗台兩邊的牆、在窗框上時左右窗框、藍底時鏡頭最遠的左右邊）出一聲，用落地那個音檔（fx.land），撞得越快越大聲、低一點；每秒 2R 以下（慢慢靠過去、偽足碰到）不響，同一面牆要先離開 0.15R 才算下一次，0.6 秒內不連發。只有聲音，手機不震（網頁沒有震動）。0 回改之前（撞牆沒聲音）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        TuneField(key: \.rubTrail, name: "揉的痕跡 v2.64", hint: "1（B9，未做 13）：揉、摸的時候看得到手指走過的痕跡：一條角色陰影色的實心帶子，越舊越淡，0.5 秒（「手指走過的痕跡（秒）」）淡完。痕跡原本就有在算，只是果凍皮那條路沒畫。0 回改之前（果凍皮上看不到；平塗皮照舊畫一暗一亮的溝）", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 B8（網頁 startFollow 的字，第三批第 7 項；甲乙盲比在面板「這一批（v2.64）盲比」那兩顆大鈕）
+        TuneField(key: \.startFollow, name: "起步跟手 v2.64", hint: "1（B8）：手一動，被抓那塊的慢一拍先用 20 毫秒，手指走 0.6R 內照走的距離直線變回原本的慢一拍，手指停 80 毫秒歸零（下一次起步又快）。慢一拍的尾巴不變，只改開頭。扯斷出來的第二團不套。正在 B8 盲比時甲乙那組蓋過這條。0 回改之前", range: 0...1, step: 1, section: "這一批 v2.64"),
+        // v2.64 未做 18（只有手機）
+        TuneField(key: \.hapDelay, name: "震動晚畫面（毫秒）v2.64", hint: "未做 18：所有震動（拉、揉的連續震動和按、放手、顆粒這些單下）比畫面晚這麼多毫秒才發，聲音和畫面照舊。交給震動引擎排時間，不卡畫面。研究說晚一點可能摸起來更軟（Han 2024、敲擊研究），Apple 說要同步，所以要盲比 0、20、40。正在震動早晚盲比時三選一那組蓋過這條。0 回改之前（全部立刻發）", range: 0...60, step: 5, section: "這一批 v2.64"),
+        TuneField(key: \.rubVary, name: "揉完的反應輪流 v2.63", hint: "1（C6）：揉完、摸完放手，小跳、多攤 2 秒、朝手指靠、嘆一口氣輪流（洗牌袋，抽完一輪再洗），小跳 40 秒內最多一次；叫聲每一種的幾個檔也抽完一輪才重抽。0 回改之前（每次都挺高、搖偽足、小跳、開心那一聲；叫聲每次亂抽）", range: 0...1, step: 1, section: "這一批 v2.63"),
     ]
 }
 

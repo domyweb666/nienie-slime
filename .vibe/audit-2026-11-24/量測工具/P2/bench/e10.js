@@ -1,0 +1,9 @@
+// 截圖：各狀態一張（身體附近 393×330），看得出來嗎
+const S=[['普通',{}],['很熟',{tr:.95}],['戒',{w:.95}],['舒服呼嚕',{f:()=>{MOOD.c=1}}],['嚇到(scare1)',{f:()=>{MOOD.scare=1}}],['縮著(cower)',{f:()=>{MOOD.cowerUntil=t+1}}],['心情好+.8',{f:()=>{BRAIN.m=.8;BRAIN.mS=.8}}],['心情差-.8',{f:()=>{BRAIN.m=-.8;BRAIN.mS=-.8}}],['睡著',{f:()=>{SLP.on=true;LIFE.st='sleep'}}],['開心挺高',{f:()=>{if(!(t-MOOD.happyT<.3))MOOD.happyT=t}}],['想睡前兆',{f:()=>{BRAIN.pre={k:'sleep',t0:t}}}],['喘',{f:()=>{BRX.exert=1}}]];
+const imgs=[];
+for(const [nm,s] of S){fresh(5,{},{tr:s.tr||0,w:s.w||0,settle:200});for(let i=0;i<60*6;i++){if(LIFE.st!=='sleep')LIFE.st='rest';LIFE.until=t+1e6;GAIT.on=false;BRAIN.s=0;IMP.tr=s.tr||0;IMP.w=s.w||0;EYE.user=t+1;EYE.nextBlink=t+3;if(s.f)s.f();update(DT)}
+ draw();const c=document.createElement('canvas');c.width=393;c.height=330;c.getContext('2d').drawImage(cv,0,400*DPR,393*DPR,330*DPR,0,0,393,330);imgs.push([nm,c.toDataURL('image/png')])}
+// 打招呼搖偽足的最大那一格、縮一下最小那一格、討摸
+fresh(6,{},{tr:.9,settle:200});LIFE.until=t+1e6;MOOD.wagT=t;EYE.user=t+3;E4.on=true;E4.ph='wave';E4.t0=t;for(let i=0;i<44;i++){LIFE.until=t+1e6;update(DT)}draw();{const c=document.createElement('canvas');c.width=393;c.height=330;c.getContext('2d').drawImage(cv,0,400*DPR,393*DPR,330*DPR,0,0,393,330);imgs.push(['打招呼搖',c.toDataURL('image/png')])}
+for(const [nm,w] of [['被點縮(普通)',0],['被點縮(戒)',.9]]){fresh(7,{deco:0,decoReal:0},{w,settle:240});LIFE.until=t+1e6;const p=scr(globalC.xc-R*.2,globalC.yc-R*.15);ev('pointerdown',1,p[0],p[1]);steps(5);ev('pointerup',1,p[0],p[1]);let best=9,bi=0,i=0;for(;i<40;i++){update(DT);const A=geo().A;if(A<best){best=A;bi=i}else if(best<9&&i-bi>0&&FLN.t0>0&&t-FLN.t0>.06&&t-FLN.t0<.12)break}draw();const c=document.createElement('canvas');c.width=393;c.height=330;c.getContext('2d').drawImage(cv,0,400*DPR,393*DPR,330*DPR,0,0,393,330);imgs.push([nm,c.toDataURL('image/png')])}
+return imgs;

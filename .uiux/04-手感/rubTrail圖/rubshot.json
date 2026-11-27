@@ -1,0 +1,234 @@
+[
+ {
+  "shots": [
+   {
+    "tag": "taro_rubTrail1_1_揉3秒",
+    "img": "taro_rubTrail1_1_揉3秒.png"
+   },
+   {
+    "tag": "taro_rubTrail1_2_放手0.25秒",
+    "img": "taro_rubTrail1_2_放手0.25秒.png"
+   },
+   {
+    "tag": "taro_rubTrail1_3_放手0.6秒",
+    "img": "taro_rubTrail1_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "taro",
+  "arm": {
+   "rubTrail": 1
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "taro_rubTrail0_1_揉3秒",
+    "img": "taro_rubTrail0_1_揉3秒.png"
+   },
+   {
+    "tag": "taro_rubTrail0_2_放手0.25秒",
+    "img": "taro_rubTrail0_2_放手0.25秒.png"
+   },
+   {
+    "tag": "taro_rubTrail0_3_放手0.6秒",
+    "img": "taro_rubTrail0_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "taro",
+  "arm": {
+   "rubTrail": 0
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "honey_rubTrail1_1_揉3秒",
+    "img": "honey_rubTrail1_1_揉3秒.png"
+   },
+   {
+    "tag": "honey_rubTrail1_2_放手0.25秒",
+    "img": "honey_rubTrail1_2_放手0.25秒.png"
+   },
+   {
+    "tag": "honey_rubTrail1_3_放手0.6秒",
+    "img": "honey_rubTrail1_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "honey",
+  "arm": {
+   "rubTrail": 1
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "honey_rubTrail0_1_揉3秒",
+    "img": "honey_rubTrail0_1_揉3秒.png"
+   },
+   {
+    "tag": "honey_rubTrail0_2_放手0.25秒",
+    "img": "honey_rubTrail0_2_放手0.25秒.png"
+   },
+   {
+    "tag": "honey_rubTrail0_3_放手0.6秒",
+    "img": "honey_rubTrail0_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "honey",
+  "arm": {
+   "rubTrail": 0
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "mint_rubTrail1_1_揉3秒",
+    "img": "mint_rubTrail1_1_揉3秒.png"
+   },
+   {
+    "tag": "mint_rubTrail1_2_放手0.25秒",
+    "img": "mint_rubTrail1_2_放手0.25秒.png"
+   },
+   {
+    "tag": "mint_rubTrail1_3_放手0.6秒",
+    "img": "mint_rubTrail1_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "mint",
+  "arm": {
+   "rubTrail": 1
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "mint_rubTrail0_1_揉3秒",
+    "img": "mint_rubTrail0_1_揉3秒.png"
+   },
+   {
+    "tag": "mint_rubTrail0_2_放手0.25秒",
+    "img": "mint_rubTrail0_2_放手0.25秒.png"
+   },
+   {
+    "tag": "mint_rubTrail0_3_放手0.6秒",
+    "img": "mint_rubTrail0_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "mint",
+  "arm": {
+   "rubTrail": 0
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "peach_rubTrail1_1_揉3秒",
+    "img": "peach_rubTrail1_1_揉3秒.png"
+   },
+   {
+    "tag": "peach_rubTrail1_2_放手0.25秒",
+    "img": "peach_rubTrail1_2_放手0.25秒.png"
+   },
+   {
+    "tag": "peach_rubTrail1_3_放手0.6秒",
+    "img": "peach_rubTrail1_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "peach",
+  "arm": {
+   "rubTrail": 1
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "peach_rubTrail0_1_揉3秒",
+    "img": "peach_rubTrail0_1_揉3秒.png"
+   },
+   {
+    "tag": "peach_rubTrail0_2_放手0.25秒",
+    "img": "peach_rubTrail0_2_放手0.25秒.png"
+   },
+   {
+    "tag": "peach_rubTrail0_3_放手0.6秒",
+    "img": "peach_rubTrail0_3_放手0.6秒.png"
+   }
+  ],
+  "trail": [
+   11,
+   6,
+   0
+  ],
+  "skinUsed": true,
+  "jel": true,
+  "skin": "A",
+  "mode": "ok",
+  "slime": "peach",
+  "arm": {
+   "rubTrail": 0
+  }
+ }
+]

@@ -10,6 +10,20 @@ protocol SlimeSoundSource: AnyObject {
     var pitchJitter: Double { get set }
     var pullMax: Double { get set }      // loudest the stretching-strand loop gets
     var rubMax: Double { get set }       // loudest the rub loop gets (the rub level passed to frame is already scaled by it)
+    /// v2.61 B1 (FeelParams.snd61): the new rub loop, and the rain at 0.3 instead of 0.6 while held. false = v2.60
+    var snd61: Bool { get set }
+    /// v2.63 C6 (FeelParams.rubVary): each kind of voice plays all its files, shuffled, before a new shuffle (a new round never starts with the last one). false = a random file each time
+    var voiceBag: Bool { get set }
+    /// v2.63 B6 (FeelParams.sndB6): a press clears only the last release's tail (the settle bubbles), not the drip after a tear or other delayed sounds. false = a press clears everything queued
+    var sndB6: Bool { get set }
+    /// v2.63 B5 (FeelParams.sndB5): startle, happy, protest and the press's wet layer play a copy of each file without its quiet lead-in (made at load). false = the files as they are
+    var sndB5: Bool { get set }
+    /// v2.63 B1 pull (FeelParams.pullFx; web SFX.frame st.open): how fast a grabbing finger opens new ground (radii a second), set before each frame; 0 = off
+    var pullOpen: Double { get set }
+    /// v2.63 B9 (FeelParams.sndGrain; web SFX.gr): the rub and strand loops' share while grains play (0.5), 1 = as before
+    var grainLoop: Double { get set }
+    /// v2.61 B7: what the engine says its own output adds (seconds), for the copied measurement only
+    var engineLatency: Double { get }
     var settleAmt: Double { get set }    // after-release bubbles / hiss, 0 = off
     var music: Double { get set }        // v2.21 background volume (lofi; v2.40 rain and fire too), 0 = off
     /// v2.40 環境音: "rain", "fire", "noise" or "lofi" (web `SFX.setAmb`). Scenes come from `amb.json`; "noise" is a bed with no events.
@@ -20,6 +34,10 @@ protocol SlimeSoundSource: AnyObject {
     func strand(gain: Double)
     /// Let go. `gain` is the release event's 0.35...1; strength s = (gain − 0.35) / 0.65.
     func release(gain: Double)
+    /// v2.63 D4 (FeelParams.flinchFx): the small sound when it flinches from your touch: the release pop's air layer, quiet, a little higher. No tail
+    func flinch(gain: Double)
+    /// v2.63 B9 (FeelParams.sndGrain): one fine slime grain for a texture tick; `gain` 0...1 is the tick's (how fast the hand is)
+    func grain(gain: Double)
     /// Every frame. `rub` 0...1 (already × rubMax), `stretch` in radii of the most-stretched grabbing finger.
     func frame(dt: Double, rub: Double, stretch: Double, grabbing: Bool)
     /// App going to the background: loops off, nothing pending.
@@ -29,9 +47,16 @@ protocol SlimeSoundSource: AnyObject {
     /// v2.31 搖晃沉澱: the ding when it has settled clear (three sines, baked to a file)
     func ding(gain: Double)
     /// v2.50 場景聲 (`fx.<kind>` in the manifest, AI samples): crawl, climb, land, swimin, cling, unstick, drip, snore, sigh. Silent without the files.
-    func fx(_ kind: String, gain: Double, delay: Double)
+    /// v2.64 B9：`rate` 是音高（撞側牆越大力越低，網頁 S.fx 的 r）；其他場景聲走下面 extension 那個，rate 1
+    func fx(_ kind: String, gain: Double, delay: Double, rate: Double)
+    /// v2.64 擺飾變真 (`prop.<kind>` in the manifest: glass, candle, book, bell; web S.knock): a thing knocked; far = fallen out of sight (quieter, duller). Silent without the files.
+    func knock(_ kind: String, gain: Double, far: Bool)
     /// 候選 17: one release "pop" file, for Core Haptics to register (nil until there is one).
     var releaseSampleURL: URL? { get }
+}
+extension SlimeSoundSource {
+    /// v2.50 場景聲，音高照舊（rate 1），跟 v2.64 之前一樣
+    func fx(_ kind: String, gain: Double, delay: Double) { fx(kind, gain: gain, delay: delay, rate: 1) }
 }
 
 /// Sample bank + layered playback. Reads `manifest.json` from the bundle:
@@ -44,6 +69,13 @@ final class SlimeAudio: SlimeSoundSource {
     var pitchJitter = 0.08
     var pullMax = 0.6
     var rubMax = 0.7
+    var snd61 = true   // v2.61 B1
+    var voiceBag = true   // v2.63 C6
+    var sndB6 = true   // v2.63 B6
+    var sndB5 = true   // v2.63 B5
+    var pullOpen = 0.0   // v2.63 B1 pull
+    var grainLoop = 1.0   // v2.63 B9
+    var engineLatency: Double { engine.outputNode.presentationLatency }
     var settleAmt = 1.0
     private(set) var releaseSampleURL: URL?
     /// v2.21 background lofi (多米 build 77: put lofi behind it), `bgm-lofi.caf` (ALAC: AAC pads silence, and AVAudioPlayer loops the whole file, so an m4a has a gap) from `prototype/sfx-design/design_lofi.py`: a 126 s loop.
@@ -75,7 +107,7 @@ final class SlimeAudio: SlimeSoundSource {
     private let ambRatio = 1.6   // web ambVol 0.4 against lofi's 0.25: the rain bed plays about −32 dBFS, a press about −34 (ASMR: the slime in front)
 
     // ---- the table (keep in step with engine.js) ----
-    private struct Play { var gain: Double; var rate: Double; var lowpass: Double; var delay = 0.0; var deco = false }
+    private struct Play { var gain: Double; var rate: Double; var lowpass: Double; var delay = 0.0; var deco = false; var take: Int? = nil }   // take: which file (v2.63 C6 voice bag); nil = random
     private let maxVoices = 14              // one-shots at once; past this the decoration layers (air, settle, strand) are dropped
     private let retrigger = 0.06            // same kind again within 60 ms: wet layer only, × 0.6
     private static func rnd(_ a: Double, _ b: Double) -> Double { Double.random(in: a...b) }
@@ -94,11 +126,11 @@ final class SlimeAudio: SlimeSoundSource {
     ]
     // pull: st = stretch (radii), v = its rate of change (radii/s, smoothed 60 ms)
     private let pullOn = 0.2
-    private func pullGain(_ st: Double, _ v: Double) -> Double { 0.12 * Self.clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * min(1, v / 2.5) }
-    private func pullRate(_ st: Double) -> Double { 0.85 + 0.4 * tanh(st / 3) }
-    private func pullLowpass(_ st: Double) -> Double { 1000 + 3500 * tanh(st / 3) }
-    private func strandRate(_ st: Double, _ v: Double) -> Double { st > 0.4 ? (2 + 16 * tanh(st / 3)) * (0.25 + 0.75 * min(1, v / 2.5)) : 0 }
-    private func strandPlay(_ st: Double) -> Play { Play(gain: Self.rnd(0.12, 0.3), rate: (0.85 + 0.5 * tanh(st / 3)) * Self.rnd(0.92, 1.08), lowpass: 9000, deco: true) }
+    private func pullGain(_ st: Double, _ v: Double) -> Double { (0.12 + 0.18 * (1 - exp(-max(0, st - 0.6) / 4))) * Self.clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * min(1, v / 2.5) }   // v2.54: held still a long pull still hums a little
+    private func pullRate(_ st: Double) -> Double { 0.85 * pow(2, 16 * (1 - exp(-st / 5)) / 12) }   // v2.54 無限拉: keeps rising (tanh stopped at about 3R): 3 semitones at 1R, 7 at 3R, 11 at 6R, 14.5 at 12R, at most 16
+    private func pullLowpass(_ st: Double) -> Double { 1000 + 7000 * (1 - exp(-st / 5)) }
+    private func strandRate(_ st: Double, _ v: Double) -> Double { st > 0.4 ? (2 + 16 * (1 - exp(-st / 4))) * (0.25 + 0.75 * min(1, v / 2.5)) : 0 }
+    private func strandPlay(_ st: Double) -> Play { Play(gain: Self.rnd(0.12, 0.3), rate: 0.85 * pow(2, 18 * (1 - exp(-st / 5)) / 12) * Self.rnd(0.92, 1.08), lowpass: 9000, deco: true) }
     // rub: n = level / rubMax; ducks under the strand loop once pulled far
     private func rubDuck(_ st: Double) -> Double { Self.clamp(1 - (st - 0.3) / 0.7, 0, 1) }
 
@@ -106,6 +138,7 @@ final class SlimeAudio: SlimeSoundSource {
     private let engine = AVAudioEngine()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
     private var bank: [String: [AVAudioPCMBuffer]] = [:]   // "press.body" → takes
+    private var bankB5: [String: [AVAudioPCMBuffer]] = [:]   // v2.63 B5: the same takes without their lead-in, same order
 
     private final class Voice {
         let player = AVAudioPlayerNode()
@@ -127,7 +160,7 @@ final class SlimeAudio: SlimeSoundSource {
     private let rubVoice = Voice()
 
     private var lastKind: [String: Double] = [:]
-    private var pending: [(at: Double, key: String, play: Play)] = []
+    private var pending: [(at: Double, key: String, play: Play, tail: Bool)] = []   // tail: a release's settle bubble (v2.63 B6: the only thing a press clears)
     private var st = 0.0, stV = 0.0
     private var wasGrabbing = false
     private var lastStretch = 0.0, heldFor = 0.0
@@ -229,8 +262,42 @@ final class SlimeAudio: SlimeSoundSource {
                     if kind == "release", layer == "air" || layer == "all", releaseSampleURL == nil { releaseSampleURL = fileURL }
                 }
                 bank["\(kind).\(layer)"] = buffers
+                if B5Set.keys.contains("\(kind).\(layer)") { bankB5["\(kind).\(layer)"] = buffers.map { leadTrim($0) } }   // v2.63 B5
             }
         }
+    }
+
+    /// v2.63 B5 (web leadTrim, B5K; the same numbers): these files start with a quiet lead-in (the loudest part 60 to 267 ms in), heard as a beat late.
+    /// The file is left alone: a copy starts 20 ms before the first −6 dB point (5 ms blocks, max of |x|, half the file's peak) when that is later
+    /// than 30 ms, with a 13 ms raised-cosine fade in.
+    private enum B5Set {
+        static let keys: Set<String> = ["voice.startle", "voice.happy", "voice.protest", "press.wet"]
+        static let thr: Float = 0.5, late = 0.03, keep = 0.02, fade = 0.013
+    }
+    private func leadTrim(_ b: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+        guard let d = b.floatChannelData?[0] else { return b }
+        let sr: Double = b.format.sampleRate, len = Int(b.frameLength), w = max(1, Int((0.005 * sr).rounded())), nb = len / w
+        guard nb > 0 else { return b }
+        var env = [Float](repeating: 0, count: nb)
+        var pk: Float = 0
+        for k in 0..<nb {
+            var m: Float = 0
+            for i in (k * w)..<((k + 1) * w) { m = max(m, abs(d[i])) }
+            env[k] = m
+            pk = max(pk, m)
+        }
+        var on = 0
+        while on < nb && env[on] < pk * B5Set.thr { on += 1 }
+        let onset = Double(on * w) / sr
+        guard onset > B5Set.late else { return b }
+        let skip = Int(((onset - B5Set.keep) * sr).rounded()), n = len - skip, fade = max(1, Int((B5Set.fade * sr).rounded()))
+        guard n > 0, let o = AVAudioPCMBuffer(pcmFormat: b.format, frameCapacity: AVAudioFrameCount(n)), let out = o.floatChannelData?[0] else { return b }
+        o.frameLength = AVAudioFrameCount(n)
+        for i in 0..<n {
+            let g: Float = i < fade ? Float(0.5 - 0.5 * cos(Double.pi * Double(i) / Double(fade))) : 1
+            out[i] = d[i + skip] * g
+        }
+        return o
     }
 
     /// Reads a file and converts it to the engine's mono 48k float format.
@@ -267,11 +334,11 @@ final class SlimeAudio: SlimeSoundSource {
     private func jitter() -> Double { 1 + Double.random(in: -pitchJitter...pitchJitter) }
 
     private func one(_ key: String, _ p: Play) {
-        guard !muted, let takes = bank[key], !takes.isEmpty else { return }
+        guard !muted, let takes = (sndB5 ? bankB5[key] : nil) ?? bank[key], !takes.isEmpty else { return }   // v2.63 B5: the trimmed copies where there are
         if p.delay > 0 {
             var q = p
             q.delay = 0
-            pending.append((at: now + p.delay, key: key, play: q))
+            pending.append((at: now + p.delay, key: key, play: q, tail: false))
             return
         }
         let t = now
@@ -281,7 +348,7 @@ final class SlimeAudio: SlimeSoundSource {
         guard let v = voices.first(where: { $0.busyUntil <= t }) ?? voices.min(by: { $0.busyUntil < $1.busyUntil }) else { return }
         startEngine()
         guard engine.isRunning else { return }
-        let buf = takes[Int.random(in: 0..<takes.count)]
+        let buf = takes[p.take.map { $0 % takes.count } ?? Int.random(in: 0..<takes.count)]
         let rate = p.rate * jitter()
         v.player.stop()
         v.speed.rate = Float(Self.clamp(rate, 0.25, 4))
@@ -310,19 +377,41 @@ final class SlimeAudio: SlimeSoundSource {
     }
 
     func press(intensity: Double) {
-        pending.removeAll()   // touching again cuts the last release's tail
+        if sndB6 { pending.removeAll { $0.tail } } else { pending.removeAll() }   // touching again cuts the last release's tail (v2.63 B6: only that; before, the drip after a tear went too)
         layered("press", Self.clamp(intensity, 0, 1), pressLayers)
     }
 
     func voice(_ kind: String, gain: Double, rate: Double) {
-        one("voice.\(kind)", Play(gain: Self.clamp(gain, 0, 1), rate: rate, lowpass: 4000))
+        let key = "voice.\(kind)", n = bank[key]?.count ?? 0
+        one(key, Play(gain: Self.clamp(gain, 0, 1), rate: rate, lowpass: 4000, take: voiceBag && n > 1 ? vbagPick(key, n) : nil))
+    }
+    /// v2.63 C6 (web vbagPick): one shuffled round of a voice's files; a new round never starts with the last one.
+    private struct VBag { var n: Int; var q: [Int]; var last: Int }
+    private var vbag: [String: VBag] = [:]
+    private func vbagPick(_ key: String, _ n: Int) -> Int {
+        var b = vbag[key] ?? VBag(n: n, q: [], last: -1)
+        if b.n != n { b = VBag(n: n, q: [], last: -1) }
+        if b.q.isEmpty {
+            b.q = Array(0..<n).shuffled()
+            if n > 1 && b.q[0] == b.last { b.q.append(b.q.removeFirst()) }
+        }
+        let k = b.q.removeFirst()
+        b.last = k
+        vbag[key] = b
+        return k
     }
 
-    func fx(_ kind: String, gain: Double, delay: Double) {
+    /// `rate`（v2.64 B9 撞側牆，網頁 S.fx 的 r）：音高再乘上這個，其他呼叫照舊是 1
+    func fx(_ kind: String, gain: Double, delay: Double, rate: Double) {
         let key = "fx.\(kind)", t = now
         if t - (lastKind[key] ?? -9) < 0.25 { return }   // the same kind at most every 0.25 s (web S.fx)
         lastKind[key] = t
-        one(key, Play(gain: Self.clamp(gain, 0, 1), rate: Self.rnd(0.96, 1.04), lowpass: 9000, delay: delay))
+        one(key, Play(gain: Self.clamp(gain, 0, 1), rate: (rate > 0 && rate.isFinite ? rate : 1) * Self.rnd(0.96, 1.04), lowpass: 9000, delay: delay))
+    }
+
+    /// v2.64 (web S.knock, the same numbers): near 0.9 × gain, pitch ±6 %, low-pass 5 kHz; far half as loud, 0.9 × the pitch, 1.2 kHz
+    func knock(_ kind: String, gain: Double, far: Bool) {
+        one("prop.\(kind)", Play(gain: Self.clamp(gain, 0, 1) * (far ? 0.5 : 0.9), rate: Self.rnd(0.94, 1.06) * (far ? 0.9 : 1), lowpass: far ? 1200 : 5000))
     }
 
     func ding(gain: Double) {
@@ -336,6 +425,19 @@ final class SlimeAudio: SlimeSoundSource {
         one("pull.strand", p)
     }
 
+    /// v2.63 D4 (web SFX.flinch: the same numbers): `gain` from the rig (0.3 × the flinch's size); nothing queued, lastStretch untouched
+    func flinch(gain: Double) {
+        one("release.air", Play(gain: Self.clamp(gain, 0, 1), rate: Self.rnd(1.08, 1.16), lowpass: 7000))
+    }
+
+    /// v2.63 B9 (web SFX.grain: the same numbers): the shortest, finest slime file (settle.bubble, 0.11 s), louder, higher and brighter the faster
+    func grain(gain: Double) {
+        let k = Self.clamp(gain, 0, 1)
+        var p = Play(gain: 0.08 + 0.2 * k, rate: 0.95 + 0.3 * k, lowpass: 2500 + 5500 * k)
+        p.deco = true
+        one("settle.bubble", p)
+    }
+
     func release(gain: Double) {
         let s = Self.clamp((gain - 0.35) / 0.65, 0, 1)
         layered("release", s, releaseLayers)
@@ -344,7 +446,7 @@ final class SlimeAudio: SlimeSoundSource {
             // pulled: 1–3 small bubbles between 0.12 and 0.7 s later
             for _ in 0..<Int((1 + 2 * s).rounded()) where Double.random(in: 0..<1) < 0.7 {
                 let p = Play(gain: (Self.rnd(0.12, 0.22) + 0.15 * s) * settleAmt, rate: Self.rnd(0.85, 1.35), lowpass: 6000, deco: true)
-                pending.append((at: now + Self.rnd(0.12, 0.7), key: "settle.bubble", play: p))
+                pending.append((at: now + Self.rnd(0.12, 0.7), key: "settle.bubble", play: p, tail: true))
             }
         } else if heldFor >= 0.5 && Double.random(in: 0..<1) < 0.6 {
             // pressed a while without pulling: air refilling, a very small hiss
@@ -383,16 +485,21 @@ final class SlimeAudio: SlimeSoundSource {
         }
 
         // stretching-strand loop: thinner = higher and brighter, faster = louder, held still = almost silent
-        let pulling = grabbing && stretch > pullOn && !muted
-        let pullTarget = pulling ? pullMax * Self.clamp(pullGain(stretch, stV), 0, 1) : 0
+        // v2.63 B1 pull (web: the same lines): pulled open onto new ground, a floor of pullMax × 0.3 × min(1, speed ÷ 0.5) under the old level
+        let open: Double = grabbing ? max(0, pullOpen) : 0
+        let pFloor: Double = open > 0 ? pullMax * PullFxSet.g * min(1, open / PullFxSet.v) : 0
+        let pulling = grabbing && (stretch > pullOn || pFloor > 0.005) && !muted
+        let pullTarget = (pulling ? max(stretch > pullOn ? pullMax * Self.clamp(pullGain(stretch, stV), 0, 1) : 0, pFloor) : 0) * grainLoop   // v2.63 B9: half while grains play
         driveLoop(pullVoice, key: "pull.loop", target: pullTarget, dt: dt, attack: 0.05, decay: 0.12,
                   rate: pulling ? pullRate(stretch) : nil, lowpass: pulling ? pullLowpass(stretch) : nil)
-        if pulling, Double.random(in: 0..<1) < strandRate(stretch, stV) * dt { one("pull.strand", strandPlay(stretch)) }
+        if pulling, stretch > pullOn, Double.random(in: 0..<1) < strandRate(stretch, stV) * dt { one("pull.strand", strandPlay(stretch)) }
 
         // rub loop, giving way to the strand loop once pulled far
-        let level = muted ? 0 : Self.clamp(rub, 0, 1) * rubDuck(stretch)
-        let n = rubMax > 0 ? Self.clamp(level / rubMax, 0, 1) : 0
-        driveLoop(rubVoice, key: "rub.loop", target: level, dt: dt, attack: 0.06, decay: 0.06,
+        let level = muted ? 0 : Self.clamp(rub, 0, 1) * rubDuck(stretch) * grainLoop   // v2.63 B9: half while grains play; the pitch and brightness as before (n below)
+        let n = rubMax > 0 && grainLoop > 0 ? Self.clamp(level / grainLoop / rubMax, 0, 1) : 0
+        // v2.61 B1: the new loop; without its files the old one. A loop already sounding keeps its file, the next rub picks again
+        let rubKey = snd61 && !(bank["rub.loop61"] ?? []).isEmpty ? "rub.loop61" : "rub.loop"
+        driveLoop(rubVoice, key: rubKey, target: level, dt: dt, attack: 0.06, decay: 0.06,
                   rate: 0.94 + 0.12 * n, lowpass: 1400 + 2600 * n)
     }
 
@@ -482,7 +589,8 @@ final class SlimeAudio: SlimeSoundSource {
 
     private func ambFrame(dt: Double, grabbing: Bool) {
         let scene = ambName != "lofi" && ambFile != nil
-        let target = scene && !muted ? music * ambRatio * (grabbing ? 0.6 : 1) : 0
+        let duck: Double = snd61 && ambName == "rain" ? 0.3 : 0.6   // v2.61 B1: the rain only; fire and noise stay at 0.6
+        let target = scene && !muted ? music * ambRatio * (grabbing ? duck : 1) : 0
         ambLevel += (target - ambLevel) * (1 - exp(-dt / (target < ambLevel ? 0.4 : 1.2)))
         ambMix.outputVolume = Float(ambLevel)
         guard scene, target > 0, ambBed.isPlaying, let evs = ambScene?["events"] as? [String: Any] else { return }

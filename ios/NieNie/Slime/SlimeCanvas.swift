@@ -13,10 +13,14 @@ struct SlimeCanvas: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SlimeView {
         let view = SlimeView(rig: controller.rig, colors: controller.slime.colors)
+        view.kind = controller.slime   // v2.57
+        view.winId = controller.winId   // v2.59 窗景
         let controller = self.controller
         view.onFrame = { [weak controller] dt in controller?.frame(dt: dt) }
+        view.onWindowFail = { [weak controller] in controller?.windowFailed() }
         view.onStats = { [weak controller] s in controller?.report(s) }
         view.latencyTest = controller.latencyTest
+        view.labGrey = controller.labGrey; view.labCircle = controller.labCircle; view.labLayersOff = controller.labLayersOff
         context.coordinator.slime = controller.slime
         return view
     }
@@ -25,9 +29,15 @@ struct SlimeCanvas: UIViewRepresentable {
         if context.coordinator.slime != controller.slime {
             context.coordinator.slime = controller.slime
             view.colors = controller.slime.colors
+            view.kind = controller.slime
         }
+        if view.winId != controller.winId { view.winId = controller.winId }
         if view.latencyTest != controller.latencyTest {
             view.latencyTest = controller.latencyTest
         }
+        // v2.52 量測: the grey box, the bare circle and the layer switches (each setter does its own work only on a change)
+        if view.labGrey != controller.labGrey { view.labGrey = controller.labGrey }
+        if view.labCircle != controller.labCircle { view.labCircle = controller.labCircle }
+        if view.labLayersOff != controller.labLayersOff { view.labLayersOff = controller.labLayersOff }
     }
 }

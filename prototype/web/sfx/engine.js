@@ -35,12 +35,12 @@
     },
     pull: {      // st 拉伸（半徑），v 拉伸的變化速度（半徑／秒，平滑 60 毫秒）
       on: 0.2,                                            // 拉不到 0.2R 不算拉
-      gain: (st, v) => 0.12 * clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * Math.min(1, v / 2.5),
-      rate: st => 0.85 + 0.4 * Math.tanh(st / 3),         // 越拉越細越高
-      lp: st => 1000 + 3500 * Math.tanh(st / 3),          // 越拉越亮
+      gain: (st, v) => (0.12 + 0.18 * (1 - Math.exp(-Math.max(0, st - 0.6) / 4))) * clamp((st - 0.2) / 0.4, 0, 1) + 0.88 * Math.min(1, v / 2.5),   // v2.54：拉著不動也有一點聲，拉越長越清楚
+      rate: st => 0.85 * Math.pow(2, 16 * (1 - Math.exp(-st / 5)) / 12),   // 越拉越細越高。v2.54 無限拉：以前 3R 後就幾乎不再變高（tanh），現在一路往上，1R 高 3 個半音、3R 7 個、6R 11 個、12R 14.5 個，最多 16 個
+      lp: st => 1000 + 7000 * (1 - Math.exp(-st / 5)),    // 越拉越亮（v2.54 一路亮到 8 kHz）
       attack: 0.05, decay: 0.12,
-      strandRate: (st, v) => st > 0.4 ? (2 + 16 * Math.tanh(st / 3)) * (0.25 + 0.75 * Math.min(1, v / 2.5)) : 0,   // 每秒幾根
-      strand: st => ({ g: rnd(0.12, 0.3), r: (0.85 + 0.5 * Math.tanh(st / 3)) * rnd(0.92, 1.08), lp: 9000, deco: true }),
+      strandRate: (st, v) => st > 0.4 ? (2 + 16 * (1 - Math.exp(-st / 4))) * (0.25 + 0.75 * Math.min(1, v / 2.5)) : 0,   // 每秒幾根
+      strand: st => ({ g: rnd(0.12, 0.3), r: 0.85 * Math.pow(2, 18 * (1 - Math.exp(-st / 5)) / 12) * rnd(0.92, 1.08), lp: 9000, deco: true }),
     },
     rub: {       // L 0..1（已乘揉的音量上限）；拉遠了讓位給拉絲，不疊成一團
       rate: n => 0.94 + 0.12 * n, lp: n => 1400 + 2600 * n,   // n = L / 上限
@@ -57,6 +57,10 @@
     // v2.40 環境音（多米 11-09：背景音改成真實環境聲，下雨、木材燃燒）：amb 'rain'／'fire'／'noise'／'lofi'（noise 是 11-22 加的粉紅噪音，只有底、沒有事件）。雨和柴火是「底＋零星事件」，
     // 底是兩分鐘無縫循環，事件照 amb.json 的頻率隨機冒出來（大小、左右、音高每次不同），聽不出循環。lofi 照舊
     // ambVol 0.4：雨的底播出來約 −32 dBFS、柴火 −34.5，捏的聲音 −34 左右；0.8 時雨比捏的聲音大 6 dB，ASMR 要史萊姆在前面（抓著時再降到六成）
+    snd61: 1,   // v2.61 B1：揉的新循環（rub.loop61）和抓著時雨降到 0.3；0 回 rub.loop、0.6
+    b5: 1, bufB5: {},   // v2.63 B5（sndB5）：嚇到、開心、不要啦、按的濕聲用跳過前奏的那一份（bufB5，載入時從同一個檔做的，leadTrim）；0 回原本的
+    gr: 1,      // v2.63 B9（sndGrain）：揉、拉循環聲乘多少（頁面給，開著時 0.5，顆粒浮在上面）；1 照舊
+    b6: 1,      // v2.63 B6（sndB6）：按下去只清上次放手的餘韻（排程裡 tail 的那幾顆），別的照放；0 回改之前（按下去整排清掉）
     amb: 'rain', ambMeta: null, ambVol: 0.4, ambSrc: null, ambSrcG: null, ambTok: 0, ambNext: {}, ambLast: {}, ambBuf: {},
   };
   // 一首可以無縫循環的 lofi（prototype/sfx-design/design_lofi.py，40 小節、76 BPM）。自己一條 gain 直接接輸出，不經過音效的 master；
@@ -128,7 +132,7 @@
       src.connect(g); tail.connect(S.bgmG); src.start(Math.max(at, c.currentTime));
     });
   }
-  function bgmTarget(grabbing) { return S.mode === 0 ? (grabbing ? S.bgmDuck : 1) : 0; }
+  function bgmTarget(grabbing) { return S.mode === 0 ? (grabbing ? (S.snd61 && S.amb === 'rain' ? 0.3 : S.bgmDuck) : 1) : 0; }
 
   function normManifest(m) {
     const out = {};
@@ -156,8 +160,8 @@
     S.master = c.createGain(); S.master.gain.value = S.muted ? 0 : S.volume; S.master.connect(c.destination);
     startBgm();
     for (const k of Object.keys(S.manifest)) for (const layer of Object.keys(S.manifest[k])) {
-      const key = k + '.' + layer; S.buf[key] = [];
-      for (const f of S.manifest[k][layer]) fetch(S.base + f).then(r => r.arrayBuffer()).then(ab => c.decodeAudioData(ab)).then(b => S.buf[key].push(b)).catch(() => {});
+      const key = k + '.' + layer, b5 = B5K.keys.includes(key); S.buf[key] = []; if (b5) S.bufB5[key] = [];
+      for (const f of S.manifest[k][layer]) fetch(S.base + f).then(r => r.arrayBuffer()).then(ab => c.decodeAudioData(ab)).then(b => { S.buf[key].push(b); if (b5) S.bufB5[key].push(leadTrim(b)); }).catch(() => {});   // v2.63 B5：同一個回呼裡推，兩邊的順序一樣（洗牌袋的檔號對得上）
     }
   };
 
@@ -165,13 +169,30 @@
   S.setMode = function (m) { S.mode = m; S.setMuted(m === 2); if (S.bgmG) { S.bgmT = bgmTarget(false); S.bgmG.gain.setTargetAtTime(S.bgmT, S.ctx.currentTime, 0.3); } };
   S.setVolume = function (v) { S.volume = v; if (S.master && !S.muted) S.master.gain.setTargetAtTime(v, S.ctx.currentTime, 0.02); };
 
-  function pick(key) { const l = S.buf[key]; return l && l.length ? l[Math.floor(Math.random() * l.length)] : null; }
+  // v2.63 B5：這四種音檔開頭有一段很小聲的前奏（量到最大聲晚 60 到 267 毫秒），聽起來像比動作晚一拍。不改音檔：載入時每個檔另外做一份跳過前奏的，
+  // 開頭到 −6 dB（5 毫秒一格取最大值，到全檔最大的一半）超過 late 秒，就從那一點前 keep 秒開始放，頭 fade 秒升餘弦淡入。Swift SlimeAudio 同一套數字（B5Set）
+  const B5K = { keys: ['voice.startle', 'voice.happy', 'voice.protest', 'press.wet'], thr: 0.5, late: 0.03, keep: 0.02, fade: 0.013 };
+  function onsetOf(b) {   // 開頭到 −6 dB 的毫秒（on）、最大聲那一格的毫秒（pk）
+    const sr = b.sampleRate, w = Math.max(1, Math.round(0.005 * sr)), nb = Math.floor(b.length / w), env = new Float32Array(nb); let pk = 0, pi = 0;
+    for (let k = 0; k < nb; k++) { let m = 0; for (let ch = 0; ch < b.numberOfChannels; ch++) { const d = b.getChannelData(ch); for (let i = k * w; i < (k + 1) * w; i++) { const a = Math.abs(d[i]); if (a > m) m = a; } } env[k] = m; if (m > pk) { pk = m; pi = k; } }
+    let on = 0; while (on < nb && env[on] < pk * B5K.thr) on++;
+    return { on: Math.round(on * w / sr * 1000), pk: Math.round(pi * w / sr * 1000), at: on * w / sr };
+  }
+  function leadTrim(b) {
+    const o = onsetOf(b); if (o.at <= B5K.late || !S.ctx) return b;
+    const sr = b.sampleRate, skip = Math.round((o.at - B5K.keep) * sr), n = b.length - skip, fade = Math.round(B5K.fade * sr); if (n <= 0) return b;
+    const out = S.ctx.createBuffer(b.numberOfChannels, n, sr);
+    for (let ch = 0; ch < b.numberOfChannels; ch++) { const s = b.getChannelData(ch), d = out.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = s[i + skip] * (i < fade ? 0.5 - 0.5 * Math.cos(Math.PI * i / fade) : 1); }
+    return out;
+  }
+  S.onsetOf = onsetOf; S.B5K = B5K;
+  function pick(key, take) { const l = S.b5 && S.bufB5[key] && S.bufB5[key].length ? S.bufB5[key] : S.buf[key]; return l && l.length ? l[take != null ? take % l.length : Math.floor(Math.random() * l.length)] : null; }   // v2.63 C6: take = which file (the page's shuffle bag, rubVary); none = random as before
 
   function one(key, p) {
     const c = S.ctx; if (!c || S.muted || !p) return;
     if (p.deco && S.active >= MAP.maxVoices) return;
     if (S.active >= MAP.maxVoices + 4) return;
-    const b = pick(key); if (!b) return;
+    const b = pick(key, p.take); if (!b) return;
     const src = c.createBufferSource(), g = c.createGain(), lp = c.createBiquadFilter();
     lp.type = 'lowpass'; lp.frequency.value = p.lp || 8000; lp.Q.value = 0.5;
     src.buffer = b; src.playbackRate.value = (p.r || 1) * (1 + (Math.random() * 2 - 1) * S.jitter);
@@ -195,7 +216,7 @@
     }
   }
 
-  S.press = function (i) { S.pending = []; layered('press', clamp(i, 0, 1)); };
+  S.press = function (i) { S.pending = S.b6 ? S.pending.filter(e => !e.tail) : []; layered('press', clamp(i, 0, 1)); };   // 再按就切掉上次放手的尾巴
 
   S.release = function (gain) {
     const s = clamp((gain - 0.35) / 0.65, 0, 1);
@@ -204,7 +225,7 @@
     if (amt <= 0) return;
     if (S.lastStretch >= 0.4) {
       for (let k = 0; k < T.bubbles(s); k++) if (Math.random() < T.bubbleProb) {
-        const p = T.bubble(s); p.g *= amt; S.pending.push({ at: now + rnd(T.from, T.to), key: 'settle.bubble', p });
+        const p = T.bubble(s); p.g *= amt; S.pending.push({ at: now + rnd(T.from, T.to), key: 'settle.bubble', p, tail: true });
       }
     } else if (S.heldFor >= T.hissHold && Math.random() < T.hissProb) {
       const p = T.hiss(s); p.g *= amt; one('settle.hiss', p);
@@ -212,7 +233,7 @@
   };
 
   // v2.22 它的聲音（E1）：一種情緒一層，r 由呼叫端依印象給（熟的高、戒的低）；黏液滴下是一顆小泡
-  S.voice = function (kind, g, r) { one('voice.' + kind, { g: clamp(g, 0, 1), r: r || 1, lp: 4000 }); };
+  S.voice = function (kind, g, r, take) { one('voice.' + kind, { g: clamp(g, 0, 1), r: r || 1, lp: 4000, take }); };
   // v2.30 擺飾碰到東西：kind pot 或 dish，g 力道；rate 小於 1 是掉到看不到的地方（遠一點、悶一點）
   S.knock = function (kind, g, rate) { const far = rate && rate < 1; one('prop.' + kind, { g: clamp(g, 0, 1) * (far ? 0.5 : 0.9), r: rnd(0.94, 1.06) * (far ? 0.9 : 1), lp: far ? 1200 : 5000 }); };
   // v2.50 場景聲（AI 音效，manifest fx.<kind>）：走、爬窗框、落地、游進來、黏到窗框、拔開、黏液滴、睡著、嘆氣、擺飾倒下、掉出窗外、走過布墊。
@@ -223,6 +244,10 @@
     if (now - (S.last[k] || -9) < 0.25) return; S.last[k] = now;
     one(k, { g: clamp(g, 0, 1), r: (r || 1) * rnd(0.96, 1.04), lp: 9000, delay: delay || 0 });
   };
+  // v2.63 D4（flinchFx）：牠縮那一下的小聲：放手「噗」的 air 層，小聲、高一點點（g 由頁面給，0.3 × 縮的大小）。不排餘韻、不動 lastStretch。Swift SlimeAudio.flinch 同一套
+  S.flinch = function (g) { one('release.air', { g: clamp(g, 0, 1), r: rnd(1.08, 1.16), lp: 7000 }); };
+  // v2.63 B9（sndGrain）：動一點一顆。k 0..1 手速（頁面給，每秒 3R 最亮）：最短最細的黏液顆粒（settle.bubble 0.11 秒），越快越大、越高、越亮。Swift SlimeAudio.grain 同一套
+  S.grain = function (k) { k = clamp(k, 0, 1); one('settle.bubble', { g: 0.08 + 0.2 * k, r: 0.95 + 0.3 * k, lp: 2500 + 5500 * k, deco: true }); };
   S.drip = function (g) { one('settle.bubble', { g: clamp(g, 0, 1) * 0.6, r: rnd(0.8, 1.1), lp: 3000, deco: true }); };
   S.strand = function (gain) { const p = MAP.pull.strand(S.st); p.g = clamp(p.g * (0.6 + 0.8 * gain), 0, 1); p.deco = false; one('pull.strand', p); };
 
@@ -254,8 +279,12 @@
     if (S.pending.length) { const now = c.currentTime; S.pending = S.pending.filter(e => { if (e.at <= now) { one(e.key, e.p); return false; } return true; }); }
     if (S.muted) return;
     // 拉絲 loop
-    const P = MAP.pull, pulling = grabbing && stretch > P.on;
-    const target = pulling ? S.pullMax * clamp(P.gain(stretch, S.v), 0, 1) : 0;
+    // v2.63 B1 拉（pullFx）：st.open = 手指往外拉出新距離的速度（半徑／秒，頁面算，pullFx 0 時給 0）。慢拉時身體一直跟上、拉伸過不了 0.2R，loop 要很久才起來；
+    // 有在拉開就給一個底 pullMax × PF.g × min(1, open ÷ PF.v)，跟原本的取大。Swift SlimeAudio pullOpen 同一套
+    const P = MAP.pull, PF = { g: 0.3, v: 0.5 }, open = grabbing ? Math.max(0, st.open || 0) : 0, floor = open > 0 ? S.pullMax * PF.g * Math.min(1, open / PF.v) : 0;
+    const pulling = grabbing && (stretch > P.on || floor > 0.005);
+    const target = (pulling ? Math.max(stretch > P.on ? S.pullMax * clamp(P.gain(stretch, S.v), 0, 1) : 0, floor) : 0) * S.gr;   // v2.63 B9：顆粒開著時一半
+    S.pullT = target;   // v2.63：這一格拉絲 loop 要多大（selftest 讀；音效沒載到也有）
     if (target > 0.005 && !S.pullV) S.pullV = loopVoice('pull.loop');
     if (S.pullV) {
       const V = S.pullV, k = 1 - Math.exp(-dt / (target > V.level ? P.attack : P.decay));
@@ -264,10 +293,10 @@
       if (pulling) { V.src.playbackRate.setTargetAtTime(P.rate(stretch), c.currentTime, 0.03); V.lp.frequency.setTargetAtTime(P.lp(stretch), c.currentTime, 0.03); }
       if (!pulling && V.level < 0.004) { stopLoop(V); S.pullV = null; }
     }
-    if (pulling) { const lam = P.strandRate(stretch, S.v); if (Math.random() < lam * dt) one('pull.strand', P.strand(stretch)); }
+    if (pulling && stretch > P.on) { const lam = P.strandRate(stretch, S.v); if (Math.random() < lam * dt) one('pull.strand', P.strand(stretch)); }
     // 揉 loop
-    const R = MAP.rub, L = clamp(st.rub || 0, 0, 1) * R.duck(stretch), n = S.rubMax > 0 ? clamp(L / S.rubMax, 0, 1) : 0;
-    if (L > 0.005 && !S.rubV) S.rubV = loopVoice('rub.loop');
+    const R = MAP.rub, L = clamp(st.rub || 0, 0, 1) * R.duck(stretch) * S.gr, n = S.rubMax > 0 ? clamp(L / S.rubMax / S.gr, 0, 1) : 0;   // v2.63 B9：音量一半，音高、亮度照原本
+    if (L > 0.005 && !S.rubV) S.rubV = loopVoice(S.snd61 && S.buf['rub.loop61'] && S.buf['rub.loop61'].length ? 'rub.loop61' : 'rub.loop');
     if (S.rubV) {
       const V = S.rubV;
       V.g.gain.setTargetAtTime(L, c.currentTime, 0.06);

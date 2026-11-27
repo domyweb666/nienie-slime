@@ -1,0 +1,8 @@
+const out={};const base={deco:0,decoReal:0};
+// 手指從身上拖到右邊緣放開（一般放手，不是系統收走）
+fresh(78,base,{tr:.6,settle:240});{const p=scr(globalC.xc+R*.5,globalC.yc);ev('pointerdown',1,p[0],p[1]);for(let i=1;i<=24;i++){ev('pointermove',1,Math.min(392,p[0]+i*8),p[1]);update(DT)}for(let i=0;i<20;i++)update(DT);LOG.length=0;const T0=t;ev('pointerup',1,392,p[1]);const tl=[];let la='';for(let i=0;i<60*6;i++){update(DT);const a=BRAIN.act+(LIFE.sns.length?'+伸':'');if(a!==la){tl.push([r2(t-T0),a,LIFE.sns.length?r2(LIFE.sns[LIFE.sns.length-1].a):'']);la=a}}out.edgeUp={tl,voices:LOG.map(q=>[r2(q[0]-T0),q[1]]).slice(0,6),lx:r2(IMP.lx)}}
+// 舉高再放：慢慢拖到畫面上方，停 1 秒，放手
+for(const mv of [200,420]){fresh(77,base,{tr:.6,settle:240});const p=scr(globalC.xc,globalC.yc-R*.2);ev('pointerdown',1,p[0],p[1]);for(let i=1;i<=90;i++){ev('pointermove',1,p[0],Math.max(40,p[1]-mv*i/90));update(DT)}for(let i=0;i<90;i++)update(DT);const y0=globalC.yc,m0=BRAIN.m,w0=IMP.w;LOG.length=0;const T0=t;ev('pointerup',1,p[0],Math.max(40,p[1]-mv));let fl=0,sc=0;for(let i=0;i<240;i++){update(DT);sc=Math.max(sc,MOOD.scare);if(t-FLN.t0<.2)fl=Math.max(fl,FLN.amp)}out['drop'+mv]={fall_mm:r2((globalC.yc-y0)*.16565),dm:r2(BRAIN.m-m0),dw:r3(IMP.w-w0),scare:r2(sc),fl:r3(fl),sfx:LOG.map(q=>[r2(q[0]-T0),q[1],q[2]]).slice(0,6)}}
+// 睡著、手指落在 2R 外（不叫醒的距離）停住：1.2 秒會不會醒
+fresh(79,base,{tr:.95,settle:240});SLP.on=true;LIFE.st='sleep';steps(60*6);{const g=geo();const e=scr(g.cx,g.y0-R*2.4);let wk=null;const T0=t;ev('pointerdown',1,e[0],e[1]);for(let i=0;i<240;i++){update(DT);if(!SLP.on&&wk==null)wk=r2(t-T0)}ev('pointerup',1,e[0],e[1]);out.sleepFar={dist:r2((g.y0-e[1])/R),wakeAt:wk}}
+return out;

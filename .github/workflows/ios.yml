@@ -102,7 +102,7 @@ jobs:
           now = int(time.time())
           token = jwt.encode({"iss": iss, "iat": now, "exp": now + 600, "aud": "appstoreconnect-v1"},
                              key, algorithm="ES256", headers={"kid": kid, "typ": "JWT"})
-          req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/apps?limit=10",
+          req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/apps?limit=200",
                                        headers={"Authorization": "Bearer " + token})
           try:
               with urllib.request.urlopen(req) as r:

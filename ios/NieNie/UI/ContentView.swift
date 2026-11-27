@@ -12,6 +12,19 @@ extension Font {
     }
 }
 
+/// v2.52 B7 (多米 11-22 交辦: 上架版本拿掉「調」按鈕，隱藏面板照舊). The 調 button is for 多米's own tuning: there in a development build and on TestFlight,
+/// gone in the App Store's build. The hidden panel (long-press the title) stays in every build and can open the desk from there.
+enum AppChannel {
+    static let showsFeelButton: Bool = {
+        #if DEBUG
+        return true
+        #else
+        // a TestFlight install carries a receipt named sandboxReceipt; the App Store's is named receipt
+        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }()
+}
+
 /// Chunky cartoon chip: white fill, thick ink outline.
 struct ChipStyle: ButtonStyle {
     var circle = false
@@ -67,7 +80,9 @@ struct ContentView: View {
                     .allowsHitTesting(false)
                 Spacer(minLength: 0)
                 if showTune {
-                    TunePanel(isPresented: $showTune)
+                    TunePanel(isPresented: $showTune, openFeel: {
+                        withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showTune = false; showFeel = true }
+                    })
                         .padding(.bottom, 12)
                         .transition(.opacity)
                 }
@@ -77,6 +92,8 @@ struct ContentView: View {
             .padding(.top, 14)
             .padding(.bottom, 18)
         }
+        .onChange(of: controller.toastGen) { _, _ in showTimedHint(controller.toastText) }   // v2.59 窗景
+        .onChange(of: showFeel) { _, open in controller.labDesk(open: open) }   // v2.61 B7: not the desk's own onAppear and onDisappear, opened again while it fades out they can come in the wrong order
         .alert("牠想跟你出門", isPresented: $controller.walkAsk) {   // 走路: asked only when the gift stone is tapped; 先不要 keeps the stone and never asks again
             Button("先不要") { controller.walkAnswer(false) }
             Button("好") { controller.walkAnswer(true) }
@@ -136,7 +153,7 @@ struct ContentView: View {
             // v2.23 收集 (多米 11-02: all of them there from the start): four slimes; the material moved to the panel
             // v2.33 一隻為主: hidden while the panel's 一隻為主 is 1
             if controller.current.one < 0.5 {
-            HStack(spacing: 2) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(76), spacing: 2), count: 3), spacing: 2) {   // v2.57 ten do not fit in a row: three to a row, like the web
                 ForEach(SlimeKind.allCases) { k in
                     let on = controller.slime == k
                     Button {
@@ -160,7 +177,7 @@ struct ContentView: View {
                 }
             }
             .padding(3)
-            .background(Capsule().fill(Palette.chip).overlay(Capsule().stroke(Palette.ink, lineWidth: 2.5)))
+            .background(RoundedRectangle(cornerRadius: 22).fill(Palette.chip).overlay(RoundedRectangle(cornerRadius: 22).stroke(Palette.ink, lineWidth: 2.5)))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("選史萊姆")
             }
@@ -177,7 +194,8 @@ struct ContentView: View {
 
             Spacer(minLength: 0)
 
-            // v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方)
+            // v2.39 手感調節台 (多米 11-16: 要有個操控數值的地方); v2.52 B7: not in the App Store's build
+            if AppChannel.showsFeelButton {
             Button {
                 withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showFeel.toggle(); if showFeel { showTune = false } }
             } label: {
@@ -186,12 +204,15 @@ struct ContentView: View {
             }
             .buttonStyle(ChipStyle(circle: true))
             .accessibilityLabel(showFeel ? "收起手感調節台" : "打開手感調節台")
+            }
         }
     }
 
     /// Its name and personality for 2.6 s.
-    private func showSlimeHint(_ k: SlimeKind) {
-        hintText = "\(k.name)：\(k.desc)"
+    private func showSlimeHint(_ k: SlimeKind) { showTimedHint("\(k.name)：\(k.desc)") }
+
+    private func showTimedHint(_ text: String) {
+        hintText = text
         hintGen += 1
         let gen = hintGen
         withAnimation(controller.reduceMotion ? nil : .easeOut(duration: 0.2)) { showHint = true }

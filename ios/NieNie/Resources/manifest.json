@@ -83,6 +83,12 @@
       "ai-rub-loop-02.wav",
       "ai-rub-loop-03.wav",
       "ai-rub-loop-04.wav"
+    ],
+    "loop61": [
+      "ai-rub-loop61-01.wav",
+      "ai-rub-loop61-02.wav",
+      "ai-rub-loop61-03.wav",
+      "ai-rub-loop61-04.wav"
     ]
   },
   "settle": {
@@ -243,6 +249,54 @@
       "ai-fx-sigh-02.wav",
       "ai-fx-sigh-03.wav",
       "ai-fx-sigh-04.wav"
+    ],
+    "topple": [
+      "ai-fx-topple-01.wav",
+      "ai-fx-topple-02.wav",
+      "ai-fx-topple-03.wav",
+      "ai-fx-topple-04.wav"
+    ],
+    "fallout": [
+      "ai-fx-fallout-01.wav",
+      "ai-fx-fallout-02.wav",
+      "ai-fx-fallout-03.wav",
+      "ai-fx-fallout-04.wav"
+    ],
+    "cloth": [
+      "ai-fx-cloth-01.wav",
+      "ai-fx-cloth-02.wav",
+      "ai-fx-cloth-03.wav",
+      "ai-fx-cloth-04.wav",
+      "ai-fx-cloth-05.wav",
+      "ai-fx-cloth-06.wav",
+      "ai-fx-cloth-07.wav",
+      "ai-fx-cloth-08.wav"
+    ]
+  },
+  "prop": {
+    "glass": [
+      "ai-prop-glass-01.wav",
+      "ai-prop-glass-02.wav",
+      "ai-prop-glass-03.wav",
+      "ai-prop-glass-04.wav"
+    ],
+    "candle": [
+      "ai-prop-candle-01.wav",
+      "ai-prop-candle-02.wav",
+      "ai-prop-candle-03.wav",
+      "ai-prop-candle-04.wav"
+    ],
+    "book": [
+      "ai-prop-book-01.wav",
+      "ai-prop-book-02.wav",
+      "ai-prop-book-03.wav",
+      "ai-prop-book-04.wav"
+    ],
+    "bell": [
+      "ai-prop-bell-01.wav",
+      "ai-prop-bell-02.wav",
+      "ai-prop-bell-03.wav",
+      "ai-prop-bell-04.wav"
     ]
   }
 }

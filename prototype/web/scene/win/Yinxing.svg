@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 828">
+<defs>
+<linearGradient id="yxSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFDDE4"></stop><stop offset=".3" stop-color="#F3E9C9"></stop><stop offset=".62" stop-color="#FFF0C4"></stop></linearGradient>
+<linearGradient id="yxRoad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2D486"></stop><stop offset="1" stop-color="#D9A54A"></stop></linearGradient>
+<radialGradient id="yxGlow"><stop offset="0" stop-color="#D98A3C" stop-opacity=".75"></stop><stop offset=".45" stop-color="#B05A20" stop-opacity=".26"></stop><stop offset="1" stop-color="#B05A20" stop-opacity="0"></stop></radialGradient>
+<g id="yxL"><path d="M0 10C-2 4-3 0-10-7-5-13 0-11 0-8 0-11 6-13 11-7 4 0 2 4 0 10Z"></path><path d="M0 8v10" stroke="#B57A1E" stroke-width="2" fill="none"></path></g>
+</defs>
+<rect width="680" height="828" fill="url(#yxSky)"></rect>
+<path d="M60 60c30-10 70-8 100 2-26 8-76 8-100-2ZM300 34c26-8 60-6 84 2-22 8-64 8-84-2Z" fill="#FFFFFF" opacity=".7"></path>
+<path d="M0 470C80 430 190 408 290 416 350 430 400 402 460 406 550 410 620 436 680 456V520H0Z" fill="#DDB877"></path>
+<g>
+<path d="M272 360h136v140H272z" fill="#B5654A"></path>
+<path d="M262 362 282 330 398 330 418 362Z" fill="#6E5A50"></path>
+<path d="M316 330v-44h48v44z" fill="#C57757"></path><path d="M308 288 340 250 372 288Z" fill="#6E5A50"></path><path d="M340 252v-22" stroke="#6E5A50" stroke-width="4"></path>
+<circle cx="340" cy="308" r="13" fill="#FFF3D6"></circle><path d="M340 300v8l6 4" stroke="#5A443A" stroke-width="3" fill="none"></path>
+<path d="M286 380h20v34h-20zM374 380h20v34h-20zM286 434h20v34h-20zM374 434h20v34h-20z" fill="#F6E4BE"></path><path d="M296 380v34M286 397h20M384 380v34M374 397h20M296 434v34M286 451h20M384 434v34M374 451h20" stroke="#8C4C38" stroke-width="3"></path>
+<path d="M320 500v-60c0-26 40-26 40 0v60z" fill="#5A443A"></path><path d="M272 420h136v6H272z" fill="#D89070"></path>
+</g>
+<path d="M0 500h680v328H0z" fill="#CF9B45"></path>
+<path d="M318 500h44L610 828H70Z" fill="url(#yxRoad)"></path>
+<path d="M300 560h0M352 590h0M318 640h0M400 660h0M270 690h0M352 730h0M230 750h0M440 740h0M300 790h0M410 800h0M180 640h0M140 700h0M520 660h0M560 620h0M100 640h0M600 600h0M180 560h0M80 580h0M500 570h0M660 560h0M30 560h0" stroke="#F8DC86" stroke-width="13" stroke-linecap="round" opacity=".8"></path>
+<path d="M318 500 70 828M362 500 610 828" stroke="#F8E6AE" stroke-width="7"></path>
+<g>
+<path d="M222 520V400" stroke="#6E4F36" stroke-width="10"></path><path d="M180 400C164 360 190 330 206 338 206 300 244 300 250 332 276 330 284 370 262 398 244 416 196 418 180 400Z" fill="#EDB63C"></path><path d="M206 338C206 316 226 308 238 314 226 326 226 350 234 362 220 366 208 354 206 338Z" fill="#F8D26A"></path>
+<path d="M458 520V400" stroke="#6E4F36" stroke-width="10"></path><path d="M500 400C516 360 490 330 474 338 474 300 436 300 430 332 404 330 396 370 418 398 436 416 484 418 500 400Z" fill="#E8AC32"></path><path d="M474 338C472 316 452 308 442 314 452 328 452 350 446 362 460 366 472 354 474 338Z" fill="#F5C957"></path>
+</g>
+<g>
+<path d="M160 560V380" stroke="#664832" stroke-width="17"></path><path d="M160 430 128 388M160 420 196 380" stroke="#664832" stroke-width="9"></path>
+<path d="M88 384C66 336 96 292 124 296 118 236 182 216 200 260 238 250 262 300 236 336 258 366 226 404 196 396 168 418 112 418 88 384Z" fill="#E7A62C"></path>
+<path d="M124 296C122 254 166 236 186 256 168 270 166 300 176 318 154 334 128 322 124 296ZM196 300c20-12 38 2 34 22-18 8-36-2-34-22ZM100 350c12-18 36-16 42 2-12 16-36 16-42-2Z" fill="#F6C84F"></path>
+<path d="M524 560V380" stroke="#664832" stroke-width="17"></path><path d="M524 430 556 388M524 420 488 380" stroke="#664832" stroke-width="9"></path>
+<path d="M596 384C618 336 588 292 560 296 566 236 502 216 484 260 446 250 422 300 448 336 426 366 458 404 488 396 516 418 572 418 596 384Z" fill="#DF9C24"></path>
+<path d="M560 296C562 254 518 236 498 256 516 270 518 300 508 318 530 334 556 322 560 296ZM584 350c-12-18-36-16-42 2 12 16 36 16 42-2Z" fill="#F0BC42"></path>
+</g>
+<g>
+<path d="M48 690V230" stroke="#573C2A" stroke-width="32"></path><path d="M40 690V230" stroke="#6E4F38" stroke-width="10"></path><path d="M48 430 124 280M48 410-30 300" stroke="#573C2A" stroke-width="15"></path>
+<path d="M-30 340C-70 280-40 200 10 206-6 120 70 70 116 120 150 70 222 110 208 176 252 206 224 274 176 268 160 316 96 326 72 300 50 350-4 362-30 340Z" fill="#E09A20"></path>
+<path d="M10 206C0 140 60 96 104 128 82 150 80 190 96 214 66 244 18 236 10 206ZM130 130c28-22 66-4 66 32-24 18-60 6-66-32ZM-20 290c14-30 52-30 64-4-16 28-52 30-64 4ZM130 230c22-22 56-12 60 14-20 20-52 14-60-14Z" fill="#F4C043"></path>
+<path d="M642 690V230" stroke="#573C2A" stroke-width="30"></path><path d="M634 690V230" stroke="#6E4F38" stroke-width="10"></path><path d="M642 430 566 276M642 410 712 300" stroke="#573C2A" stroke-width="14"></path>
+<path d="M712 350C748 300 726 236 686 240 692 176 640 140 604 172 578 150 534 172 538 216 508 240 522 292 560 290 576 330 626 338 648 316 664 354 694 366 712 350Z" fill="#D48E1A"></path>
+<path d="M686 240C686 200 648 176 616 192 632 212 632 238 622 254 644 274 678 264 686 240ZM556 210c22-20 48-6 46 22-20 12-42 2-46-22ZM690 310c-14-24-40-22-50-2 14 22 38 22 50 2Z" fill="#EDB63C"></path>
+</g>
+<g>
+<path d="M18 690c30-18 90-18 118-2 24 14 34 36 24 60-40 18-130 20-170 0Z" fill="#E9AE33"></path><path d="M30 706c20-12 62-12 84 0-20 12-62 14-84 0Z" fill="#F8D467"></path>
+<path d="M664 690c-30-18-86-16-108 0-22 14-28 36-18 56 40 16 120 16 150 0Z" fill="#E2A529"></path>
+<path d="M592 648h86M592 668h86M586 692h94" stroke="#4E3A2E" stroke-width="9" stroke-linecap="round"></path><path d="M604 640v84M666 640v84M592 696v30M678 696v30" stroke="#3A2A20" stroke-width="6" stroke-linecap="round"></path>
+</g>
+<g fill="#F2BE3C"><use href="#yxL" transform="translate(120 770) rotate(40)"></use><use href="#yxL" transform="translate(60 800) rotate(-30) scale(1.3)"></use><use href="#yxL" transform="translate(176 800) rotate(100)"></use><use href="#yxL" transform="translate(560 780) rotate(-50) scale(1.2)"></use><use href="#yxL" transform="translate(630 800) rotate(20)"></use><use href="#yxL" transform="translate(520 720) rotate(70)"></use><use href="#yxL" transform="translate(220 700) rotate(-20)"></use><use href="#yxL" transform="translate(260 620) rotate(60) scale(.8)"></use><use href="#yxL" transform="translate(440 620) rotate(-60) scale(.8)"></use></g>
+<g style="opacity: {{n}}; transition: opacity .6s">
+<rect width="680" height="828" fill="#7270B4" style="mix-blend-mode: multiply"></rect>
+<path d="M260 60h0M320 100h0M400 50h0M460 130h0M290 180h0M420 200h0M240 30h0M370 170h0M500 70h0" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round"></path>
+<circle cx="336" cy="120" r="32" fill="#FBF1CC"></circle><circle cx="322" cy="112" r="28" fill="#62639A"></circle>
+<path d="M286 380h20v34h-20zM374 380h20v34h-20zM286 434h20v34h-20z" fill="#FFCB6A"></path><circle cx="340" cy="308" r="13" fill="#FFE9A8"></circle>
+<path d="M194 560V452M486 560V452" stroke="#1D1D33" stroke-width="7"></path><path d="M182 452h24l-5-28h-14zM474 452h24l-5-28h-14z" fill="#FFE9A0"></path>
+<g style="mix-blend-mode: plus-lighter"><circle cx="194" cy="440" r="150" fill="url(#yxGlow)" opacity=".7"></circle><circle cx="486" cy="440" r="150" fill="url(#yxGlow)" opacity=".7"></circle><ellipse cx="340" cy="600" rx="200" ry="90" fill="url(#yxGlow)" opacity=".3"></ellipse></g>
+</g>
+<g fill="#F7CC4E">
+<g><animateTransform attributeName="transform" type="translate" values="0 -80;60 380;-10 900" dur="14s" repeatCount="indefinite"></animateTransform><use href="#yxL" transform="translate(90 0) rotate(30)"></use><use href="#yxL" transform="translate(330 60) rotate(120) scale(.9)"></use><use href="#yxL" transform="translate(560 20) rotate(-40) scale(1.1)"></use></g>
+<g><animateTransform attributeName="transform" type="translate" values="0 -80;-70 360;20 900" dur="18s" begin="-7s" repeatCount="indefinite"></animateTransform><use href="#yxL" transform="translate(200 0) rotate(70) scale(1.2)"></use><use href="#yxL" transform="translate(440 40) rotate(-20)"></use><use href="#yxL" transform="translate(640 80) rotate(160)"></use></g>
+<g><animateTransform attributeName="transform" type="translate" values="0 -80;40 420;-60 900" dur="16s" begin="-11s" repeatCount="indefinite"></animateTransform><use href="#yxL" transform="translate(30 10) rotate(-70)"></use><use href="#yxL" transform="translate(270 0) rotate(20) scale(.85)"></use><use href="#yxL" transform="translate(500 60) rotate(90) scale(1.15)"></use></g>
+</g>
+</svg>

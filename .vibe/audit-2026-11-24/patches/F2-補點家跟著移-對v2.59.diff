@@ -1,0 +1,19 @@
+--- a/prototype/web/index.html
++++ b/prototype/web/index.html
+@@ -830,7 +830,7 @@
+   const nQX=back?ip(QX):null,nQY=back?ip(QY):null;
+   const eL=EYE.L&&EYE.L.length?qAt(EYE.L):null,eR=EYE.R&&EYE.R.length?qAt(EYE.R):null,hq=[QX[hiIdx]||0,QY[hiIdx]||0];
+   const nX=ip(X),nY=ip(Y),nPX=ip(PX),nPY=ip(PY),nH0X=ip(H0X),nH0Y=ip(H0Y),nQDX=QDX&&QDX.length===N?ip(QDX):null,nQDY=QDY&&QDY.length===N?ip(QDY):null,nQVX=QVX&&QVX.length===N?ip(QVX):null,nQVY=QVY&&QVY.length===N?ip(QVY):null,nEX=ip(EX),nEY=ip(EY);
+-  const cgx=globalC.cs,cgy=globalC.sn;
++  const cgx=globalC.cs,cgy=globalC.sn;let hm0x=0,hm0y=0;for(let i=0;i<N;i++){hm0x+=X[i];hm0y+=Y[i]}hm0x/=N;hm0y/=N;   // F2 試：補點前的粒子平均
+   N=n2;bnd=nbnd;
+   X=nX;Y=nY;PX=nPX;PY=nPY;H0X=nH0X;H0Y=nH0Y;EX=nEX;EY=nEY;
+   Q0X=new Float64Array(N);Q0Y=new Float64Array(N);QX=new Float64Array(N);QY=new Float64Array(N);
+@@ -845,6 +845,7 @@
+   if(CLING.ax){CLING.ax=null;CLING.ay=null}
+   for(const e of fm){if(!e)continue;const [f,w,ox,oy,ux,uy]=e,mem=[];for(let i=0;i<N;i++)if(w[i]>.02){mem.push([i,ox[i],oy[i],w[i],ux[i],uy[i]]);GRAB[i]=1}f.mem=mem;f.reachN=null}   // reachN 是舊清單的長度，補點後清單換了（不清掉的話，手指回到起點時清單被撐長、出現空的，整個畫面停住）；每筆 [粒子, 偏移 x, y, 權重, 徑向 x, y]
+   buildClusters();for(const c of clusters){c.cs=cgx;c.sn=cgy}
++  {let hx=0,hy=0;for(let i=0;i<N;i++){hx+=X[i];hy+=Y[i]}hx/=N;hy/=N;HOMEX+=hx-hm0x;HOMEY+=hy-hm0y;globalC.xc=hx;globalC.yc=hy;CPX=hx;CPY=hy}   // F2 試：家跟著粒子平均移，回家彈簧不把整隻往回推
+   bndL=bnd.map((i,k)=>{const j=bnd[(k+1)%bnd.length];return Math.hypot(Q0X[j]-Q0X[i],Q0Y[j]-Q0Y[i])});
+   bndL2=bnd.map((i,k)=>{const j=bnd[(k+2)%bnd.length];return Math.hypot(Q0X[j]-Q0X[i],Q0Y[j]-Q0Y[i])});
+   BIDX=new Int32Array(N).fill(-1);bnd.forEach((i,k)=>{BIDX[i]=k});
