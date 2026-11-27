@@ -1,5 +1,7 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.65（11-27）：加 T92（小史萊姆的臉 twinEye：兩指拉開、壓牆拉，眼距 ≤ 1.3 倍、歪 ≤ 50 度、在外框裡；瞇、> <、∩、眨眼）、T93（splitHold：拉到極限撐 11 秒不斷、一直撐 12 到 14 秒斷、快撐不住了越來越明顯、極限六成五撐 20 秒不斷，三個材質）、
+     T94（twinFb：小史萊姆按、拉、捏、揉、放手有聲音和觸感；0 照 v2.62）；在 T91 後面、T74 前面跑。舊項目一律 splitHold 0、twinEye 0、twinFb 0（PRE47 也是，T61、T63 量的是舊規格），T74 也釘 0
    v2.64（11-27）：加 T91（B8 起步跟手：每秒 120 格，最上面往裡 0.3R 抓住往上拉，60、150、300、600 點每秒走 2 點 startFollow 1 要比 0 早一半以上、拉到最後的落後差 15% 內、0 時 lagK 每格就是原本的公式；B8 甲乙對到的組；在 T90 後面、T74 前面跑，幾秒）
    v2.64（11-27）：加 T89（C8 十隻招牌動作、喜歡的位置：十隻各放著 5 分鐘，自己的招牌 2 次以上、別隻的 0 次、喜歡那格待最久；signature 0 不做、家在布墊；你摸出來的喜歡和夜晚蠟燭優先；在 T88 後面、T74 前面跑，約 5 分鐘）。
      舊項目一律 signature 0；T72、T73、T78、T79、T82、T84、T87 也釘 0（整份比對過預設 1 和改之前，這七項的數字會變；T42、T70、T74、T81 本來每次都不同）。
@@ -84,7 +86,7 @@
   // v2.52：窗台不再蓋掉拉伸上限（A1）。舊項目的門檻是在「窗台上最多 3.2R、記形 2.6R」下定的，用 sillCap 3.2 回到那個行為；新的行為在 T63 測
   const PRE62 = {}; for (const k in PRESETS) PRE62[k] = { ...PRESETS[k] };   // v2.62 真正的預設（扯斷開著）：T74 用，跑完用它還回去
   const PRE54 = {}; for (const k in PRESETS) PRE54[k] = { ...PRESETS[k], split: 0 };   // v2.62：T65 到 T73 量的是扯斷之前的行為，亂拉時不准斷   // v2.54 真正的預設（無限拉開著）：T65 用，跑完還回去
-  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], rubVary: 0, lookTarget: 0, tapBack: 0, slowBlink: 0, signature: 0, sndWall: 0, rubTrail: 0, endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）   // v2.63 C6：舊項目一律 rubVary 0（整份比對過，T33、T39、T41 會變；T33 量的就是放手小跳）   // v2.64 C5：舊項目一律 lookTarget 0（量的是 v2.63 的張望）   // v2.64 D8：舊項目一律 tapBack 0、slowBlink 0
+  for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], rubVary: 0, lookTarget: 0, tapBack: 0, slowBlink: 0, signature: 0, sndWall: 0, rubTrail: 0, splitHold: 0, twinEye: 0, twinFb: 0, endless: 0, frameCling: 1, rateK: 0, ...(k === 'clay' ? { slide: 1.5 } : {}) };   // v2.54：舊項目全部釘在 v2.53 的拉法（無限拉關、黏窗框開、黏土 slide 1.5）   // v2.63 C6：舊項目一律 rubVary 0（整份比對過，T33、T39、T41 會變；T33 量的就是放手小跳）   // v2.64 C5：舊項目一律 lookTarget 0（量的是 v2.63 的張望）   // v2.64 D8：舊項目一律 tapBack 0、slowBlink 0
   const PRE47 = { ...PRESETS }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], pressPull: 0, dragCalm: 0, memSmooth: 0, stretchCap: 0, memCap: 0, tremble: 1, struggle: 1, lump: 0, strand: 0, tugEdge: 0, split: 0, edgeCling: 0, sillCap: 3.2 }; PRESETS.clay = { ...PRESETS.clay, alpha: .4, lag: .12, pressSink: .8 };
   const P1 = { ...PRESETS.clay, ...OFF24, brain: 0 }, OFF23 = { eyes: 0, sleep: 0, echo: 0, introSwim: 0 }, P0 = { ...P1, ...OFF23 }, P27 = { ...PRESETS }, PSAVE = {}; for (const k in PRESETS) PSAVE[k] = { ...PRESETS[k], ...OFF27 }; for (const k in PRESETS) PRESETS[k] = { ...PRESETS[k], ...OFF24, slide: 0, drag: 0, dentFade: 10, imp: 0, e1: 0, e2: 0, e3: 0, e4: 0, ...OFF23, brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 };
   const P27R = { ...P27 }; for (const k in P27) { P27[k] = { ...P27[k], brain: 0, decoReal: 0, shake: 0, cling: 0, pairMax: 0, tear: 0, flipMem: 0, homeClamp: 0, clingTidy: 0 }; PSAVE[k].brain = 0; PSAVE[k].shake = 0; PSAVE[k].cling = 0; PSAVE[k].pairMax = 0; PSAVE[k].tear = 0; PSAVE[k].flipMem = 0; PSAVE[k].homeClamp = 0; PSAVE[k].clingTidy = 0; }   // v2.38：兩指上限與撕開只在 T54 開   // v2.36：黏牆只在 T53 開，舊項目量原本的行為   // v2.31：搖晃沉澱只在 T48 開；P27R 是沒改過的，跑完還給 PRESETS
@@ -2586,9 +2588,98 @@
     r.ref = { plan0: [142, 83, 58, 42], plan1: [58, 33, 25, 17] };
     r.part = { a: okA, b: okB, c: okC, d: okD }; r.ok = okA && okB && okC && okD;
     res.T91_startFollow = r; res.PASS.startFollow = r.ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T92 到 T94 v2.65（多米 11-27 build 179 真機回報，V265.md）。共用：窗台、白天、沒有窗景、圓身體（viewOver，跟 app 一樣）、真正的預設（PRE62），牠自己會動的關掉（大腦、招牌、張望有對象、頂回來），印象歸零
+  { const clock = saveClock(), view0 = { ...VIEW }, sl0 = SLIME, cm0 = curMat;
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const upAll = () => { for (const id of [...fingers.keys(), ...B2.fg.keys()]) ev('pointerup', id, 0, 0); };
+    const fresh = (sid, seed, over) => { upAll(); Object.assign(VIEW, { skin: 'A', body: 'round', face: 1, bg: 'day', win: '' }); const si = SLIMES.findIndex(q => q.id === sid), s = SLIMES[si]; Math.random = seeded(seed); SLIME = si; curMat = s.mat;
+      mat = { ...PRE62[s.mat], seed: s.seed, ...s.p, ...viewOver(), eyes: 1, sill: 1, intro: 0, introSwim: 0, brain: 0, signature: 0, lookTarget: 0, tapBack: 0, ...over }; setup(); impReset(); IMP.tr = 0; IMP.w = 0; IMPD.tr = 0; IMPD.w = 0; SPLIT.n = 0; SPLIT.merged = 0; SPH.n = 0; WANDER.moving = false; WANDER.next = t + 1e5; steps(150); };
+    const yank = (id, wx, wy) => { let [x, y] = scr(wx, wy); ev('pointerdown', id, x, y); steps(3); const n0 = SPLIT.n; for (let k = 0; k < 14 && SPLIT.n === n0; k++) { y = Math.max(6, y - R * .3); ev('pointermove', id, x, y); steps(1); } return [x, y]; };
+    const twC = () => twinCenter(), twRaw = () => { const b = B2, av = a => { let x = 0, y = 0; for (const i of a) { x += b.X[i]; y += b.Y[i]; } return [x / a.length, y / a.length]; }, L = av(b.eL), Q = av(b.eR); return [L[0], L[1], Q[0], Q[1]]; };
+    const twRest = () => { const b = B2, av = a => { let x = 0, y = 0; for (const i of a) { x += b.Q0X[i]; y += b.Q0Y[i]; } return [x / a.length, y / a.length]; }, L = av(b.eL), Q = av(b.eR); return Math.hypot(Q[0] - L[0], Q[1] - L[1]); };
+    // 斷出第二隻，搬到左邊放著（rejoin、mergeWait 99：不讓牠合回）
+    const twin = (sid, seed, over) => { fresh(sid, seed, { splitHold: 0, rejoin: 99, mergeWait: 99, ...over }); let [x, y] = yank(1, globalC.xc, globalC.yc - R * .3); steps(2); const ok = B2.on; const q = cv.getBoundingClientRect();
+      for (let k = 1; k <= 40; k++) { ev('pointermove', 1, x + (q.left + 70 - x) * k / 40, y + (q.top + 300 - y) * k / 40); steps(1); } ev('pointerup', 1, q.left + 70, q.top + 300); steps(180); return ok && B2.on; };
+    const grabMain = () => [...fingers.values()].find(g => g.mode === 'grab');
+
+  // (T92) #1 小史萊姆的臉（twinEye）。量過原因：第二隻的眼睛各綁在最近 3 顆粒子上、沒有限制，兩指往兩邊拉時眼睛那幾顆跟著手指走（眼距 6.5 倍、黏土放手 10 秒還 3.9 倍），壓在牆上往外拉兩眼連線轉到 126 度。
+  //   兩指把第二隻往兩邊拉到畫面邊撐 1.5 秒、抓右邊往左牆再往右上拉：畫出來的兩眼距離 ≤ 靜止的 1.3 倍、歪 ≤ 50 度、兩顆都在外框裡；twinEye 0 只記錄（原本的數字）。
+  //   表情（twinEye 1）：抓著瞇（0.82 以下）、兩指拉開撐住出現 > <、輕揉 2 秒出現 ∩、放著 8 秒內有眨眼
+  { const r = { m: {} }; let ok = true;
+    try {
+      for (const sid of ['honey', 'mint', 'tangyuan']) for (const eye of [1, 0]) {
+        const o = { split: twin(sid, 9201, { twinEye: eye }) }; if (!o.split) { ok = false; r.m[sid + eye] = o; continue; }
+        const d0 = twRest(); let mx = 0, tilt = 0, inMin = 1e9, sq = false, open = 1;
+        const look = () => { const p = eye && B2.pose ? B2.pose : twRaw(), P = B2.bnd.map(i => [B2.X[i], B2.Y[i]]); mx = Math.max(mx, Math.hypot(p[2] - p[0], p[3] - p[1]) / d0); tilt = Math.max(tilt, Math.abs(Math.atan2(p[3] - p[1], p[2] - p[0]))); inMin = Math.min(inMin, sdRing(P, p[0], p[1]), sdRing(P, p[2], p[3])); if (eye && B2.ey) { if (B2.ey.mode === 'squeeze') sq = true; open = Math.min(open, B2.ey.openD); } };
+        { const [cx, cy] = twC(), q = cv.getBoundingClientRect(), [lx, ly] = scr(cx - B2.r * .5, cy), [rx, ry] = scr(cx + B2.r * .5, cy); ev('pointerdown', 1, lx, ly); ev('pointerdown', 2, rx, ry); steps(3);
+          for (let k = 1; k <= 90; k++) { ev('pointermove', 1, lx - (lx - q.left - 8) * k / 90, ly); ev('pointermove', 2, rx + (q.right - 8 - rx) * k / 90, ry); steps(1); look(); } for (let k = 0; k < 90; k++) { steps(1); look(); } upAll(); }
+        o.two = { ratio: +mx.toFixed(2), tilt: Math.round(tilt * 180 / Math.PI), inMin: +inMin.toFixed(1), squeeze: sq, open: +open.toFixed(2) }; steps(120);
+        mx = 0; tilt = 0; inMin = 1e9;
+        { const [cx, cy] = twC(), q = cv.getBoundingClientRect(); let [x, y] = scr(cx + B2.r * .6, cy); ev('pointerdown', 1, x, y); steps(3); const x0 = x, y0 = y;
+          for (let k = 1; k <= 30; k++) { ev('pointermove', 1, x0 + (q.left + 10 - x0) * k / 30, y0); steps(1); look(); } x = q.left + 10;
+          for (let k = 1; k <= 120; k++) { ev('pointermove', 1, x + (q.right - 10 - x) * k / 120, y0 - 200 * k / 120); steps(1); look(); } for (let k = 0; k < 60; k++) { steps(1); look(); } upAll(); }
+        o.wall = { ratio: +mx.toFixed(2), tilt: Math.round(tilt * 180 / Math.PI), inMin: +inMin.toFixed(1) };
+        if (eye) { steps(60); const [cx, cy] = twC(); let happy = false; const [x0, y0] = scr(cx, cy); ev('pointerdown', 1, x0, y0); steps(2);
+          for (let k = 0; k < 150; k++) { const a = k / 60 * 2 * Math.PI; ev('pointermove', 1, x0 + Math.cos(a) * R * .12 * CAM.z, y0 + Math.sin(a) * R * .12 * CAM.z); steps(1); if (B2.ey.mode === 'happy') happy = true; } upAll();
+          const b0 = B2.ey.blinkT; let blink = false; for (let k = 0; k < 480 && !blink; k++) { steps(1); if (B2.ey.blinkT !== b0 && B2.ey.blinkT <= t) blink = true; }
+          o.expr = { happy, blink };
+          ok = ok && o.two.ratio <= 1.31 && o.wall.ratio <= 1.31 && o.two.tilt <= 50 && o.wall.tilt <= 50 && o.two.inMin >= 0 && o.wall.inMin >= 0 && o.two.squeeze && o.two.open <= .82 && happy && blink; }
+        r.m[sid + eye] = o; upAll(); }
+    } catch (e) { r.err = String(e && e.stack || e).slice(0, 300); ok = false; }
+    upAll(); twinDrop(); r.ok = ok; res.T92_twinEye = r; res.PASS.twinEye = ok; restoreClock(clock); }
+
+  // (T93) #3 不要那麼容易撕開（splitHold 12、splitEdge 0.9）。三個材質，抓中心往上 0.3R 往上拉（每秒 2.5R）：
+  //   a 拉到畫面頂撐 11 秒（從第一次到極限算）放手：不准斷；b 拉到畫面頂一直撐：要斷，從第一次到極限到斷 12 到 14 秒；撐的時候「快撐不住了」越來越明顯：
+  //     最後 3 秒的細絲斷聲（pull）和輕震（tick）比前 3 秒多、連續震動最後 3 秒的平均比前 3 秒大、撐滿前 SPH.p 到 0.9 以上；
+  //   c 只拉到極限的六成五就停、撐 20 秒：不准斷，撐的時候最大比例要在 splitEdge 以下（不然這項量的不是「極限以下」）
+  { const r = { m: {} }; let ok = true;
+    try {
+      for (const sid of ['honey', 'mint', 'tangyuan']) {
+        const o = {}, E = PRE62[SLIMES.find(q => q.id === sid).mat].splitEdge;
+        let tE = -1; const pull = (stopQ) => { const [x0, y0] = scr(globalC.xc, globalC.yc - R * .3); ev('pointerdown', 1, x0, y0); steps(3); const q = cv.getBoundingClientRect(); let y = y0, k = 0; tE = -1;
+          for (; k < 600; k++) { const f = grabMain(); if (f && tE < 0 && (f.spQ || 0) >= E) tE = t - DT; if (stopQ && f && (f.spQ || 0) >= stopQ) break; const ny = Math.max(q.top + 6, y - 2.5 * R * CAM.z / 60); if (ny === y) break; y = ny; ev('pointermove', 1, x0, y); steps(1); } return [x0, y]; };   // tE：第一次到極限（拉的途中就可能到）
+        // a
+        fresh(sid, 9301); HAP.log = []; log.splice(0); pull(0); let mq = 0; for (let k = 0; k < 60 * 30 && (tE < 0 || t - tE < 11); k++) { steps(1); const f = grabMain(); if (f) { mq = Math.max(mq, f.spQ || 0); if (tE < 0 && (f.spQ || 0) >= E) tE = t - DT; } if (SPLIT.n) break; }
+        upAll(); steps(30); o.a = { reach: tE >= 0, maxQ: +mq.toFixed(2), split: SPLIT.n };
+        // b
+        fresh(sid, 9302); HAP.log = []; log.splice(0); pull(0); let tS = -1, pMax = 0; const ev3 = [];
+        for (let k = 0; k < 60 * 30 && tS < 0; k++) { steps(1); const f = grabMain(); if (tE < 0 && f && (f.spQ || 0) >= E) tE = t - DT; pMax = Math.max(pMax, SPH.p); ev3.push([t, HPC.lv]); if (SPLIT.n) tS = t; }
+        const cnt = (a, b, kind) => HAP.log.filter(h => h[0] === kind && h[2] >= a && h[2] < b).length, plog = log.filter(z => z[0] === 'pull');
+        const lv = (a, b) => { const z = ev3.filter(q => q[0] >= a && q[0] < b); return z.length ? z.reduce((p, q) => p + q[1], 0) / z.length : 0; };
+        o.b = { reach: tE >= 0, split: SPLIT.n, sec: tS >= 0 && tE >= 0 ? +(tS - tE).toFixed(2) : -1, pMax: +pMax.toFixed(2), tick0: tE >= 0 ? cnt(tE, tE + 3, 'tick') : -1, tick1: tS >= 0 ? cnt(tS - 3, tS, 'tick') : -1, hap0: +lv(tE, tE + 3).toFixed(3), hap1: +lv(tS - 3, tS).toFixed(3), pulls: plog.length };
+        upAll(); steps(10); twinDrop();
+        // c
+        fresh(sid, 9303); pull(E * .65); mq = 0; let split = 0; for (let k = 0; k < 60 * 20; k++) { steps(1); const f = grabMain(); if (f) mq = Math.max(mq, f.spQ || 0); if (SPLIT.n) { split = SPLIT.n; break; } }
+        upAll(); steps(10); o.c = { maxQ: +mq.toFixed(2), split };
+        ok = ok && o.a.reach && o.a.split === 0 && o.b.reach && o.b.split === 1 && o.b.sec >= 12 && o.b.sec <= 14 && o.b.pMax >= .9 && o.b.tick1 > o.b.tick0 && o.b.hap1 > o.b.hap0 && o.c.split === 0 && o.c.maxQ < E;
+        r.m[sid] = o; twinDrop(); }
+    } catch (e) { r.err = String(e && e.stack || e).slice(0, 300); ok = false; }
+    HAP.log = null; upAll(); twinDrop(); r.ok = ok; res.T93_splitHold = r; res.PASS.splitHold = ok; restoreClock(clock); }
+
+  // (T94) #2 小史萊姆被按、被拉、被捏、被揉、放手有主體那套聲音和觸感（twinFb）。黏土，斷出第二隻後：按下去、兩指往兩邊拉 1 秒、兩指往中間捏、單指揉 1 秒、放手。
+  //   twinFb 1：按（press，力道不是寫死的 0.3）、拉（pull，手機 tick）、兩指捏（press＋squish）、放手（release，手機 release）都有，拉絲聲（SFX.frame stretch）、揉的聲音（sfxRub）跟著動；
+  //   twinFb 0：照 v2.62 只有按 0.3、放手 0.4，拉絲和揉都不動
+  { const r = { m: {} }; let ok = true; const fr0 = SFX && SFX.frame; let stMax = 0, rubMax = 0;
+    try {
+      if (SFX) SFX.frame = (dt, o) => { stMax = Math.max(stMax, o && o.grabbing ? o.stretch || 0 : 0); rubMax = Math.max(rubMax, o && o.rub || 0); return fr0.call(SFX, dt, o); };
+      for (const fb of [1, 0]) {
+        const o = { split: twin('honey', 9401, { twinFb: fb }) }; HAP.log = []; log.splice(0); stMax = 0; rubMax = 0;
+        const [cx, cy] = twC(), q = cv.getBoundingClientRect(), [lx, ly] = scr(cx - B2.r * .5, cy), [rx, ry] = scr(cx + B2.r * .5, cy);
+        ev('pointerdown', 1, lx, ly); ev('pointerdown', 2, rx, ry); steps(3);
+        for (let k = 1; k <= 60; k++) { ev('pointermove', 1, lx - (lx - q.left - 8) * k / 60, ly); ev('pointermove', 2, rx + (q.right - 8 - rx) * k / 60, ry); steps(1); } steps(20);
+        const ax = q.left + 8, bx = q.right - 8, mxp = (ax + bx) / 2; for (let k = 1; k <= 60; k++) { ev('pointermove', 1, ax + (mxp - 5 - ax) * k / 60, ly); ev('pointermove', 2, bx + (mxp + 5 - bx) * k / 60, ry); steps(1); }
+        ev('pointerup', 2, mxp + 5, ry); steps(20); for (let k = 0; k < 60; k++) { const a = k / 30 * 2 * Math.PI; ev('pointermove', 1, mxp - 20 + Math.cos(a) * R * .15, ly + Math.sin(a) * R * .15); steps(1); } ev('pointerup', 1, mxp - 20, ly); steps(10);
+        const L = log.filter(z => !String(z[0]).startsWith('voice.')), H = HAP.log.map(h => h[0]);
+        o.snd = [...new Set(L.map(z => z[0]))].join(); o.hap = [...new Set(H)].join(); o.press = L.filter(z => z[0] === 'press').map(z => z[1]); o.release = L.filter(z => z[0] === 'release').map(z => z[1]); o.pulls = L.filter(z => z[0] === 'pull').length; o.stMax = +stMax.toFixed(2); o.rubMax = +rubMax.toFixed(2);
+        if (fb) ok = ok && o.split && o.press.length >= 2 && o.press[0] !== .3 && o.pulls >= 1 && o.release.length >= 1 && H.includes('press') && H.includes('tick') && H.includes('squish') && H.includes('release') && o.stMax > .3 && o.rubMax > 0;
+        else ok = ok && o.split && o.press.length === 2 && o.press.every(g => g === .3) && o.pulls === 0 && o.release.length === 2 && o.release.every(g => g === .4) && o.stMax === 0 && o.rubMax === 0;
+        r.m['fb' + fb] = o; upAll(); twinDrop(); }
+    } catch (e) { r.err = String(e && e.stack || e).slice(0, 300); ok = false; }
+    if (SFX) SFX.frame = fr0; HAP.log = null; upAll(); twinDrop(); r.ok = ok; res.T94_twinFb = r; res.PASS.twinFb = ok; restoreClock(clock); }
+    Object.assign(VIEW, view0); SLIME = sl0; curMat = cm0; mat = { ...PRESETS.clay }; setup(); res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
-    const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0 };   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
+    const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0, splitHold: 0, twinEye: 0, twinFb: 0 };   // v2.65：T74 量的是 v2.62 的快扯撕開、v2.62 的臉和聲音，三顆釘 0   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0
     try { window.__SPLIT_PRE = P74; o = await (0, eval)(await (await fetch('splittest.js?' + Date.now())).text()); } catch (e) { o.r.err = String(e); } finally { delete window.__SPLIT_PRE; }
     o.r.sec = Math.round((performance.now() - T0) / 1000); res.T74_split = o.r; log.splice(0); restoreClock(clock); mat = { ...PRESETS.clay }; setup();
     res.PASS.split = !!o.pass; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
