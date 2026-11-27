@@ -2,7 +2,7 @@
 
 > 工作樹 `E:/捏捏史萊姆/_wt-第三批`，分支 `batch3-v2.64`，起點是 `feel-3x-panel-v1` 的 `c53919f`（v2.63，build 179）。**已推到 GitHub（只跑編譯），沒發 TestFlight，手機沒在 iPhone 上跑過。** 細節、每項 commit、Agent 取的數字全在根目錄 `BATCH3.md`（最上面有摘要，待確認照項目分組）。
 
-> **11-27 多米說「合回主線，但先不發 TestFlight」：已快轉合進 `feel-3x-panel-v1`（`8e56551`）並推上去。沒跑 ios.yml testflight。** 要發時手動跑 ios.yml、勾 testflight。另外 GitHub 上有一條別的對話開的 `mini-slime-v2.65`（也從 `c53919f` 開，132 個檔，自測裡有 T92），還沒合；合它的時候會跟這批撞，selftest 編號和 `KEYS64` 那塊要對一下。
+> **11-27 多米說「合回主線，但先不發 TestFlight」：已快轉合進 `feel-3x-panel-v1`（`8e56551`）並推上去。沒跑 ios.yml testflight。** 要發時手動跑 ios.yml、勾 testflight。另外 GitHub 上有一條別的對話開的 `mini-slime-v2.65`（也從 `c53919f` 開，132 個檔，自測也用了 T87 到 T92 的編號，跟這批 T87 到 T91 撞號），還沒合；合它的時候會跟這批撞，selftest 編號和 `KEYS64` 那塊要對一下。
 
 ## ✅ 完成（10 項）
 - 手機：大腦第三片記地方（`brMem`，`44fd418`）；擺飾變真（`decoReal` 等六個，`512cae6`、`2b54bac`，`bumpSoft` 接上）。
