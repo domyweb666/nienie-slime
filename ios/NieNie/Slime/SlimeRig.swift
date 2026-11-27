@@ -6598,7 +6598,7 @@ final class SlimeRig {
                 ex[0] = mx - cu * hh; ey[0] = my - su * hh; ex[1] = mx + cu * hh; ey[1] = my + su * hh
             }
         }
-        twPose =(lx: ex[0], ly: ey[0], rx: ex[1], ry: ey[1])
+        twPose = (lx: ex[0], ly: ey[0], rx: ex[1], ry: ey[1])
     }
 
     // The merges (mergeFx). All of them: mass is how much of it has flowed into A (0 to 1), A's size k = √(1 − frac·(1 − mass)), its own sc = √(1 − mass), so the area is
