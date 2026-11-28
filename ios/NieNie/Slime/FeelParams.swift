@@ -295,6 +295,7 @@ struct FeelParams: Equatable, Codable {
     var splitHold: Double = 12        // 撕開要撐幾秒：身體被拉到極限（splitEdge）要撐這麼久才撕開成兩隻；掉到極限以下 0.3 秒內不算，再久每秒退 2 秒，放手歸零。0 = 跟 v2.62 一樣（拉開 splitAt、手指快過 splitV 就斷）
     var splitEdge: Double = 0.9       // 撕開的極限（比例）：身體真的被拉開多少（扣掉跟過去的那份，bodyStretch）÷ 這個材質拉得到的上限（拉力 slide 的長度，最多 2.3R）到這個比例才算在極限
     var twinEye: Double = 1           // 小史萊姆的臉照主體：1 = 眼距最多 1.3 倍、臉最多歪 50 度、離外框留一顆眼睛（照 eyePose），表情照主體（眨眼、抓著瞇、被扯 > <、揉 ∩、睡著 ∪、戒的睜大）；0 = 跟 v2.62 一樣
+    var markStyle: Double = 2         // v2.65 #9（多米 11-27 真機：按下去像深色甜甜圈、拉扯有深色條紋；網頁 markStyle，實作對照.md）按壓、拉扯的痕跡：2 = B 壓薄透光（手指下變透變亮、周圍一圈稍濃、放手往外漾；拉長那段中間透、兩側濃），1 = 只做共同的那層（設計稿 D 只看外形：凹痕不進高度場、細的地方不推背景），0 = 跟 v2.63 一樣
     var twinFb: Double = 1            // 小史萊姆的聲音和觸感照主體：1 = 按、拉、拉絲、揉、兩指捏、質地微震、放手、點一下、被扯、被揉，強度照主體同一張表、乘面積比的 1/4 次方；0 = 跟 v2.62 一樣（按 0.3、放手 0.4 兩聲）
     var endless: Double = 1           // v2.54 無限拉 (多米 11-22: pulled 5 cm it grew 3 cm and stopped; it should stretch without end and stay under the finger): the finger never gives way, the soft limits (maxPull, memMax) are off, and each edge's hard limit widens by `capG` while the held patch cannot keep up; 0 = v2.53
     var growK: Double = 1.5           // how fast the edge limits widen while the held patch lags the finger (e to this power a second)
@@ -1036,6 +1037,7 @@ struct TuneField: Identifiable {
         TuneField(key: \.splitHold, name: "撕開要撐幾秒 v2.65", hint: "（多米 11-27 build 179：太容易撕開）身體被拉到極限（下面那條「撕開的極限」）要撐這麼久才撕開成兩隻；掉到極限以下 0.3 秒內不算，再久每秒退 2 秒，放手歸零。快撐不住時越撐越細、發抖、拉絲聲越來越緊、細絲一根根斷、震動越來越密。0 回 v2.62：拉開「分裂距離」、手指快過「扯斷速度」就斷", range: 0...30, step: 1, section: "這一批 v2.65"),
         TuneField(key: \.splitEdge, name: "撕開的極限（比例）v2.65", hint: "身體真的被拉開多少（扣掉整隻跟過去的那份）÷ 這個材質拉得到的上限（拉力的長度，最多 2.3 個半徑＝手機畫面擋住的地方），到這個比例才算在極限。黏土要往上拉到快到畫面頂；果凍、麻糬拉到整隻被拖著走就算", range: 0.5...1, step: 0.02, section: "這一批 v2.65"),
         TuneField(key: \.twinEye, name: "小史萊姆的臉照主體 v2.65", hint: "1：撕下來那隻的眼睛照主體那套：眼距最多 1.3 倍、臉最多歪 50 度、離外框留一顆眼睛，兩指往兩邊拉臉也不會被拆開；表情跟主體一樣（眨眼、抓著瞇、被扯 > <、揉 ∩、睡著 ∪、戒的時候睜大）。0 回 v2.62", range: 0...1, step: 1, section: "這一批 v2.65"),
+        TuneField(key: \.markStyle, name: "按壓拉扯的痕跡 v2.65", hint: "（多米 11-27 真機：按下去像深色甜甜圈、兩個圓疊在一起，拉扯時身體裡有深色長條）2＝B 壓薄透光（多米選的）：手指下那塊變透變亮、周圍一圈稍濃，放手往外漾一下；拉長那段中間透、兩側濃。1＝只做共同的那層（設計稿 D 只看外形：凹痕不進高度場、細的地方不推背景，什麼都不畫）。0＝v2.63 現況", range: 0...2, step: 1, section: "這一批 v2.65"),
         TuneField(key: \.twinFb, name: "小史萊姆的聲音觸感照主體 v2.65", hint: "1：撕下來那隻按、拉、拉絲、揉、兩指捏、質地微震、放手、點一下、被扯、被揉都跟主體同一套聲音和震動，強度照主體的表、乘面積比的 1/4 次方（約 0.82）。0 回 v2.62（只有按 0.3、放手 0.4 兩聲）", range: 0...1, step: 1, section: "這一批 v2.65"),
     ]
 }

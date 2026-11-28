@@ -844,11 +844,26 @@ final class SlimeView: UIView {
         let off = labLayersOff, moodOff = off.contains("mood")
         let tr = rig.showsImpression && !moodOff ? rig.impShownTrust : 0, w = rig.showsImpression && !moodOff ? rig.impShownWary : 0
         let R = rig.R * z
-        let dents = off.contains("dent") ? [] : rig.dents.compactMap { d -> JellySkin.Dent? in
-            let r = rig.R * rig.params.dentSize * d.d
-            guard r >= 0.5 else { return nil }
-            let p = rig.toScreen(d.x, d.y)
-            return JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(r * z * 1.2), d: Float(min(1, d.d)))
+        var marks = JellySkin.Marks()   // v2.65 #9 markStyle（網頁 jelRender）：0 照 v2.63；1、2 的凹痕半徑固定 0.53R（設計稿 58px）、深度是看得到的深度
+        marks.mode = Float(rig.markMS)
+        var dents: [JellySkin.Dent] = []
+        if rig.markMS < 1 {
+            dents = off.contains("dent") ? [] : rig.dents.compactMap { d -> JellySkin.Dent? in
+                let r = rig.R * rig.params.dentSize * d.d
+                guard r >= 0.5 else { return nil }
+                let p = rig.toScreen(d.x, d.y)
+                return JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(r * z * 1.2), d: Float(min(1, d.d)))
+            }
+        } else if !off.contains("dent") {
+            for d in rig.markDents {
+                let p = rig.toScreen(d.x, d.y)
+                dents.append(JellySkin.Dent(x: Float(p.x), y: Float(p.y), r: Float(0.53 * rig.R * z), d: Float(d.mv)))
+                marks.rel.append(Float(d.mr)); marks.d0.append(Float(d.m0))
+            }
+        }
+        if let q = rig.markPullView {
+            let b = rig.toScreen(q.bx, q.by), e = rig.toScreen(q.tx, q.ty)
+            marks.bx = Float(b.x); marks.by = Float(b.y); marks.tx = Float(e.x); marks.ty = Float(e.y); marks.s = Float(q.s); marks.fade = Float(q.fade)
         }
         let hz = rig.haze
         let p = rig.params
@@ -893,7 +908,7 @@ final class SlimeView: UIView {
                  skin: skin, round: round,
                  water: off.contains("refr") ? 0 : p.water, refr: refr, absorb: p.absorb,
                  shine: p.lookShine, opaque: p.lookOpaque, edgeClean: p.lookEdgeClean,   // v2.61b edgeClean (多米 11-26). v2.60 (多米 11-24): opaque, no highlights, all ten; the panel's 外觀 chip (clear) makes them glossy and see-through
-                 extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"), mesh: mesh)
+                 extra: extra, hiOff: off.contains("hi"), rimOff: off.contains("wet"), mesh: mesh, marks: marks)
         if LabProbe.shared.skinOn {   // v2.61 A7
             let fill: [CGPath] = mesh == nil ? [body] + extra : []
             LabProbe.shared.skinFrame(mesh: mesh, paths: fill, outline: outline, size: bounds.size, R: R, round: round)

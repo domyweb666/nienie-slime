@@ -965,6 +965,7 @@ final class SlimeRig {
 
     final class Finger {
         var splitT = 0.0          // v2.62: how long it has been pulled far and fast enough to tear
+        var mk: MarkPull? = nil   // v2.65 #9 markStyle（網頁 f.mk）：這次抓住的第一格記下被抓那顆、它和身體中心在哪
         var spT = 0.0, spLo = 0.0, spQ = 0.0   // v2.65 splitHold（網頁 f.spT、f.spLo、f.spQ）：在極限撐了幾秒、掉到極限以下多久、這一格拉開多少（÷ 上限）
         var tug: Bool? = nil      // v2.51: grabbed near the outline: it pulls a strand out, the body is not carried (nil = not judged yet)
         var r0x: Double? = nil, r0y = 0.0   // v2.61 A4: where it took hold, from the body's centre (r0x, r0y on the web; not the contact radius r0)
@@ -1286,7 +1287,7 @@ final class SlimeRig {
         tugX = 0; tugY = 0; escOn = false; purr = 0
         moodTugS = 0; petReset(); flTc = 1; flTapQ = false; flTapAt = -9   // v2.61 D1 D2 C3 (the fingers' own go with the fingers)
         bondLastT = -9; flBk = 0; sooOn = false; sooG = 0; sooOK = false   // v2.63 D6 (web setup: the same): the clock set back, the last hold must not sit in the future
-        dentList.removeAll()
+        dentList.removeAll(); markGone.removeAll(); markSeen.removeAll(); markPull = nil
         t = 0; lastTouch = -10; nextTwitch = 3; relaxUntil = -1
         tLife = 0; releaseCount = 0; nextSpecial = 0; specialUntil = -1
         wanderMoving = false; wanderNext = 3; wanderVX = 0; wanderVY = 0
@@ -1850,7 +1851,7 @@ final class SlimeRig {
         }
         if let e = eL { eyeL = near(e.0, e.1, 4) }
         if let e = eR { eyeR = near(e.0, e.1, 4) }
-        dentList.removeAll()
+        dentList.removeAll(); markGone.removeAll(); markSeen.removeAll(); markPull = nil
         CAPG = 1
         if back {   // the shape is still long on the built mesh: the limits widen to just what it needs, so letting go does not shrink it at once
             let mat = effParams
@@ -2170,10 +2171,83 @@ final class SlimeRig {
     /// it was held (w 0...1: wider and shallower), and how the skin around it is stretched (a b c dd, CGAffineTransform order,
     /// rotation removed so the light stays upper-left).
     struct DentView { let x, y, d, p, w, a, b, c, dd: Double }
+    // MARK: v2.65 #9 markStyle（多米 11-27 真機：按壓像甜甜圈、拉扯有深色條紋；網頁 MARK、markStep、markVis、markPullS，實作對照.md）
+    // 0 v2.63（凹痕減在高度場上）、1 只做共同的那層（設計稿 D 只看外形）、2 B 壓薄透光。1、2 的凹痕只畫在顏色層，自己記一份看得到的深度；物理的 d、p 一點都不動。
+    // 物理已經收掉的凹痕放進 markGone 讓它退完、漾完；markPull 是拉長那段。只寫畫面用的量，不抽亂數
+    final class MarkPull { let i: Int, x0: Double, y0: Double, cx: Double, cy: Double, n: Int; var rel = -1.0
+        init(i: Int, x0: Double, y0: Double, cx: Double, cy: Double, n: Int) { self.i = i; self.x0 = x0; self.y0 = y0; self.cx = cx; self.cy = cy; self.n = n } }
+    private var markGone: [Dent] = []
+    private var markSeen: [Dent] = []
+    private var markPull: MarkPull? = nil
+    /// 這一格的 markStyle（0、1、2），markStep 記下，畫的時候用同一個
+    private(set) var markMS = 0
+    /// 畫面用的凹痕（markStyle 1、2）：世界座標、看得到的深度 mv、放手後幾秒 mr（按著 -1）、放手那一刻的深度 m0（0.15 以下不漾，給 0）
+    struct MarkDentView { let x, y, mv, mr, m0: Double }
+    var markDents: [MarkDentView] {
+        guard markMS >= 1 else { return [] }
+        var o: [MarkDentView] = []
+        for d in dentList + markGone where o.count < 6 && d.mvOn && d.i < N {
+            let rip: Bool = d.m0 > 0.15 && d.mr >= 0 && d.mr < 0.5
+            if d.mv < 0.005 && !rip { continue }
+            o.append(MarkDentView(x: X[d.i], y: Y[d.i], mv: d.mv, mr: d.mr, m0: d.m0 > 0.15 ? d.m0 : 0))
+        }
+        return o
+    }
+    /// 拉長那段（markStyle 2）：根部 B＝現在的身體中心＋（抓下去時被抓那顆離中心的位移）× 0.45；尖端 T＝那顆現在的位置（世界座標）；s 拉長量；fade 放手後的淡出
+    struct PullView { let bx, by, tx, ty, s, fade: Double }
+    var markPullView: PullView? {
+        guard markMS >= 2, let q = markPull, q.i < N, q.n == N else { return nil }
+        let cx = clusters[gi].xc, cy = clusters[gi].yc
+        return PullView(bx: cx + (q.x0 - q.cx) * 0.45, by: cy + (q.y0 - q.cy) * 0.45, tx: X[q.i], ty: Y[q.i], s: markPullS(q), fade: q.rel < 0 ? 1 : exp(-q.rel / 0.13))
+    }
+    /// 拉長量 s：細頸 B 到 T 比抓下去時長了多少 ÷ 1.3R。實作對照寫的是「那顆離靜止位置多遠」，app 裡整團會被拖著走、會走路，那樣量到的大半是平移不是拉長（網頁量過：果凍往上拉 1.5R 整團跟上去，s 還有 0.73）
+    private func markPullS(_ q: MarkPull) -> Double {
+        let ox = q.x0 - q.cx, oy = q.y0 - q.cy, cx = clusters[gi].xc, cy = clusters[gi].yc
+        return max(0, min(1, (hypot(X[q.i] - cx - ox * 0.45, Y[q.i] - cy - oy * 0.45) - 0.55 * hypot(ox, oy)) / (1.3 * R)))
+    }
+    /// 設計稿 jelly-demo.js：B 沉 τ 0.06 秒、退 τ 0.09 秒；D 0.05、0.1
+    private func markVis(_ dn: Dent, _ dt: Double, _ held: Bool, _ ms: Int) {
+        let ti: Double = ms >= 2 ? 0.06 : 0.05, to: Double = ms >= 2 ? 0.09 : 0.1
+        if !dn.mvOn { dn.mvOn = true; dn.mv = 0; dn.mr = -1; dn.m0 = 0 }
+        if held { dn.mv += (1 - dn.mv) * (1 - exp(-dt / ti)); dn.mr = -1 }
+        else { if dn.mr < 0 { dn.mr = 0; dn.m0 = dn.mv } else { dn.mr += dt }; dn.mv *= exp(-dt / to) }
+    }
+    private func markStep(_ dt: Double, _ mat: FeelParams) {
+        let ms = Int(max(0, min(2, mat.markStyle.rounded())))
+        markMS = ms
+        if ms < 1 { markGone.removeAll(); markSeen.removeAll(); markPull = nil; return }
+        for dn in dentList { markVis(dn, dt, dn.finger != nil && !dn.pull, ms) }
+        for dn in markSeen where !dentList.contains(where: { $0 === dn }) && !markGone.contains(where: { $0 === dn }) { markGone.append(dn) }
+        markSeen = dentList
+        for k in stride(from: markGone.count - 1, through: 0, by: -1) {
+            let dn = markGone[k]
+            markVis(dn, dt, false, ms)
+            if dn.i >= N || (dn.mv < 0.005 && !(dn.m0 > 0.15 && dn.mr < 0.5)) { markGone.remove(at: k) }
+        }
+        while markGone.count > 6 { markGone.removeFirst() }
+        var best: MarkPull? = nil, bs = -1.0
+        for f in fingers.values {
+            if f.mode != .grab || f.mem.isEmpty { f.mk = nil; continue }   // 補抓、換陣列都不換；放開或改成摸就清掉
+            if f.mk == nil || f.mk!.n != N || f.mk!.i >= N {
+                var i = f.mem[0].i, w = -1.0
+                for m in f.mem where m.w > w && m.i < N { w = m.w; i = m.i }
+                if i < N { f.mk = MarkPull(i: i, x0: X[i], y0: Y[i], cx: clusters[gi].xc, cy: clusters[gi].yc, n: N) }
+            }
+            guard let q = f.mk, q.i < N else { continue }
+            let s = markPullS(q)
+            if s > bs { bs = s; best = q }
+        }
+        if let b = best { markPull = b; b.rel = -1 }
+        else if let q = markPull {
+            if q.rel < 0 { q.rel = 0 } else { q.rel += dt }
+            if q.rel > 0.6 || q.i >= N || q.n != N { markPull = nil }
+        }
+    }
     /// v2.16: p is the physical press (the body spreads, area, highlight, shadow), d the visible depth. nb: neighbours and their
     /// offsets at the press, to fit how the skin is stretched
     private final class Dent { let i: Int; var d = 0.0; var finger: ObjectIdentifier?; var pull = false
         var p = 0.0, v = 0.0, p0 = 0.0, tau = 0.0, w = 0.0, held = 0.0
+        var mvOn = false, mv = 0.0, mr = -1.0, m0 = 0.0   // v2.65 #9 markStyle 1、2（網頁 dn.mv、mr、m0）：看得到的深度、放手後幾秒（按著 -1）、放手那一刻的深度
         var nb: [(i: Int, ox: Double, oy: Double)] = []
         init(i: Int, finger: ObjectIdentifier?) { self.i = i; self.finger = finger } }
     private var dentList: [Dent] = []
@@ -2975,6 +3049,7 @@ final class SlimeRig {
             }
         }
         if mat.press2 < 0.5 { dentList.removeAll { $0.finger == nil && $0.d < 0.02 } }
+        markStep(dt, mat)   // v2.65 #9 痕跡（只寫畫面用的量，網頁 update 在 PRESS_SUM 之後）
         // finger lag: effective position = start + tanh-limited displacement, then chase it
         for f in fingers.values {
             // chase target: the prediction only on a frame that got a fresh move event, else the real finger,

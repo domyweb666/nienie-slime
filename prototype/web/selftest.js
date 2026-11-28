@@ -1,5 +1,6 @@
 /* 捏捏史萊姆 網頁原型 回歸自測（Agent 程式自測：只抓「壞掉」，抓不到「好不好捏」）
 
+   v2.65（11-27）：加 T95（markStyle 按壓、拉扯的痕跡：2 B 壓薄透光時色器拿到 2、凹痕不進高度場、半徑 0.53R、中心不比按之前和下半圈暗、拉扯有細頸、放手清掉；0 的凹痕照舊公式；0 和 2 物理一模一樣；在 T94 後面、T74 前面跑）。
    v2.65（11-27）：加 T92（小史萊姆的臉 twinEye：兩指拉開、壓牆拉，眼距 ≤ 1.3 倍、歪 ≤ 50 度、在外框裡；瞇、> <、∩、眨眼）、T93（splitHold：拉到極限撐 11 秒不斷、一直撐 12 到 14 秒斷、快撐不住了越來越明顯、極限六成五撐 20 秒不斷，三個材質）、
      T94（twinFb：小史萊姆按、拉、捏、揉、放手有聲音和觸感；0 照 v2.62）；在 T91 後面、T74 前面跑。舊項目一律 splitHold 0、twinEye 0、twinFb 0（PRE47 也是，T61、T63 量的是舊規格），T74 也釘 0
    v2.64（11-27）：加 T91（B8 起步跟手：每秒 120 格，最上面往裡 0.3R 抓住往上拉，60、150、300、600 點每秒走 2 點 startFollow 1 要比 0 早一半以上、拉到最後的落後差 15% 內、0 時 lagK 每格就是原本的公式；B8 甲乙對到的組；在 T90 後面、T74 前面跑，幾秒）
@@ -2677,6 +2678,40 @@
     } catch (e) { r.err = String(e && e.stack || e).slice(0, 300); ok = false; }
     if (SFX) SFX.frame = fr0; HAP.log = null; upAll(); twinDrop(); r.ok = ok; res.T94_twinFb = r; res.PASS.twinFb = ok; restoreClock(clock); }
     Object.assign(VIEW, view0); SLIME = sl0; curMat = cm0; mat = { ...PRESETS.clay }; setup(); res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
+  // T95 v2.65 #9 按壓、拉扯的痕跡（markStyle；多米 11-27 真機：按下去像深色甜甜圈、拉扯有深色條紋；實作對照.md 的 B 壓薄透光）。窗台、白天、沒有窗景、皮 A、真正的預設（PRE62），桃桃、仙草，大腦、招牌、張望有對象、頂回來關。
+  //   按身體中間 0.3 秒（畫出來、讀色器拿到的 uniform 和畫面），放手 1 秒，再抓上面往上拉 2R（0.5 秒）撐 0.3 秒、放手 0.75 秒。
+  //   a markStyle 2：色器拿到的 markStyle 是 2（H1 不減凹痕）、凹痕半徑 0.53R、深度 0.9 以上；凹痕中心不比按之前暗、不比下半圈（0.53R）暗；拉的時候細頸有傳（s > 0.1；量到桃桃 0.68、仙草 0.22）、放手 0.75 秒後凹痕和細頸都清掉
+  //   b markStyle 0：色器拿到 0、凹痕照舊公式（半徑 dentSize×深度×1.2、深度夾 1）、uD2 和細頸全 0；中心、圈的亮度只記錄
+  //   c 只動畫面：先跑一次 0，再跑 0、2 各一次（兩次前面都接一次 0），每一點位置和下一個亂數一樣
+  { const clock = saveClock(), view0 = { ...VIEW }, sl0 = SLIME, cm0 = curMat, r = { m: {} }; let ok = true;
+    const scr = (wx, wy) => { const v = viewV(), q = cv.getBoundingClientRect(); return [(wx - CAM.x) * CAM.z + v.x + q.left, (wy - CAM.y) * CAM.z + v.y + q.top]; };
+    const upAll = () => { for (const id of [...fingers.keys()]) ev('pointerup', id, 0, 0); };
+    const lum = (x, y) => { const d = ctx.getImageData(Math.round(x * DPR), Math.round(y * DPR), 1, 1).data; return .299 * d[0] + .587 * d[1] + .114 * d[2]; };
+    const U = n => { const gl = JEL.gl; if (!gl) return null; const v = gl.getUniform(JEL.pF, gl.getUniformLocation(JEL.pF, n)); return typeof v === 'number' ? v : Array.from(v || []); };
+    const run = (sid, ms) => { upAll(); Object.assign(VIEW, { skin: 'A', body: 'round', face: 1, bg: 'day', win: '' }); const si = SLIMES.findIndex(q => q.id === sid), S = SLIMES[si]; Math.random = seeded(9501); SLIME = si; curMat = S.mat;
+      mat = { ...PRE62[S.mat], seed: S.seed, ...S.p, ...viewOver(), eyes: 1, sill: 1, intro: 0, introSwim: 0, brain: 0, signature: 0, lookTarget: 0, tapBack: 0, markStyle: ms }; setup();
+      t = 0; lastTouch = -10; nextTwitch = 3; tLife = 0; relaxUntil = -1; SLP.lastAny = -99; SLP.on = false; SLP.k = 0; impReset(); IMP.tr = .3; IMP.w = 0; IMPD.tr = .3; IMPD.w = 0; ESC.on = false; WANDER.moving = false; WANDER.next = 1e5;
+      E2.tk.length = 0; E2.tkT = 0; DENTS.length = 0; E4.count = 99; GREET.st = ''; GREET.until = -9; EYE.user = -9; voice.last = -9; FLN.say = null; PAIR.tearT = -9; PAIR.over = 0; steps(150); log.splice(0);   // 照 T90 的 fresh：時鐘和表演中的量歸零，前一次留下的不會錯開這一次
+      const o = {}, cx = globalC.xc, cy = globalC.yc, [x0, y0] = scr(cx, cy), q = cv.getBoundingClientRect(), lx = x0 - q.left, ly = y0 - q.top, rr = .53 * R * CAM.z;
+      const ring = () => { let a = 0; for (let k = 0; k < 7; k++) { const th = Math.PI * (.2 + .6 * k / 6); a += lum(lx + rr * Math.cos(th), ly + rr * Math.sin(th)); } return a / 7; };
+      draw(); o.c0 = +lum(lx, ly).toFixed(1); o.r0 = +ring().toFixed(1);
+      ev('pointerdown', 1, x0, y0); steps(18); draw(); o.c1 = +lum(lx, ly).toFixed(1); o.r1 = +ring().toFixed(1);
+      const ud = U('uD[0]'), p1 = U('uPull1'), u2 = U('uD2[0]'), dn = DENTS[0]; o.ms = p1 && p1[2]; o.nD = U('nD'); o.ud = ud && ud.map(v => +v.toFixed(3)); o.u2 = u2 && u2.map(v => +v.toFixed(3));
+      o.rB = ud ? +(ud[2] / (R * CAM.z)).toFixed(3) : -1; o.dOld = dn ? [+(R * mat.dentSize * dn.d * CAM.z * 1.2).toFixed(3), +Math.min(1, dn.d).toFixed(3)] : null;
+      ev('pointerup', 1, x0, y0); steps(60);
+      const [px, py] = scr(globalC.xc + R * .1, globalC.yc - R * .55); ev('pointerdown', 1, px, py); steps(3); const u = R * CAM.z; for (let k = 1; k <= 30; k++) { ev('pointermove', 1, px, py - 2 * u * k / 30); steps(1); } steps(18); draw();
+      const pp = U('uPull1'); o.pull = pp && pp.map(v => +v.toFixed(3)); ev('pointerup', 1, px, py - 2 * u); steps(45); draw(); o.after = { nD: U('nD'), pull: (U('uPull1') || []).map(v => +v.toFixed(3)), gone: MARK.gone.length };
+      o.pos = X.slice(0, N).reduce((a, v, i) => a + v * (i % 7 + 1) + Y[i] * (i % 5 + 1), 0).toFixed(6); o.next = Math.random(); return o; };
+    try {
+      for (const sid of ['peach', 'xiancao']) {
+        run(sid, 0); const b = run(sid, 0), a = run(sid, 2); r.m[sid] = { a: { ...a, pos: undefined }, b: { ...b, pos: undefined } };
+        const okA = a.ms === 2 && a.nD >= 1 && Math.abs(a.rB - .53) < .01 && a.ud[3] >= .9 && a.c1 >= a.c0 - 2 && a.c1 >= a.r1 - 2 && a.pull[0] > .1 && a.pull[2] === 2 && a.after.nD === 0 && a.after.pull[0] === 0 && a.after.gone === 0;
+        const okB = b.ms === 0 && b.nD >= 1 && b.dOld && Math.abs(b.ud[2] - b.dOld[0]) < .01 && Math.abs(b.ud[3] - b.dOld[1]) < .001 && b.u2.every(v => v === 0) && b.pull.every(v => v === 0);
+        const okC = a.pos === b.pos && a.next === b.next;
+        r.m[sid].part = { a: okA, b: okB, c: okC }; ok = ok && okA && okB && okC; }
+    } catch (e) { r.err = String(e && e.stack || e).slice(0, 300); ok = false; }
+    upAll(); Object.assign(VIEW, view0); SLIME = sl0; curMat = cm0; mat = { ...PRESETS.clay }; setup(); restoreClock(clock);
+    r.ok = ok; res.T95_markStyle = r; res.PASS.markStyle = ok; res.ALL_PASS = Object.values(res.PASS).every(Boolean); }
   // T74 v2.62 扯斷成兩隻、碰到合回（多米 11-26）。測試本身在 splittest.js（也能單獨跑），用真正的預設（PRE62）。擋：四版合併動畫都會斷、斷了不准再斷、拖去碰一定合、合回 3 秒後點數一樣、面積 ±3%、A 回到原本大小；放著自己爬回去也合；splitAgain 1 合回後能再斷、0 不能；split 0 不斷
   { const clock = saveClock(), T0 = performance.now(); let o = { r: { err: '' }, pass: false };
     const P74 = {}; for (const k in PRE62) P74[k] = { ...PRE62[k], lookNoDown: 0, splitHold: 0, twinEye: 0, twinFb: 0 };   // v2.65：T74 量的是 v2.62 的快扯撕開、v2.62 的臉和聲音，三顆釘 0   // v2.63 C5：張望不朝下預設 1 之後窗台上張望的方向變了（合回那幾格跟著變），這一項量的是舊規格，釘 0

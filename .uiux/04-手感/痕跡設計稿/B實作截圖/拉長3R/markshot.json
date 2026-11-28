@@ -1,0 +1,164 @@
+[
+ {
+  "shots": [
+   {
+    "tag": "peach_markStyle0_1_按住0.3秒",
+    "img": "peach_markStyle0_1_按住0.3秒.png"
+   },
+   {
+    "tag": "peach_markStyle0_2_放手0.15秒",
+    "img": "peach_markStyle0_2_放手0.15秒.png"
+   },
+   {
+    "tag": "peach_markStyle0_3_拉長3R撐住",
+    "img": "peach_markStyle0_3_拉長3R撐住.png"
+   },
+   {
+    "tag": "peach_markStyle0_4_放手0.3秒",
+    "img": "peach_markStyle0_4_放手0.3秒.png"
+   }
+  ],
+  "info": {
+   "R": 106.1,
+   "z": 1,
+   "ms": 0,
+   "jel": true,
+   "skin": "A",
+   "used": true,
+   "dent": [
+    [
+     0.91,
+     null
+    ]
+   ],
+   "pull": null
+  },
+  "slime": "peach",
+  "arm": {
+   "markStyle": 0
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "peach_markStyle2_1_按住0.3秒",
+    "img": "peach_markStyle2_1_按住0.3秒.png"
+   },
+   {
+    "tag": "peach_markStyle2_2_放手0.15秒",
+    "img": "peach_markStyle2_2_放手0.15秒.png"
+   },
+   {
+    "tag": "peach_markStyle2_3_拉長3R撐住",
+    "img": "peach_markStyle2_3_拉長3R撐住.png"
+   },
+   {
+    "tag": "peach_markStyle2_4_放手0.3秒",
+    "img": "peach_markStyle2_4_放手0.3秒.png"
+   }
+  ],
+  "info": {
+   "R": 106.1,
+   "z": 1,
+   "ms": 2,
+   "jel": true,
+   "skin": "A",
+   "used": true,
+   "dent": [
+    [
+     0.91,
+     0.99
+    ]
+   ],
+   "pull": {
+    "i": 104,
+    "s": 0.16
+   }
+  },
+  "slime": "peach",
+  "arm": {
+   "markStyle": 2
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "xiancao_markStyle0_1_按住0.3秒",
+    "img": "xiancao_markStyle0_1_按住0.3秒.png"
+   },
+   {
+    "tag": "xiancao_markStyle0_2_放手0.15秒",
+    "img": "xiancao_markStyle0_2_放手0.15秒.png"
+   },
+   {
+    "tag": "xiancao_markStyle0_3_拉長3R撐住",
+    "img": "xiancao_markStyle0_3_拉長3R撐住.png"
+   },
+   {
+    "tag": "xiancao_markStyle0_4_放手0.3秒",
+    "img": "xiancao_markStyle0_4_放手0.3秒.png"
+   }
+  ],
+  "info": {
+   "R": 106.1,
+   "z": 1,
+   "ms": 0,
+   "jel": true,
+   "skin": "A",
+   "used": true,
+   "dent": [
+    [
+     0.91,
+     null
+    ]
+   ],
+   "pull": null
+  },
+  "slime": "xiancao",
+  "arm": {
+   "markStyle": 0
+  }
+ },
+ {
+  "shots": [
+   {
+    "tag": "xiancao_markStyle2_1_按住0.3秒",
+    "img": "xiancao_markStyle2_1_按住0.3秒.png"
+   },
+   {
+    "tag": "xiancao_markStyle2_2_放手0.15秒",
+    "img": "xiancao_markStyle2_2_放手0.15秒.png"
+   },
+   {
+    "tag": "xiancao_markStyle2_3_拉長3R撐住",
+    "img": "xiancao_markStyle2_3_拉長3R撐住.png"
+   },
+   {
+    "tag": "xiancao_markStyle2_4_放手0.3秒",
+    "img": "xiancao_markStyle2_4_放手0.3秒.png"
+   }
+  ],
+  "info": {
+   "R": 106.1,
+   "z": 1,
+   "ms": 2,
+   "jel": true,
+   "skin": "A",
+   "used": true,
+   "dent": [
+    [
+     0.91,
+     0.99
+    ]
+   ],
+   "pull": {
+    "i": 138,
+    "s": 0.3
+   }
+  },
+  "slime": "xiancao",
+  "arm": {
+   "markStyle": 2
+  }
+ }
+]

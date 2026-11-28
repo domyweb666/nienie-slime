@@ -260,6 +260,8 @@ final class SkinMesh {
 final class JellySkin {
     let layer = CAMetalLayer()
     struct Dent { var x, y, r, d: Float }
+    /// v2.65 #9 markStyle（網頁 uD2、uPull0、uPull1）：每個凹痕放手後幾秒（按著 -1）、放手那一刻的深度；拉長那段的根部、尖端（螢幕點，y 向下）、拉長量、淡出。mode 0 = v2.63
+    struct Marks { var mode: Float = 0; var rel: [Float] = []; var d0: [Float] = []; var bx: Float = 0, by: Float = 0, tx: Float = 0, ty: Float = 0, s: Float = 0, fade: Float = 0 }
     struct Skin { var kEdge, kCore, aEdge, aCore, amb, dif, glow, line, nk, shin, s0, s1, spec, sheen, arc: Float; var wet: Float = 0 }
     /// The web's JSKINS: A clear (多米 11-07), B milky (what A becomes while the glitter clouds it)
     static let skinA = Skin(kEdge: 0.45, kCore: 0.42, aEdge: 0.52, aCore: 0.80, amb: 0.86, dif: 0.24, glow: 0.60, line: 0.38, nk: 0.95, shin: 320, s0: 0.42, s1: 0.66, spec: 0.85, sheen: 0.12, arc: 0.92)
@@ -518,7 +520,9 @@ final class JellySkin {
     func render(path: CGPath, rpx: Double, dents: [Dent], body: UIColor, shade: UIColor, line: UIColor, skin: Skin, round: Double = 0, water: Double = 0, refr: Double = 0.3, absorb: Double = 0.68,
                 shine: Double = 1, opaque: Double = 0, edgeClean: Double = 0, extra: [CGPath] = [],   // v2.51: highlights × shine; the thick part hides the room; extra shapes (the strand, the small blob) join the mask
                 hiOff: Bool = false, rimOff: Bool = false,                      // v2.52 C4: the highlights, or the second highlight and the rim of light, left out (to read each layer's cost)
-                mesh: SkinMesh? = nil) {                                        // v2.61 A1 skinU: the mask from the body's triangles; nil = from `path` and `extra`, as up to v2.60
+                mesh: SkinMesh? = nil,                                          // v2.61 A1 skinU: see below
+                marks: Marks = Marks()) {                                       // v2.65 #9 markStyle; the default is v2.63
+        // v2.61 A1 skinU: the mask from the body's triangles; nil = from `path` and `extra`, as up to v2.60
         guard let mask, let h1, let h2, let q1, let q2, let ctx = maskCtx, let data = ctx.data else { return }
         // 1 the mask
         func paint() {
@@ -572,7 +576,7 @@ final class JellySkin {
         func mix(_ a: SIMD3<Float>, _ b: SIMD3<Float>, _ k: Float) -> SIMD4<Float> { let m = a + (b - a) * k; return SIMD4<Float>(m.x, m.y, m.z, 1) }
         let bc = rgb(body), sc = rgb(shade), lc = rgb(line), white = SIMD3<Float>(1, 1, 1)
         var u: [SIMD4<Float>] = []
-        u.reserveCapacity(16)
+        u.reserveCapacity(25)
         u.append(SIMD4<Float>(Float(W), Float(H), Float(rpx), Float(min(6, dents.count))))
         for i in 0..<6 { let d = i < dents.count ? dents[i] : Dent(x: 0, y: 0, r: 1, d: 0); u.append(SIMD4<Float>(d.x, d.y, max(0.5, d.r), d.d)) }
         u.append(mix(bc, white, skin.kEdge)); u.append(mix(bc, sc, skin.kCore)); u.append(mix(sc, lc, 0.35)); u.append(mix(bc, white, 0.3))
@@ -583,6 +587,19 @@ final class JellySkin {
         u.append(SIMD4<Float>(skin.arc * hi, round > 0 ? 0.46 : 0, rimOff ? 0 : skin.wet * sh, Float(edgeClean)))   // w: v2.61b edgeClean
         let wv: Float = room != nil ? Float(max(0, min(1, water))) * min(1, skin.wet) : 0   // v2.49: no baked room, no water skin
         u.append(SIMD4<Float>(wv, Float(refr), Float(absorb), Float(max(0, min(1, opaque)))))
+        // v2.65 #9 markStyle (web jelRender: uD2, uPull0, uPull1, cSat), after k4 in LightU's order
+        for i in 0..<6 { u.append(SIMD4<Float>(i < marks.rel.count ? marks.rel[i] : 0, 0, 0, i < marks.d0.count ? marks.d0[i] : 0)) }
+        u.append(SIMD4<Float>(marks.bx, marks.by, marks.tx, marks.ty))
+        u.append(SIMD4<Float>(marks.s, marks.fade, marks.mode, 0))
+        do {   // cSat: the body colour, saturation +25%, value +10% (HSV; web jelSat)
+            let mx = max(bc.x, bc.y, bc.z), mn = min(bc.x, bc.y, bc.z)
+            let v2: Float = min(1, mx * 1.1), s2: Float = min(1, (mx > 0 ? (mx - mn) / mx : 0) * 1.25)
+            if mx - mn < 1e-6 { u.append(SIMD4<Float>(v2, v2, v2, 1)) } else {
+                let k: Float = v2 / mx
+                func ch(_ x: Float) -> Float { k * mx * (1 - s2 * (mx - x) / (mx - mn)) }
+                u.append(SIMD4<Float>(ch(bc.x), ch(bc.y), ch(bc.z), 1))
+            }
+        }
         let rp = MTLRenderPassDescriptor()
         rp.colorAttachments[0].texture = drawable.texture
         rp.colorAttachments[0].loadAction = .clear

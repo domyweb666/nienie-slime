@@ -80,15 +80,25 @@ struct LightU {
     float4 k2;           // s0, s1, spec, sheen
     float4 k3;           // arc, rnd (v2.47: threshold on the small blur for the outline, 0 = the mask), wet (v2.47)
     float4 k4;           // v2.49: water (0 = the v2.48 skin), refr (how far the background bends, in radii), absorb (how much the thick part takes its colour); v2.51 w: opaque
+    // v2.65 #9 markStyle (web uD2, uPull0, uPull1, cSat; 實作對照.md): uD2 per dent x seconds since let go (-1 held), w its depth when let go (the ripple);
+    // uPull0 the neck's root B.xy and tip T.xy (pixels, y down); uPull1 x stretch s, y fade, z markStyle; cSat the body colour, saturation +25%, value +10%
+    float4 uD2[6];
+    float4 uPull0;
+    float4 uPull1;
+    float4 cSat;
 };
+
+static float mkLin(float x, float a, float va, float b, float vb) { return mix(va, vb, clamp((x - a) / (b - a), 0.0, 1.0)); }   // the design's gradients, straight pieces
 
 static float H1(float2 uv, texture2d<float> B1, sampler sm, constant LightU& u) {
     float h = 0.45 * smoothstep(0.0, 1.0, B1.sample(sm, uv).r);
     float2 px = uv * u.resRpxN.xy;
     int nD = int(u.resRpxN.w);
-    for (int i = 0; i < nD; i++) {
-        float2 q = (px - u.uD[i].xy) / u.uD[i].z;
-        h -= u.uD[i].w * 0.24 * exp(-dot(q, q) * 1.6);
+    if (u.uPull1.z < 0.5) {   // v2.65 #9 markStyle 1, 2: dents no longer dig the height field (no dark ring, bright rim, doubled background)
+        for (int i = 0; i < nD; i++) {
+            float2 q = (px - u.uD[i].xy) / u.uD[i].z;
+            h -= u.uD[i].w * 0.24 * exp(-dot(q, q) * 1.6);
+        }
     }
     return h;
 }
@@ -103,16 +113,43 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     // v2.47 rnd: the outline from the blurred mask, so sharp corners and thin spikes round off and concave corners join like water
     float m = M.sample(sm, v).r, cov = rnd > 0.0 ? smoothstep(rnd - 0.05 * (1.0 - 0.6 * ec), rnd + 0.05 * (1.0 - 0.6 * ec), B1.sample(sm, v).r) : smoothstep(mix(0.18, 0.38, ec), mix(0.82, 0.62, ec), m);
     if (cov <= 0.0) return float4(0.0);
+    float mS = u.uPull1.z, b2 = B2.sample(sm, v).r, thick0 = smoothstep(0.08, 0.8, b2);
+    float kB2 = mS > 0.5 ? 0.55 * smoothstep(0.10, 0.45, thick0) : 0.55;   // v2.65 #9 markStyle 1, 2: the large blur's slope eased where it is thin (the dark streaks along a pull)
     float2 e = 2.0 / res, E = 8.0 / res;
     float gx = (H1(v + float2(e.x, 0.0), B1, sm, u) - H1(v - float2(e.x, 0.0), B1, sm, u)) / 4.0
-             + 0.55 * (B2.sample(sm, v + float2(E.x, 0.0)).r - B2.sample(sm, v - float2(E.x, 0.0)).r) / 16.0;
+             + kB2 * (B2.sample(sm, v + float2(E.x, 0.0)).r - B2.sample(sm, v - float2(E.x, 0.0)).r) / 16.0;
     float gyDown = (H1(v + float2(0.0, e.y), B1, sm, u) - H1(v - float2(0.0, e.y), B1, sm, u)) / 4.0
-                 + 0.55 * (B2.sample(sm, v + float2(0.0, E.y)).r - B2.sample(sm, v - float2(0.0, E.y)).r) / 16.0;
+                 + kB2 * (B2.sample(sm, v + float2(0.0, E.y)).r - B2.sample(sm, v - float2(0.0, E.y)).r) / 16.0;
     float gy = -gyDown;   // the web's y ran up
     float3 n = normalize(float3(-gx * rpx * nk, -gy * rpx * nk, 1.0));
     float3 L = normalize(float3(-0.5, 0.72, 0.9)), Hv = normalize(L + float3(0.0, 0.0, 1.0));
-    float b1 = B1.sample(sm, v).r, b2 = B2.sample(sm, v).r, thick = smoothstep(0.08, 0.8, b2), fres = pow(1.0 - n.z, 2.0);
-    float3 col = mix(u.cEdge.rgb, u.cCore.rgb, thick);
+    float b1 = B1.sample(sm, v).r, thick = thick0, fres = pow(1.0 - n.z, 2.0);
+    // v2.65 #9 B 壓薄透光 (markStyle 2): under the finger the body is pressed thin (thick smaller: paler, what is behind shows), the middle of a pulled neck too;
+    // what shows through is bent by the body's own refraction (ro reads thick0), so it does not shift
+    float2 P = v * res;
+    int nD = int(u.resRpxN.w);
+    float pk = 0.0, neckM = 0.0, neckW = 0.0;
+    float3 cE = u.cEdge.rgb;
+    if (mS > 1.5) {
+        for (int i = 0; i < nD; i++) {
+            float d = u.uD[i].w;
+            if (d <= 0.0) continue;
+            float lq = length(P - u.uD[i].xy) / u.uD[i].z / 0.95;
+            thick *= 1.0 - 0.6 * d * (lq < 0.5 ? mkLin(lq, 0.0, 1.0, 0.5, 0.85) : mkLin(lq, 0.5, 0.85, 1.0, 0.0));
+        }
+        if (u.uPull1.x > 0.0 && u.uPull1.y > 0.0) {
+            float2 Bp = u.uPull0.xy, BT = u.uPull0.zw - Bp;
+            float hN = clamp(dot(P - Bp, BT) / max(dot(BT, BT), 1.0), 0.0, 1.0), dN = length(P - (Bp + BT * hN));
+            float al = smoothstep(-0.3 * rpx, 0.15 * rpx, dot(P - Bp, BT) / max(length(BT), 1.0));   // the root end fades in pixels (hN's 0 to 0.15 cut a straight line on a short pull)
+            pk = u.uPull1.x * u.uPull1.y;
+            thick *= 1.0 - 0.22 * pk * exp(-pow(dN / (0.4 * rpx), 2.0));   // the base: a pulled neck is thinner anyway
+            neckM = exp(-pow(dN / (0.3 * rpx * (1.0 - 0.3 * u.uPull1.x)), 2.0)) * al;
+            neckW = exp(-pow(dN / (0.2 * rpx), 2.0)) * al;
+            thick *= 1.0 - 0.72 * pk * neckM;
+            cE = mix(u.cEdge.rgb, u.cSat.rgb, 0.55 * pk);
+        }
+    }
+    float3 col = mix(cE, u.cCore.rgb, thick);
     col *= amb + dif * clamp(dot(n, L), 0.0, 1.0);
     float tr = clamp(dot(n.xy, normalize(float2(0.35, -0.94))), 0.0, 1.0);
     col += u.cGlow.rgb * smoothstep(0.0, 0.7, tr) * (0.25 + 0.75 * fres) * glow;
@@ -122,23 +159,57 @@ fragment float4 jelLight(VOut in [[stage_in]], texture2d<float> M [[texture(0)]]
     // through a drop); thin places are almost colourless, only the thick part takes its colour; a band of light gathers inside the far edge; the rim reflects the sky
     float water = u.k4.x;
     if (water > 0.0) {
-        float2 ro = float2(-n.x, n.y) * rpx * u.k4.y / res * (0.3 + 0.7 * thick);   // n's y runs up, the texture's down
+        float2 ro = float2(-n.x, n.y) * rpx * u.k4.y / res * (0.3 + 0.7 * thick0);   // n's y runs up, the texture's down
+        if (mS > 0.5) ro *= smoothstep(0.05, 0.35, thick0);   // v2.65 #9 markStyle 1, 2: no pushing the background inside a thin neck
         float3 bg = BG.sample(sm, v + ro).rgb;
         float3 T = mix(float3(1.0), u.cCore.rgb, clamp(thick * u.k4.z + 0.05, 0.0, 1.0));
         float3 w = bg * T + u.cGlow.rgb * smoothstep(0.15, 0.8, tr) * (0.2 + 0.8 * fres) * glow * 0.5;
-        w = mix(w, col, clamp(smoothstep(0.03 * (1.0 - ec), mix(0.35, 0.1, ec), thick) * u.k4.w, 0.0, 1.0));   // v2.51: the thick part hides what is behind it
+        w = mix(w, col, clamp(smoothstep(0.03 * (1.0 - ec), mix(0.35, 0.1, ec), thick) * u.k4.w * (1.0 + 0.5 * pk * (1.0 - thick) * (1.0 - neckM)), 0.0, 1.0));   // v2.51: the thick part hides what is behind it; v2.65 B: a pull makes the edge layer richer (×1 + 0.5·pk)
         w *= 1.0 - 0.16 * (1.0 - ec) * smoothstep(0.2, 0.55, fres) * (1.0 - smoothstep(0.55, 0.9, fres));
         w = mix(w, float3(0.95, 0.98, 1.0), fres * 0.3);
         c = mix(c, float4(w, 1.0), water);
     }
+    // v2.65 #9 B 壓薄透光's colour layer (after the water, before the outline): under the finger the body's light colour 22% and white 14%; the ring pushed aside
+    // toward cSat (richer, not black); let go, that ring spreads out for 0.5 s; a pulled neck's middle white 16%
+    if (mS > 1.5) {
+        for (int i = 0; i < nD; i++) {
+            float lq = length(P - u.uD[i].xy) / u.uD[i].z, d = max(u.uD[i].w, 0.0);
+            if (d > 0.0) {
+                float g = lq < 0.6 ? mkLin(lq, 0.0, 1.0, 0.6, 0.45) : mkLin(lq, 0.6, 0.45, 1.0, 0.0);
+                c.rgb = mix(c.rgb, u.cCore.rgb * c.a, 0.22 * d * g);
+                c.rgb = mix(c.rgb, float3(c.a), 0.14 * d * g);
+                float uu = lq / 1.45, ring = uu < 0.7 ? mkLin(uu, 0.5, 0.0, 0.7, 0.32) : (uu < 0.86 ? mkLin(uu, 0.7, 0.32, 0.86, 0.14) : mkLin(uu, 0.86, 0.14, 1.0, 0.0));
+                c.rgb = mix(c.rgb, u.cSat.rgb * c.a, ring * d);
+            }
+            float rel = u.uD2[i].x, d0 = u.uD2[i].w;
+            if (rel >= 0.0 && rel < 0.5 && d0 > 0.0) {
+                float t = rel / 0.5, R2 = 1.0 + 0.75 * (1.0 - (1.0 - t) * (1.0 - t)), a2 = 0.3 * d0 * pow(1.0 - t, 1.4), uu = lq / (1.45 * R2);
+                float ra = uu < 0.8 ? mkLin(uu, 0.62, 0.0, 0.8, a2) : (uu < 0.9 ? mkLin(uu, 0.8, a2, 0.9, 0.35 * a2) : mkLin(uu, 0.9, 0.35 * a2, 1.0, 0.0));
+                float3 rc = mix(u.cSat.rgb, float3(1.0), clamp((uu - 0.8) / 0.1, 0.0, 1.0));
+                c.rgb = mix(c.rgb, rc * c.a, ra);
+            }
+        }
+        c.rgb = mix(c.rgb, float3(c.a), 0.16 * pk * neckW);
+    }
     c = mix(c, float4(u.cLine.rgb, 1.0), (1.0 - smoothstep(0.5, 0.66, b1)) * line * (1.0 - 0.7 * ec));
-    float nh = max(dot(n, Hv), 0.0);
+    // v2.65 #9 markStyle 1, 2: the highlight pushed aside by the finger (only the highlight's normal; the shading and the refraction stay); 0.2R, a 0.86R gaussian in the design
+    float3 ns = n;
+    if (mS > 0.5) {
+        float2 aw = float2(0.0);
+        for (int i = 0; i < nD; i++) {
+            float2 q = (P - u.uD[i].xy) / u.uD[i].z;
+            float l = length(q);
+            if (l > 1e-4) aw += q / l * 0.35 * u.uD[i].w * exp(-dot(q, q) * 0.6);
+        }
+        ns = normalize(n + float3(aw.x, -aw.y, 0.0));   // P's y runs down, n's up
+    }
+    float nh = max(dot(ns, Hv), 0.0);
     c.rgb += float3(pow(nh, shin * 0.22) * sheen * (1.0 - thick * 0.4)) * c.a;
     c = mix(c, float4(1.0), smoothstep(s0, s1, pow(nh, shin)) * spec);
     // v2.47 水潤: a second small highlight beside the main one, a rim of light along the edge
     if (wet > 0.0) {
         float3 H2 = normalize(normalize(float3(-0.26, 0.46, 0.9)) + float3(0.0, 0.0, 1.0));
-        c = mix(c, float4(1.0), smoothstep(0.5, 0.8, pow(max(dot(n, H2), 0.0), shin * 2.2)) * 0.75 * wet);
+        c = mix(c, float4(1.0), smoothstep(0.5, 0.8, pow(max(dot(ns, H2), 0.0), shin * 2.2)) * 0.75 * wet);
         c.rgb += float3(fres * 0.30 * wet * (1.0 - 0.6 * water)) * c.a;
     }
     // the bright arc: along the contour just inside the outline, only the part facing the light; it follows a pull or a squash, thin places lose it
