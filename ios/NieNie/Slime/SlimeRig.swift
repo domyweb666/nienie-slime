@@ -6585,15 +6585,17 @@ final class SlimeRig {
             let dx: Double = ex[1] - ex[0], dy: Double = ey[1] - ey[0], d: Double = hypot(dx, dy), mx: Double = twD0 * 1.3
             if d > mx { let k: Double = (1 - mx / d) / 2; ex[0] += dx * k; ey[0] += dy * k; ex[1] -= dx * k; ey[1] -= dy * k }
         }
-        do {   // v2.65 T92 (web twinPose): pulled back in one by one the line between the eyes can tilt too far (64° measured against a wall); turn it about the middle to at most 0.85 (th's own limit), and if that puts an eye outside, bring both toward the middle, at most four times
-            let mx: Double = (ex[0] + ex[1]) / 2, my: Double = (ey[0] + ey[1]) / 2, dx: Double = ex[1] - ex[0], dy: Double = ey[1] - ey[0]
+        do {   // v2.65 T92 (web twinPose): pulled back in one by one the line between the eyes can tilt too far (64° measured against a wall); turn it about the middle to at most 0.85 (th's own limit), and if that puts an eye outside (-4.8 measured), bring them closer while moving the middle toward the deepest particle, at most ten times
+            var mx: Double = (ex[0] + ex[1]) / 2, my: Double = (ey[0] + ey[1]) / 2
+            let dx: Double = ex[1] - ex[0], dy: Double = ey[1] - ey[0]
             let d: Double = hypot(dx, dy), a: Double = atan2(dy, dx), ac: Double = max(-0.85, min(0.85, a))
             if d > 1e-6 && ac != a {
                 let cu: Double = cos(ac), su: Double = sin(ac)
-                var hh: Double = d / 2
-                for _ in 0..<4 {
+                var hh: Double = d / 2, bx: Double = mx, by: Double = my, bd: Double = -1e9
+                for i in 0..<twN { let s: Double = sdRing(P, twX[i], twY[i]); if s > bd { bd = s; bx = twX[i]; by = twY[i] } }
+                for _ in 0..<10 {
                     if sdRing(P, mx - cu * hh, my - su * hh) >= M * 0.6 && sdRing(P, mx + cu * hh, my + su * hh) >= M * 0.6 { break }
-                    hh *= 0.8
+                    hh *= 0.88; mx += (bx - mx) * 0.25; my += (by - my) * 0.25
                 }
                 ex[0] = mx - cu * hh; ey[0] = my - su * hh; ex[1] = mx + cu * hh; ey[1] = my + su * hh
             }
